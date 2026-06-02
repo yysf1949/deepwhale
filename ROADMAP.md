@@ -131,40 +131,251 @@ deepwhale>
 
 ---
 
-## Sprint 3：MCP + Computer Use（2 周）
+## Sprint 3：MCP + Computer Use（2 周，Windows 深度对齐 OpenAI Codex 26.527）
 
-**目标**：装 Playwright MCP 后能自动开网页填表，Computer Use 能在 sandbox 内操控 GUI。
+**目标**：装 Playwright MCP 后能自动开网页填表；**Computer Use 跨 macOS / Linux / Windows 三大平台**，多模态融合（截图 + 平台原生 accessibility tree），**OS 级沙箱保护**。
+
+> **背景**：OpenAI Codex 26.527（2026-05-29）**首次**把 Computer Use 带到 Windows。深挖官方沙箱文章（[Building a Safe, Effective Sandbox on Windows](https://openai.com/index/building-codex-windows-sandbox)）后，**Windows 沙箱不能简单套 macOS/Linux 方案**——必须**重做**。本 Sprint 任务清单 = Codex 实战 + deepwhale 复刻。
+>
+> **关键事实**（来自 Codex #19305 + oflight.co.jp 2026-06-01）：
+> - **Windows 是 foreground-only**（不像 macOS 可后台并行多个 agent 各自带光标）
+> - **Windows 没有原生 sandbox 等价物**（macOS Seatbelt / Linux Landlock/seccomp），OpenAI **自建** 了 2 套（unelevated → elevated）
+> - **Windows 沙箱不工作时的退化选项**：（a）每条命令都审批（低效）；（b）Full Access 模式（无监督）—— deepwhale v1.0 不接受这个降级
 
 ### 任务清单
 
-- [ ] **MCP 完整支持**（官方 SDK + Reasonix 借鉴）
-  - client：stdio / SSE / Streamable HTTP
-  - server：让 deepwhale 自己也作为 MCP server 暴露（`deepwhale serve --mcp`）
-  - 配置：`~/.deepwhale/mcp.json`
-- [ ] **Browser MCP**（Codex 复刻点 1）
-  - 集成 `@playwright/mcp` 开箱即用
-  - 截图 + 元素 click + 表单填写 + JS evaluate
+#### A. 核心沙箱重做（跨平台，对齐 Codex）
+
+- [ ] **3 模式 sandbox**（对齐 Codex `sandbox_mode`）
+  - `read-only` / `workspace-write` / `danger-full-access`
+  - `workspace-write` 默认 `network_access = false`
+  - `writable_roots` / `exclude_tmpdir_env_var` / `exclude_slash_tmp` 可调
+- [ ] **3 approval policy**（对齐 Codex `approval_policy`）
+  - `untrusted`（任何动作都问）/ `on-request`（越界时问）/ `never`（CI 用）
+  - `sandbox_mode` × `approval_policy` **正交**组合
+- [ ] **macOS Seatbelt**
+  - `~/.deepwhale/sandbox/macos.sbpl`（`codex-rs/sandboxing/src/seatbelt.rs` 借鉴）
+  - **`(allow mach-register (global-name-regex #"^org\.chromium\."))` 必备**（Codex #21292 踩坑前置，Playwright Chromium 多进程 IPC）
+- [ ] **Linux 三件套**
+  - Bubblewrap（user/mount namespace） + Landlock（FS LSM） + seccomp（syscall 过滤，默认禁 `socket`）
+  - Ubuntu 24.04 unprivileged user namespace 受限时，引导装 apparmor profile
+  - `codex-rs/bwrap` + `codex-rs/linux-sandbox` 借鉴
+- [ ] **Windows 沙箱（重做，详见 §3 Windows 深度）**
+  - v1.0 走 Codex **unelevated sandbox** 方案（不需要 admin）
+  - `write_restricted` token + 合成 SID `sandbox-write`
+  - 拒写 `<cwd>/.git` / `<cwd>/.deepwhale` / `<cwd>/.agents`
+  - 网络用 env 变量 fail-closed（`HTTPS_PROXY=http://127.0.0.1:9` 等）
+  - v1.1 再升级 Codex **elevated sandbox**（专用 local user + 防火墙）
+- [ ] **用户可扩展沙箱**（对齐 Codex #24742）
+  - `~/.deepwhale/sandbox-extra.{sb,profile}` drop-in 文件
+  - 动态拼接到主策略（Sprint 3 末实现）
+- [ ] **Process Hardening**（pre-main 阶段）
+  - 禁用 `LD_PRELOAD` / `LD_LIBRARY_PATH`（Linux/macOS）
+  - 清理 `DEEPWHALE_` 前缀 env vars（防 API key 注入到子进程）
+  - 禁 core dump、禁 ptrace
+- [ ] **Network Proxy**（与 Sprint 2 一起做）
+  - MITM proxy：白名单子进程联网（默认只允许 DeepSeek API）
+  - 借鉴 `codex-rs/network-proxy`
+
+#### B. MCP 完整支持
+
+- [ ] MCP client：stdio / SSE / Streamable HTTP（官方 SDK）
+- [ ] MCP server：`deepwhale serve --mcp`（让 deepwhale 自己也作为 MCP server 暴露）
+- [ ] `~/.deepwhale/mcp.json` 配置
+- [ ] **集成 `@playwright/mcp@latest` 作为 browser provider**
+  - `--allowed-hosts` / `--blocked-origins` / `--isolated` / `--headless` 全部暴露
   - **预置 1 个 Browser skill**：访问 URL → 提取信息 → 截图存档
-- [ ] **Computer Use**（Codex 复刻点 2）
-  - 截图工具（`screenshot`）：macOS `screencapture` / Linux `grim` / Win `nircmd`
-  - 输入工具（`mouse_move` / `mouse_click` / `keyboard_type`）：跨平台 `nut.js`
-  - **OS 沙箱保护**（CodeWhale 借鉴）：macOS Seatbelt / Linux Landlock，鼠标键盘限制在窗口内
-- [ ] **LSP 集成**（CodeWhale 借鉴，可选）
-  - rust-analyzer / pyright / tsserver 实时诊断
-  - 编译错误当自我纠正信号
+  - `browser_run_code_unsafe` 工具默认**关闭**
+
+#### C. Computer Use（跨平台，多模态融合）
+
+- [ ] **Action 完整清单**（对齐 Codex computer-use-preview）
+  - `screenshot` / `screenshot_with_annotated_elements`
+  - `left_click` / `right_click` / `middle_click` / `double_click`
+  - `type` / `key` / `key_hold` / `key_release`
+  - `mouse_move` / `scroll` / `wait`
+  - `back` / `forward` / `reload` / `search` / `find` / `zoom`
+  - **避开 `back` action 已知坑**：computer-use-preview 不发 `back`，用 `key` `Alt+Left` 代替
+- [ ] **多模态融合**（对齐 Codex 关键创新）
+  - 截图（screenshot）+ **平台原生 accessibility tree**
+  - 定位：**元素 ref 优先**（无需算坐标），**坐标 fallback**
+- [ ] **macOS**
+  - 截图：`screencapture -x` CLI / Core Graphics API
+  - UI 树：**ApplicationServices.framework**（AX API）
+  - 输入：Quartz Event Services（CGEvent）
+  - TCC 权限引导：Screen Recording + Accessibility（首次启动）
+  - Locked Computer Use：**v1.0 不做**（Apple AuthorizationPlugIn 复杂）
+- [ ] **Linux**
+  - 截图：`grim` / `maim` / `scrot`（Wayland/X11 不同工具）
+  - UI 树：**AT-SPI**（GNOME 桌面）/ `accessibility` D-Bus 接口
+  - 输入：`xdotool`（X11）/ `ydotool`（Wayland）
+- [ ] **Windows**（**最复杂，详见 §3**）
+  - 截图：`windows-capture` Rust crate（Graphics Capture API + DXGI Desktop Duplication）
+  - UI 树：**UI Automation API**（`uiautomation` Rust crate v0.25.0，27 万下载）
+  - 输入：Win32 `SendInput` / `mouse_event`（通过 napi-rs 直调 Rust）
+  - **Foreground-only 限制**（与 Mac 区别见 §3）
+- [ ] **App-level allowlist**（对齐 Codex `@AppName`）
+  - 首次提到新 app 必须询问
+  - "Always allow" 让未来自动
+  - 敏感操作（删除、支付）**始终**额外询问
+- [ ] **OS 沙箱保护**（每平台）
+  - macOS：Seatbelt 沙箱内执行
+  - Linux：bwrap 沙箱内执行
+  - Windows：受限 token 沙箱内执行（详见 §3）
+
+#### D. Browser Tool 路由（Codex 决策树）
+
+- [ ] 设计 `@Browser` / `@Chrome` / `@Computer` 强制调用语法
+- [ ] 自动决策树（v1.0 简化版）
+  ```
+  任务
+    ↓
+  [1] localhost / 公开页？──Yes──→ Playwright MCP
+    │ No
+    ↓
+  [2] 桌面 GUI 应用？──Yes──→ Computer Use
+    │ No
+    ↓
+  [3] 提示用户
+  ```
+- [ ] **v1.0 只实现 Playwright MCP + Computer Use**（In-app Browser / Chrome Extension 留 v1.1）
+- [ ] Docker 镜像内置 desktop 环境（参考 OpenAI 官方 Computer Use Docker 模板），方便用户在 Linux server 上跑 Windows computer use via RDP
+
+#### E. LSP 集成（次要）
+
+- [ ] rust-analyzer / pyright / tsserver 实时诊断
+- [ ] 编译错误当自我纠正信号
+
+### §3 Windows 深度（为什么 v1.0 要重做）
+
+> **本节是研究 deepwhale Sprint 3 必须对齐 Codex Windows 沙箱的关键**。
+
+#### 3.1 Codex Windows 沙箱的"两代"演进（2025-09 → 2026-05）
+
+| 阶段 | 名称 | 设计 | 缺陷 |
+|---|---|---|---|
+| **第一代** | unelevated sandbox | write_restricted token + 合成 SID `sandbox-write` + env 变量 fail-closed 禁网络 | 网络保护仅"建议性"，任何带私有 socket 栈的程序可绕过；ACL 改动慢 |
+| **第二代** | elevated sandbox | 同样 write_restricted token，但 principal = Codex **自建的专用 local user** + **Windows Firewall 规则** | 需 admin 一次设置（创建 user + 防火墙规则） |
+
+**deepwhale v1.0 决策**：先实现 **unelevated**（无需 admin，普通用户能跑），v1.1 再升级 elevated。理由：
+- v1.0 用户基数小，先解决"能跑"问题
+- 规避 "v1.0 + 需要 admin elevation" 的兼容性噩梦
+- Codex 自己也是这个路线
+
+#### 3.2 Windows 沙箱技术栈（deepwhale 实现参考）
+
+| 层 | 技术 | Rust crate / API | 备注 |
+|---|---|---|---|
+| **Token 降权** | Win32 `CreateRestrictedToken` | `windows` crate | 创建 write_restricted token，restricted SID 列表 = `[Everyone, Logon, Synthetic, sandbox-write]` |
+| **ACL 设置** | Win32 `SetSecurityInfo` | `windows` crate | 给 workspace 加 `sandbox-write` SID 的写权限；给 `.git` / `.deepwhale` / `.agents` 加 deny ACL |
+| **网络 fail-closed** | env 变量 | 直接 setenv | `HTTPS_PROXY=http://127.0.0.1:9` 等 + `GIT_SSH_COMMAND=cmd /c exit 1` |
+| **进程启动** | `CreateProcessAsUser` | `windows` crate | 在受限 token 下启动子进程 |
+| **Computer Use 截图** | Graphics Capture API | `windows-capture` crate | 跨 Windows 10/11，避开 GDI 性能差 |
+| **Computer Use UI 树** | UI Automation API | `uiautomation` crate v0.25.0 | 27 万下载，**Windows 原生 accessibility** |
+| **Computer Use 输入** | Win32 `SendInput` | `windows` crate | 鼠标键盘底层 API |
+
+#### 3.3 Windows Computer Use 的"Foreground-Only"约束
+
+**Codex 5/29 在 Windows 推的 Computer Use 跟 Mac 有本质区别**：
+
+| 维度 | Mac (Codex) | Windows (Codex) | 原因 |
+|---|---|---|---|
+| **多 agent 并行** | ✅ 4/2026 起的"background computer use"，多个 agent 各自有光标 | ❌ **foreground-only**，同一时刻只能 1 个 agent 操控 active desktop | Windows 只有 1 个 desktop session，多 agent 会互抢光标 |
+| **锁屏操作** | ✅ Locked Computer Use（Apple AuthorizationPlugIn 协议） | ❌ 不支持 | Apple 协议独有 |
+| **后台截图** | ✅ TCC Screen Recording | ⚠️ 需用户主动 enable "Run as different user" | Windows 截图 API 默认需要 active session |
+| **App allowlist** | ✅ | ✅ | 一致 |
+
+**对 deepwhale 的启示**：
+- v1.0 在 Windows 上**先接受 foreground-only 限制**
+- UI 必须清晰显示 "🖥️ CodeWhale 正在操控你的桌面"（用户在跑别的会看见）
+- v1.x 探索：**RDP 虚拟桌面**（每个 agent 一个 RDP session，模拟 Mac 的 background）—— Codex 也在摸索
+- Linux 没有这个限制（多 X11/Wayland session）
+
+#### 3.4 Windows Computer Use 多模态融合
+
+**截图层**（`windows-capture` 借鉴）：
+```rust
+// windows-capture 简化示例
+use windows_capture::capture::GraphicsCaptureApiHandler;
+
+let mut handler = GraphicsCaptureApiHandler::new(...);
+let frame = handler.wait_for_frame()?;
+let buffer = frame.buffer()?;  // BGRA 像素
+```
+
+**UI Automation 层**（`uiautomation` 借鉴）：
+```rust
+use uiautomation::UIAutomation;
+
+let automation = UIAutomation::new()?;
+let root = automation.get_root_element()?;
+let walker = automation.create_tree_walker()?;
+let condition = automation.create_true_condition()?;
+let mut elements = vec![root.clone()];
+for element in &elements {
+    let children = walker.get_next_sibling(element)?;
+    // 每个 element 暴露 .name() / .control_type() / .bounding_rectangle()
+}
+```
+
+**融合策略**（对齐 Codex）：
+1. 模型发出 `screenshot` action → Rust 返回 BGRA buffer → TS 编码 PNG → 发给 model
+2. 模型发出 `left_click` action 时**优先**查 UI Automation ref 树（避免坐标漂移）
+3. 失败时 fallback 到坐标点击
+
+#### 3.5 Windows 沙箱与 Computer Use 的边界
+
+**关键问题**：用户授权 Codex 截图 + 操控桌面时，**沙箱内 vs 沙箱外**的边界在哪？
+
+**Codex 决策**（来自 oflight.co.jp 2026-06-01 报道）：
+> "Computer use runs on the active desktop. Windows users, this one's for you."
+
+**deepwhale 决策**：
+- **Computer Use 必须在沙箱外执行**（沙箱会阻止屏幕截图和输入事件）
+- 但**普通 shell / 文件操作**仍在沙箱内
+- 用户授权 Computer Use 时**明确提示**："以下操作将不被沙箱保护，但仅限当前 app"
+- App-level allowlist 走"Always allow"后才继续（避免反复打断）
+
+#### 3.6 Windows 平台特殊坑（必看）
+
+| 坑 | 现象 | 对策 |
+|---|---|---|
+| **UAC 弹窗** | agent 触发了需要 UAC 的操作 → 永远卡住 | **agent 不允许触发 UAC 操作**，pre-main 检查 token elevation level，拒绝 high |
+| **DPI 缩放** | 截图坐标和 UI Automation ref 对不上 | 用 DPI 感知的 `GetPhysicalCursorPos` / `SetPhysicalCursorPos` |
+| **多显示器** | 截图跨多显示器边界 → 模型困惑 | 默认只截主显示器，扩展位可选 |
+| **TCC 类似机制** | Windows 没有 TCC，但有 UAC + AppLocker | 失败时引导用户去 Settings → Privacy 授权 |
+| **UIA 不支持的应用** | 老 Win32 应用 / 部分游戏 | 自动 fallback 到纯截图 + 坐标点击（精度差，UI 提示用户） |
+| **输入法干扰** | 中文 IME 抢键盘事件 | `type` action 前先 `key` `Esc` 退出 IME，`type` 完后再激活 |
 
 ### 验收标准
 
-- 装好 Playwright MCP 后，`deepwhale` 描述任务能自动打开网页、填表、截图
-- Computer Use 能在 sandbox 内操控指定应用（指定窗口、限制输入范围）
+- 装好 Playwright MCP 后，**macOS / Linux / Windows** 描述任务能自动打开网页、填表、截图
+- Computer Use 在三平台都能操控指定 app（多模态融合：截图 + UI 树）
+- **Windows foreground-only 限制**在 UI 上明确告知
+- **Windows 沙箱在普通用户权限下可用**（无需 admin）
+- **App-level allowlist 真的工作**（mention 新 app 时会问）
+- Playwright 在 macOS Seatbelt 内**不崩溃**（前置加好 Chromium mach-register 规则）
 - LSP 报错能自动反馈给模型
 
 ### 借鉴资产
 
-- 官方 `@modelcontextprotocol/sdk`
-- `@playwright/mcp`
-- CodeWhale 的 Seatbelt / Landlock 实现
-- nut.js 跨平台输入库
+- **官方文档**：
+  - [OpenAI Codex Windows 沙箱官方文章（David Wiesen, 2026-05-13）](https://openai.com/index/building-codex-windows-sandbox)
+  - [Codex Computer Use on Windows（oflight.co.jp 2026-06-01）](https://www.oflight.co.jp/en/columns/openai-codex-computer-use-windows-2026)
+  - [Codex #19305 issue（用户为什么需要 Windows Computer Use）](https://github.com/openai/codex/issues/19305)
+- **Codex 源码**：
+  - `codex-rs/sandboxing/src/seatbelt.rs`（macOS）
+  - `codex-rs/sandboxing/src/landlock.rs`（Linux）
+  - `codex-rs/windows-sandbox`（Windows）
+- **Rust 库**：
+  - `windows` crate（Win32 API 绑定）
+  - `windows-capture` crate（截图，Graphics Capture API）
+  - `uiautomation` crate v0.25.0（27 万下载，UI Automation API）
+  - `nut.js`（跨平台输入，仅 macOS/Linux；Windows 走 napi-rs 直调 SendInput）
+- **MCP**：
+  - `@modelcontextprotocol/sdk`（官方）
+  - `@playwright/mcp@latest`（Playwright 团队）
+  - Playwright MCP 实战（[blog.gopenai.com](https://blog.gopenai.com/automating-e2e-chat-flow-testing-with-codex-playwright-mcp-1ce4020dcbca)）
 
 ---
 
@@ -247,7 +458,8 @@ deepwhale>
 |---|---|---|
 | 主语言 | TypeScript（Node ≥ 22） | pi-mono 验证、扩展开发快 |
 | TUI 框架 | Ink（React 19）起步 | Reasonix 实战验证、跨平台一致 |
-| 沙箱 | 双层：白名单 shell + Rust OS 沙箱 | 跨平台一致 + 安全性 |
+| 沙箱 | **3 模式**（read-only / workspace-write / danger-full-access） + **3 approval policy**（untrusted / on-request / never），对齐 Codex | 跨平台一致 + 安全性 + Codex 已验证 |
+| Computer Use 平台策略 | **macOS background 模式**（TCC + 多 agent 并行） / **Windows foreground-only**（5/29 Codex 26.527 限制） / **Linux 多 session** | 对齐 OpenAI 实际方案，不假创新 |
 | 分发 | npm + Tauri + Homebrew + Docker | 跟 pi/Codex/Reasonix 一致 |
 | 配置 | TOML | CodeWhale 验证，注释友好 |
 | Skills 格式 | 对齐 Codex 开放标准 | 跨工具复用 |
@@ -259,7 +471,11 @@ deepwhale>
 | 风险 | 等级 | 对策 |
 |---|---|---|
 | DeepSeek API 限流 | 中 | 前缀缓存降耗 + Flash/Pro 智能路由 |
-| Windows 沙箱复杂 | 中 | Sprint 3 暂只 macOS/Linux，Windows 走 Job Object 兜底 |
+| **Windows 沙箱自建复杂度** | **高** | v1.0 走 Codex **unelevated**（write_restricted token + 合成 SID + env 禁网）—— 无需 admin；v1.1 再升 elevated（专用 local user + Firewall）。对齐 [Codex 官方文章](https://openai.com/index/building-codex-windows-sandbox) |
+| **Windows Computer Use foreground-only** | 中 | UI 明确告知；v1.x 探索 RDP 虚拟桌面模拟 Mac background |
+| **Windows Computer Use 平台原生栈** | 中 | 截图用 `windows-capture` crate（Graphics Capture API），UI 树用 `uiautomation` crate（UI Automation API），输入走 Win32 `SendInput` 通过 napi-rs |
+| **UAC 弹窗永久卡住** | 中 | pre-main 检查 token elevation level，**拒绝 high elevation**（agent 不允许触发 UAC 操作） |
+| **Windows DPI 缩放导致坐标错位** | 低 | 用 DPI 感知 API `GetPhysicalCursorPos` / `SetPhysicalCursorPos` |
 | MCP 协议演进 | 低 | pin 官方 SDK minor 版本 |
 | Skills 安全（恶意 skill 偷数据） | **高** | Skills 沙箱：默认只读，permissions 显式声明 |
 | 跨渠道状态同步 | 中 | 所有渠道走同一 RPC + Session Manager |
@@ -290,4 +506,9 @@ deepwhale>
 
 **最后更新**：2026-06-02
 **当前 Sprint**：Sprint 0（技术选型 + monorepo 骨架）
+**本次更新重点**：
+- **Sprint 3 全面重做**：Windows Computer Use 深度对齐 OpenAI Codex 26.527（5/29/2026 发布）
+- 新增 **§3 Windows 深度**（6 小节）：两代沙箱演进 / 技术栈表 / foreground-only 约束 / 多模态融合 / 沙箱与 Computer Use 边界 / 6 个平台特殊坑
+- 架构决策表新增"Computer Use 平台策略"行（macOS background / Windows foreground-only / Linux 多 session）
+- 风险登记新增 4 项 Windows 相关风险（含 UAC / DPI / 平台原生栈）
 **下次更新**：Sprint 0 完结时
