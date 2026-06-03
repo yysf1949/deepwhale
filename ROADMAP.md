@@ -1,37 +1,84 @@
 # 🗺 deepwhale ROADMAP
 
-> **6 版本锚 × 13 个月，单人开发节奏**
+> **6 版本锚 × 13-17 个月（含风险系数），单人开发节奏**
 >
 > **核心变化**（vs 初版 10 周版）：
-> 1. **时间锚从 10 周改为 13 个月**（v1.0 = Phase 1 = Claude Code Lite，3 个月）
+> 1. **时间锚从 10 周改为 13-17 个月**（v1.0 = Phase 1 = Claude Code Lite，3-4 月）
 > 2. **砍掉 22 项延后事项**（详见 [ARCHITECTURE.md §4](./ARCHITECTURE.md)）
 > 3. **Docker 沙箱统一替换 Seatbelt/Landlock/Windows Job Object**（v1.0 起）
-> 4. **Session 从 DAG 降级为 Linear**（v1.0），DAG 延后到 v2.0
+> 4. **Session 从 DAG 降级为 Linear**（v1.0），DAG 延后到 **v2.5 与 Planner 同链路**
 > 5. **Constitution 9 层权威砍掉**（个人化产物，不适合 deepwhale）
 > 6. **保留所有已验证的正确决策**：Prefix-cache 4 机制提前到 v1.0 / StormBreaker / SanitizeToolPairing / i18n 第 1 行定对 / 强制 release 节奏
 >
-> **v3 重大架构升级**（2026-06-03，6.5/10 → 8.4/10 基础上进一步升级）：
+> **v3 重大架构升级**（2026-06-03，6.5/10 → 8.4/10 → 8.8/10）：
 > 7. **Code Intelligence Layer 新增**（v1.5 基础 / v2.0 增强）—— 解决"10万行项目失明"
-> 8. **v2.5 独立插档做 Planner**（避免 v2 4 个大件再爆）
+> 8. **v2.5 独立插档做 Planning Framework**（Planner + Task Object + Plan Cache + Execution Boundary + DAG）—— 避免 v2 4 件太重
 > 9. **Computer Use 改兼容层**（Codex 协议优先，**不自研**）—— 节省 1 个月
-> 10. **Memory Ranking 算法**（importance / last_accessed / decay_score / scope）—— 解决"5000 memories 必崩"
+> 10. **Memory Ranking 算法 + source 字段**（importance / last_accessed / decay_score / scope / source）—— 解决"5000 memories 必崩" + 解决"长期记忆/项目记忆/用户偏好混在一起"
 > 11. **v1.5 砍 4 项**（Automation/Cron/Remote TUI/Compaction 挪到 v2.0）
-> 12. **Browser Agent = 真实 Browser Planner**（不是 Playwright Wrapper）—— 解决"淘宝/京东失败"
+> 12. **Browser Agent v2.0/v3.0 拆分**（v2.0 = 4 件基础，v3.0 = 3 件增强）
+> 13. **Capability Model 统一抽象**（Tool/MCP/Plugin/Browser/Computer → 1 套 Capability Registry）
+> 14. **Agent Runtime 架构定型**（4 角色 Execution Boundary 强制、单 process 内 4 函数）
+>
+> **4 份架构设计文档**（2026-06-03 完成）：
+> - [AGENT_RUNTIME.md](./design/AGENT_RUNTIME.md)：4 角色契约 + Task/Message/Context/Observation/Memory
+> - [CAPABILITY_MODEL.md](./design/CAPABILITY_MODEL.md)：5 套能力来源统一抽象
+> - [CODE_INTELLIGENCE.md](./design/CODE_INTELLIGENCE.md)：4 模块关系（Workspace Index / Symbol Graph / Reference Graph / Semantic Search）
+> - [BROWSER_PLANNER.md](./design/BROWSER_PLANNER.md)：Observe→Plan→Act→Recovery 循环
+> **原则**：只写架构 / 边界 / 职责 / 接口 / 数据流，**不写实现细节**
 
-## 总览
+## 演进路径（Observe → Plan → Execute+Review → Research）
+
+DeepWhale 6 个版本形成清晰的 5 步能力演进：
+
+| 版本 | 能力主题 | 验证什么 | 关键模块 |
+|---|---|---|---|
+| **v1.0** | Coding Agent | 6 工具 + Linear Session | Executor |
+| **v1.5** | 大型仓库理解 | Tree-sitter + Symbol Graph + Code Intel 基础 | Code Intelligence Layer |
+| **v2.0** | **Observe** | 真实 Browser Planner + Memory Ranking + Code Intel 增强 | Browser Agent 基础 + Memory Ranking |
+| **v2.5** | **Plan** | Planning Framework（Planner + DAG + Task Object + Plan Cache + Boundary）| Planner Agent |
+| **v3.0** | **Execute + Review** | Browser Agent 增强 + Reviewer + Computer Use 兼容层 | Reviewer + Computer Use 兼容层 |
+| **v4.0** | **Research + Long-running** | 5 角色 + TaskGraph + Persistent Memory + Desktop | Researcher + Agent OS |
+
+**总览表**：
 
 | Phase | 版本 | 月份 | 累计 | 主题 | 关键交付 | 状态 |
 |---|---|---|---|---|---|---|
-| **Phase 1** | v1.0 | 第 1-3 个月 | 3 月 | **Claude Code Lite** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker | 🚧 进行中 |
-| **Phase 2** | v1.5 | 第 4-5 个月 | 5 月 | **Codex Core + Code Intel 基础** | Approval + Task + Skills + Extension API + Hooks + StormBreaker + **Code Intelligence 基础**（Tree-sitter + Symbol Graph + Workspace Index） | ⏳ 待开始 |
-| **Phase 3** | v2.0 | 第 6-8 个月 | 8 月 | **+Browser Agent + Code Intel 增强** | **真实 Browser Planner** + MCP + Session DAG + **Memory Ranking 算法** + **Reference Graph + Semantic Search** | ⏳ 待开始 |
-| **Phase 3.5** | **v2.5** | **第 9 个月** | **9 月** | **+Planner（独立插档）** | **双 Agent 模式**（Planner → Executor），可降级为单 Agent 兼容 v1.0 | ⏳ 待开始 |
-| **Phase 4** | v3.0 | 第 10-11 个月 | 11 月 | **+Computer Use 兼容层 + Reviewer** | **Computer Use 兼容层**（Codex 协议优先，**不自研**）+ Reviewer + Compaction 钩子化 | ⏳ 待开始 |
-| **Phase 5** | v4.0 | 第 12-13 个月 | **13 月** | **Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Plugin Marketplace + Desktop + Channels | ⏳ 待开始 |
+| **Phase 1** | v1.0 | 第 1-3 个月 | 3 月 | **Coding Agent** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker | 🚧 进行中 |
+| **Phase 2** | v1.5 | 第 4-5 个月 | 5 月 | **大型仓库理解** | Approval + Task + Skills + Extension API + Hooks + StormBreaker + **Code Intelligence 基础**（Tree-sitter + Symbol Graph + Workspace Index） | ⏳ 待开始 |
+| **Phase 3** | v2.0 | 第 6-8 个月 | 8 月 | **Observe** | **真实 Browser Agent 基础**（4 件：DOM Understanding / Element Ranking / Page Summary / Action History）+ Memory Ranking + Code Intel 增强 + 4 项补回 | ⏳ 待开始 |
+| **Phase 3.5** | **v2.5** | **第 9 个月** | **9 月** | **Plan** | **Planning Framework**（Planner + DAG + Task Object + Plan Cache + Execution Boundary） | ⏳ 待开始 |
+| **Phase 4** | v3.0 | 第 10-11 个月 | 11 月 | **Execute + Review** | **Browser Agent 增强**（3 件：Visual Grounding / 策略级 Error Recovery / Adaptive Retry）+ Reviewer + **Computer Use 兼容层** | ⏳ 待开始 |
+| **Phase 5** | v4.0 | 第 12-13 个月 | **13 月** | **Research + Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Plugin Marketplace + Desktop + Channels | ⏳ 待开始 |
 
 > **v1.0 = 1 个 release**（不是 5+1 个 Sprint）
 > **v1.5 起 = 每月 1 个 minor release**（每周一 minor 强制节奏）
-> **v1.5 累计 5 个月、v2.0 累计 8 个月、v2.5 累计 9 个月、v3.0 累计 11 个月、v4.0 累计 13 个月**
+> **v1.5 累计 5 月、v2.0 累计 8 月、v2.5 累计 9 月、v3.0 累计 11 月、v4.0 累计 13 月**
+
+## v2.0 Tier-1 / Tier-2 拆分（2026-06-03 用户拍板）
+
+v2.0 范围内的 4 项"补回"任务（Automation / Remote TUI / Compaction / MCP）**不作为一级模块**，定义为 Tier-2：
+
+| 优先级 | 包含 | 价值判断 |
+|---|---|---|
+| **Tier-1**（v2.0 核心价值，**必须完成**）| **Browser Agent 基础**（4 件）+ **Memory Ranking** + **Code Intelligence 增强** | Browser Agent 延期 → v2.0 算失败；其他延期 → v2.0.1 补 |
+| **Tier-2**（v2.0 补回项，延期可挪 v2.0.x）| **Automation** + **Remote TUI** + **Compaction** + **MCP Runtime** | 4 项 Codex 复刻的"边角料"——延期不影响 v2.0 主旨 |
+
+**理由**：如果 Browser Agent 延期但 Remote TUI 完成，用户不会认为 v2.0 成功；反过来 Browser Agent 完成而 Remote TUI 延期，用户仍认为 v2.0 成功。**v2.0.1 / v2.0.2 用来补 Tier-2**。
+
+## 风险系数（计划 vs 实际）
+
+| 阶段 | 计划 | 实际预估 | 风险点 |
+|---|---|---|---|
+| v1.0 | 3 个月 | 3-4 个月 | i18n 路径 / 4 包 monorepo / Prefix-cache 4 机制 |
+| v1.5 | 2 个月 | 2-3 个月 | 8 项 Codex Core + Code Intel 基础（**比预想多**） |
+| v2.0 | 3 个月 | **3-4 个月**（DAG 挪走 → 可能降到 3.5 月）| Browser Agent 4 件 + Memory Ranking + Code Intel 增强 + 4 项 Tier-2 |
+| v2.5 | 1 个月 | 1 个月 | Planning Framework 4 组件集中 |
+| v3.0 | 2 个月 | 2-3 个月 | Browser Agent 3 件增强 + Reviewer + Computer Use 兼容层 |
+| v4.0 | 2 个月 | 2-3 个月 | 5 角色 + TaskGraph + Persistent Memory + Desktop + Channels |
+| **总计** | **13 个月** | **15-17 个月** | **中位数 16 个月** |
+
+> **单人项目 15-17 个月属正常区间**。**严格执行**（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **成功概率 80%+**。
 
 ---
 
@@ -306,29 +353,56 @@ deepwhale>
 >
 > **v2.5 单独做 Planner**（**避免 v2 4 个大件再加 Planner 爆掉**）
 
-### Sprint 9-11（真实 Browser Agent + 补 4 项 + Memory Ranking，第 6-7 个月）
+### Sprint 9-11（Observe：Browser Agent 基础 + Memory Ranking + Code Intel 增强 + 4 项 Tier-2，第 6-8 个月）
 
-#### 任务清单
+> **v2.0 = Tier-1（核心） + Tier-2（补回）**。**DAG 砍到 v2.5**（DAG 与 Planner 同链路更紧）。
 
-**真实 Browser Agent**（**不是 Playwright Wrapper**）：
-- [ ] **Browser Planner**（任务级，**v2.0 关键**）
-  - DOM Understanding（AST 解析当前页面 DOM 结构）
-  - Element Ranking（按用户意图给元素排序）
-  - Visual Grounding（截图标注元素位置）
-  - Action History（避免重复操作已失败的元素）
-  - Page Summarization（长页面压缩成 token 友好的 summary）
-  - Error Recovery（失败回退到上一步 / 改用不同 selector）
+#### Tier-1 任务清单（**必须完成，延期 → v2.0 失败**）
+
+**真实 Browser Agent 基础**（**4 件能力**——v2.0 只做基础，v3.0 做增强）：
+- [ ] **DOM Understanding**（AST 解析当前页面 DOM 结构 + 提取语义）
+- [ ] **Element Ranking**（按用户意图 + 元素语义 + 视觉位置给元素排序）
+- [ ] **Page Summarization**（长页面压缩为 token 友好的 summary）
+- [ ] **Action History**（维护已执行动作列表避免重复）
 - [ ] **Browser Executor**（操作级，复用 Playwright）
   - 7 个核心 API：navigate / click / type / extract / screenshot / download / upload
   - 集成 `@playwright/mcp` 开箱即用
   - Browser sandbox 走 Docker（与 Tool Runtime 同一沙箱）
-- [ ] **真实场景测试**
+- [ ] **真实场景测试**（v2.0 必须过）
   - 淘宝：搜索"机械键盘" + 点击商品 + 加购
   - 京东：搜索 + 筛选 + 进入详情
   - Amazon：搜索 + 看评论 + 加购
-  - 失败时**自动重试 + 改 selector**（不靠人手动修）
+  - 失败时**自动重试 + 改 selector**（v2.0 基础重试，v3.0 升级为策略级）
 
-**补 v1.5 砍的 4 项**：
+**Memory Ranking 算法**（**解决"5000 memories 必崩"** + **解决"长期/项目/用户偏好混在一起"**）：
+- [ ] **Memory Schema**
+  - `{ id, content, source, scope, importance, last_accessed, decay_score, created_at, embedding? }`
+  - **source 字段**（v1.5 没加，v2.0 补）：`user_preference` / `project_fact` / `workspace` / `user_explicit` / `auto_extracted`
+  - scope 显式标记：`user` / `project` / `session`
+- [ ] **Ranking 算法**
+  - `score = importance * decay(last_accessed) * scope_weight`
+  - decay 函数：指数衰减（半衰期 30 天）
+  - scope_weight：user=1.0 / project=0.7 / session=0.4
+- [ ] **回收机制**
+  - score < threshold 自动归档（不删除，可恢复）
+  - 单元测试：1000 条 memory 回收后性能无下降
+- [ ] **hand-edit 优先**
+  - memory 文件直接可编辑
+  - 自动写入不会覆盖 user 手改的字段
+  - 按 source 字段可过滤（只看项目记忆 / 只看用户偏好）
+
+**Code Intelligence 增强**（v1.5 基础升级）：
+- [ ] **Reference Graph**：跨文件 symbol 引用图（callers / callees / importers）
+  - 持久化：`~/.deepwhale/index/<project-hash>/references.jsonl`
+  - 支持查询：找 symbol 的所有引用、找死代码、找循环依赖
+- [ ] **Semantic Search**：基于 embeddings 的语义搜索
+  - 复用 DeepSeek V4 embedding API
+  - 索引：`~/.deepwhale/index/<project-hash>/embeddings.bin`
+  - 暴露 `semantic_search` 工具
+- [ ] **reference_lookup 完整版**：kind 支持 callers / callees / importers / all
+
+#### Tier-2 任务清单（**v2.0.x 补回，延期不影响 v2.0 主旨**）
+
 - [ ] **Cron Automations**
   - `~/.deepwhale/automations/*.yaml` 定义定时任务
   - 模板：daily-report / code-review / test-runner / dep-update
@@ -344,112 +418,90 @@ deepwhale>
   - 配置：`~/.deepwhale/mcp.json`
   - **deepwhale 也可作为 MCP server 暴露**（`deepwhale serve --mcp`）
 
-**Memory Ranking 算法**（**解决"5000 memories 必崩"**）：
-- [ ] **Memory Schema**
-  - `{ content, importance, last_accessed, decay_score, scope, created_at }`
-  - scope 显式标记：`user` / `project` / `session`
-- [ ] **Ranking 算法**
-  - `score = importance * decay(last_accessed) * scope_weight`
-  - decay 函数：指数衰减（半衰期 30 天）
-  - scope_weight：user=1.0 / project=0.7 / session=0.4
-- [ ] **回收机制**
-  - score < threshold 自动归档（不删除，可恢复）
-  - 单元测试：1000 条 memory 回收后性能无下降
-- [ ] **hand-edit 优先**
-  - memory 文件直接可编辑
-  - 自动写入不会覆盖 user 手改的字段
+#### ⚠️ Sprint 9-11 红线
+- **Session DAG 不在 v2.0 做**——v2.5 与 Planner 同链路做
+- **Browser Agent 不要做成 Playwright Wrapper**——v2.0 必须有 Browser Planner 4 件
+- **Memory Ranking 不要做复杂 ML**——用显式公式
+- **Tier-1 vs Tier-2 不可混淆**——Tier-1 延期 = v2.0 失败，Tier-2 延期 = v2.0.x 补
 
-**Session DAG**（v1.0 Linear 升级）：
-- [ ] `parentId + leafId` 的 DAG 形态
-- [ ] JSONL append-only（与 v1.0 同套路）
-- [ ] 跨分支不丢消息
+---
 
-**Code Intelligence 增强**（v1.5 基础升级）：
-- [ ] **Reference Graph**：跨文件 symbol 引用图（callers / callees / importers）
-  - 持久化：`~/.deepwhale/index/<project-hash>/references.jsonl`
-  - 支持查询：找 symbol 的所有引用、找死代码、找循环依赖
-- [ ] **Semantic Search**：基于 embeddings 的语义搜索
-  - 复用 DeepSeek V4 embedding API
-  - 索引：`~/.deepwhale/index/<project-hash>/embeddings.bin`（FAISS 或 hnswlib）
-  - 暴露 `semantic_search` 工具
-- [ ] **reference_lookup 完整版**：kind 支持 callers / callees / importers / all
-
-**Plugin 打包**：
-- [ ] `.dwp` 格式（类似 `.vsix`）
-- [ ] 跨机安装测试
+### Sprint 12（v2.0 release 收尾，第 8 个月末）
 
 #### 验收标准
 - 装好 Browser Agent 后能在淘宝/京东/Amazon 完成"搜索 + 加购"完整流程
-- Browser Planner 失败自动重试（人工不修 selector）
-- 4 项补回功能全部跑通（Automation / Remote TUI / Compaction / MCP）
-- Session DAG 跨分支不丢消息
+- Browser Planner 4 件能力跑通（DOM/Element/Page Summary/Action History）
+- **Tier-1 全部完成**（Browser Agent 4 件 + Memory Ranking + Code Intel 增强）
+- **Tier-2 至少 3/4 完成**（Automation / Remote TUI / Compaction / MCP，可挪 v2.0.x）
 - **1000 条 memory 回收测试通过**（无性能下降）
 - 10 万行项目能查 callers/callees 和做语义搜索
-- Codex 14 项功能 → **12/14**（+ MCP / Automation / Remote TUI / Compaction，**+ Session DAG 升级**）
-
-#### ⚠️ Sprint 9-11 红线
-- **Browser Agent 不要做成 Playwright Wrapper**——必须有 Browser Planner
-- **Memory Ranking 不要做复杂 ML**——用显式公式（importance × decay × scope）
-- **Planner 不要在 v2.0 加**——v2.5 独立插档做
+- Codex 14 项功能 → **12/14**（+ MCP / Automation / Remote TUI / Compaction）
+- **Session DAG 不算入 v2.0**——v2.5 与 Planner 同链路做
+- 文档：v2.0 release notes + Tier-1/Tier-2 进度表
 
 ---
 
-### Sprint 12（v2.0 release 收尾，第 8 个月）
+## Phase 3.5 — v2.5 Planning Framework（第 9 个月）
+
+**目标**：**Plan** 能力主题——**Planning Framework**（**4 组件 + DAG**）。**v2.5 第 9 个月末必发**。
+
+> **vs 初版"Planner Agent"**：
+> - **范围扩大**为 Planning Framework（4 组件 + DAG），不只 Planner
+> - **DAG 从 v2.0 挪到 v2.5**（DAG 与 Planner 同链路更紧，避免 v2.0 太重）
+> - **加 Task Object / Plan Cache / Execution Boundary**——避免 v2.5 出现 Planner 偷偷执行 / Executor 偷偷规划的耦合
+> - v3.0 Reviewer 接入时**无需重构**（v2.5 已留好 Execution Boundary）
+
+### Sprint 13（Planning Framework：Planner + DAG + Task Object + Plan Cache + Boundary，第 9 个月）
 
 #### 任务清单
-- [ ] **v2.0 release**
-  - 第 8 个月末 GitHub Release
-  - CHANGELOG 完整记录
-  - **Codex 12/14 ✅**（+2 项挪到 v2.5/v3.0/v4.0）
 
-#### 验收标准
-- Codex 12/14 ✅
-- 文档：v2.0 release notes + 12/14 对照表
-
----
-
-## Phase 3.5 — v2.5 +Planner（**独立插档**，第 9 个月）
-
-**目标**：**双 Agent 模式**（Planner → Executor）—— v2 已经有 4 个大件，**v2.5 独立做 Planner 避免 v2 爆掉**。**v2.5 第 9 个月末必发**。
-
-> **为什么是 v2.5 插档而不是 v2 一起做**：
-> - v2 已经有 4 个大件（Browser Agent + Memory Ranking + Code Intel 增强 + 4 项补回）
-> - 再加 Planner 必然导致 v2 延期
-> - v2.5 是 v2 延期风险的"安全阀"
-> - 独立插档让 v2 / v2.5 / v3.0 各自能发
-
-### Sprint 13（Planner + 双 Agent 模式，第 9 个月）
-
-#### 任务清单
-- [ ] **Planner**（任务拆解 + 依赖分析）
-  - 输入：用户任务（自然语言）
-  - 输出：子任务 DAG（带依赖关系）
-  - 拆解算法：基于 LLM 推理 + 启发式模板
-  - 例：`重构用户模块` → [读 schema(0) → 改 UserService(2) → 改 controller(3) → 写测试(4) → Reviewer(5)]
-- [ ] **双 Agent 流水线**
-  - `Planner → Executor`（双角色）
-  - Planner 拆解后**逐步喂给 Executor**（不是一次性全 dump）
-  - Executor 完成后反馈 Planner，Planner 决定下一步
-- [ ] **降级模式**：`mode=single`
-  - **完全兼容 v1.0 行为**（用户可选择 `deepwhale --mode=single`）
-  - 单测验证：同一任务在 single/planner 模式下输出结果一致
-- [ ] **Planner 工具暴露**
+**Planner**（**任务拆解 + 依赖分析**）：
+- [ ] 输入：用户任务（自然语言）
+- [ ] 输出：子任务 DAG（带依赖关系）
+- [ ] 拆解算法：基于 LLM 推理 + 启发式模板
+- [ ] 例：`重构用户模块` → [读 schema(0) → 改 UserService(2) → 改 controller(3) → 写测试(4) → Reviewer(5)]
+- [ ] Planner 工具暴露：
   - `plan_task`（把自然语言任务转 DAG）
   - `decompose_task`（细化单个子任务）
   - `get_subtask_status`（查询子任务进度）
-- [ ] **单测**：拆解 5 个真实场景任务
-  - "重构用户模块" / "修复登录 bug" / "添加支付功能" / "升级依赖" / "写测试"
-  - 验证依赖图正确
+
+**Task Object**（**任务数据结构**）：
+- [ ] Schema：`{ id, goal, subtasks, status, depends_on, result, created_at, ... }`
+- [ ] Subtask Schema：`{ id, description, capability, args, depends_on }`
+- [ ] 状态机：`pending → ready → running → done | failed | blocked`
+- [ ] 详见 [AGENT_RUNTIME.md §2.1](./design/AGENT_RUNTIME.md)
+
+**Session DAG**（**v1.0 Linear 升级，v2.0 挪到 v2.5**）：
+- [ ] `parentId + leafId` 的 DAG 形态
+- [ ] JSONL append-only（与 v1.0 同套路）
+- [ ] 跨分支不丢消息
+- [ ] 单元测试：kill -9 后能恢复
+- [ ] **与 TaskGraph 正交**（Session DAG = 消息树，Task DAG = 工作流图，v4.0 升级为 TaskGraph）
+
+**Plan Cache**（**避免重复规划**）：
+- [ ] 跨 session 复用规划结果（基于任务 hash）
+- [ ] 失效机制：用户任务变更 → 重新规划
+- [ ] 单测：5 个真实场景任务规划结果跨 session 复用
+
+**Execution Boundary**（**v2.5 关键约束**）：
+- [ ] **Planner 不执行**——Planner 调任何 tool 立即报错
+- [ ] **Executor 不规划**——Executor 收到未规划 Task 立即报错
+- [ ] **Reviewer 不执行生产动作**（v3.0 接入时直接用此约束）
+- [ ] 单测覆盖：4 种角色越权场景
 
 #### 验收标准
 - 双 Agent 模式：Planner 把"重构用户模块"拆成 DAG 子任务，Executor 按序执行
+- Session DAG 跨分支不丢消息
+- Plan Cache 跨 session 复用 5 个真实场景任务
+- Execution Boundary 4 种越权场景单测全过
 - 降级模式：`deepwhale --mode=single` 行为完全等同 v1.0
 - 5 个真实场景任务拆解测试通过
 - **v2.5 第 9 个月必发**（不拖到 v3.0）
 
 #### ⚠️ v2.5 红线
 - **Planner 不要做复杂推理**——基于 LLM 简单 prompt + 启发式模板
-- **双 Agent = 单 process 内 2 个函数**——不真 spawn 2 个 Agent
+- **Execution Boundary 必须强制**——4 角色越权立即报错
+- **4 组件不可拆分**——单 v2.5 必须一次性发布 Planning Framework 完整版
 - **降级模式必须可工作**——`--mode=single` 100% 兼容 v1.0
 
 ## Phase 4 — v3.0 +Computer Use 兼容层 + Reviewer（第 10-11 个月）
@@ -483,10 +535,25 @@ deepwhale>
   - 输入：Coder/Executor 的输出（代码 / diff / 命令结果）
   - 输出：approve / request_changes + 具体反馈
   - 三角色流水线：`Planner → Executor → Reviewer`
+  - **v2.5 Execution Boundary 复用**（Reviewer 不执行生产动作，Planner 重新规划）
 - [ ] **Reviewer 工作流**
   - 自动跑 linter / test / type check
   - 对比修改前后的语义（防止"看起来 OK 实际坏"）
   - 失败时反馈给 Planner，Planner 决定重做还是跳过
+
+**Browser Agent 增强**（**v2.0 4 件基础升级到 7 件完整**）：
+- [ ] **Visual Grounding**（截图标注元素位置）
+  - 用视觉模型理解截图
+  - 解决"selector 多次失败"问题（改用视觉定位）
+- [ ] **策略级 Error Recovery**（v2.0 基础重试 → v3.0 策略级）
+  - Selector 多次失败 → 切 Visual Grounding
+  - 页面结构变化 → 重新 Page Summarization
+  - 多次重试仍失败 → 切 Adaptive Retry
+- [ ] **Adaptive Retry**（基于失败模式动态调整策略）
+  - 失败 1 次：改 selector 策略
+  - 失败 2 次：切 Visual Grounding
+  - 失败 3 次：切 keyboard 不用 click
+  - 失败 4 次：snapshot 整页 + 回到 Planner
 
 **Compaction 钩子化**（v2.0 升级）：
 - [ ] 让 extension 完全替换默认 Compaction
@@ -497,12 +564,14 @@ deepwhale>
 - 装好 Codex Computer Use 兼容层后能在 sandbox 内开指定应用、点击、输入
 - Compaction 后 token 下降 70% 但语义保留
 - **Reviewer 能发现 Coder 输出中的明显 bug**（用 5 个真实 bug fixture 测）
+- **Browser Agent 增强 3 件全跑通**（Visual Grounding / Error Recovery / Adaptive Retry）
 - **v3.0 第 11 个月必发**
 
 #### ⚠️ Phase 4 红线
 - **Windows Computer Use 不做**（OS 差异大，v3.0 主要验证 macOS + Linux X11）
 - **OCR/UI Detection 不自研**——复用 Codex 兼容层现成视觉模型
 - **mouse_move/mouse_click 不自己实现**——通过兼容层 API 委托
+- **Browser Agent 增强必须在 v3.0 完成**——不能挪到 v4.0（v4.0 只加 Researcher）
 
 ---
 
@@ -617,6 +686,10 @@ deepwhale>
 | Browser Runtime 跨浏览器一致 | 中 | Playwright 抽象足够，**不做自定义协议** |
 | Computer Use OS 差异 | 高 | v3.0 主要验证 macOS + Linux X11，Windows v3.0 不做 |
 | Reasonix 1.0 6 周未发 | 中 | **强制 release 节奏**（每周一 minor，**v1.0/v1.5/v2.0/v3.0/v4.0 必发**） |
+| **项目成功概率** | 评估 | 严格执行（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **80%+** |
+| **Code Intelligence 实际效果** | 高 | v1.5 基础先验（Tree-sitter + Symbol Graph），v2.0 增强前先实测，不要写完才发现效果差 |
+| **Browser Planner 鲁棒性** | 高 | 真实场景（淘宝/京东/Amazon）必须过；失败自动重试 + 改 selector |
+| **DeepSeek 长任务稳定性** | 中 | 长 session 必须能恢复 + Compaction 不能崩 |
 | StormBreaker 漏判 | 中 | **用 (tool, error) 签名不用 args** |
 | Hermes footer 数字收敛 bug | 低 | **多字段同值时去冗余/加标签区分** |
 | Hermes i18n 路径错 | 低 | **Sprint 0 第 1 行定对** |

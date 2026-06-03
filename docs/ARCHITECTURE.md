@@ -120,17 +120,32 @@
 - **Hooks**（5 事件 + Reasonix 退出码语义）
 - **StormBreaker / SanitizeToolPairing**（Reasonix 抄）
 
-**v2.0 包含**（Browser Agent + Memory Ranking）：
-- **MemoryManager** + **Ranking 算法**（importance/last_accessed/decay_score/scope）
+**v2.0 包含**（**Observe** 能力主题 + 真实 Browser Agent 4 件基础）：
+- **MemoryManager** + **Ranking 算法**（importance × decay × scope_weight）
+- **Memory Schema 加 `source` 字段**（`user_preference` / `project_fact` / `workspace` / `user_explicit` / `auto_extracted`）—— 解决"长期/项目/用户偏好混在一起"
+- **Browser Agent 基础 4 件**（v2.0 不做全 7 件，v3.0 增强）：
+  - DOM Understanding / Element Ranking / Page Summarization / Action History
+- **v2.0 拆 Tier-1/Tier-2**（**DAG 砍到 v2.5**）：
+  - Tier-1（必须完成）：Browser Agent 4 件 + Memory Ranking + Code Intelligence 增强
+  - Tier-2（v2.0.x 补回）：Automation / Remote TUI / Compaction / MCP Runtime
 - 跨 Executor / Browser Agent / Code Intelligence 三层共享
+- 详细设计见 [BROWSER_PLANNER.md](./design/BROWSER_PLANNER.md)
 
-**v2.5 包含**（**双 Agent 模式**）：
+**v2.5 包含**（**Planning Framework = 4 组件 + DAG**）：
 - **Planner**（任务拆解 + 依赖分析）
+- **Task Object**（`{ id, goal, subtasks, status, depends_on, result }`，状态机：`pending → ready → running → done | failed | blocked`）
+- **Plan Cache**（跨 session 复用规划结果）
+- **Execution Boundary**（**v2.5 关键约束**：Planner 不执行 / Executor 不规划 / Reviewer 不执行生产动作）
+- **Session DAG**（**v1.0 Linear 升级**——v2.0 砍到 v2.5，与 Planner 同链路更紧）
 - 流水线：`Planner → Executor`（双角色，可降级为单 Executor 兼容 v1.0）
+- 详细设计见 [AGENT_RUNTIME.md](./design/AGENT_RUNTIME.md)
 
-**v3.0 包含**（Reviewer + Compaction 钩子化）：
+**v3.0 包含**（**Execute + Review** + Browser Agent 增强 3 件 + Computer Use 兼容层）：
 - **Reviewer**（验证、self-check、Code Review 自动化）
-- 流水线：`Planner → Executor → Reviewer`（三角色）
+- 流水线：`Planner → Executor → Reviewer`（三角色，**v2.5 Execution Boundary 复用**）
+- **Browser Agent 增强 3 件**（v2.0 4 件基础 → v3.0 7 件完整）：
+  - Visual Grounding / 策略级 Error Recovery / Adaptive Retry
+- **Computer Use 兼容层**（**不自研 OCR/UI Detection**——首选 Codex Computer Use 协议）
 - Compaction 钩子化（让 extension 完全替换默认）
 
 **v4.0 包含**（**完整 5 角色 Multi-Agent**）：
@@ -528,21 +543,22 @@ deepwhale.tool('semantic_search', {
 
 | Phase | 版本 | 时长 | 累计 | 核心交付 |
 |---|---|---|---|---|
-| Phase 1 | v1.0 | 3 个月 | 3 个月 | Claude Code Lite |
-| Phase 2 | v1.5 | 2 个月 | 5 个月 | **Codex Core 8/14 + Code Intelligence 基础** |
-| Phase 3 | v2.0 | 3 个月 | 8 个月 | **+Browser Agent + Memory Ranking + Code Intel 增强** |
-| **Phase 3.5** | **v2.5** | **1 个月** | **9 个月** | **+Planner（双 Agent 模式）** |
-| Phase 4 | v3.0 | 2 个月 | 11 个月 | **+Computer Use 兼容层 + Reviewer** |
-| Phase 5 | v4.0 | 2 个月 | **13 个月** | **Agent OS + 5 角色 + TaskGraph** |
+| Phase 1 | v1.0 | 3-4 个月 | 3-4 个月 | Claude Code Lite |
+| Phase 2 | v1.5 | 2-3 个月 | 5-7 个月 | **Codex Core 8/14 + Code Intelligence 基础** |
+| Phase 3 | v2.0 | 3-4 个月 | 8-11 个月 | **Observe：Browser Agent 4 件 + Memory Ranking + Code Intel 增强 + 4 项 Tier-2** |
+| **Phase 3.5** | **v2.5** | **1 个月** | **9-12 个月** | **Plan：Planning Framework（4 组件 + DAG）** |
+| Phase 4 | v3.0 | 2-3 个月 | 11-15 个月 | **Execute+Review：Browser Agent 增强 3 件 + Reviewer + Computer Use 兼容层** |
+| Phase 5 | v4.0 | 2-3 个月 | **13-17 个月** | **Research+Agent OS：5 角色 + TaskGraph + Persistent Memory + Desktop** |
 
-**单人开发 13 个月节奏**（vs 初版 10 周 90% 失败）→ **完成概率预估 75-80%**
+**单人开发 13-17 个月节奏**（中位数 16 个月）→ **严格执行**（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **成功概率 80%+**
 
 **vs 上版（5 阶段 13 个月）**：
 - v1.5 砍 4 项（Automation/Cron/Remote TUI/Compaction 挪到 v2.0），加 Code Intel 基础
-- v2.0 月份 +1（因为 Browser Agent + Memory Ranking + Code Intel 增强 = 3 个大件）
-- v2.5 插 1 个月（Planner 单独立项）
-- v3.0 月份 -1（Computer Use 改兼容层不自研，省 1 个月）
-- v4.0 月份 -1（Researcher 从 v4 独立抽出后，v4 收尾 2 个月足够）
+- v2.0 拆 Tier-1/Tier-2（**DAG 砍到 v2.5**），月份 3-4 月（DAG 砍走后风险↓）
+- v2.5 改为 Planning Framework（4 组件 + DAG + Boundary + Plan Cache）
+- v3.0 加 Browser Agent 增强 3 件（Visual / Error Recovery / Adaptive Retry）
+- v3.0 月份 2-3 月（Computer Use 改兼容层不自研，省基础 1 个月，但 Browser 增强加 1 个月）
+- v4.0 月份 2-3 月（Researcher 从 v4 独立抽出后，v4 收尾 2 个月足够；Desktop 复杂度可能拖到 3 月）
 
 ---
 
@@ -605,6 +621,14 @@ deepwhale.tool('semantic_search', {
 - **ROADMAP.md**：5 阶段的 Sprint 任务清单（**执行细节**，与本文件版本锚一致）
 - **README.md**：项目对外介绍（一句话定位 = v1.0 = Claude Code Lite）
 - **docs/research/**：5 份深度调研（**设计来源**，不随版本变）
+
+**4 份架构设计文档**（**docs/design/**）：
+- [AGENT_RUNTIME.md](./design/AGENT_RUNTIME.md)：4 角色契约 + Task/Message/Context/Observation/Memory 数据结构
+- [CAPABILITY_MODEL.md](./design/CAPABILITY_MODEL.md)：5 套能力来源（Tool/MCP/Plugin/Browser/Computer）统一抽象
+- [CODE_INTELLIGENCE.md](./design/CODE_INTELLIGENCE.md)：4 模块（Workspace Index / Symbol Graph / Reference Graph / Semantic Search）关系
+- [BROWSER_PLANNER.md](./design/BROWSER_PLANNER.md)：Observe → Plan → Act → Recovery 循环
+
+**原则**：design/ 文档**只写架构 / 边界 / 职责 / 接口 / 数据流**，**不写实现细节**（不选 sqlite/postgres/lancedb，不写 tree-sitter query，不写 Playwright API）
 
 ---
 
