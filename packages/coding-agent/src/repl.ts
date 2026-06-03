@@ -26,7 +26,6 @@ import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core
 import {
   APIKeyMissingError,
   ChatMessage,
-  DeepSeekClient,
   isLLMError,
   LLMAuthError,
   LLMClient,
@@ -46,12 +45,20 @@ import {
   type ToolLoopStep,
 } from './agent/index.js';
 import { createDefaultRegistry } from './tools/registry.js';
+import { createDefaultClient, type Provider } from './llm-factory.js';
 
 const VERSION = '0.1.0';
 
 export interface ReplOptions {
-  /** 注入 LLM 客户端（默认 DeepSeekClient）。单测用。 */
+  /** 注入 LLM 客户端（默认 createDefaultClient env 推断, Sprint 1b.5 Step 2 C3 拍板）。单测用。 */
   client?: LLMClient;
+  /**
+   * Sprint 1b.5 Step 2 (2.5 拍板, C3 拍板 2026-06-03): 显式 provider. 跟 env 推断冲突时优先.
+   * 跟 options.client 互斥 — 传 client 时 provider 忽略 (单测路径).
+   */
+  provider?: Provider;
+  /** Sprint 1b.5 Step 2: 显式 model. 不传则用 provider 默认 (deepseek → deepseek-v4-flash, anthropic → claude-sonnet-4-5). */
+  model?: string;
   /** 注入输入流（默认 stdin）。单测用。 */
   input?: NodeJS.ReadableStream;
   /** 注入输出流（默认 stdout）。单测用。 */
@@ -105,13 +112,23 @@ export async function runOneTurn(
 export async function startRepl(options: ReplOptions = {}): Promise<number> {
   const out = options.output ?? stdout;
   const err = options.errorOutput ?? stderr;
-  const client = options.client ?? new DeepSeekClient();
+  // Sprint 1b.5 Step 2 (2.5 C3 拍板): provider 由 options.client / options.provider / env 推断
+  // - client 显式给 → 走 client (单测路径)
+  // - client 未给 + provider 显式给 → 走 createDefaultClient({provider})
+  // - client 未给 + provider 未给 → 走 createDefaultClient() (env 推断 + 双设报错)
+  // 任何抛 APIKeyMissingError 都被 catch 后写到 stderr (跟 1b 时代行为一致)
+  const client =
+    options.client ??
+    createDefaultClient({
+      ...(options.provider !== undefined ? { provider: options.provider } : {}),
+      ...(options.model !== undefined ? { model: options.model } : {}),
+    });
   const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
 
   // greeting
   out.write(`${t('cli.greeting', VERSION, client.model)}\n`);
-  if (!process.env['DEEPSEEK_API_KEY']) {
+  if (!process.env['DEEPSEEK_API_KEY'] && !process.env['ANTHROPIC_AUTH_TOKEN']) {
     err.write(`${t('error.api_key_missing')}\n`);
   }
   out.write(`${t('cli.no_api_key_hint')}\n\n`);
@@ -327,8 +344,28 @@ export function formatUsageStatus(usage: Usage | undefined): string | null {
   // 满 usage: 完整 status
   const hitRatePct = ((usage.cache_hit_rate ?? 0) * 100).toFixed(0);
   const cost = usage.cost_turn ?? 0;
-  const costStr = cost < 0.01 ? `¥${cost.toFixed(4)}` : `¥${cost.toFixed(3)}`;
+  // Sprint 1b.5 Step 2 (2.4 拍板): 读 cost_currency 决 symbol, 不在数字层做汇率换算.
+  // - 'CNY' → ¥ (Sprint 1b/1b.5 时代 DeepSeek V4-Flash 默认)
+  // - 'USD' → $ (Sprint 1b.5 Step 2 起 Anthropic Sonnet/Opus 走)
+  // - absent (R7 中间路径 / 老 Usage 没 cost_currency 字段) → '?' 显示 + 不报 cost 数字
+  //   让用户知道"这次没算 cost"
+  const symbol = formatCostSymbol(usage.cost_currency);
+  const costStr = usage.cost_currency === undefined
+    ? 'cost ?'
+    : (cost < 0.01 ? `${symbol}${cost.toFixed(4)}` : `${symbol}${cost.toFixed(3)}`);
   return `cache: ${hitRatePct}% | ${costStr}/turn | prompt ${formatTokens(prompt_tokens)} (${formatTokens(usage.tokens_uncached ?? prompt_tokens)} new)`;
+}
+
+/** cost_currency → 显示 symbol. 不在 UI 层做汇率换算. */
+function formatCostSymbol(currency: 'CNY' | 'USD' | undefined): string {
+  switch (currency) {
+    case 'CNY':
+      return '¥';
+    case 'USD':
+      return '$';
+    case undefined:
+      return '?';
+  }
 }
 
 function formatTokens(n: number): string {

@@ -251,6 +251,58 @@ describe('formatUsageStatus (Sprint 1b)', () => {
     expect(line).toMatch(/100 new/);
   });
 
+  it('Sprint 1b.5 Step 2 (2.4 拍板): cost_currency=USD → 显示 $ symbol', () => {
+    // P1 fix (2026-06-03): cost 0.018 是 Anthropic Sonnet 典型 turn 价格 (1000 input + 1000 completion)
+    // 走 ≥ 0.01 的 3 位小数分支. 跟 ¥ 路径行为一致, 只是 symbol 切换.
+    const line = formatUsageStatus({
+      prompt_tokens: 1000,
+      completion_tokens: 1000,
+      total_tokens: 2000,
+      cached_tokens: 0,
+      cache_hit_rate: 0,
+      cost_turn: 0.018,
+      cost_currency: 'USD', // Sprint 1b.5 Step 2: Anthropic 默认 USD
+      tokens_uncached: 1000,
+    });
+    expect(line).toMatch(/cache: 0%/);
+    expect(line).toMatch(/\$0\.018/); // 3 位小数 (>= 0.01)
+    expect(line).not.toMatch(/¥/);
+  });
+
+  it('Sprint 1b.5 Step 2 (2.4 拍板): cost_currency=USD + cost < 0.01 → 4 位小数 $', () => {
+    // Sonnet cache hit 走 0.005 这种 < 0.01 case, 4 位小数稳定展示
+    const line = formatUsageStatus({
+      prompt_tokens: 1000,
+      completion_tokens: 100,
+      total_tokens: 1100,
+      cached_tokens: 900,
+      cache_hit_rate: 0.9,
+      cost_turn: 0.0003,
+      cost_currency: 'USD',
+      tokens_uncached: 100,
+    });
+    expect(line).toMatch(/\$0\.0003/); // 4 位小数
+    expect(line).not.toMatch(/¥/);
+  });
+
+  it('Sprint 1b.5 Step 2 (2.4 拍板): cost_currency absent (R7 中间路径) → "cost ?" 占位', () => {
+    // R7: pricing 找不到 model / pricing undefined / 老 Usage 没 cost_currency 字段
+    // → cost_currency undefined → 'cost ?' 不显示具体数字 (避免显示错的 cost)
+    const line = formatUsageStatus({
+      prompt_tokens: 1000,
+      completion_tokens: 100,
+      total_tokens: 1100,
+      cached_tokens: 900,
+      cache_hit_rate: 0.9,
+      // cost_turn: undefined (R7 中间路径)
+      // cost_currency: undefined (R7 中间路径)
+      tokens_uncached: 100,
+    });
+    expect(line).toMatch(/cost \?\/turn/);
+    expect(line).not.toMatch(/¥/);
+    expect(line).not.toMatch(/\$/);
+  });
+
   it('tokens_uncached == prompt (全 miss, cache_hit_rate=0) 仍正常显示', () => {
     // 边界: cached=0, 但 cached_tokens 字段存在 (LLM 显式说 0)
     // P1 fix (2026-06-03): cost 缩小 1000×, 输入 0.0004 (4 位小数稳定展示)。

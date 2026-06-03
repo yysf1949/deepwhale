@@ -15,7 +15,15 @@
 export const DEEPWHALE_LLM_VERSION = '0.1.0';
 export { DeepSeekClient, DEEPSEEK_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-client.js';
 export type { DeepSeekClientOptions } from './deepseek-client.js';
+// Sprint 1b.5 Step 2: Anthropic provider (走 /anthropic endpoint, DeepSeek shim)
+// - D1 拍板: 用官方 @anthropic-ai/sdk 实例发请求, 手写 parseAnthropic* 翻译
+// - X3 拍板: Step 2 不接真, 测试用 mock fetch
+export { AnthropicClient, DEEPSEEK_ANTHROPIC_BASE_URL, ANTHROPIC_DEFAULT_MODEL } from './anthropic-client.js';
+export type { AnthropicClientOptions } from './anthropic-client.js';
 export { canonicalizeSchema } from './canonicalize-schema.js';
+// Sprint 1b.5 Step 2: 抽出来给 AnthropicClient 复用. parseOai* 处理 OAI-shape 协议
+// (DeepSeek 直接返 + DeepSeek shim 接 /anthropic 路径时也返 OAI-shape).
+export { isSseDoneSentinel, parseOaiChatCompletion, parseSseEvent, parseSseUsageField } from './parse.js';
 export {
   parsePricingConfig,
   loadPricingConfig,

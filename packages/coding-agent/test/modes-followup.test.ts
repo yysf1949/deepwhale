@@ -509,6 +509,7 @@ describe('runPrintMode — Sprint 1b usage summary', () => {
             cached_tokens: 900,
             cache_hit_rate: 0.9,
             cost_turn: 0.00009,
+            cost_currency: 'CNY', // Sprint 1b.5: 锁住新字段 (formatUsageStatus 读 cost_currency 决 symbol)
             tokens_uncached: 100,
           },
         } as ChatResult;
