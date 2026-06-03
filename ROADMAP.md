@@ -1,51 +1,57 @@
-# 🗺 deepwhale ROADMAP（基于 4 份深度调研优化版）
+# 🗺 deepwhale ROADMAP
 
-> **5+1 个 Sprint，10 周，从 0 到 v1.0**
-> **核心变化**（vs 初版）：
-> 1. **Prefix-cache 4 大机制从 Sprint 5 提到 Sprint 1**（多轮对话立即触发 cache）
-> 2. **新增 StormBreaker 到 Sprint 2**（工具增多后是 P0）
-> 3. **Windows 沙箱明文只做 Job Object**（避免 CodeWhale "假撑" 教训）
-> 4. **新增 Sprint 6：Hermes 长期记忆层**（跨 session 知识沉淀）
-> 5. **i18n 路径在 Sprint 0 第一行定对**（Hermes 教训）
+> **5 阶段版本锚 × 13 个月，单人开发节奏**
+>
+> **核心变化**（vs 初版 10 周版）：
+> 1. **时间锚从 10 周改为 13 个月**（v1.0 = Phase 1 = Claude Code Lite，3 个月）
+> 2. **砍掉 18 项延后事项**（详见 [ARCHITECTURE.md §4](./ARCHITECTURE.md)）
+> 3. **Docker 沙箱统一替换 Seatbelt/Landlock/Windows Job Object**（v1.0 起）
+> 4. **Session 从 DAG 降级为 Linear**（v1.0），DAG 延后到 v2.0
+> 5. **Constitution 9 层权威砍掉**（个人化产物，不适合 deepwhale）
+> 6. **保留所有已验证的正确决策**：Prefix-cache 4 机制提前到 v1.0 / StormBreaker / SanitizeToolPairing / i18n 第 1 行定对 / 强制 release 节奏
 
 ## 总览
 
-| Sprint | 周次 | 主题 | 关键交付 | 状态 |
-|---|---|---|---|---|
-| **Sprint 0** | 第 1 周前 3 天 | 4 包 monorepo + 路径/i18n/配置基础设施 | `pnpm dev` 跑通最小 CLI | 🚧 进行中 |
-| **Sprint 1** | 第 1-2 周 | MVP 核心 + **Prefix-cache 4 大机制提前** | DeepSeek 多轮 + 6 工具 + Session DAG + **cache 99% 命中** | ⏳ 待开始 |
-| **Sprint 2** | 第 3-4 周 | 扩展平台 + **StormBreaker + SanitizeToolPairing** | Skills + Extension + Hooks + **防死循环** | ⏳ 待开始 |
-| **Sprint 3** | 第 5-6 周 | Rust 沙箱（macOS/Linux/Windows 文档明确） + MCP + Computer Use | 双层沙箱 + Browser MCP + 截图/键鼠 | ⏳ 待开始 |
-| **Sprint 4** | 第 7-8 周 | 多渠道 + 桌面 + 远程（app-server 模式） | Tauri GUI + 飞书/TG/邮件 + Remote TUI | ⏳ 待开始 |
-| **Sprint 5** | 第 9-10 周 | 自动化 + 打磨 + **强制 release 节奏** | Cron + Session 分享 + Compaction 钩子化 + **v1.0 release** | ⏳ 待开始 |
-| **Sprint 6**（可选） | 第 11-12 周 | Hermes-like 长期记忆 + 跨 session 知识沉淀 | MEMORY.md + library/ + 知识图谱 | ⏳ 可选 |
+| Phase | 版本 | 月份 | 主题 | 关键交付 | 状态 |
+|---|---|---|---|---|---|
+| **Phase 1** | v1.0 | 第 1-3 个月 | **Claude Code Lite** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker | 🚧 进行中 |
+| **Phase 2** | v1.5 | 第 4-5 个月 | **Codex Clone** | Approval + Task + Skills + Extension API + Hooks + StormBreaker + Cron + Compaction | ⏳ 待开始 |
+| **Phase 3** | v2.0 | 第 6-7 个月 | **+Browser Agent** | MCP + Browser Runtime + Plugin 打包 + Session DAG + Memory 三层 | ⏳ 待开始 |
+| **Phase 4** | v3.0 | 第 8-10 个月 | **+Computer Use** | Computer Runtime + Compaction 钩子化 | ⏳ 待开始 |
+| **Phase 5** | v4.0 | 第 11-13 个月 | **Agent OS** | 完整 Multi-Agent + Plugin Marketplace + Desktop + Web + Channels + 文档站 | ⏳ 待开始 |
+
+> **v1.0 = 1 个 release**（不是 5+1 个 Sprint）
+> **v1.5 起 = 每月 1 个 minor release**（每周一 minor 强制节奏）
+> **v1.5 累计 5 个月、v2.0 累计 7 个月、v3.0 累计 10 个月、v4.0 累计 13 个月**
 
 ---
 
-## Sprint 0：4 包 monorepo + 基础设施（3 天）
+## Phase 1 — v1.0 Claude Code Lite（第 1-3 个月）
+
+**目标**：能替代 Claude Code 完成日常 coding 任务。**v1.0 第 3 个月必发**（避免 Reasonix 1.0 6 周未发教训）。
+
+### Sprint 0（3 天，搭骨架）
 
 **目标**：`pnpm dev` 跑通最小 CLI，调用 DeepSeek V4-Flash 流式输出"hello"。**第 1 行代码就定对路径、i18n、配置**。
 
-### 任务清单
-
+#### 任务清单
 - [ ] **建 GitHub 仓库** `yysf1949/deepwhale`（Private）✅
 - [ ] **建 4 包 monorepo**（对齐 pi）
-  - `packages/llm/` — 多 provider 客户端
-  - `packages/agent-core/` — 事件总线 + 工具 + 沙箱桥 + 缓存
+  - `packages/llm/` — 多 provider 客户端（v1 = DeepSeek only）
+  - `packages/agent-core/` — EventBus + Tool Registry + 沙箱桥 + 缓存
   - `packages/tui/` — Ink 渲染
   - `packages/coding-agent/` — 产品层 = llm + agent-core + tui
 - [ ] **pnpm workspace + Turborepo**
 - [ ] **配置基础设施**（**第 1 天就定对**）：
   - 路径：`~/.deepwhale/`（**首行写死 + 旧路径 fallback 模式**——避免 CodeWhale `~/.deepseek/` → `~/.codewhale/` 重命名教训）
   - i18n：`from agent.i18n import t`（**第 1 行就定对**——Hermes 教训：原 `gateway.i18n` 错导致永远英文）
-  - 配置：`~/.deepwhale/config.toml`（zod 校验，CodeWhale 验证）
-  - Skills 4 约定目录：`.deepwhale/skills/`、`.agents/skills/`、`~/.deepwhale/skills/`、`~/.claude/skills/`
-- [ ] **`@deepwhale/llm` OpenAI 兼容客户端**
+  - 配置：`~/.deepwhale/config.toml`（zod 校验）
+  - 4 个 Skills 约定目录（v1.0 暂不读，v1.5 启用）：`.deepwhale/skills/`、`.agents/skills/`、`~/.deepwhale/skills/`、`~/.claude/skills/`
+- [ ] **`@deepwhale/llm` OpenAI 兼容客户端**（**v1 = DeepSeek only**）
 - [ ] **`@deepwhale/coding-agent` 最小 CLI 入口**
 - [ ] **CI：GitHub Actions**（lint + typecheck + 基础测试 + 4 包版本同步）
 
-### 验收标准
-
+#### 验收标准
 ```bash
 $ pnpm dev
 deepwhale> hello
@@ -53,25 +59,23 @@ deepwhale> hello
 deepwhale>
 ```
 
-### ⚠️ Sprint 0 红线（避免 Sprint 1 翻工）
-
+#### ⚠️ Sprint 0 红线（避免 Sprint 1 翻工）
 - **i18n 路径第 1 行定对**（Hermes 教训）
 - **路径迁移兼容机制**写好（CodeWhale 教训）
 - **4 包版本同步 CI**（pi #4908 教训）
 
 ---
 
-## Sprint 1：MVP 核心 + Prefix-cache 4 大机制（2 周）
+### Sprint 1（MVP 核心 + Prefix-cache 4 大机制，第 1-2 周）
 
 **目标**：能跟 DeepSeek 多轮对话、编辑本地文件、跑 shell 命令、二次启动恢复会话。**5 轮后 cache 命中率 ≥ 90%**。
 
-### 任务清单
-
+#### 任务清单
 - [ ] **DeepSeek 接入**（`@deepwhale/llm`）
   - OpenAI 兼容客户端
   - 流式响应（SSE）
   - 错误重试 + 限流退避
-- [ ] **⚡ Prefix-cache 4 大机制**（**Reasonix 全抄，deepwhale 核心优势**）
+- [ ] **⚡ Prefix-cache 4 大机制**（**v1.0 必带，deepwhale 核心优势**）
   - **机制 1：System prompt 一次组装** — `composeSystemPrompt()` 每个 session 只跑一次，按 session ID 缓存（`boot.go:120-148`）
   - **机制 2：`content: ""` 永远序列化**（不带 omitempty）— 防 wire-level 缓存 hash 变化（`openai.go:354-368`）
   - **机制 3：Reasoning content 不打 wire** — DeepSeek V4 thinking tokens 在 session 内部保留，wire 上不传（`openai.go:131-137`）
@@ -79,62 +83,131 @@ deepwhale>
   - **加 regression test**：4 个机制都加 unit test
   - **加 cache 可观测性**：控制台实时显示 `cache_hit_rate` + `cost/turn`
 - [ ] **Tool Registry**：内置 6 个核心工具
-  - `bash`（白名单 shell）
+  - `bash`（**白名单 shell**——v1.0 第一层沙箱）
   - `read_file` / `write_file` / `edit_file`（hash 锚定）
   - `grep` / `find`
 - [ ] **3 种运行模式**（CodeWhale 借鉴，先做 3 种）
   - `interactive`（默认，TUI）
   - `print`（`deepwhale -p "..."` 一次性）
   - `rpc`（JSON-RPC over stdio）
-- [ ] **JSONL append-only DAG Session**（pi 抄）
-  - `parentId + leafId` 的 DAG 形态
+- [ ] **Linear Session**（**v1.0 = 简单 Linear，DAG 砍掉**）
+  - JSONL append-only（pi 借鉴但**不做 DAG**）
   - 每条 entry 立即 `appendFileSync`
   - 崩溃后 `loadEntriesFromFile` 重建
-- [ ] **Constitution 9 层权威**（CodeWhale 抄）
-  - 抄结构，注入 system prompt
-  - 7 Articles + Statutes + Regulations
-  - 写明不抄 CodeWhale 的"Brother Whale"个人化（避免神化/宗教化倾向）
+- [ ] **Docker 沙箱**（**v1.0 = Docker only**，砍掉 Seatbelt/Landlock/Job Object）
+  - 白名单 shell 走 Docker `docker run --rm -v ... -w ... deepwhale-sandbox bash -c "..."`
+  - 默认镜像：node:22-alpine
+  - 网络默认禁用（`--network=none`），用户可显式开启
 
-### 验收标准
-
+#### 验收标准
 - 能跟 DeepSeek V4-Flash 多轮对话（10 轮上下文连贯）
 - 能编辑本地文件 + 跑命令（白名单内）
-- 二次启动自动恢复上次会话
+- 二次启动自动恢复会话（**Linear Session**）
 - **5 轮后 `cache_hit_rate ≥ 90%`**（Reasonix 经济性指标）
 - 单 turn cost ≤ $0.05
 - Prefix-cache 4 大机制都有 unit test
+- `rm -rf /` 跑在 Docker 内被 `--network=none` + rootfs 隔离拦截
 
-### ⚠️ Sprint 1 红线
-
+#### ⚠️ Sprint 1 红线
 - **Compaction 还没做，但任何 system prompt 修改要走"cache-reset point review"**（Reasonix 教训）
 - **Cache miss 时不要报错**——未知就显示"unknown"（CodeWhale 教训）
+- **Session 不要做 DAG**（v1.0 = Linear，**v2.0 升级**）
+- **沙箱不要做 Seatbelt/Landlock/Job Object**（v1.0 = Docker only）
 
 ---
 
-## Sprint 2：扩展平台 + StormBreaker（2 周）
+### Sprint 2（Cache 可观测性 + Session 打磨 + Docker 优化，第 3-4 周）
 
-**目标**：装 1 个社区 skill 就能用，写 1 个 30 行 Extension 注册自定义工具。**带 StormBreaker 防死循环**。
+**目标**：v1.0 release-ready。**cache 命中率可观测**、Session 跨崩溃恢复、Docker 冷启动优化。
 
-### 任务清单
+#### 任务清单
+- [ ] **Cache 可观测性升级**
+  - 实时显示 `cache_hit_rate` / `cost/turn` / `tokens_cached` / `tokens_uncached`
+  - **多字段同值时去冗余/加标签区分**（Hermes footer 教训）
+- [ ] **Session 跨崩溃恢复**
+  - Linear Session JSONL 写盘测试（kill -9 后能恢复）
+  - **Unit test 验证**（不能丢消息）
+- [ ] **Docker 沙箱优化**
+  - 预热镜像（`deepwhale-sandbox-warm`）
+  - `--rm` 严格 + `--read-only` rootfs
+  - 网络/文件挂载策略文档化
+- [ ] **基础 UX 打磨**
+  - 错误信息友好（DeepSeek 限流 / API key 缺失 / Docker 未启动）
+  - TUI 流式渲染测试
+- [ ] **强制 release 节奏**
+  - **v0.1 必发**（Sprint 2 末）
+  - CHANGELOG.md 起头
+  - tag + GitHub Release 流程跑通
 
-- [ ] **🛡 StormBreaker 防死循环**（Reasonix 抄，**工具增多后是 P0**）
+#### 验收标准
+- v0.1 release 发布（`yysf1949/deepwhale` Releases 页面有 tag）
+- 文档：README + 快速开始 + 4 个 Skills 目录说明 + Docker 前置条件
+- Docker 未启动时给清晰错误（不是 stack trace）
+
+---
+
+### Sprint 3-4（v1.0 收尾 + 文档化 + 测试覆盖，第 5-12 周）
+
+**目标**：v1.0 第 3 个月末必发。**测试覆盖率 ≥ 60%**。
+
+#### 任务清单
+- [ ] **测试覆盖**
+  - Unit test：Prefix-cache 4 机制 / 6 个工具 / Linear Session / Docker 沙箱
+  - Integration test：多轮对话 / 二次启动恢复 / Docker 内跑白名单命令
+  - E2E test：CLI 模式 / TUI 模式 / print 模式
+- [ ] **文档**
+  - README 完整（快速开始 + 架构 + 命令参考）
+  - 故障排查 FAQ
+  - 开发指南（如何加新工具 / 新模型）
+- [ ] **性能**
+  - Docker 冷启动 ≤ 1s
+  - TUI 流式响应 ≤ 200ms 延迟
+- [ ] **v1.0 release**
+  - 第 3 个月末 GitHub Release
+  - npm publish（`@deepwhale/llm` / `@deepwhale/coding-agent` / ...）
+  - Homebrew formula（可选）
+
+#### 验收标准
+- v1.0 release 发布
+- npm 包可安装
+- 测试覆盖率 ≥ 60%
+- **Codex 14 项功能 0/14**（**v1.5 才到 14/14**）
+
+#### ⚠️ v1.0 红线
+- **不要做 MCP / Browser / Computer / Plugins / Skills / Desktop / 渠道**（**砍掉清单**）
+- **不要做 Session DAG**（v1.0 = Linear）
+- **不要做 Compaction**（v1.5 起）
+- **不要做 Plugin Marketplace**（v1.5 起）
+- **不要做文档站**（v1.5 起）
+- **v1.0 第 3 个月末必发**（不拖）
+
+---
+
+## Phase 2 — v1.5 Codex Clone（第 4-5 个月）
+
+**目标**：100% Codex Client 复刻（**14/14 功能对齐**）。**v1.5 第 5 个月末必发**。
+
+### Sprint 5-6（Skills + Extension API + Hooks，第 4 个月）
+
+#### 任务清单
+- [ ] **🛡 StormBreaker 防死循环**（Reasonix 抄，**工具增多后 P0**）
   - 3 次相同 `(tool, error)` 签名触发暂停 + 用户确认
-  - **关键：用 (tool, error) 签名，不用 args 签名**（`agent.go:690-729` 实战观察："a stuck model reworks the arguments cosmetically while failing identically"）
-  - 加 unit test：模拟死循环场景
+  - **关键：用 (tool, error) 签名，不用 args 签名**（Reasonix 实战观察）
+  - Unit test：模拟死循环场景
 - [ ] **🛡 SanitizeToolPairing**（Reasonix 抄，**1 个函数 4 cases**）
   - 4 种 pairing case：orphan assistant tool_call、orphan tool_result、重复 tool_call、tool_result 不匹配
   - **理解 4 cases 一次性处理，不是"4 遍"**（Reasonix 误解纠偏）
-  - 加 unit test：每种 case 单独测
+  - Unit test：每种 case 单独测
 - [ ] **Skills 系统**（对齐 Codex Skills 开放标准 + pi Skills 借鉴）
-  - 目录：`./.deepwhale/skills/`、`<project>/.agents/skills/`、`~/.deepwhale/skills/`、`~/.claude/skills/`
+  - 4 个约定目录：`.deepwhale/skills/`、`<project>/.agents/skills/`、`~/.deepwhale/skills/`、`~/.claude/skills/`
   - 格式：`SKILL.md` + YAML frontmatter（`name` / `description` / `triggers`）
-  - **索引硬上限 4KB**（Reasonix 抄）— names+descriptions 进 system prompt，body 按需
+  - **索引硬上限 4KB**（Reasonix 抄）
   - 内置 3 个示范：commit / test / review-pr
 - [ ] **EventBus 包装**（pi 抄）
-  - 30 行 wrapper，try/catch 隔离（一个 extension 抛错不阻塞后续）
-  - **21 个 `whale.*` ExtensionEvent 联合类型**（pi 改前缀）
-- [ ] **Extension API**（pi 借鉴，**最关键**）
-  - `defineTool({ name, description, parameters, execute })` —— **零运行时，5 行类型守卫**（pi `types.ts:491-495`）
+  - 30 行 wrapper，try/catch 隔离
+  - **21 个 `whale.*` ExtensionEvent 联合类型**
+- [ ] **Extension API**（pi 借鉴，**v1.5 关键**）
+  - `defineTool({ name, description, parameters, execute })` —— **零运行时，5 行类型守卫**
   - 21 个事件：`whale.session_start` / `whale.tool_call` / `whale.tool_result` / `whale.message_end` / `whale.session_before_compact` / ...
 - [ ] **Hooks**（5 事件 + Reasonix 退出码语义）
   - `pre_tool_use` / `post_tool_use` / `user_prompt_submit` / `stop` / `session_start`
@@ -142,187 +215,139 @@ deepwhale>
   - **Hook trust flag 不在项目里**（`~/.deepwhale/trust.json`，Reasonix 抄）
 - [ ] **Package Manager**（pi 抄）
   - 解析 `whale:` / `git:` / 本地路径
-  - 正则 `/^(@?[^@]+(?:\/[^@]+)?)(?:@(.+))?$/`
-  - 资源优先级 4 档：project/local < project/auto < user/local < user/auto < package
-- [ ] **Plugin 打包**（`.dwp` 格式，类似 `.vsix`）
+  - 资源优先级 4 档
 
-### 验收标准
-
+#### 验收标准
 - 装 1 个社区 skill 能用
 - 写 1 个 30 行 Extension 注册自定义工具
 - 装 1 个带 hooks 的 plugin，hook 真的触发
-- **StormBreaker 测出死循环场景能暂停**（unit test 通过）
-- **SanitizeToolPairing 4 种 case 都能处理**（4 个 unit test 通过）
-- 打包 1 个 `.dwp` 文件能跨机安装
+- **StormBreaker 测出死循环场景能暂停**
+- **SanitizeToolPairing 4 种 case 都能处理**
+- Codex 14 项功能 → **8/14**（+ Skills / Plugins / Hooks）
 
-### ⚠️ Sprint 2 红线
-
+#### ⚠️ Sprint 5-6 红线
 - **Extension tool 重名启动时检测**（pi #5316 教训）
 - **Hook payload 走 JSON on stdin**（Reasonix 抄）
 - **Extension manifest 在 package.json**（pi 抄）/ deepwhale 用 `pyproject.toml` 的 `[tool.deepwhale]`
 
 ---
 
-## Sprint 3：Rust 沙箱 + MCP + Computer Use（2 周）
+### Sprint 7-8（Codex 复刻收尾：Approval / Task / Cron / Compaction，第 5 个月）
 
-**目标**：装 Playwright MCP 后能自动开网页填表，Computer Use 能在 sandbox 内操控 GUI。**Rust 沙箱**双层。
+#### 任务清单
+- [ ] **Approval System**（Codex 抄）
+  - 工具调用前弹确认（默认 deny 危险操作）
+  - 白名单内自动 approve
+- [ ] **Task Mode**（Codex 抄）
+  - `/task <id>` 跳转到指定 session
+  - 任务列表 UI
+- [ ] **Cron Automations**（Codex 抄）
+  - `~/.deepwhale/automations/*.yaml` 定义定时任务
+  - 模板：daily-report / code-review / test-runner / dep-update
+- [ ] **Compaction**（v1.5 = **cache-reset point 唯一**）
+  - **Compaction = 唯一 cache-reset point**（Reasonix 抄）
+  - `session_before_compact` 钩子让 extension 完全替换默认
+  - Tail 边界按 token budget 而不是 message count
+- [ ] **Remote TUI**（WebSocket 远程控制）
+  - `deepwhale serve --http` 暴露 `/v1/*`
+  - 远端 TUI 通过 WebSocket 连接
+- [ ] **v1.5 release**
+  - 第 5 个月末 GitHub Release
+  - CHANGELOG 完整记录
+  - **Codex 14/14 ✅**
 
-### 任务清单
-
-- [ ] **🛡 Rust 沙箱**（CodeWhale 抄，**双层架构**）
-  - **第一层：白名单 shell**（`crates/execpolicy/` 等价 TS 实现）
-    - 路径白名单 + 命令白名单
-    - TimeLimit 30s 默认
-    - 输出 ≤ 4000 bytes
-  - **第二层：Rust OS 沙箱**（napi-rs 桥）
-    - **macOS Seatbelt**：完整 sandbox-exec 包装（CodeWhale `seatbelt.rs:1-695` 全抄）
-    - **Linux Landlock + bwrap 回退**（CodeWhale `landlock.rs` 是 marker-only，**deepwhale 要做真实现**或用 bwrap）
-      - 优先 bwrap（如 `/usr/bin/bwrap` 存在，issue #2184 模式）
-      - 兜底 Landlock（kernel 5.13+）
-    - **Windows Job Object process-tree containment** —— **明文文档：只做 process-tree，不假撑 FS/Network/AppContainer 隔离**（CodeWhale `mod.rs:14-15` 教训）
-- [ ] **MCP 完整支持**（官方 SDK + Reasonix 借鉴）
-  - client：stdio / SSE / Streamable HTTP
-  - server：让 deepwhale 自己也作为 MCP server 暴露（`deepwhale serve --mcp`）
-  - 配置：`~/.deepwhale/mcp.json`
-- [ ] **Browser MCP**（Codex 复刻点 1）
-  - 集成 `@playwright/mcp` 开箱即用
-  - 截图 + 元素 click + 表单填写 + JS evaluate
-- [ ] **Computer Use**（Codex 复刻点 2）
-  - 截图工具（`screenshot`）：跨平台
-  - 输入工具（`mouse_move` / `mouse_click` / `keyboard_type`）：跨平台
-  - **OS 沙箱保护**（CodeWhale 借鉴）：鼠标键盘限制在窗口内
-- [ ] **LSP 集成**（CodeWhale 借鉴，可选）
-  - rust-analyzer / pyright / tsserver 实时诊断
-  - 编译错误当自我纠正信号
-
-### 验收标准
-
-- 装好 Playwright MCP 后，能自动打开网页、填表、截图
-- Computer Use 能在 sandbox 内操控指定应用
-- **Rust 沙箱 macOS 测：能跑 `rm -rf /` 但被 Seatbelt 拦截**
-- **Linux 沙箱测：能跑 `/etc/shadow` 读但被 Landlock 拦截**
-- **Windows 沙箱测：能跑 `taskkill /im explorer.exe /f` 但被 Job Object 拦截进程树逃逸**
-- LSP 报错能自动反馈给模型
-
-### ⚠️ Sprint 3 红线
-
-- **Windows 沙箱文档明文写"不假撑"**（CodeWhale 教训）
-- **Linux Landlock 不要学 CodeWhale "marker only"**（要么真做要么不做）
-- **Rust 沙箱跑在独立进程**（napi-rs IPC），不影响主进程性能
+#### 验收标准
+- **Codex 14/14 ✅**（TUI / 多模型 / Skills / Plugins / MCP-stub / Approval / Task / Automations / Remote TUI / Session / Compaction / Hooks / ...）
+- 装好 daily-report automation，定时跑通
+- 文档：v1.5 release notes + 14/14 对照表
 
 ---
 
-## Sprint 4：多渠道 + 桌面 + 远程（2 周）
+## Phase 3 — v2.0 +Browser Agent（第 6-7 个月）
 
-**目标**：飞书发消息给 bot，CLI 看到任务入队；Tauri 桌面 GUI 能跑；关闭 GUI 后任务继续。
+**目标**：能自动开网页、填表、截图。**v2.0 第 7 个月末必发**。
 
-### 任务清单
+### Sprint 9-10（Browser Runtime + MCP + Session DAG，第 6-7 个月）
 
-- [ ] **Channels**（Hermes 借鉴 + CodeWhale 飞书桥 SDK）
-  - **飞书**：抄 `@codewhale/feishu-bridge` SDK 模式（`@larksuiteoapi/node-sdk`）
-    - **强制走 post payload**（Hermes 教训：表格不渲染，message_id=om_x100b6ee7c17cfca0c2d94a6a3087ac5）
-    - bot 消息 → RPC 投递 → 流式回写
-  - **Telegram**：inline keyboard 确认 / 取消
-  - **邮件**：IMAP 监听，主题做指令
-  - **微信**：用户场景特殊，按需
-- [ ] **Tauri 桌面客户端**（CodeWhale 借鉴规划）
+#### 任务清单
+- [ ] **MCP Runtime**（stdio / http / sse 动态注册）
+  - 官方 SDK
+  - 配置：`~/.deepwhale/mcp.json`
+  - **deepwhale 也可作为 MCP server 暴露**（`deepwhale serve --mcp`）
+- [ ] **Browser Runtime**（Playwright + 统一 API）
+  - 6 个核心 API：navigate / click / type / extract / screenshot / download / upload
+  - 集成 `@playwright/mcp` 开箱即用
+  - Browser sandbox 走 Docker（与 Tool Runtime 同一沙箱）
+- [ ] **Plugin 打包**（`.dwp` 格式，类似 `.vsix`）
+  - 打包 1 个 `.dwp` 文件能跨机安装
+- [ ] **Session DAG**（**v1.0 Linear 升级**）
+  - `parentId + leafId` 的 DAG 形态
+  - 跨分支不丢消息
+- [ ] **MemoryManager**（Short/Long/Summary 三层）
+  - Short：最近会话
+  - Long：向量库
+  - Summary：自动压缩
+- [ ] **v2.0 release**
+  - 第 7 个月末 GitHub Release
+  - 装好 Playwright MCP 后能自动开网页填表截图
+  - Browser Runtime 6 个核心 API 全部跑通
+
+---
+
+## Phase 4 — v3.0 +Computer Use（第 8-10 个月）
+
+**目标**：能操控电脑 GUI。**v3.0 第 10 个月末必发**。
+
+### Sprint 11-15（Computer Runtime + Compaction 钩子化，第 8-10 个月）
+
+#### 任务清单
+- [ ] **Computer Runtime**（macOS / Linux X11 优先，Windows 不做）
+  - `mouse_move` / `mouse_click` / `keyboard_input` / `keyboard_hotkey` / `screen_capture` / `window_control`
+  - 跑在 Docker sandbox 内
+- [ ] **Compaction 钩子化**（让 extension 完全替换默认）
+  - `session_before_compact` / `session_after_compact` 钩子
+- [ ] **Computer Use MCP 集成**
+  - Computer Use 也可作为 MCP server 暴露
+- [ ] **v3.0 release**
+  - 第 10 个月末 GitHub Release
+  - 在 sandbox 内能开指定应用、点击、输入
+  - Compaction 后 token 下降 70% 但语义保留
+
+#### ⚠️ Phase 4 红线
+- **Windows Computer Use 不做**（OS 差异大，v3.0 主要验证 macOS + Linux X11）
+
+---
+
+## Phase 5 — v4.0 Agent OS（第 11-13 个月）
+
+**目标**：完整 Agent Operating System。**v4.0 第 13 个月末必发**。
+
+### Sprint 16-20（Multi-Agent + Desktop + Channels + 文档站，第 11-13 个月）
+
+#### 任务清单
+- [ ] **完整 Multi-Agent**
+  - Planner / Researcher / Executor / Reviewer 流水线
+  - 单 Agent 模式保留为 `mode=single`
+- [ ] **Plugin Marketplace**
+  - npm 命名空间 `@deepwhale/`
+  - `deepwhale search skills` 命令
+- [ ] **Desktop**（Tauri 2.x）
   - 多 tab 会话
   - 右侧 panel 显示 agent 读/改过的文件
   - 底部 cost / cache / token meters
-  - 复用 `coding-agent` SDK 启动
-  - **CORS 白名单 `tauri://localhost`**（CodeWhale `app-server/lib.rs:22-31` 抄）
-- [ ] **Web UI**（可选）：浏览器访问 `localhost:7331`
-- [ ] **Remote TUI**（Codex 复刻点 3 + CodeWhale app-server 模式）
-  - `deepwhale serve --http` 暴露 `/v1/*`（CodeWhale axum HTTP+JSON-RPC 抄）
-  - 远端 TUI 通过 WebSocket 连接
-- [ ] **单 transport-agnostic controller**（Reasonix 抄）
-  - TUI / web / 桌面 / 飞书全部走同一 controller
-  - 业务逻辑只写一次
-
-### 验收标准
-
-- 飞书发消息给 bot，能在 CLI 看到任务入队 + 流式回写
-- **飞书 markdown 表格实测能渲染**（强制 post payload 验证）
-- Tauri 桌面 GUI 跑起来，多 tab 切换不丢状态
-- 关闭桌面 GUI 后，后台 task 继续跑
-- 远端 TUI 通过 WebSocket 连
-
-### ⚠️ Sprint 4 红线
-
-- **Hermes i18n 教训**：i18n 路径在 Sprint 0 已定对，但 channel 翻译要测一遍
-- **Hermes footer 教训**：多渠道 footer 字段不要同值收敛
-- **Hermes hot-reload 教训**：channel 插件如果支持 hot reload，mtime 检测必须在 wrapper 内部
-
----
-
-## Sprint 5：自动化 + 打磨 + 强制 release 节奏（2 周）
-
-**目标**：装好 daily-report automation，每天早上 9 点自动生成报告推到飞书。**v1.0 release 真正发出来**（避免 Reasonix 1.0 6 周未发教训）。
-
-### 任务清单
-
-- [ ] **Cron Automations**（Codex 复刻点 4）
-  - `~/.deepwhale/automations/*.yaml` 定义定时任务
-  - 模板：daily-report / code-review / test-runner / dep-update
-  - **no_agent watchdog 模式**（Hermes 抄）：脚本自跑，省 token
-- [ ] **Session 分享**（pi 借鉴）
-  - `deepwhale share <session-id>` → 公开 URL
-  - HTML 渲染 + 敏感信息脱敏
-- [ ] **Compaction 钩子化**（pi 抄 + Reasonix cache-aware）
-  - **Compaction = 唯一 cache-reset point**（Reasonix 抄）
-  - `session_before_compact` 钩子让 extension 完全替换默认
-  - Tail 边界按 token budget 而不是 message count（Reasonix `compact.go:271-289`）
-- [ ] **Plugin Marketplace**
-  - 发布到 npm 命名空间 `@deepwhale/`
-  - `deepwhale search skills` 命令
-- [ ] **强制 release 节奏**（Reasonix 教训）
-  - **每周一发 minor release**（v0.1 → v0.2 → ... → v1.0）
-  - 每个 release 配 CHANGELOG.md
-  - **v1.0 第 10 周必发**（不拖）
-- [ ] **文档站**（`deepwhale.dev`）
-  - GitHub Pages + VitePress
+- [ ] **Web UI**（可选）
+  - 浏览器访问 `localhost:7331`
+- [ ] **Channels**（**v4.0 重新评估清单**）
+  - 飞书：bot 消息 → RPC 投递 → 流式回写
+  - Telegram：inline keyboard
+  - 邮件 / 微信：按需
+- [ ] **文档站**（VitePress）
   - Quickstart / Skills 开发指南 / Extension API 文档 / FAQ
-- [ ] **示例扩展 5-10 个**（抄 pi `examples/extensions/`）
-  - `commit` / `test` / `review-pr` / `refactor` / `dep-update` / `changelog` / `security-scan` / `i18n-extract` / `custom-compaction` / `event-bus`
-
-### 验收标准
-
-- 装好 daily-report automation，每天早上 9 点自动生成报告推到飞书
-- session 压缩后 token 数下降 70% 但语义保留
-- 文档站上线
-- **v1.0 release 第 10 周必发**（CHANGELOG.md 完整）
-- 至少 5 个示例扩展可一键安装
-
-### ⚠️ Sprint 5 红线
-
-- **不要做"4 遍 tool-call repair"**（误解纠偏：实际是 1 个 `SanitizeToolPairing` 函数 4 cases）
-- **不要学 Reasonix 拖延 release**——每周一 minor，10 周 v1.0
-
----
-
-## Sprint 6（可选）：Hermes-like 长期记忆 + 跨 session 知识沉淀（2 周）
-
-**目标**：用户用 deepwhale 1 周后，**知识能沉淀下来**，跨 session 复用，类似 Hermes MEMORY + library。
-
-### 任务清单
-
-- [ ] **MEMORY.md 短期记忆**
-  - 自动捕获用户偏好（"用户偏好中文" / "用户偏好简洁"）
-  - Imperative 写法直接当事实存（不是指令）
-  - 索引首行不能被吞（Reasonix #2778 教训）
-- [ ] **library/ 长期知识**
-  - 一条 knowledge 一个 md 文件 + 总索引
-  - 跨 session 复用
-- [ ] **跨 session 知识图谱**
-  - Session 间实体链接（项目、文件、决策）
-  - 用户能 hand-edit
-- [ ] **MCP 知识服务**（暴露 deepwhale 知识为 MCP server）
-
-### 验收标准
-
-- 用户用 1 周后，deepwhale 知道"用户偏好中文、简洁、XDA 链接要看"
-- 跨 session 复用上一 session 的关键决策
-- **MEMORY.md 索引首行完整**（unit test 验证）
+- [ ] **v4.0 release**
+  - 第 13 个月末 GitHub Release
+  - 4 个 Agent 角色协同跑通
+  - 桌面 GUI 跑起来
+  - 文档站上线
 
 ---
 
@@ -330,73 +355,87 @@ deepwhale>
 
 | 决策点 | 选择 | 理由 |
 |---|---|---|
-| 主语言 | **TypeScript（Node ≥ 22）** | pi 验证 58.6k stars，**不抄 Reasonix Go 栈** |
+| 主语言 | **TypeScript（Node ≥ 22）** | pi 验证 58.6k stars |
 | TUI 框架 | **Ink**（React 19） | pi 实战验证、跨平台一致 |
-| 桌面 | **Tauri 2.x** | 生态成熟，CodeWhale 已规划，**不抄 Reasonix Wails** |
-| 沙箱 | **双层：白名单 shell + Rust OS 沙箱** | 跨平台一致 + 安全性 |
-| Windows 沙箱 | **明文：Job Object process-tree only** | **不假撑 FS/Network 隔离**（CodeWhale 教训） |
-| 分发 | npm + Tauri + Homebrew + Docker | 跟 pi/Codex/Reasonix 一致 |
-| 配置 | TOML | CodeWhale 验证，注释友好 |
-| Skills 格式 | **对齐 Codex 开放标准 + pi frontmatter 兼容** | 跨工具复用 |
+| 桌面 | **Tauri 2.x**（v4.0） | 生态成熟，**v4.0 之前不做** |
+| 沙箱（v1-v3） | **Docker only** | 跨平台一致 + 单人可维护 |
+| 沙箱（v4） | **Docker + 多实例编排** | Multi-Agent 隔离 |
+| 分发 | npm + Homebrew + Docker | 跟 pi/Codex/Reasonix 一致 |
+| 配置 | TOML | CodeWhale 验证 |
+| Skills 格式 | **对齐 Codex 开放标准** | 跨工具复用 |
 | 4 包 monorepo | **对齐 pi** | 复用 pi 社区经验 |
-| ExtensionEvent | **21 个 `whale.*` 事件**（pi 改前缀） | 跟 pi 兼容但区分内/外 |
-| MCP | 官方 SDK | 唯一标准 |
-| Release 节奏 | **每周一 minor，第 10 周 v1.0** | 避免 Reasonix 1.0 6 周未发 |
+| ExtensionEvent | **21 个 `whale.*` 事件**（v1.5） | 跟 pi 兼容但区分内/外 |
+| MCP | 官方 SDK（v2.0） | 唯一标准 |
+| Release 节奏 | **每周一 minor**（v1.5 起） | 避免 Reasonix 1.0 6 周未发 |
 | i18n 路径 | **第 1 行定对** | Hermes 教训 |
 | License | MIT | 全家桶都是 MIT |
+| **Constitution 9 层权威** | **砍掉** | 个人化产物，不适合 deepwhale |
+| **Session DAG** | **v1 = Linear，v2 = DAG** | 避免 v1 过度复杂 |
+
+---
 
 ## 风险登记
 
 | 风险 | 等级 | 对策 |
 |---|---|---|
 | DeepSeek API 限流 | 中 | 前缀缓存降耗 + Flash/Pro 智能路由 |
-| **Windows 沙箱不完整** | 中 | **明文文档：Job Object only，不假撑**（CodeWhale 教训） |
+| **Scope explosion** | **高** | **本 ROADMAP 就是为压制这个风险**——5 阶段版本锚 + 砍掉清单 18 项 |
+| 单人开发 burnout | 中 | Phase 之间预留 1 周缓冲期 |
+| **Windows 沙箱不完整** | **不评估** | **v1-v4 都不做 Windows 沙箱**（统一 Docker） |
 | MCP 协议演进 | 低 | pin 官方 SDK minor 版本 |
-| **Skills 安全**（恶意 skill 偷数据） | **高** | Skills 默认只读 + `permissions:` 显式声明 + **Hook trust flag 在 `~/.deepwhale/trust.json` 不在项目里**（Reasonix 抄） |
-| 跨渠道状态同步 | 中 | 所有渠道走同一 RPC + Session Manager |
-| 用户基数小 → 没人写扩展 | 中 | 自带 5-10 个示范 skill 降低门槛（pi `examples/extensions/` 抄） |
-| **Reasonix 1.0 6 周未发** | 中 | **强制 release 节奏**（每周一 minor） |
-| **StormBreaker 漏判**（死循环改 args） | 中 | **用 (tool, error) 签名不用 args**（Reasonix 实战观察） |
-| **Hermes footer 数字收敛 bug** | 低 | **多字段同值时去冗余/加标签区分**（用户视角 = bug） |
-| **Hermes i18n 路径错** | 低 | **Sprint 0 第 1 行定对** |
-| **Hermes hot-reload mtime 错位** | 低 | **mtime 检测在 wrapper 内部**（如果做 plugin hot reload） |
-| **Hermes 飞书表格不渲染** | 中 | **强制 post payload** |
-| **CodeWhale "marker-only" Landlock** | 低 | **deepwhale 要么真做要么不做** |
-
-## 与 Codex 全功能对照表
-
-| Codex 功能 | 状态 | 落在 Sprint |
-|---|---|---|
-| TUI 交互 | ✅ | Sprint 1 |
-| 多种模型切换 | ✅ | Sprint 1 |
-| Skills | ✅ | Sprint 2 |
-| Plugins | ✅ | Sprint 2 |
-| MCP Client/Server | ✅ | Sprint 3 |
-| Browser MCP | ✅ | Sprint 3 |
-| Computer Use | ✅ | Sprint 3 |
-| Automations | ✅ | Sprint 5 |
-| Remote TUI | ✅ | Sprint 4 |
-| Desktop GUI | ✅ | Sprint 4 |
-| 多渠道接入 | ✅ | Sprint 4 |
-| Session 持久化/恢复 | ✅ | Sprint 1 |
-| Compaction | ✅ | Sprint 5 |
-| Hooks | ✅ | Sprint 2 |
-
-**覆盖率**：Codex 全功能 14/14 ✅
-
-**deepwhale 独家（超越 Codex）**：
-- ✅ Prefix-cache 4 大机制（Reasonix 全抄）
-- ✅ StormBreaker 防死循环（Reasonix 抄）
-- ✅ Rust 沙箱 macOS Seatbelt + Linux Landlock + bwrap（CodeWhale 抄）
-- ✅ Constitution 9 层权威（CodeWhale 抄）
-- ✅ JSONL append-only DAG Session（pi 抄）
-- ✅ 21 个 ExtensionEvent 钩子化 Compaction（pi 抄）
-- ✅ Hermes 多渠道 + MEMORY/library 分层
-- ✅ CodeWhale 飞书桥 SDK 模式
+| **Skills 安全** | **高** | Skills 默认只读 + `permissions:` 显式声明 + Hook trust flag 在 `~/.deepwhale/trust.json` |
+| 跨 Phase 时间拖延 | 中 | **强制 release 节奏**：每个 Phase 末尾必发版本 |
+| Docker 沙箱冷启动慢 | 低 | Phase 1 接受，Phase 3 优化 |
+| Browser Runtime 跨浏览器一致 | 中 | Playwright 抽象足够，**不做自定义协议** |
+| Computer Use OS 差异 | 高 | v3.0 主要验证 macOS + Linux X11，Windows v3.0 不做 |
+| Reasonix 1.0 6 周未发 | 中 | **强制 release 节奏**（每周一 minor，**v1.0/v1.5/v2.0/v3.0/v4.0 必发**） |
+| StormBreaker 漏判 | 中 | **用 (tool, error) 签名不用 args** |
+| Hermes footer 数字收敛 bug | 低 | **多字段同值时去冗余/加标签区分** |
+| Hermes i18n 路径错 | 低 | **Sprint 0 第 1 行定对** |
+| CodeWhale "marker-only" Landlock | 不评估 | **deepwhale 走 Docker，不学 CodeWhale 沙箱思路** |
 
 ---
 
-**最后更新**：2026-06-02（基于 4 份深度调研优化）
-**当前 Sprint**：Sprint 0（4 包 monorepo + 基础设施）
-**下次更新**：Sprint 0 完结时
+## 与 Codex 全功能对照表
+
+| Codex 功能 | 状态 | 落在版本 |
+|---|---|---|
+| TUI 交互 | ✅ | v1.0 |
+| 多种模型切换 | ⚠️ v1.0 = DeepSeek only；v1.5 = +OpenAI/Claude | v1.0 / v1.5 |
+| Skills | ✅ | v1.5 |
+| Plugins | ✅ | v1.5 |
+| MCP Client/Server | ✅ | v2.0 |
+| Browser MCP | ✅ | v2.0 |
+| Computer Use | ✅ | v3.0 |
+| Automations | ✅ | v1.5 |
+| Remote TUI | ✅ | v1.5 |
+| Desktop GUI | ✅ | v4.0 |
+| 多渠道接入 | ✅ | v4.0 |
+| Session 持久化/恢复 | ✅ | v1.0（Linear）→ v2.0（DAG） |
+| Compaction | ✅ | v1.5 |
+| Hooks | ✅ | v1.5 |
+
+**覆盖率进度**：
+- v1.0 = **3/14**（TUI / 多模型-DS-only / Session-Linear）
+- v1.5 = **8/14**（+ Skills / Plugins / Hooks / Approval / Task / Automations / Remote TUI / Compaction）
+- v2.0 = **10/14**（+ MCP / Browser MCP）
+- v3.0 = **11/14**（+ Computer Use）
+- v4.0 = **14/14 ✅**（+ Desktop / 多渠道 / 完整 Multi-Agent）
+
+**deepwhale 独家（vs Codex）**：
+- ✅ **Prefix-cache 4 大机制**（Reasonix 全抄）— **v1.0 必带**
+- ✅ **StormBreaker 防死循环**（Reasonix 抄）— v1.5 工具增多后 P0
+- ✅ **SanitizeToolPairing**（Reasonix 抄）— v1.5
+- ✅ **Compaction = 唯一 cache-reset point**（Reasonix 抄）— v1.5
+- ✅ **Docker 沙箱统一**（v1.0-v4.0 跨平台一致，**Codex 没做**）
+- ✅ **JSONL append-only Session**（pi 借鉴，v1.0 Linear → v2.0 DAG）— 简单可恢复
+- ✅ **21 个 ExtensionEvent 钩子化 Compaction**（v1.5 起）
+- ✅ **完整 Multi-Agent 流水线**（v4.0）
+
+---
+
+**最后更新**：2026-06-03（确立 5 阶段版本锚，砍掉 18 项延后事项，Docker 沙箱统一）
+**当前阶段**：Phase 1 Sprint 0（4 包 monorepo + 基础设施）
+**下次更新**：v0.1 release 时
+**架构详情**：[docs/ARCHITECTURE.md](./ARCHITECTURE.md)
 **总报告**：[docs/research/MASTER_RESEARCH.md](./docs/research/MASTER_RESEARCH.md)
