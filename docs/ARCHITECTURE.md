@@ -632,6 +632,42 @@ deepwhale.tool('semantic_search', {
 
 ---
 
-**最后更新**：2026-06-03（确立 4 层架构 + 5 阶段版本锚，砍掉 18 项延后事项）
+## 10. Release Gates（**项目级止损机制，假设驱动**）
+
+> **核心思想**：DeepWhale 不只是"功能路线图"，而是**"假设驱动开发路线图"**——3 个 Technical Bets + 3 个 Release Gates 守护。完整定义见 [ROADMAP.md §Release Gates](./ROADMAP.md)。
+
+### 3 个 Technical Bets
+
+| Bet | 等级 | 验证版本 | 失败后果 | 赌的是什么 |
+|---|---|---|---|---|
+| **Bet-1 Code Intelligence** | **P0** | v1.5 | Coding Agent 失败，项目失去核心价值 | Agent 能理解大型代码库（100K LOC） |
+| **Bet-2 Browser Planner** | **P1** | v2.0 | 退化为 Claude Code 级产品（仍有价值）| Agent 能稳定获取外部信息 |
+| **Bet-3 Long-Horizon Stability** | **P0** | v3.0 | Multi-Agent 失败，5 角色失去意义 | Agent 能持续 30-50 步不漂移 |
+
+### 3 个 Release Gates
+
+| Gate | 类型 | 触发时机 | 通过 → | 失败 → |
+|---|---|---|---|---|
+| **Gate-1** Code Intelligence Kill Test | **Kill** | v1.5 release 前 | 进入 v2.0 | 停止 Browser/Computer/Desktop，优先修 Code Intel |
+| **Gate-1.5** Browser Viability Decision Gate | **Decision** | v2.0 release 前 | ≥80% 完整路线 | 50-80% 降级 / <50% 砍 Browser 投资 |
+| **Gate-2** Long-Horizon Kill Test | **Kill** | v3.0 release 前 | 进入 v4.0 | 暂停 Researcher/TaskGraph/Desktop，优先修 Planning/Compaction/Reviewer |
+
+### Gates 与架构层关系
+
+| Gate | 验证的架构层 | 关键模块 |
+|---|---|---|
+| **Gate-1** | Code Intelligence Layer + 部分 Agent Layer | Tree-sitter + Symbol Graph + Workspace Index |
+| **Gate-1.5** | Runtime Layer（Browser Agent Runtime）| Browser Planner 4 件基础 |
+| **Gate-2** | Agent Layer + Memory Layer + 部分 Runtime | Planner + Reviewer + Compaction 三者协同 |
+
+**vs 4 份 design 文档的引用关系**：
+- **AGENT_RUNTIME.md** 直接被 Gate-2 引用（4 角色契约）
+- **CODE_INTELLIGENCE.md** 直接被 Gate-1 引用（4 模块关系）
+- **BROWSER_PLANNER.md** 直接被 Gate-1.5 引用（Observe/Plan/Act/Recovery）
+- **CAPABILITY_MODEL.md** 跨 Gates 被引用（统一 Capability 抽象）
+
+---
+
+**最后更新**：2026-06-03（确立 4 层架构 + 5 阶段版本锚 + 3 Bets + 3 Gates，砍掉 18 项延后事项）
 **当前阶段**：Phase 1 Sprint 0（4 包 monorepo + 基础设施）
 **下次更新**：v1.0 release 时

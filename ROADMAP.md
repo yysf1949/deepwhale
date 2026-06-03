@@ -1,6 +1,7 @@
 # 🗺 deepwhale ROADMAP
 
 > **6 版本锚 × 13-17 个月（含风险系数），单人开发节奏**
+> **Hypothesis-Driven Roadmap（假设驱动开发路线图）**——3 个 Bets + 3 个 Gates
 >
 > **核心变化**（vs 初版 10 周版）：
 > 1. **时间锚从 10 周改为 13-17 个月**（v1.0 = Phase 1 = Claude Code Lite，3-4 月）
@@ -10,7 +11,7 @@
 > 5. **Constitution 9 层权威砍掉**（个人化产物，不适合 deepwhale）
 > 6. **保留所有已验证的正确决策**：Prefix-cache 4 机制提前到 v1.0 / StormBreaker / SanitizeToolPairing / i18n 第 1 行定对 / 强制 release 节奏
 >
-> **v3 重大架构升级**（2026-06-03，6.5/10 → 8.4/10 → 8.8/10）：
+> **v4 架构定型**（2026-06-03，6.5/10 → 8.4/10 → 8.8/10 → 假设驱动）：
 > 7. **Code Intelligence Layer 新增**（v1.5 基础 / v2.0 增强）—— 解决"10万行项目失明"
 > 8. **v2.5 独立插档做 Planning Framework**（Planner + Task Object + Plan Cache + Execution Boundary + DAG）—— 避免 v2 4 件太重
 > 9. **Computer Use 改兼容层**（Codex 协议优先，**不自研**）—— 节省 1 个月
@@ -19,6 +20,7 @@
 > 12. **Browser Agent v2.0/v3.0 拆分**（v2.0 = 4 件基础，v3.0 = 3 件增强）
 > 13. **Capability Model 统一抽象**（Tool/MCP/Plugin/Browser/Computer → 1 套 Capability Registry）
 > 14. **Agent Runtime 架构定型**（4 角色 Execution Boundary 强制、单 process 内 4 函数）
+> 15. **3 个 Technical Bets + 3 个 Release Gates**（**Hypothesis-Driven Roadmap** 关键结构）
 >
 > **4 份架构设计文档**（2026-06-03 完成）：
 > - [AGENT_RUNTIME.md](./design/AGENT_RUNTIME.md)：4 角色契约 + Task/Message/Context/Observation/Memory
@@ -27,18 +29,170 @@
 > - [BROWSER_PLANNER.md](./design/BROWSER_PLANNER.md)：Observe→Plan→Act→Recovery 循环
 > **原则**：只写架构 / 边界 / 职责 / 接口 / 数据流，**不写实现细节**
 
+---
+
+## Release Gates（**项目级止损机制，假设驱动**）
+
+> **核心思想**：ROADMAP 不只是"功能路线图"，而是**"假设驱动开发路线图"**。每个版本验证一个核心假设，假设失败 → 立即止损。
+
+### 3 个 Technical Bets（**决定项目成败的 3 个核心赌注**）
+
+| Bet | 等级 | 验证版本 | 失败后果 | 赌的是什么 |
+|---|---|---|---|---|
+| **Bet-1 Code Intelligence** | **P0** | v1.5 | Coding Agent 失败，项目失去核心价值 | Agent 能理解大型代码库（100K LOC） |
+| **Bet-2 Browser Planner** | **P1** | v2.0 | DeepWhale 退化为 Claude Code 级产品（仍有价值）| Agent 能稳定获取外部信息 |
+| **Bet-3 Long-Horizon Stability** | **P0** | v3.0 | Multi-Agent 失败，5 角色失去意义 | Agent 能持续 30-50 步不漂移 |
+
+**P0 vs P1 关键差异**：
+- **P0 失败 = 项目核心价值丧失**：必须 Kill Gate（暂停主线，优先修复）
+- **P1 失败 = 项目仍有价值**：Decision Gate（按成功率分支，不暂停）
+
+### 3 个 Release Gates（**版本发布前的硬性门槛**）
+
+#### Gate-1（v1.5 release 前）：Code Intelligence Kill Test
+
+**目标**：验证 Bet-1（Code Intelligence）
+
+**测试仓库**（任选 1 个或多个）：
+- Spring Boot
+- Kubernetes
+- LangChain
+- VSCode
+
+**规模**：50K+ LOC（**必须 100K LOC 也试一次**）
+
+**任务**：
+1. 定位某功能入口
+2. 分析完整调用链
+3. 找到修改点
+4. 输出修改方案
+
+**要求**：**20 分钟以内**完成
+
+**结果**：
+
+| 状态 | 行动 |
+|---|---|
+| **PASS** | → 进入 v2.0 开发 |
+| **FAIL** | → **停止 Browser / Computer Use / Desktop 开发**<br>→ 优先修复 Code Intelligence<br>→ 修好重测 Gate-1，PASS 后再进 v2.0 |
+
+**典型失败症状**（避免主观判断）：
+- 重复打开文件
+- 反复搜索
+- 修改错误位置
+- 上下文浪费
+- 20 分钟内未完成
+
+---
+
+#### Gate-1.5（v2.0 release 前）：Browser Viability Decision Gate
+
+**目标**：验证 Bet-2（Browser Planner）**是否值得继续投资**
+
+**测试场景**（4 类站点）：
+- GitHub
+- 官方文档站
+- Google
+- Amazon
+
+**任务**：搜索 / 点击 / 提取 / 翻页 / 返回结果
+
+**统计**：**Success Rate**（4 站点 × 5 任务 = 20 个样本）
+
+**结果**：
+
+| 成功率 | 行动 |
+|---|---|
+| **≥ 80%** | → 继续 Browser Agent 增强（v3.0 的 3 件）<br>→ 走完整路线 v3.0 → v4.0 |
+| **50-80%** | → **进入降级路线**<br>→ 冻结 Browser Agent 增强<br>→ 保留 v2.0 4 件基础能力<br>→ 不开发 Visual Grounding / Adaptive Retry<br>→ 资源转向 Long-Horizon（v3.0 集中） |
+| **< 50%** | → **Browser Runtime 维持最小实现**<br>→ 后续版本不再投入<br>→ DeepWhale 定位回归：<br>　**Claude Code + Code Intelligence + Multi-Agent**<br>→ v3.0/v4.0 砍掉 Browser 增强 / 桌面 / Marketplace 中所有 Browser 相关项 |
+
+**为什么是 Decision Gate 而不是 Kill Gate**：
+- Browser 不是项目核心价值
+- 即使 < 50% 失败，DeepWhale 仍有：Claude Code Lite + Code Intelligence + Planner + Reviewer + Persistent Memory + MCP + Skills + Computer Use 兼容层
+- 这依然是一个有价值的产品
+
+---
+
+#### Gate-2（v3.0 release 前）：Long-Horizon Kill Test
+
+**目标**：验证 Bet-3（Long-Horizon Stability）
+
+**任务**：修复一个**真实 Bug**
+
+**完整流程**：
+1. 读代码
+2. 定位问题
+3. 修改
+4. 运行测试
+5. 修复失败
+6. 重新尝试
+7. 再次测试
+8. 完成
+
+**要求**：**连续 30-50 Tool Calls 保持目标一致**
+
+**结果**：
+
+| 状态 | 行动 |
+|---|---|
+| **PASS** | → 进入 v4.0（Researcher + 5 角色 + Persistent Memory） |
+| **FAIL** | → **暂停 Researcher / TaskGraph / Desktop** 开发<br>→ 集中修复 **Planning / Compaction / Reviewer** 三者协同<br>→ 修好重测 Gate-2，PASS 后再进 v4.0 |
+
+**典型失败症状**：
+- 第 30 步后忘记目标
+- 重复执行已失败的步骤
+- 无限循环同一工具调用
+- 上下文超出后丢失计划
+
+**为什么 Long-Horizon 是 P0 Kill Gate**：
+- Compaction + Planning + Review 三者协同是 Multi-Agent 基础
+- 失败 = 5 角色流水线失去意义
+- DeepSeek 长任务漂移不是模型问题，是**工程问题**（必须靠框架解决）
+
+---
+
+### Gates 时间线总览
+
+```
+v1.0 Coding Agent
+   ↓
+v1.5 Code Intelligence
+   ↓
+[Gate-1: Code Intelligence Kill Test]
+   ├─ PASS → 继续
+   └─ FAIL → 暂停，修复
+   ↓
+v2.0 Browser Intelligence（Observe）
+   ↓
+[Gate-1.5: Browser Viability Decision Gate]
+   ├─ ≥80%  → 继续 v3.0
+   ├─ 50-80% → 降级路线
+   └─ <50%  → 砍 Browser 投资
+   ↓
+v2.5 Planning Framework
+   ↓
+v3.0 Long-Horizon Execution
+   ↓
+[Gate-2: Long-Horizon Kill Test]
+   ├─ PASS → 继续 v4.0
+   └─ FAIL → 暂停，修复
+   ↓
+v4.0 Autonomous Agent OS
+```
+
 ## 演进路径（Observe → Plan → Execute+Review → Research）
 
-DeepWhale 6 个版本形成清晰的 5 步能力演进：
+DeepWhale 6 个版本形成清晰的 5 步能力演进 + 3 个 Release Gates 守护：
 
-| 版本 | 能力主题 | 验证什么 | 关键模块 |
-|---|---|---|---|
-| **v1.0** | Coding Agent | 6 工具 + Linear Session | Executor |
-| **v1.5** | 大型仓库理解 | Tree-sitter + Symbol Graph + Code Intel 基础 | Code Intelligence Layer |
-| **v2.0** | **Observe** | 真实 Browser Planner + Memory Ranking + Code Intel 增强 | Browser Agent 基础 + Memory Ranking |
-| **v2.5** | **Plan** | Planning Framework（Planner + DAG + Task Object + Plan Cache + Boundary）| Planner Agent |
-| **v3.0** | **Execute + Review** | Browser Agent 增强 + Reviewer + Computer Use 兼容层 | Reviewer + Computer Use 兼容层 |
-| **v4.0** | **Research + Long-running** | 5 角色 + TaskGraph + Persistent Memory + Desktop | Researcher + Agent OS |
+| 版本 | 能力主题 | 验证什么 | Release Gate | 关键模块 |
+|---|---|---|---|---|
+| **v1.0** | Coding Agent | 6 工具 + Linear Session | — | Executor |
+| **v1.5** | 大型仓库理解 | Tree-sitter + Symbol Graph + Code Intel 基础 | **[Gate-1 Kill Test](#gate-1v15-release-前code-intelligence-kill-test)** | Code Intelligence Layer |
+| **v2.0** | **Observe** | 真实 Browser Planner 4 件 + Memory Ranking + Code Intel 增强 | **[Gate-1.5 Decision](#gate-15v20-release-前browser-viability-decision-gate)** | Browser Agent 基础 + Memory Ranking |
+| **v2.5** | **Plan** | Planning Framework（Planner + DAG + Task Object + Plan Cache + Boundary）| — | Planner Agent |
+| **v3.0** | **Execute + Review** | Browser Agent 增强 3 件 + Reviewer + Computer Use 兼容层 | **[Gate-2 Kill Test](#gate-2v30-release-前long-horizon-kill-test)** | Reviewer + Computer Use 兼容层 |
+| **v4.0** | **Research + Long-running** | 5 角色 + TaskGraph + Persistent Memory + Desktop | — | Researcher + Agent OS |
 
 **总览表**：
 
@@ -686,10 +840,13 @@ deepwhale>
 | Browser Runtime 跨浏览器一致 | 中 | Playwright 抽象足够，**不做自定义协议** |
 | Computer Use OS 差异 | 高 | v3.0 主要验证 macOS + Linux X11，Windows v3.0 不做 |
 | Reasonix 1.0 6 周未发 | 中 | **强制 release 节奏**（每周一 minor，**v1.0/v1.5/v2.0/v3.0/v4.0 必发**） |
-| **项目成功概率** | 评估 | 严格执行（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **80%+** |
-| **Code Intelligence 实际效果** | 高 | v1.5 基础先验（Tree-sitter + Symbol Graph），v2.0 增强前先实测，不要写完才发现效果差 |
-| **Browser Planner 鲁棒性** | 高 | 真实场景（淘宝/京东/Amazon）必须过；失败自动重试 + 改 selector |
-| **DeepSeek 长任务稳定性** | 中 | 长 session 必须能恢复 + Compaction 不能崩 |
+| **项目成功概率** | 评估 | 严格执行（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **80-85%** |
+| **Bet-1 Code Intelligence**（**P0**）| **P0 Kill** | [Gate-1 守护](./ROADMAP.md#gate-1v15-release-前code-intelligence-kill-test)：v1.5 不通过 → 暂停 Browser/Computer/Desktop，优先修 |
+| **Bet-2 Browser Planner**（**P1**）| **P1 Decision** | [Gate-1.5 守护](./ROADMAP.md#gate-15v20-release-前browser-viability-decision-gate)：v2.0 通过率决定路线（≥80% 完整 / 50-80% 降级 / <50% 砍 Browser 投资） |
+| **Bet-3 Long-Horizon Stability**（**P0**）| **P0 Kill** | [Gate-2 守护](./ROADMAP.md#gate-2v30-release-前long-horizon-kill-test)：v3.0 不通过 → 暂停 Researcher/TaskGraph/Desktop，优先修 Planning/Compaction/Reviewer |
+| **Code Intelligence 实际效果** | 高（P0）| v1.5 基础先验（Tree-sitter + Symbol Graph），v2.0 增强前先实测 |
+| **Browser Planner 鲁棒性** | 中（P1）| Gate-1.5 通过率决定（不是非黑即白——有降级路线） |
+| **DeepSeek 长任务稳定性** | **高（P0）** | Compaction + Planning + Reviewer 三者协同（不是单点修复） |
 | StormBreaker 漏判 | 中 | **用 (tool, error) 签名不用 args** |
 | Hermes footer 数字收敛 bug | 低 | **多字段同值时去冗余/加标签区分** |
 | Hermes i18n 路径错 | 低 | **Sprint 0 第 1 行定对** |
