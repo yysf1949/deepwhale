@@ -1,18 +1,20 @@
 /**
  * Print 模式 — Sprint 1a
  *
- * 一次性 chat + tool loop：接 stdin prompt（不是从 readline），跑完退出。
+ * 一次性 chat（默认）+ tool loop：接 -p prompt，跑完退出。
  *
  * 用法：
  *   deepwhale -p "列出当前目录"
- *   echo "..." | deepwhale -p ""    # 从 stdin 读 prompt
  *
  * 行为契约：
- *   - 接 tool loop（默认）+ session（可选）
+ *   - enableToolLoop=true（默认）：接 tool loop（runToolLoop + createDefaultRegistry）
+ *   - enableToolLoop=false（--no-tool-loop）：纯 chat，**完全不暴露 tools schema 给 LLM**，
+ *     不调任何工具。即使 LLM 想调 tool_calls，client 端 tools=undefined，
+ *     LLM 服务端收到请求 schema 不含 tools，会回纯文本 content。
  *   - 流式输出到 stdout（不缓冲）
  *   - 退出码：0 正常 / 1 错误 / 2 用法错
  *
- * Sprint 1a 简化：不读 stdin（Sprint 0.3 同），只读 -p 参数。
+ * Sprint 1a 简化：不读 stdin，只读 -p 参数。
  */
 
 import process from 'node:process';
@@ -69,17 +71,49 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
       { role: 'user', content: options.prompt },
     ];
 
-    // 调 tool loop（流式 + 实时打印）
+    // 调 LLM。两种模式分支:
+    //   - enableToolLoop=true (默认): 走 runToolLoop, 创 registry, 让 LLM 能调 tool
+    //   - enableToolLoop=false (--no-tool-loop): 走 client.stream 直发,
+    //     tools 字段不传, 强制 LLM 服务端 schema 里不出现 tool, 不会产生 tool_calls
     let result: ToolLoopResult;
     try {
-      const maxSteps = enableToolLoop ? options.maxSteps : 1;
-      result = await runToolLoop(client, turnMessages, {
-        registry: createDefaultRegistry(),
-        onChunk: (chunk) => {
-          if (chunk.content) process.stdout.write(chunk.content);
-        },
-        ...(maxSteps !== undefined ? { maxSteps } : {}),
-      });
+      if (enableToolLoop) {
+        result = await runToolLoop(client, turnMessages, {
+          registry: createDefaultRegistry(),
+          onChunk: (chunk) => {
+            if (chunk.content) process.stdout.write(chunk.content);
+          },
+          ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
+        });
+        printStepSummary(result.steps);
+      } else {
+        // --no-tool-loop: 真关闭 tool calling。流式 + tools=undefined,
+        // 让 LLM 服务端只回 content, 不返回 tool_calls 字段。
+        // stream() 内部已累加好 final.content, 这里只负责把增量实写到 stdout。
+        // 注意: client.stream 的 onChunk 接 ChatChunk, content 在 delta.content 上
+        // (与 runToolLoop 的 onChunk 签名不同, 后者直接 .content)。
+        const streamResult = await client.stream(turnMessages, {
+          onChunk: (chunk) => {
+            if (chunk.delta.content) process.stdout.write(chunk.delta.content);
+          },
+        });
+        // 包装成 ToolLoopResult 形态,让 caller 持久化逻辑无感
+        result = {
+          messages: [
+            ...turnMessages,
+            { role: 'assistant', content: streamResult.content },
+          ],
+          final: streamResult,
+          steps: [
+            {
+              kind: 'assistant',
+              ts: Date.now(),
+              message: { role: 'assistant', content: streamResult.content },
+              result: streamResult,
+            },
+          ],
+        };
+      }
     } catch (e) {
       if (isToolLoopError(e)) {
         process.stderr.write(`\nerror: tool loop hit max steps (${e.steps})\n`);
@@ -88,10 +122,6 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
       }
       return 1;
     }
-
-    // 流式已实时打印 final content;非流式分支(no onChunk)此处补打印一次。
-    // Sprint 1a print 模式总是传 onChunk,所以这里不再重复打印。
-    printStepSummary(result.steps);
 
     // 持久化 steps
     if (writer) {

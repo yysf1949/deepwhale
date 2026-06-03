@@ -192,6 +192,49 @@ describe('runPrintMode — Sprint 1a follow-up', () => {
       stdoutSpy.mockRestore();
     }
   });
+
+  it('P3 follow-up: --no-tool-loop (enableToolLoop=false) 不创 registry, 不走 runToolLoop, 也不让 LLM 看到 tools schema', async () => {
+    // 之前 bug: enableToolLoop=false 只把 maxSteps=1, 仍跑 runToolLoop + createDefaultRegistry。
+    // 这意味着:
+    //   - LLM 服务端收到请求 body.tools 字段不为空(registry 里所有 tool schema 都进去了)
+    //   - LLM 完全可以发 tool_calls, 1 step 撞 limit 然后抛错
+    // 修后: --no-tool-loop 真关闭, 走 client.stream 直发, options.tools=undefined
+    //   (DeepSeekClient.buildRequestBody 看到 undefined 就不会发 tools 字段)。
+    const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'pure' }] });
+    let toolsSeenInStreamCall: unknown = 'never-called';
+    // 包装 stream 拦截 options, 验证 LLM 端没收到 tools
+    const realStream = client.stream as unknown as ReturnType<typeof vi.fn>;
+    const wrappedStream = vi.fn(
+      async (msgs: ChatMessage[], options: { tools?: unknown; onChunk: (chunk: ChatChunk) => void }) => {
+        toolsSeenInStreamCall = options.tools;
+        return realStream(msgs, options);
+      },
+    );
+    // 替换 mock client 的 stream 为包装版
+    (client as { stream: typeof wrappedStream }).stream = wrappedStream;
+    const stdoutChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((data) => {
+      stdoutChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    try {
+      const code = await runPrintMode({ prompt: 'no tool pls', client, enableToolLoop: false });
+      expect(code).toBe(0);
+      // 验证 1: client.stream 被调用(说明走了直发路径, 不调 runToolLoop)
+      expect(wrappedStream).toHaveBeenCalledTimes(1);
+      // 验证 2: client.chat 不应被调用(enableToolLoop=false 不走 chat 路径)
+      expect(client.chat).not.toHaveBeenCalled();
+      // 验证 3: LLM 端拿到的 options.tools 必须是 undefined, 不会发 tools schema
+      expect(toolsSeenInStreamCall).toBeUndefined();
+      // 验证 4: 业务结果: 增量打印 'pure' 到 stdout
+      expect(stdoutChunks.join('')).toContain('pure');
+      // 验证 5: seen.messages 收到 user 消息(单轮, user 进 LLM)
+      expect(seen.messages).toHaveLength(1);
+      expect(seen.messages[0]?.at(-1)).toEqual({ role: 'user', content: 'no tool pls' });
+    } finally {
+      stdoutSpy.mockRestore();
+    }
+  });
 });
 
 // =====================================================================
@@ -269,5 +312,56 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
     expect(turn2.at(-1)).toEqual({ role: 'user', content: 'Q2' });
     // 至少有一条 assistant 来自 turn 1
     expect(turn2.some((m) => m.role === 'assistant')).toBe(true);
+  });
+
+  it('P1 follow-up: close 后正在跑的 chat 仍要完整写完 stdout (no premature exit)', async () => {
+    // 之前 bug: rl.on('close') 立即 finish, 不会等 chain 排空。慢响应下,
+    // runRpcMode 提前 return, sendOk 还没写完 stdout, caller 看到响应被截断 / 丢失。
+    // 修后: close 触发后, 排队的 chat 必须等 in-flight chain drain 完才 finish。
+    // 验证路径: req.stream=true 触发 RPC 走 client.stream() (runToolLoop + onChunk),
+    // mock client 故意延迟 100ms 才 onChunk, input 立刻 end() 触发 close。
+    // 修复后: stdout 必含 SLOW_OK + id=1 response, runRpcMode 不会提前 return。
+    const { PassThrough } = await import('node:stream');
+    const input = new PassThrough();
+    const stdoutChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((data) => {
+      stdoutChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    // mock client: 故意 stream() 延迟 100ms 才 onChunk,模拟"慢响应"
+    const slowClient: LLMClient = {
+      model: 'mock' as ModelId,
+      chat: vi.fn(async (): Promise<ChatResult> => okResult('unused')),
+      stream: vi.fn(
+        async (
+          _msgs: ChatMessage[],
+          options: { onChunk: (chunk: ChatChunk) => void },
+        ): Promise<ChatResult> => {
+          await new Promise((r) => setTimeout(r, 100));
+          options.onChunk({ delta: { content: 'SLOW_OK' } });
+          return okResult('SLOW_OK');
+        },
+      ),
+    };
+    try {
+      const codePromise = runRpcMode({ client: slowClient, input });
+      // stream=true 触发 RPC 走 client.stream() 路径,验证慢响应 + close 同步发生
+      input.write(
+        `${JSON.stringify({ id: '1', method: 'chat', params: { prompt: 'Q', stream: true } })}\n`,
+      );
+      input.end();
+      const code = await codePromise;
+      expect(code).toBe(0);
+      // 关键: 慢响应内容必须已写完 stdout, response 必须包含 id=1
+      // SLOW_OK 既来自 chat.delta notification 也来自 final result.content,
+      // 协议上 result.content 是 LLM 输出, 必含; 修复前可能因 close 提前 finish 而缺失。
+      const all = stdoutChunks.join('');
+      expect(all).toContain('SLOW_OK');
+      expect(all).toMatch(/"id"\s*:\s*"1"/);
+      // 客户端必须真调到 stream 路径(不能 fallback 到 chat 路径)
+      expect(slowClient.stream).toHaveBeenCalledTimes(1);
+    } finally {
+      stdoutSpy.mockRestore();
+    }
   });
 });

@@ -480,6 +480,57 @@ describe('DeepSeekClient', () => {
       expect(result.content).toBe('hi');
     });
 
+    it('P2-D follow-up: [DONE] sentinel does not count as SSE parse failure', async () => {
+      // 之前 bug: parseSseEvent 对 [DONE] 返回 null, stream loop 把所有 null 算 sseParseFailures++,
+      // 正常流也刷 [deepwhale] warn: SSE parse failures: 1。修后 [DONE] 必须显式 skip 且不计数。
+      const events = [oaiDelta('a'), oaiDelta('b'), 'data: [DONE]'];
+      const { fn } = makeMockFetch(() => makeSseResponse(events, '\n'));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        const result = await c.stream(
+          [{ role: 'user', content: 'hi' }],
+          { onChunk: () => {} },
+        );
+        // 业务正确
+        expect(result.content).toBe('ab');
+        // 关键: stderr 不能出现 SSE parse failure warn
+        const warns = stderrSpy.mock.calls
+          .map((c) => String(c[0]))
+          .filter((s) => s.includes('SSE parse failures'));
+        expect(warns).toEqual([]);
+      } finally {
+        stderrSpy.mockRestore();
+      }
+    });
+
+    it('P2-D follow-up: [DONE] is skipped even when split mid-line across chunks', async () => {
+      // 真 wire-level 场景: data: [DONE] 行可能被 TCP chunk 边界切到两次。
+      // 我们的 buffer 累积 + 末尾 flush 路径都要把 [DONE] 识别出来,不能让它漏到 parseSseEvent 算 failure。
+      const enc = new TextEncoder();
+      const part1 = enc.encode('da');
+      const part2 = enc.encode('ta: [DONE]\n\n');
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(part1);
+          controller.enqueue(part2);
+          controller.close();
+        },
+      });
+      const { fn } = makeMockFetch(() => new Response(stream, { status: 200 }));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        await c.stream([{ role: 'user', content: 'hi' }], { onChunk: () => {} });
+        const warns = stderrSpy.mock.calls
+          .map((c) => String(c[0]))
+          .filter((s) => s.includes('SSE parse failures'));
+        expect(warns).toEqual([]);
+      } finally {
+        stderrSpy.mockRestore();
+      }
+    });
+
     it('flushes trailing buffer even when stream ends without trailing delimiter', async () => {
       // 真实 OAI 服务端通常 stream 以 \n\n 结尾,但有些实现 (curl --no-buffer) 不发最后一个 delimiter
       // client 的 "末尾 flush buffer" 分支必须覆盖这种情况

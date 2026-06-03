@@ -84,13 +84,19 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
   process.stderr.write('  notifications: stderr only\n');
 
   const rl: RLInterface = createInterface({ input: options.input ?? process.stdin, terminal: false });
-  let exitCode = 0;
   let exiting = false;
   // Sprint 1a follow-up:readline line event 不会 await handler,并发 dispatch 会让 workingMessages race。
   // 维护一个 in-flight chain,保证 request 串行处理,workingMessages 累积语义稳定。
+  //
+  // P1 follow-up:close/SIGINT 路径必须先 await chain,否则正在跑的 chat 写到一半就被 rl.close 砍掉,
+  // chat.delta notification / response 都会被截断,响应"晚到"或直接丢。
+  // 协议契约:close 触发后,已收到的 request 仍要完整处理完,只有 stdin 已关且 chain 排空才能 finish。
   let chain: Promise<void> = Promise.resolve();
+  // 标记"想退出",但不立刻 finish。close handler 会 await chain 再 finish。
+  let shouldExit = false;
+  let exitSignal: number = 0;
 
-  const finish = async (code: number): Promise<void> => {
+  const finish = async (): Promise<void> => {
     if (exiting) return;
     exiting = true;
     rl.close();
@@ -101,7 +107,12 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
         /* best-effort */
       }
     }
-    exitCode = code;
+  };
+
+  const requestShutdown = (code: number): void => {
+    if (shouldExit) return; // 已经处于 shutdown 流程,不要重复 signal
+    shouldExit = true;
+    exitSignal = code;
   };
 
   rl.on('line', (line: string) => {
@@ -142,19 +153,23 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
   });
 
   rl.on('close', () => {
-    void finish(0);
+    // stdin 关闭 → 标记退出,但不立刻 finish。finish 由 chain 排空触发。
+    requestShutdown(0);
   });
 
   process.on('SIGINT', () => {
-    void finish(0);
+    requestShutdown(0);
   });
   process.on('SIGTERM', () => {
-    void finish(0);
+    requestShutdown(0);
   });
 
-  // 阻塞直到 stdin 关闭
+  // 阻塞直到 stdin 关闭。close 之后,等 chain 排空再 cleanup。
   await new Promise<void>((resolve) => rl.once('close', () => resolve()));
-  return exitCode;
+  // P1 follow-up:等 chain 排空 + finish,才能保证 close 之后排队的 request 完整写完 stdout。
+  await chain;
+  await finish();
+  return exitSignal;
 }
 
 async function dispatch(

@@ -174,6 +174,10 @@ export class DeepSeekClient implements LLMClient {
           const event = buffer.slice(0, m.index);
           buffer = buffer.slice(m.index + m[0].length);
           delimRe.lastIndex = 0; // 每次切完后 buffer 头部变了,从头再来
+          // P2-D follow-up:[DONE] sentinel 是 OAI 协议正常终止标记,绝不能算 parse failure。
+          // 必须在 parseSseEvent 之前拦截,否则正常流也会刷 warn,污染 stderr 日志。
+          // 其他返回 null 的情况(heartbeat / comment / JSON 损坏)才是真正需要 warn 的失败。
+          if (isSseDoneSentinel(event)) continue;
           const parsed = parseSseEvent(event);
           if (parsed === null) {
             sseParseFailures += 1;
@@ -199,16 +203,19 @@ export class DeepSeekClient implements LLMClient {
       }
       // 末尾 flush buffer
       if (buffer.trim().length > 0) {
-        const parsed = parseSseEvent(buffer);
-        if (parsed) {
-          chunkCount += 1;
-          if (parsed.delta.content) assembledContent += parsed.delta.content;
-          if (parsed.delta.tool_calls) assembledToolCalls = [...parsed.delta.tool_calls];
-          if (parsed.usage) usage = parsed.usage;
-          if (parsed.finish_reason) finishReason = parsed.finish_reason;
-          options.onChunk(parsed);
-        } else {
-          sseParseFailures += 1;
+        // 同样先看 [DONE] sentinel,再走 parseSseEvent
+        if (!isSseDoneSentinel(buffer)) {
+          const parsed = parseSseEvent(buffer);
+          if (parsed) {
+            chunkCount += 1;
+            if (parsed.delta.content) assembledContent += parsed.delta.content;
+            if (parsed.delta.tool_calls) assembledToolCalls = [...parsed.delta.tool_calls];
+            if (parsed.usage) usage = parsed.usage;
+            if (parsed.finish_reason) finishReason = parsed.finish_reason;
+            options.onChunk(parsed);
+          } else {
+            sseParseFailures += 1;
+          }
         }
       }
       // Sprint 1a 修 P2-D:JSON parse 失败不再静默,在 stderr 留一行 warn(运维排查用)。
@@ -470,8 +477,34 @@ function parseOaiChatCompletion(json: unknown, fallbackModel: ModelId): ChatResu
 }
 
 /**
- * 解析单个 SSE event（`data: {...}\n` / `data: [DONE]\n`）。
+ * 判断 SSE event raw text 是否是 OAI 协议的 [DONE] 终止 marker。
+ * 在 parseSseEvent 之前调用,确保 [DONE] sentinel 不被算作 parse failure
+ * (P2-D follow-up: 之前会被静默归入 sseParseFailures++, 正常流也刷 warn)。
+ *
+ * 容忍: data: [DONE] / data:[DONE] / 多个 data: 行 / 前后空白 / CRLF。
+ */
+function isSseDoneSentinel(eventRaw: string): boolean {
+  // 扫所有 data: 行,看是否有且只有 [DONE]
+  let sawDataLine = false;
+  for (const ln of eventRaw.split('\n')) {
+    if (!ln.startsWith('data:')) continue;
+    const payload = ln.slice(5).trimStart();
+    if (payload === '[DONE]') {
+      sawDataLine = true;
+    } else {
+      // [DONE] event 不应混入别的 data
+      return false;
+    }
+  }
+  return sawDataLine;
+}
+
+/**
+ * 解析单个 SSE event（`data: {...}\n`）。
  * 返回 null 表示跳过该 event（heartbeat / comment / 解析失败）。
+ *
+ * 注意:[DONE] sentinel 由 isSseDoneSentinel 在调用方提前拦截,
+ * 本函数不再处理,避免重复路径让 caller 误算 parse failure。
  */
 function parseSseEvent(eventRaw: string): ChatChunk | null {
   const lines = eventRaw.split('\n');
@@ -484,7 +517,7 @@ function parseSseEvent(eventRaw: string): ChatChunk | null {
   }
   if (dataLines.length === 0) return null;
   const data = dataLines.join('\n');
-  if (data === '[DONE]') return null; // 终止 marker,不产生 chunk
+  // [DONE] sentinel 已被 isSseDoneSentinel 提前拦截,这里不再判断。
   let json: unknown;
   try {
     json = JSON.parse(data);
