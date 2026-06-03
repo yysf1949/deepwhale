@@ -123,7 +123,20 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       ...(options.provider !== undefined ? { provider: options.provider } : {}),
       ...(options.model !== undefined ? { model: options.model } : {}),
     });
-  const enableToolLoop = options.enableToolLoop ?? true;
+  // Sprint 1b.5 Step 2.5 (F3 拍板, R-G1 修正 2026-06-03): anthropic × tool loop 防护.
+  // - 落点: mode 层 (startRepl / runPrintMode / 后续 runRpcMode), 不**在** factory 改.
+  // - 触发: provider 是 anthropic (client.model 以 'claude-' 开头) + enableToolLoop !== false
+  // - 行为: stderr warning + 设 enableToolLoop=false (温柔降级, 不打断 user 第一轮)
+  // - 设计: 跟 1b 时代 '没 API key' stderr 风格一致, 引导 user 不阻断
+  const isAnthropic = client.model.startsWith('claude-');
+  const enableToolLoop =
+    options.enableToolLoop ?? (isAnthropic ? false : true); // anthropic 默认不**开** tool loop
+  if (isAnthropic && options.enableToolLoop !== false) {
+    err.write(
+      'warning: Anthropic provider in Sprint 1b.5 does not support tool loop; ' +
+        'auto-disabling tools. Use DeepSeek or wait for Sprint 1c tool schema conversion.\n',
+    );
+  }
   const sessionPath = options.sessionPath;
 
   // greeting
@@ -343,17 +356,18 @@ export function formatUsageStatus(usage: Usage | undefined): string | null {
   }
   // 满 usage: 完整 status
   const hitRatePct = ((usage.cache_hit_rate ?? 0) * 100).toFixed(0);
-  const cost = usage.cost_turn ?? 0;
-  // Sprint 1b.5 Step 2 (2.4 拍板): 读 cost_currency 决 symbol, 不在数字层做汇率换算.
-  // - 'CNY' → ¥ (Sprint 1b/1b.5 时代 DeepSeek V4-Flash 默认)
-  // - 'USD' → $ (Sprint 1b.5 Step 2 起 Anthropic Sonnet/Opus 走)
-  // - absent (R7 中间路径 / 老 Usage 没 cost_currency 字段) → '?' 显示 + 不报 cost 数字
-  //   让用户知道"这次没算 cost"
+  const uncached = formatTokens(usage.tokens_uncached ?? prompt_tokens);
+  // Sprint 1b.5 Step 2.5 (F5 拍板, review 2026-06-03 找到): cost_turn/cost_currency 都 absent
+  // (R7 中间路径 / F4 保守) → 安静少显示字段, **不**显示 'cost ?'. 跟 1b 拍板 "absent 安静"
+  // 一致. user 视角看 'cost ?/turn' 是 'UI 不知道' 不是 '这次没算', 显示 '?' 反而误导.
+  if (usage.cost_turn === undefined || usage.cost_currency === undefined) {
+    return `cache: ${hitRatePct}% | prompt ${formatTokens(prompt_tokens)} (${uncached} new)`;
+  }
+  // cost 字段齐: 读 cost_currency 决 symbol
   const symbol = formatCostSymbol(usage.cost_currency);
-  const costStr = usage.cost_currency === undefined
-    ? 'cost ?'
-    : (cost < 0.01 ? `${symbol}${cost.toFixed(4)}` : `${symbol}${cost.toFixed(3)}`);
-  return `cache: ${hitRatePct}% | ${costStr}/turn | prompt ${formatTokens(prompt_tokens)} (${formatTokens(usage.tokens_uncached ?? prompt_tokens)} new)`;
+  const cost = usage.cost_turn; // narrowed by 上面 if guard (cost_turn !== undefined)
+  const costStr = cost < 0.01 ? `${symbol}${cost.toFixed(4)}` : `${symbol}${cost.toFixed(3)}`;
+  return `cache: ${hitRatePct}% | ${costStr}/turn | prompt ${formatTokens(prompt_tokens)} (${uncached} new)`;
 }
 
 /** cost_currency → 显示 symbol. 不在 UI 层做汇率换算. */
@@ -382,18 +396,27 @@ function appendUsageStatus(usage: Usage | undefined, err: NodeJS.WritableStream)
 
 function formatError(e: unknown): string {
   if (e instanceof APIKeyMissingError) return t('error.api_key_missing');
-  if (e instanceof LLMAuthError) return t('cli.error.auth', String(e.status));
+  if (e instanceof LLMAuthError) {
+    // Sprint 1b.5 Step 2.5 修: tsc strict 看 LLMAuthError.status 在 .status 上
+    return t('cli.error.auth', String((e as { status: number }).status));
+  }
   if (e instanceof LLMRateLimitError) return t('cli.error.rate_limit');
   if (e instanceof LLMNetworkError) {
-    const msg = e.cause instanceof Error ? e.cause.message : e.message;
+    const err = e as { cause?: unknown; message: string };
+    const msg = err.cause instanceof Error ? err.cause.message : err.message;
     return t('cli.error.network', msg);
   }
-  if (e instanceof LLMStreamError) return t('cli.error.stream', e.message);
+  if (e instanceof LLMStreamError) {
+    return t('cli.error.stream', (e as Error).message);
+  }
   if (e instanceof LLMUnknownError) {
-    const detail = e.status !== undefined ? `HTTP ${e.status}` : e.message;
+    const err = e as { status?: number; message: string };
+    const detail = err.status !== undefined ? `HTTP ${err.status}` : err.message;
     return t('cli.error.unknown', detail);
   }
-  if (e instanceof ToolLoopLimitError) return t('cli.tool_loop_limit', e.steps);
+  if (e instanceof ToolLoopLimitError) {
+    return t('cli.tool_loop_limit', (e as { steps: number }).steps);
+  }
   if (isLLMError(e)) return t('cli.error.unknown', e.message);
   if (e instanceof Error) return t('cli.error.unknown', e.message);
   return t('cli.error.unknown', String(e));

@@ -285,9 +285,9 @@ describe('formatUsageStatus (Sprint 1b)', () => {
     expect(line).not.toMatch(/¥/);
   });
 
-  it('Sprint 1b.5 Step 2 (2.4 拍板): cost_currency absent (R7 中间路径) → "cost ?" 占位', () => {
+  it('Sprint 1b.5 Step 2.5 (F5 拍板): cost_currency absent (R7 中间路径) → 安静省略 cost segment', () => {
     // R7: pricing 找不到 model / pricing undefined / 老 Usage 没 cost_currency 字段
-    // → cost_currency undefined → 'cost ?' 不显示具体数字 (避免显示错的 cost)
+    // → cost_currency undefined → 安静少显示字段, **不**显示 'cost ?' (跟 1b 拍板 "absent 安静" 一致)
     const line = formatUsageStatus({
       prompt_tokens: 1000,
       completion_tokens: 100,
@@ -298,7 +298,12 @@ describe('formatUsageStatus (Sprint 1b)', () => {
       // cost_currency: undefined (R7 中间路径)
       tokens_uncached: 100,
     });
-    expect(line).toMatch(/cost \?\/turn/);
+    // F5: cost 段完全省略, 不显示 'cost ?'
+    expect(line).toMatch(/cache: 90%/);
+    expect(line).toMatch(/prompt 1\.0k/);
+    expect(line).toMatch(/100 new/);
+    expect(line).not.toMatch(/cost \?/);
+    expect(line).not.toMatch(/turn/);
     expect(line).not.toMatch(/¥/);
     expect(line).not.toMatch(/\$/);
   });

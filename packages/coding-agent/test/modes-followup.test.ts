@@ -484,8 +484,81 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
 });
 
 // =====================================================================
-// Sprint 1b: print 退出后打 usage summary 到 stderr
+// Sprint 1b.5 Step 2.5 (F3 拍板): mode 层 anthropic × tool loop 防护
 // =====================================================================
+
+describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', () => {
+  /**
+   * F3 拍板: anthropic provider + enableToolLoop 不显式传 → mode 层自动关 tool loop + stderr
+   * warning. 设计意图 = 温柔降级, 不阻断 user 第一轮.
+   *
+   * 关键: 验**没**走 runToolLoop 路径 (即 client.chat 没被调), 走了 client.stream 直发路径.
+   * 验 stderr 含特定 warning 文案 (跟 1b 时代 "no API key" stderr 风格一致).
+   */
+  it('F3-A: anthropic client + enableToolLoop=undefined → stderr warning + 走 client.stream (不跑 tool loop)', async () => {
+    // mock client model 必须以 'claude-' 开头, 触发 F3 startsWith 检查
+    const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'anthropic says hi' }] });
+    // 直接改 model 字段 (不 spread, 保留 vi.fn 引用)
+    (client as { model: ModelId }).model = 'claude-sonnet-4-5' as ModelId;
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
+      stderrChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    const stdoutChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((data) => {
+      stdoutChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    try {
+      // 关键: enableToolLoop 不传, 让 mode 层自己判断
+      const code = await runPrintMode({ prompt: 'hi', client });
+      expect(code).toBe(0);
+      // 验证 1: stderr 必含 F3 warning 文案
+      const stderrAll = stderrChunks.join('');
+      expect(stderrAll).toMatch(/warning: Anthropic provider in Sprint 1b\.5 does not support tool loop/);
+      expect(stderrAll).toMatch(/auto-disabling tools/);
+      // 验证 2: 走了 client.stream 路径 (F3 触发 enableToolLoop=false)
+      expect(client.stream).toHaveBeenCalledTimes(1);
+      // 验证 3: client.chat **没**被调 (走 tool loop 才调 chat)
+      expect(client.chat).not.toHaveBeenCalled();
+      // 验证 4: LLM 看到了 user prompt
+      expect(seen.messages).toHaveLength(1);
+      expect(seen.messages[0]?.at(-1)).toEqual({ role: 'user', content: 'hi' });
+    } finally {
+      stdoutSpy.mockRestore();
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it('F3-B: deepseek client + enableToolLoop=undefined → stderr 无 F3 warning + 走 client.chat (tool loop 默认开)', async () => {
+    // 对照: deepseek model 不以 'claude-' 开头, F3 防护**不**触发, 走默认 tool loop 路径
+    const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'deepseek says hi' }] });
+    (client as { model: ModelId }).model = 'deepseek-v4-flash' as ModelId;
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
+      stderrChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      const code = await runPrintMode({ prompt: 'hi', client });
+      expect(code).toBe(0);
+      // 验证 1: stderr **不**含 F3 warning
+      const stderrAll = stderrChunks.join('');
+      expect(stderrAll).not.toMatch(/Anthropic provider in Sprint 1b\.5/);
+      // 验证 2: 走了 client.stream 路径 (runToolLoop 内部 runStreamStep 调 stream, 因 onChunk 必传)
+      expect(client.stream).toHaveBeenCalledTimes(1);
+      // 验证 3: client.chat **没**被调 (runToolLoop 不会走 chat 分支, 因 onChunk 必传)
+      expect(client.chat).not.toHaveBeenCalled();
+      // 验证 4: LLM 看到了 user prompt
+      expect(seen.messages[0]?.at(-1)).toEqual({ role: 'user', content: 'hi' });
+    } finally {
+      stdoutSpy.mockRestore();
+      stderrSpy.mockRestore();
+    }
+  });
+});
 
 describe('runPrintMode — Sprint 1b usage summary', () => {
   it('Sprint 1b #2: print 退出后 stderr 必含 cache/cost summary (跟 REPL 状态栏同一格式)', async () => {

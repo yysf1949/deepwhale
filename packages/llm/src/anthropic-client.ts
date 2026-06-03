@@ -338,23 +338,37 @@ function mapStopReason(stopReason: AnthropicMessage['stop_reason']): ChatResult[
 
 /**
  * 把 Anthropic Usage 翻译成标准化 Usage 结构 (带 cache/cost 字段).
- * B1 拍板: cached_tokens = (cache_creation ?? 0) + (cache_read ?? 0).
+ *
+ * B1 拍板 (Sprint 1b.5 Step 2): cached_tokens = (cache_creation ?? 0) + (cache_read ?? 0).
+ *
+ * ⚠️ 重要语义修正 (F4 拍板 2026-06-03, review 找到):
+ * Anthropic 官方 prompt caching 文档: total input tokens = input_tokens + cache_creation_input_tokens
+ * + cache_read_input_tokens. 之前 Step 2 写时把 input_tokens 当"总 prompt" 是错的, 漏算 cache
+ * 字段对应的 token 总量. 修法:
+ *
+ * - total_prompt = input_tokens + cache_creation + cache_read
+ * - cached_tokens = cache_creation + cache_read (跟 Step 2 一致)
+ * - tokens_uncached = total_prompt - cached_tokens = input_tokens (不变量)
+ * - cache_hit_rate = cached_tokens / total_prompt (cache 命中率, 包括 write + read)
+ *
+ * **Cost 1b.5 保守策略** (F4 拍板): cache_creation 跟 cache_read 价格不同 (Sonnet 1h TTL write
+ * \$3.75/M, read \$0.30/M, 比例 12.5×), 1b.5 pricing 模型**不**拆 cache_write vs cache_read 字段.
+ * 为避免假装知道 cache_creation 价格, **保守**: cache_creation OR cache_read 任一非零 →
+ * cost_turn/cost_currency 字段 absent. 留 sprint 2 加 `cache_write_per_m` 字段.
+ * - 注意: tokens_uncached 仍**可**算 (是 input_tokens, 跟 cache 字段无关), 不受 cost 限制
  *
  * 接受 Usage | MessageDeltaUsage (后者无 cache_creation / cache_read, 视为 0).
- * Sprint 1b.5 Step 2: AnthropicMessage.usage 是完整 Usage, 流末尾 message_delta
- * 拿到的 event.usage 是 MessageDeltaUsage (只有 output_tokens + cache_creation +
- * cache_read, 没 input_tokens). 统一视为 0 cache_creation/cache_read 处理.
+ * Sprint 1b.5 Step 2: 流末尾 message_delta event.usage 是 MessageDeltaUsage, 走 delta 路径
+ * 不算 cost, 真实生产靠 stream.finalMessage() 拿完整 Usage.
  */
 export function parseAnthropicUsage(
   usage: AnthropicUsage | MessageDeltaUsage,
   fallbackModel: ModelId,
   pricing?: PricingConfig,
 ): Usage | undefined {
-  // AnthropicUsage (完整): 有 input_tokens + output_tokens + cache_creation + cache_read
   // MessageDeltaUsage (流末尾 message_delta 事件): 只有 output_tokens, 拿不到 input/cache.
   //   → 视为 delta 增量, 不算完整 cost. 真实生产靠 stream.finalMessage() 拿完整 Usage.
   if (!('input_tokens' in usage)) {
-    // 流中 message_delta event: 只透出 output_tokens, 不算 cost / cache.
     return {
       prompt_tokens: 0,
       completion_tokens: usage.output_tokens,
@@ -363,27 +377,37 @@ export function parseAnthropicUsage(
   }
   // 此后 usage 一定是 AnthropicUsage (有 input_tokens + cache_creation + cache_read)
   const full = usage as AnthropicUsage;
-  const prompt = full.input_tokens;
-  const completion = full.output_tokens;
-  // B1: 合并 cache 字段. cache_creation / cache_read 都可能 null.
+  // F4 修正: total_prompt = input + cache_creation + cache_read (官方文档)
   const cacheCreation = full.cache_creation_input_tokens ?? 0;
   const cacheRead = full.cache_read_input_tokens ?? 0;
   const cached = cacheCreation + cacheRead;
-  const total = prompt + completion;
+  const totalPrompt = full.input_tokens + cached;
+  const completion = full.output_tokens;
+  const total = totalPrompt + completion;
   const out: Usage = {
-    prompt_tokens: prompt,
+    prompt_tokens: totalPrompt, // 跟 DeepSeek OAI shape 字段对齐 (prompt = 全部输入, 含 cache)
     completion_tokens: completion,
     total_tokens: total,
   };
   if (cached > 0) out.cached_tokens = cached;
-  // 跟 parseOaiSseUsageField 一致, 透传 pricing + model 给 computeCost
-  // 注意: cached=0 也算 cost (只是 0 cache hit). 跟 1b P1 (P2-D follow-up) 行为一致.
-  const breakdown = computeCost(pricing, fallbackModel, prompt, completion, cached);
-  if (breakdown !== undefined) {
-    out.cache_hit_rate = breakdown.cache_hit_rate;
-    if (breakdown.cost_turn !== undefined) out.cost_turn = breakdown.cost_turn;
-    if (breakdown.cost_currency !== undefined) out.cost_currency = breakdown.cost_currency;
-    out.tokens_uncached = breakdown.tokens_uncached;
+  // tokens_uncached 仍算 (跟 cache 字段无关, 跟 computeCost 内部算的 uncached 一致)
+  if (cached > 0) out.tokens_uncached = full.input_tokens; // = totalPrompt - cached
+  // F4 保守: cache_creation OR cache_read 非零 → cost_turn 字段 absent. 留 sprint 2 加 cache_write_per_m 字段.
+  // 1b.5 pricing 模型只有 cache_miss / cache_hit / completion, 不能区分 cache_creation 跟
+  // cache_read 的不同价. 假装按 cache_hit 价算 cache_creation 会**低估** Sonnet 12.5×.
+  if (cached === 0) {
+    // 跟 parseOaiSseUsageField 一致, 透传 pricing + model 给 computeCost
+    // cached=0 (LLM 显式说 0 cache hit) → 走完整 4 字段路径, 跟 OAI shape 对齐
+    const breakdown = computeCost(pricing, fallbackModel, totalPrompt, completion, 0);
+    if (breakdown !== undefined) {
+      out.cache_hit_rate = breakdown.cache_hit_rate;
+      if (breakdown.cost_turn !== undefined) out.cost_turn = breakdown.cost_turn;
+      if (breakdown.cost_currency !== undefined) out.cost_currency = breakdown.cost_currency;
+      out.tokens_uncached = breakdown.tokens_uncached;
+    }
+  } else {
+    // cache_creation OR cache_read 非零: cost 字段 absent, 但 cache_hit_rate 仍算 (观测)
+    out.cache_hit_rate = totalPrompt > 0 ? cached / totalPrompt : 0;
   }
   return out;
 }

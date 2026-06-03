@@ -18,7 +18,7 @@
  */
 
 import process from 'node:process';
-import { DeepSeekClient, type ChatMessage, type LLMClient } from '@deepwhale/llm';
+import { type ChatMessage, type LLMClient } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
 import {
   isToolLoopError,
@@ -30,19 +30,43 @@ import {
 } from '../agent/index.js';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { formatUsageStatus } from '../repl.js';
+import { createDefaultClient, type Provider } from '../llm-factory.js';
 
 export interface PrintModeOptions {
   prompt: string;
   sessionPath?: string;
   enableToolLoop?: boolean;
   maxSteps?: number;
-  /** 注入 LLM 客户端（默认 DeepSeekClient）。Sprint 1a follow-up:单测用。 */
+  /**
+   * 注入 LLM 客户端（默认 createDefaultClient env 推断, Sprint 1b.5 Step 2.5 C3 拍板）。
+   * Sprint 1a follow-up: 单测用。
+   */
   client?: LLMClient;
+  /** Sprint 1b.5 Step 2.5: 显式 provider, 跟 env 推断冲突时优先. */
+  provider?: Provider;
+  /** Sprint 1b.5 Step 2.5: 显式 model. 不传则用 provider 默认. */
+  model?: string;
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<number> {
-  const client: LLMClient = options.client ?? new DeepSeekClient();
-  const enableToolLoop = options.enableToolLoop ?? true;
+  // Sprint 1b.5 Step 2.5: print mode 跟 startRepl 一样, 用 createDefaultClient 让 provider
+  // 走 env 推断 + 显式 provider 优先 (C3 拍板). 不再写死 DeepSeekClient.
+  const client: LLMClient =
+    options.client ??
+    createDefaultClient({
+      ...(options.provider !== undefined ? { provider: options.provider } : {}),
+      ...(options.model !== undefined ? { model: options.model } : {}),
+    });
+  // Sprint 1b.5 Step 2.5 (F3 拍板, R-G1 修正 2026-06-03): anthropic × tool loop 防护 (mode 层).
+  const isAnthropic = client.model.startsWith('claude-');
+  const enableToolLoop =
+    options.enableToolLoop ?? (isAnthropic ? false : true);
+  if (isAnthropic && options.enableToolLoop !== false) {
+    process.stderr.write(
+      'warning: Anthropic provider in Sprint 1b.5 does not support tool loop; ' +
+        'auto-disabling tools. Use DeepSeek or wait for Sprint 1c tool schema conversion.\n',
+    );
+  }
   const sessionPath = options.sessionPath;
 
   // session 加载

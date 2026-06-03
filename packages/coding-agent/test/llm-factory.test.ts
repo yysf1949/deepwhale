@@ -69,7 +69,10 @@ describe('llm-factory — 显式 provider 优先 (不读 env)', () => {
     expect(client.model).toBe('deepseek-v4-flash');
   });
 
-  it('5. 显式 provider=anthropic, env 都没设 → 走 anthropic (不报错)', () => {
+  it('5. 显式 provider=anthropic, env 显式设 ANTHROPIC_AUTH_TOKEN → 走 anthropic (不报错, client 读 env)', () => {
+    // Sprint 1b.5 Step 2.5 (F1 拍板): factory anthropic 路径**不**传 apiKey, 让 client
+    // 内部 resolveApiKey() 读 env. 测试**必须**显式设 env, 验证 client 真的能 resolve.
+    process.env['ANTHROPIC_AUTH_TOKEN'] = 'test-anthropic-key';
     const client = createDefaultClient({ provider: 'anthropic' });
     expect(client.model).toBe('claude-sonnet-4-5');
   });
@@ -86,7 +89,8 @@ describe('llm-factory — 显式 provider 优先 (不读 env)', () => {
     expect(client.model).toBe('deepseek-v4-pro');
   });
 
-  it('8. 显式 model=claude-opus-4-5, provider=anthropic → 透传 model', () => {
+  it('8. 显式 model=claude-opus-4-5, provider=anthropic → 透传 model (env 设了 key)', () => {
+    process.env['ANTHROPIC_AUTH_TOKEN'] = 'test-anthropic-key';
     const client = createDefaultClient({ provider: 'anthropic', model: 'claude-opus-4-5' });
     expect(client.model).toBe('claude-opus-4-5');
   });

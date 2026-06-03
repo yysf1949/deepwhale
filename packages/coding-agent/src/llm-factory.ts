@@ -40,15 +40,27 @@ export function createDefaultClient(options: CreateClientOptions = {}): LLMClien
     case 'deepseek':
       return new DeepSeekClient({ ...(options.model !== undefined ? { model: options.model } : {}) });
     case 'anthropic':
-      // Sprint 1b.5 Step 2 (2.5 拍板, X3 拍板): factory 在显式 provider + env 都没设时
-      // 不能让 AnthropicClient.constructor 抛 APIKeyMissingError (测试场景 + cli.ts 解析
-      // --provider=anthropic 后用户可能没及时设 env). 透传 'placeholder' 给 client, 真实
-      // 调用时才报 (mock fetch 触发 SDK error path).
-      return new AnthropicClient({
-        apiKey: 'placeholder', // X3 拍板: 不**接**真, 占位 key 让 constructor 过
-        ...(options.model !== undefined ? { model: options.model } : {}),
-      });
+      // Sprint 1b.5 Step 2.5 (F1 拍板, review 2026-06-03): 不**传** apiKey, 让 AnthropicClient
+      // 内部 resolveApiKey() 读 env. 之前传 'placeholder' 是测试 mock 路径留下的 bug, 会**盖**
+      // 真实 env ANTHROPIC_AUTH_TOKEN / DEEPSEEK_API_KEY, Step 3 真接会 401.
+      //
+      // X3 拍板: 测试场景单测 mock fetch, 不**走**真 HTTP, apiKey 走 env 也无所谓.
+      // 真要测试"不传 apiKey 时 constructor 抛" 的路径, 显式 inject options.apiKey.
+      return new AnthropicClient({ ...(options.model !== undefined ? { model: options.model } : {}) });
   }
+}
+
+/**
+ * 公开 env key 解析, 给 mode 层 (repl/print/rpc) 显式判断 provider 用.
+ * 跟 AnthropicClient.resolveApiKey 内部逻辑**保持一致**: ANTHROPIC_AUTH_TOKEN 优先,
+ * DEEPSEEK_API_KEY 退路. 不抛 (返 undefined 让 caller 决定).
+ */
+export function resolveAnthropicApiKey(): string | undefined {
+  const anthropic = process.env['ANTHROPIC_AUTH_TOKEN'];
+  if (anthropic !== undefined && anthropic !== '') return anthropic;
+  const deepseek = process.env['DEEPSEEK_API_KEY'];
+  if (deepseek !== undefined && deepseek !== '') return deepseek;
+  return undefined;
 }
 
 /**

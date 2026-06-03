@@ -98,7 +98,7 @@ currency         = "USD"
     expect(result.usage?.cost_currency).toBe('USD');
   });
 
-  it('6. cache_creation + cache_read 合并到 cached_tokens (B1 拍板)', () => {
+  it('6. cache_creation + cache_read 合并到 cached_tokens + total_prompt 包含 cache (F4 修正)', () => {
     const message = {
       id: 'msg_1',
       type: 'message' as const,
@@ -115,14 +115,18 @@ currency         = "USD"
       },
     };
     const result = parseAnthropicMessage(message, 'claude-sonnet-4-5' as ModelId, pricing);
-    // B1: 600 + 200 = 800 cached_tokens
+    // F4 修正: total_prompt = input + cache_creation + cache_read = 1000 + 600 + 200 = 1800
+    expect(result.usage?.prompt_tokens).toBe(1800);
+    // B1: cached = 600 + 200 = 800
     expect(result.usage?.cached_tokens).toBe(800);
-    expect(result.usage?.cache_hit_rate).toBeCloseTo(0.8);
-    // cost: cache_miss 200 (uncached) * 3.0 / 1e6 + cache_hit 800 * 0.30 / 1e6 + completion 100 * 15.0 / 1e6
-    //     = 0.0006 + 0.00024 + 0.0015 = 0.00234 USD
-    expect(result.usage?.cost_turn).toBeCloseTo(0.00234, 5);
-    expect(result.usage?.cost_currency).toBe('USD');
-    expect(result.usage?.tokens_uncached).toBe(200);
+    // cache_hit_rate = cached / total_prompt = 800 / 1800 ≈ 0.444
+    expect(result.usage?.cache_hit_rate).toBeCloseTo(0.444, 3);
+    // F4 保守: cache_creation (Sonnet $3.75/M) 跟 cache_read ($0.30/M) 价格差 12.5×,
+    // 1b.5 pricing 不拆 → cost_turn 字段 absent. 留 sprint 2 加 cache_write_per_m 字段.
+    expect(result.usage?.cost_turn).toBeUndefined();
+    expect(result.usage?.cost_currency).toBeUndefined();
+    // tokens_uncached 仍 = input_tokens (不变量: total_prompt - cached)
+    expect(result.usage?.tokens_uncached).toBe(1000);
   });
 
   it('7. cache_creation + cache_read 都 null → cached_tokens absent (无 cache)', () => {
@@ -143,6 +147,37 @@ currency         = "USD"
     };
     const result = parseAnthropicMessage(message, 'claude-sonnet-4-5' as ModelId, pricing);
     expect(result.usage?.cached_tokens).toBeUndefined();
+    // F4: cached=0 (cache_creation + cache_read 都 null) → 走完整 4 字段路径
+    expect(result.usage?.cost_currency).toBe('USD');
+    // cost: 100/1e6 * 3.0 + 50/1e6 * 15.0 = 0.0003 + 0.00075 = 0.00105
+    expect(result.usage?.cost_turn).toBeCloseTo(0.00105, 5);
+  });
+
+  it('6b. F4: cache_creation 单独非零 (新建 cache) → cost absent (留 sprint 2)', () => {
+    // 1b.5 不拆 cache_write 价, 1b.5 保守: cost_turn absent. 但 cache_hit_rate 仍算
+    const message = {
+      id: 'msg_1',
+      type: 'message' as const,
+      role: 'assistant' as const,
+      model: 'claude-sonnet-4-5',
+      content: [{ type: 'text' as const, text: 'hi', citations: null }],
+      stop_reason: 'end_turn' as const,
+      stop_sequence: null,
+      usage: {
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_creation_input_tokens: 500, // 只 cache_creation
+        cache_read_input_tokens: null,
+      },
+    };
+    const result = parseAnthropicMessage(message, 'claude-sonnet-4-5' as ModelId, pricing);
+    expect(result.usage?.cached_tokens).toBe(500);
+    // total_prompt = 100 + 500 = 600
+    expect(result.usage?.prompt_tokens).toBe(600);
+    expect(result.usage?.cache_hit_rate).toBeCloseTo(500 / 600, 3);
+    // F4 保守: cost 字段 absent
+    expect(result.usage?.cost_turn).toBeUndefined();
+    expect(result.usage?.cost_currency).toBeUndefined();
   });
 
   it('8. stop_reason=tool_use → finish_reason=tool_calls (Sprint 1c 实施 tool_calls 翻译)', () => {

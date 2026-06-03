@@ -233,8 +233,11 @@ export class DeepSeekClient implements LLMClient {
       // 末尾 flush buffer
       if (buffer.trim().length > 0) {
         // 同样先看 [DONE] sentinel,再走 parseSseEvent
+        // Sprint 1b.5 Step 2.5 (F6 拍板, review 2026-06-03 找到): 之前 flush 路径漏传
+        // this.pricing + this.model, 最后一个 SSE usage event 没尾随双换行时会丢
+        // cost_turn/cost_currency. 修法: 跟正常 path 一致传 this.pricing, this.model.
         if (!isSseDoneSentinel(buffer)) {
-          const parsed = parseSseEvent(buffer);
+          const parsed = parseSseEvent(buffer, this.pricing, this.model);
           if (parsed) {
             chunkCount += 1;
             if (parsed.delta.content) assembledContent += parsed.delta.content;
