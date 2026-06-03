@@ -82,6 +82,20 @@ const DANGEROUS_PATTERNS: ReadonlyArray<{ re: RegExp; reason: string }> = [
 /** Sprint 0.2 sandbox 边界：cwd 必须落在此根目录之下。 */
 const SANDBOX_ROOT = pathResolve(process.cwd());
 
+/**
+ * 跨平台 builtin 兜底：返回 string 表示命中（stdout），null 表示走 execFile。
+ *
+ * 触发原因：Windows 的 `echo` / `cd` / `dir` 等是 cmd builtin，没有独立 exe，
+ * `execFile` 会 spawn ENOENT。Sprint 0.2 简化版只实现 `echo`（最常用 + 测试覆盖）。
+ */
+function tryBuiltin(command: string, args: string[]): string | null {
+  if (command === 'echo') {
+    // POSIX `echo` 行为：args 用单空格连接，末尾加 \n
+    return args.join(' ') + '\n';
+  }
+  return null;
+}
+
 export class BashTool implements Tool {
   readonly name = 'bash' as ToolName;
   readonly description =
@@ -141,6 +155,18 @@ export class BashTool implements Tool {
         success: false,
         content: '',
         error: `permission-denied: cwd '${requestedCwd}' is outside sandbox root '${SANDBOX_ROOT}'`,
+      };
+    }
+
+    // Sprint 0.2 跨平台兜底：少数命令在 Windows 上是 shell builtin（无独立可执行文件），
+    // `execFile` 会 ENOENT。这些命令用 Node 内置等价实现，不走 spawn。
+    // 后续 Sprint 1+ 沙箱化时整套换掉（arch §2.3）。
+    const builtinResult = tryBuiltin(command, argList);
+    if (builtinResult !== null) {
+      return {
+        success: true,
+        content: builtinResult,
+        meta: { command, args: argList, builtin: true },
       };
     }
 

@@ -14,7 +14,7 @@
     "dev": "pnpm -r --parallel dev",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -b",
-    "pretest": "pnpm build",
+    "pretest": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "pnpm -r exec rm -rf dist .tsbuildinfo",

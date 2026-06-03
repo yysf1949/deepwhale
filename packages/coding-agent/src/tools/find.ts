@@ -4,12 +4,15 @@
  * Sprint 0.2 范围：跨平台 Node 实现（不走 find/ripgrep，避开 Windows find.exe 陷阱）
  * Sprint 2+ 候选：换成 napi natives（Node 实现 + Profile 验证瓶颈）
  *
- * 设计：基于 fs.readdirSync({ recursive: true, withFileTypes: true })（Node 20+）。
- * 在 Windows 上不能依赖 `find` 命令（系统 find.exe 是文件搜索工具，语义错位）。
+ * 设计：基于 fs.lstatSync（不跟随 symlink）+ readdirSync。lstat 而非 stat 是关键：
+ * - stat 跟随 symlink，type='l' 分支永远 false，且 visited 拿不到 realdir 去重
+ * - lstat 给出 link 自身属性，type='l' 才能正确命中
+ * - 递归不跟随 symlink 目录：避免 symlink 环路 + 减少越界
  */
 
-import { readdirSync, statSync, type Stats } from 'node:fs';
+import { lstatSync, readdirSync, realpathSync, type Stats } from 'node:fs';
 import { resolve, join, relative } from 'node:path';
+import process from 'node:process';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 
@@ -56,7 +59,7 @@ export class FindTool implements Tool {
     const rootPath = resolve(path);
     let rootStat;
     try {
-      rootStat = statSync(rootPath);
+      rootStat = lstatSync(rootPath);
     } catch (err) {
       const e = err as Error & { code?: string };
       return {
@@ -90,9 +93,20 @@ export class FindTool implements Tool {
     }
 
     const matches: string[] = [];
-    const visited = new Set<string>(); // 简单 symlink 去环
+    // visited 用 realpath 算：symlink 指向的目录必须按真实路径去重，
+    // 否则 `dir -> /elsewhere/loop` 这类环会死循环 / 重复遍历。
+    const visited = new Set<string>();
     const walk = (dir: string, depth: number): void => {
       if (matches.length >= MAX_RESULTS_DEFAULT) return;
+      // realpath 会跟随 symlink,realpathSync 失败（ENOENT 等）就跳过
+      let realDir: string;
+      try {
+        realDir = realpathSync(dir);
+      } catch {
+        return;
+      }
+      if (visited.has(realDir)) return;
+      visited.add(realDir);
       let entries: string[];
       try {
         // 指定 encoding='utf8' 让 @types/node 推出 string[]（避免 Dirent<NonSharedBuffer> 分支）
@@ -100,29 +114,26 @@ export class FindTool implements Tool {
       } catch {
         return; // 跳过无权限 / 已删除目录
       }
-      const realDir = resolve(dir);
-      if (visited.has(realDir)) return;
-      visited.add(realDir);
       for (const name of entries) {
         if (matches.length >= MAX_RESULTS_DEFAULT) return;
         const full = join(dir, name);
-        const st = statSyncSafe(full);
+        // lstatSync 不跟随 symlink — 这正是 type='l' 能正确命中的关键
+        const st = lstatSyncSafe(full);
         if (st === null) continue;
         const isFile = st.isFile();
         const isDir = st.isDirectory();
-        // Sprint 0.2 简化：type='l' symlink 用 stat 结果判断。
-        // 真正的 symlink 链路去重依赖 visited（解析后的真实路径），
-        // 跟 stat 是否 link 无关，visited 已覆盖。
+        const isLink = st.isSymbolicLink();
         const passType =
           typeFilter === null
             ? true
             : (typeFilter.wantFile && isFile) ||
               (typeFilter.wantDir && isDir) ||
-              (typeFilter.wantLink && st.isSymbolicLink());
+              (typeFilter.wantLink && isLink);
         if (passType && regex.test(name)) {
           matches.push(relative(process.cwd(), full) || full);
         }
-        if (isDir && depth < maxDepth) {
+        // 只递归真实目录（不跟随 symlink 目录），避开环路 + 越界
+        if (isDir && !isLink && depth < maxDepth) {
           walk(full, depth + 1);
         }
       }
@@ -156,10 +167,10 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-/** 静默 statSync 失败（无权限 / 路径已消失），返回 null 让 caller 跳过。 */
-function statSyncSafe(p: string): Stats | null {
+/** 静默 lstatSync 失败（无权限 / 路径已消失），返回 null 让 caller 跳过。 */
+function lstatSyncSafe(p: string): Stats | null {
   try {
-    return statSync(p);
+    return lstatSync(p);
   } catch {
     return null;
   }

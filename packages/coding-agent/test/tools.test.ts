@@ -7,7 +7,7 @@ import { FindTool } from '../src/tools/find.js';
 import { GrepTool } from '../src/tools/grep.js';
 import { ToolRegistry, createDefaultRegistry } from '../src/tools/registry.js';
 import { computeLineHashes } from '@deepwhale/edit-engine';
-import { promises as fs } from 'node:fs';
+import { promises as fs, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -179,6 +179,55 @@ describe('Sprint 0.2: 6 tools (v1.0 MVP)', () => {
       }
       await fs.rm(dir, { recursive: true });
     });
+
+    it("type='l' identifies symlinks (regression: lstat vs stat)", async () => {
+      // 旧实现用 statSync(stat 跟随 symlink),isSymbolicLink() 永远 false, wantLink 永远空。
+      const dir = join(tmpdir(), `dw-find-link-${Date.now()}`);
+      await fs.mkdir(join(dir, 'real'), { recursive: true });
+      await fs.writeFile(join(dir, 'real', 'a.ts'), '');
+      try {
+        symlinkSync(join(dir, 'real', 'a.ts'), join(dir, 'link.ts'), 'file');
+      } catch {
+        // Windows 上无开发者模式 / 无权限时 symlink 可能 ENOENT — 跳过
+        await fs.rm(dir, { recursive: true });
+        return;
+      }
+
+      const tool = new FindTool();
+      const result = await tool.execute({ path: dir, name: '*.ts', type: 'l' });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const lines = result.content.split('\n').filter(Boolean);
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toContain('link.ts');
+      }
+      await fs.rm(dir, { recursive: true });
+    });
+
+    it('does not infinite-loop on symlink directory cycles (regression: realpath dedup)', async () => {
+      // 制造 `subdir/loop -> subdir` 这种环。旧实现 visited 用 resolve（不跟随 symlink）,
+      // `subdir/loop` 跟 `subdir` 的 resolve 结果不同,环会死循环或栈溢出。
+      const dir = join(tmpdir(), `dw-find-loop-${Date.now()}`);
+      await fs.mkdir(join(dir, 'subdir'), { recursive: true });
+      try {
+        symlinkSync(dir, join(dir, 'subdir', 'loop'), 'dir');
+      } catch {
+        await fs.rm(dir, { recursive: true });
+        return;
+      }
+
+      const tool = new FindTool();
+      // 关键断言：在合理超时内完成 + 不重复
+      const result = await tool.execute({ path: dir, name: '*', maxDepth: 5 });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const lines = result.content.split('\n').filter(Boolean);
+        // subdir 出现 1 次, subdir/loop 出现 1 次（作为 symlink 自身,不是目录递归进入）
+        const subdirCount = lines.filter((l) => l.endsWith('subdir')).length;
+        expect(subdirCount).toBe(1);
+      }
+      await fs.rm(dir, { recursive: true });
+    });
   });
 
   describe('GrepTool', () => {
@@ -208,6 +257,29 @@ describe('Sprint 0.2: 6 tools (v1.0 MVP)', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.content).toBe('');
+      }
+      await fs.rm(dir, { recursive: true });
+    });
+
+    it('LF file line numbers correct regardless of host EOL (regression: split on EOL)', async () => {
+      // 旧实现用 EOL==='\r\n' 决定 sep,Windows 上读 LF 文件会把整段当 1 行。
+      // 这里显式写 LF 文件（appendFile + '\n'），确保内容是 LF。
+      const dir = join(tmpdir(), `dw-grep-lf-${Date.now()}`);
+      await fs.mkdir(dir, { recursive: true });
+      const file = join(dir, 'multi.ts');
+      await fs.writeFile(file, 'line1\nline2 MATCH\nline3\n', 'utf8');
+      // 确认文件确实是 LF（防御性 — fs.writeFile 不应该转换）
+      const raw = await fs.readFile(file);
+      expect(raw.includes('\r\n')).toBe(false);
+
+      const tool = new GrepTool();
+      const result = await tool.execute({ pattern: 'MATCH', path: file });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // 行号必须是 2（line2 MATCH 在第 2 行），不是 1（旧 bug）。
+        // 精确匹配: filename 后必须是 :2:，再后面才是 "line2 MATCH"。
+        expect(result.content).toMatch(/multi\.ts:2:line2 MATCH/);
+        expect(result.content).not.toMatch(/multi\.ts:1:/);
       }
       await fs.rm(dir, { recursive: true });
     });

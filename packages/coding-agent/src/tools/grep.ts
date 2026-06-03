@@ -10,7 +10,6 @@
 
 import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
 import { resolve, join, relative } from 'node:path';
-import { EOL } from 'node:os';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 
@@ -101,12 +100,12 @@ export class GrepTool implements Tool {
       } catch {
         continue; // 二进制 / 无权限 / race condition
       }
-      // 检测 BOM 和 CRLF — CRLF 时 strip trailing \r
+      // 检测 BOM。split 用 /\r?\n/：文件原文用什么换行就按什么切，
+      // 避免在 Windows 上 EOL='\r\n' 时把 LF 文件整段当一行（用户报告 P2-1）。
       if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-      const sep = text.includes('\r\n') ? '\r\n' : EOL === '\r\n' ? '\r\n' : '\n';
-      const lines = text.split(sep);
+      const lines = text.split(/\r?\n/);
       for (let i = 0; i < lines.length; i++) {
-        const line = (lines[i] ?? '').replace(/\r$/, '');
+        const line = lines[i] ?? '';
         if (re.test(line)) {
           matches.push(`${relative(process.cwd(), file) || file}:${i + 1}:${line}`);
           if (matches.length >= maxResults) break;
