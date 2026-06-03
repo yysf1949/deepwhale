@@ -20,5 +20,6 @@ export type {
 } from './types.js';
 
 export { HashlineEngine } from './engines/hashline/index.js';
+export { hashLine, computeLineHashes, findAnchor } from './engines/hashline/snapshots.js';
 export { UnifiedDiffEngine } from './engines/unified-diff/index.js';
 export { createDefaultEngine, createEngine } from './registry.js';
