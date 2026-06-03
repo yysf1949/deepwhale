@@ -364,4 +364,57 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
       stdoutSpy.mockRestore();
     }
   });
+
+  it('P1 follow-up #3: SIGINT 在 stdin 还开着时也能让 runRpcMode 在 250ms 内返回 (no hang)', async () => {
+    // 之前 bug: signal handler 只 requestShutdown(0) 但不 rl.close(),
+    // 若 stdin 没数据 (用户不喂 input), 进程永远等 close 事件 → 挂住。
+    // 复现: process.emit('SIGINT') 后 250ms 内不 resolve。
+    // 修后: signal handler 主动 rl.close(), 走和 stdin close 一样的 drain 路径,
+    // 必须等 in-flight chat 完成后才 return。
+    const { PassThrough } = await import('node:stream');
+    const input = new PassThrough();
+    const stdoutChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((data) => {
+      stdoutChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    // slow client: 50ms 后返回 SLOW_OK
+    const slowClient: LLMClient = {
+      model: 'mock' as ModelId,
+      chat: vi.fn(async (): Promise<ChatResult> => okResult('unused')),
+      stream: vi.fn(
+        async (
+          _msgs: ChatMessage[],
+          options: { onChunk: (chunk: ChatChunk) => void },
+        ): Promise<ChatResult> => {
+          await new Promise((r) => setTimeout(r, 50));
+          options.onChunk({ delta: { content: 'SLOW_OK' } });
+          return okResult('SLOW_OK');
+        },
+      ),
+    };
+    try {
+      // watchSignals: 走真实 SIGINT handler (但 emit 是 process 内部, 不影响 vitest)
+      const codePromise = runRpcMode({ client: slowClient, input, watchSignals: ['SIGINT'] });
+      // 喂一个会慢响应的 request
+      input.write(
+        `${JSON.stringify({ id: '1', method: 'chat', params: { prompt: 'Q', stream: true } })}\n`,
+      );
+      // 给 mock stream 一点启动时间
+      await new Promise((r) => setTimeout(r, 5));
+      // 关键: 触发 SIGINT 但 stdin 没 end。修复前: hang 250ms+。修复后: 在 ~50ms 内 resolve。
+      process.emit('SIGINT');
+      const start = Date.now();
+      const code = await codePromise;
+      const elapsed = Date.now() - start;
+      // 退出码 130 (128 + 2 = SIGINT) 反映是被 signal 干掉
+      expect(code).toBe(130);
+      // 250ms 内必须 resolve (slow stream 50ms + drain 缓冲; 修复前会 hang 到 vitest timeout)
+      expect(elapsed).toBeLessThan(250);
+      // 慢响应内容必须写完 (drain 路径生效)
+      expect(stdoutChunks.join('')).toContain('SLOW_OK');
+    } finally {
+      stdoutSpy.mockRestore();
+    }
+  });
 });

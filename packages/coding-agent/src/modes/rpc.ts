@@ -38,6 +38,12 @@ export interface RpcModeOptions {
   client?: LLMClient;
   /** 注入输入流（默认 process.stdin）。Sprint 1a follow-up:单测用。 */
   input?: NodeJS.ReadableStream;
+  /**
+   * 注入 signal handler 监听哪个信号（默认监听 SIGINT + SIGTERM）。
+   * Sprint 1a follow-up #3: 单测用 — 避免重复监听真实 OS signal 污染 vitest 全局。
+   * 设成 `[]` 跳过 signal handler 注册, 仅靠 stdin close 退出。
+   */
+  watchSignals?: ReadonlyArray<NodeJS.Signals>;
 }
 
 interface RpcRequest {
@@ -154,21 +160,38 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
 
   rl.on('close', () => {
     // stdin 关闭 → 标记退出,但不立刻 finish。finish 由 chain 排空触发。
+    // Sprint 1a follow-up #3:signal handler 走的是 "rl.close() 触发此 close handler" 路径,
+    // 所以 SIGINT/SIGTERM 也走这里 drain — 保证 in-flight chat 能写完响应。
     requestShutdown(0);
   });
 
-  process.on('SIGINT', () => {
-    requestShutdown(0);
-  });
-  process.on('SIGTERM', () => {
-    requestShutdown(0);
-  });
+  // Sprint 1a follow-up #3: 之前 SIGINT/SIGTERM 只 requestShutdown(0) 但不 rl.close(),
+  // 若 stdin 还开着 (例如纯 RPC 模式无 stdin 数据), 进程永远等 close 事件 → 挂住。
+  // 修法: signal handler 主动 rl.close(), 走和 stdin close 一样的 drain 路径。
+  // exitSignal 反映是被 signal 干掉 (128 + 信号编号), 让 caller 决定退出码 130/143。
+  const watchSignals = options.watchSignals ?? (['SIGINT', 'SIGTERM'] as const);
+  const signalHandlers: Array<{ sig: NodeJS.Signals; handler: () => void }> = [];
+  for (const sig of watchSignals) {
+    const handler = (): void => {
+      // 128 + 信号编号 是 POSIX 约定 (130 = SIGINT, 143 = SIGTERM, ...)
+      const code = sig === 'SIGINT' ? 130 : sig === 'SIGTERM' ? 143 : 128;
+      requestShutdown(code);
+      // 主动触发 close, 走和 stdin close 完全一样的 drain 路径
+      rl.close();
+    };
+    process.on(sig, handler);
+    signalHandlers.push({ sig, handler });
+  }
 
   // 阻塞直到 stdin 关闭。close 之后,等 chain 排空再 cleanup。
   await new Promise<void>((resolve) => rl.once('close', () => resolve()));
   // P1 follow-up:等 chain 排空 + finish,才能保证 close 之后排队的 request 完整写完 stdout。
   await chain;
   await finish();
+  // 卸载 signal handler 避免 leak: 同一进程多次调用 runRpcMode 不能重复挂 signal。
+  for (const { sig, handler } of signalHandlers) {
+    process.off(sig, handler);
+  }
   return exitSignal;
 }
 
