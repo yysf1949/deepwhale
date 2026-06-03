@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# env
+.env
+.env.local
+.env.*.local
+
+# coverage
+coverage/
+.nyc_output/
+
+# deepwhale runtime
+.deepwhale/
+sessions/
+*.session.jsonl
+.cache/

@@ -1,0 +1,31 @@
+{
+  "name": "@deepwhale/edit-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./engines/hashline": {
+      "types": "./dist/engines/hashline/index.d.ts",
+      "import": "./dist/engines/hashline/index.js"
+    },
+    "./engines/unified-diff": {
+      "types": "./dist/engines/unified-diff/index.d.ts",
+      "import": "./dist/engines/unified-diff/index.js"
+    }
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@deepwhale/core": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "clean": "rm -rf dist .tsbuildinfo"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/llm" },
+    { "path": "./packages/coding-agent" },
+    { "path": "./packages/edit-engine" }
+  ]
+}

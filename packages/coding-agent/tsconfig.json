@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "test/**"],
+  "references": [
+    { "path": "../core" },
+    { "path": "../edit-engine" },
+    { "path": "../llm" }
+  ]
+}
