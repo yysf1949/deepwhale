@@ -232,8 +232,9 @@ describe('DeepSeekClient', () => {
   describe('usage (Sprint 1b: cache_hit_rate / cost_turn / tokens_uncached)', () => {
     it('Sprint 1b: 满 usage (含 cached_tokens) → 算对 cache_hit_rate / cost_turn / tokens_uncached', async () => {
       // 1000 prompt, 80% 命中 cache = 800 cached, 200 uncached; 100 completion
-      // cost = 200 * 0.0005 + 800 * 0.0001 + 100 * 0.001
-      //      = 0.1 + 0.08 + 0.1 = 0.28
+      // cost = 200 * 0.5/1e6 + 800 * 0.1/1e6 + 100 * 1/1e6
+      //      = 0.0001 + 0.00008 + 0.0001 = 0.00028
+      // P1 fix (2026-06-03): 之前算成 0.28 (大 1000×), 修了 ¥/M → ¥/token 单位
       const response = {
         ...SAMPLE_RESPONSE,
         usage: {
@@ -250,7 +251,7 @@ describe('DeepSeekClient', () => {
       expect(result.usage?.cached_tokens).toBe(800);
       expect(result.usage?.cache_hit_rate).toBeCloseTo(0.8);
       expect(result.usage?.tokens_uncached).toBe(200);
-      expect(result.usage?.cost_turn).toBeCloseTo(0.28);
+      expect(result.usage?.cost_turn).toBeCloseTo(0.00028);
     });
 
     it('Sprint 1b: 无 cached_tokens → 3 个新字段全 undefined (不写默认值避免假数据)', async () => {
@@ -282,8 +283,8 @@ describe('DeepSeekClient', () => {
       // 0/0 走 prompt>0 短路, hit rate 0
       expect(result.usage?.cache_hit_rate).toBe(0);
       expect(result.usage?.tokens_uncached).toBe(0);
-      // cost = 0 + 0 + 10 * 0.001 = 0.01
-      expect(result.usage?.cost_turn).toBeCloseTo(0.01);
+      // cost = 0 + 0 + 10 * 1/1e6 = 0.00001 (P1 fix: 之前 0.01 大 1000×)
+      expect(result.usage?.cost_turn).toBeCloseTo(0.00001);
     });
 
     it('Sprint 1b: stream usage-only chunk 同样算 cache_hit_rate / cost_turn / tokens_uncached', async () => {
@@ -319,9 +320,82 @@ describe('DeepSeekClient', () => {
       expect(result.usage?.cached_tokens).toBe(180);
       expect(result.usage?.cache_hit_rate).toBeCloseTo(0.9);
       expect(result.usage?.tokens_uncached).toBe(20);
-      // cost = 20 * 0.0005 + 180 * 0.0001 + 50 * 0.001
-      //      = 0.01 + 0.018 + 0.05 = 0.078
-      expect(result.usage?.cost_turn).toBeCloseTo(0.078);
+      // cost = 20 * 0.5/1e6 + 180 * 0.1/1e6 + 50 * 1/1e6
+      //      = 0.00001 + 0.000018 + 0.00005 = 0.000078 (P1 fix: 之前 0.078 大 1000×)
+      expect(result.usage?.cost_turn).toBeCloseTo(0.000078);
+    });
+
+    it('Sprint 1b P1 fix: 末 chunk 同时带 choices=[{finish_reason:"stop"}] + 顶层 usage → usage 不丢', async () => {
+      // 真实 DeepSeek 流: include_usage=true 时, 末 chunk 形如
+      // {choices:[{delta:{}, finish_reason:"stop"}], usage:{...}}
+      // 之前 parseSseEvent 看到 choices 非空就走 content 路径, 顶层 usage 被丢弃。
+      // P1 fix: 任何 chunk 都先解析顶层 usage, 末 chunk 必须能透出 cache/cost 给状态栏。
+      const events = [
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-1',
+          object: 'chat.completion.chunk',
+          model: 'deepseek-v4-flash',
+          choices: [{ index: 0, delta: { content: 'hi' } }],
+        })}`,
+        // 末 chunk: choices 不空 + 顶层 usage
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-1',
+          object: 'chat.completion.chunk',
+          model: 'deepseek-v4-flash',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+          usage: {
+            prompt_tokens: 200,
+            completion_tokens: 50,
+            total_tokens: 250,
+            prompt_cache_hit_tokens: 180,
+          },
+        })}`,
+        'data: [DONE]',
+      ];
+      const res = makeSseResponse(events);
+      const { fn } = makeMockFetch(() => res);
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const result = await c.stream(
+        [{ role: 'user', content: 'hi' }],
+        { onChunk: () => {} },
+      );
+      // 修复前: result.usage 是 undefined; 修复后: usage 透出
+      expect(result.usage).toBeDefined();
+      expect(result.usage?.cached_tokens).toBe(180);
+      expect(result.usage?.cache_hit_rate).toBeCloseTo(0.9);
+      expect(result.usage?.tokens_uncached).toBe(20);
+      expect(result.usage?.cost_turn).toBeCloseTo(0.000078);
+    });
+
+    it('Sprint 1b P1 fix: stream 路径 body 必须带 stream_options.include_usage=true (服务端才会回 usage)', async () => {
+      // 校验 wire-level: client 真的在 stream=true 时把 stream_options.include_usage=true
+      // 塞进 request body, 不会因为改 buildRequestBody 时漏写而退化。
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+          controller.close();
+        },
+      });
+      const { fn, calls } = makeMockFetch(
+        () => new Response(stream, { status: 200 }),
+      );
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      await c.stream([{ role: 'user', content: 'hi' }], { onChunk: () => {} });
+      const body = JSON.parse(calls[0]!.rawBody) as Record<string, unknown>;
+      expect(body['stream']).toBe(true);
+      expect(body['stream_options']).toEqual({ include_usage: true });
+    });
+
+    it('Sprint 1b P1 fix: 非流式 chat() body 不带 stream_options (避免污染 wire)', async () => {
+      // 反向断言: stream=false 时 stream_options 不该被注入。
+      // OAI 协议允许在非流式请求里也带 stream_options 但会被忽略,
+      // 但我们不在非流式路径加它, 保持 wire 最小化。
+      const { fn, calls } = makeMockFetch(() => jsonResponse(SAMPLE_RESPONSE));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      await c.chat([{ role: 'user', content: 'hi' }]);
+      const body = JSON.parse(calls[0]!.rawBody) as Record<string, unknown>;
+      expect(body['stream']).toBe(false);
+      expect(body['stream_options']).toBeUndefined();
     });
   });
 

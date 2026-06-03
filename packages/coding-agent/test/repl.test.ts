@@ -229,19 +229,22 @@ describe('formatUsageStatus (Sprint 1b)', () => {
     expect(line).not.toContain('¥');
   });
 
-  it('满 usage → 完整 4 字段 "cache: 90% | ¥X.XXX/turn | prompt Xk (Y new)"', () => {
+  it('满 usage → 完整 4 字段 "cache: 90% | ¥X.XXXX/turn | prompt Xk (Y new)"', () => {
+    // P1 fix (2026-06-03): cost 公式从 ¥/token 改成 ¥/M, formatUsageStatus 走 < 0.01
+    // 的 4 位小数分支. 输入 cost_turn = 0.0002 (能被 toFixed(4) 精确表达,
+    // 不会被 IEEE 754 浮点舍入). 真实场景下 0.00018 / 0.00024 / 0.00008 这类都属此分支。
     const line = formatUsageStatus({
       prompt_tokens: 1000,
       completion_tokens: 100,
       total_tokens: 1100,
       cached_tokens: 900,
       cache_hit_rate: 0.9,
-      cost_turn: 0.18,
+      cost_turn: 0.0002,
       tokens_uncached: 100,
     });
     expect(line).not.toBeNull();
     expect(line).toMatch(/cache: 90%/);
-    expect(line).toMatch(/¥0\.18/);
+    expect(line).toMatch(/¥0\.0002/);
     expect(line).toMatch(/turn/);
     expect(line).toMatch(/prompt 1\.0k/);
     expect(line).toMatch(/100 new/);
@@ -249,13 +252,14 @@ describe('formatUsageStatus (Sprint 1b)', () => {
 
   it('tokens_uncached == prompt (全 miss, cache_hit_rate=0) 仍正常显示', () => {
     // 边界: cached=0, 但 cached_tokens 字段存在 (LLM 显式说 0)
+    // P1 fix (2026-06-03): cost 缩小 1000×, 输入 0.0004 (4 位小数稳定展示)。
     const line = formatUsageStatus({
       prompt_tokens: 500,
       completion_tokens: 50,
       total_tokens: 550,
       cached_tokens: 0,
       cache_hit_rate: 0,
-      cost_turn: 0.3,
+      cost_turn: 0.0004,
       tokens_uncached: 500,
     });
     expect(line).not.toBeNull();

@@ -83,8 +83,12 @@ export interface Usage {
  * 公式:
  * - tokens_uncached = max(0, prompt - cached)
  * - cache_hit_rate = cached / prompt  (prompt=0 时 0, 避免除零)
- * - cost_turn = tokens_uncached * 0.0005 + cached * 0.0001 + completion * 0.001
- *   (V4-Flash: cache miss ¥0.5/M, cache hit ¥0.1/M, completion ¥1/M, 单位 ¥/token)
+ * - cost_turn = tokens_uncached * 0.5/1e6 + cached * 0.1/1e6 + completion * 1/1e6
+ *   (V4-Flash: cache miss ¥0.5/M, cache hit ¥0.1/M, completion ¥1/M)
+ *
+ *   P1 fix (2026-06-03): 早期版本直接用 0.0005/0.0001/0.001 当 ¥/token,
+ *   算出来比真实成本大 1000×(1000 prompt + 100 completion 当时给 ¥0.28,
+ *   实际应约 ¥0.00028)。改成除 1e6 显式表达 ¥/M → ¥/token,避免下次再写错。
  */
 export interface CostBreakdown {
   cache_hit_rate: number;
@@ -100,8 +104,12 @@ export function computeCostBreakdown(
   if (cachedTokens === undefined) return undefined;
   const tokensUncached = Math.max(0, promptTokens - cachedTokens);
   const hitRate = promptTokens > 0 ? cachedTokens / promptTokens : 0;
-  // V4-Flash pricing (2026-06, 单位: ¥/token)
-  const costTurn = tokensUncached * 0.0005 + cachedTokens * 0.0001 + completionTokens * 0.001;
+  // V4-Flash pricing (2026-06): ¥0.5/M cache miss, ¥0.1/M cache hit, ¥1/M completion.
+  // 把 ¥/M 转 ¥/token 必须除 1e6, 不要直接当 ¥/token 用(会大 1000×)。
+  const costTurn =
+    tokensUncached * (0.5 / 1_000_000) +
+    cachedTokens * (0.1 / 1_000_000) +
+    completionTokens * (1 / 1_000_000);
   return {
     cache_hit_rate: hitRate,
     cost_turn: costTurn,

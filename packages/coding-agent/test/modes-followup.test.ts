@@ -454,7 +454,7 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
               total_tokens: 1050,
               cached_tokens: 900,
               cache_hit_rate: 0.9,
-              cost_turn: 0.09,
+              cost_turn: 0.00009,
               tokens_uncached: 100,
             },
           };
@@ -472,8 +472,8 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
       const all = stdoutChunks.join('');
       // 顶层 cache_hit_rate 必须出现 (caller 1 层访问)
       expect(all).toMatch(/"cache_hit_rate"\s*:\s*0\.9/);
-      // 顶层 cost_turn 必须出现
-      expect(all).toMatch(/"cost_turn"\s*:\s*0\.09/);
+      // 顶层 cost_turn 必须出现 (P1 fix: 0.09 → 0.00009, 公式大 1000× → 缩小 1000×)
+      expect(all).toMatch(/"cost_turn"\s*:\s*0\.00009/);
       // usage 字段也必须保留 (caller 想要全量数据仍可访问)
       expect(all).toMatch(/"usage"/);
     } finally {
@@ -507,7 +507,7 @@ describe('runPrintMode — Sprint 1b usage summary', () => {
             total_tokens: 1050,
             cached_tokens: 900,
             cache_hit_rate: 0.9,
-            cost_turn: 0.09,
+            cost_turn: 0.00009,
             tokens_uncached: 100,
           },
         } as ChatResult;

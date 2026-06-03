@@ -258,6 +258,12 @@ export class DeepSeekClient implements LLMClient {
       model: this.model,
       messages: messages.map(toWireMessage),
       stream,
+      // P1 fix (2026-06-03): OAI/DeepSeek 在 stream=true 时, 必须在 body 里
+      // 显式带 stream_options.include_usage=true, 服务端才在最后一个 chunk
+      // (可能带 choices 也可能不带) 上携带 usage 字段。
+      // 不然 cache_hit_rate / cost_turn / tokens_uncached 在 stream 路径全部拿不到。
+      // ref: https://api-docs.deepseek.com/api/create-chat-completion
+      ...(stream ? { stream_options: { include_usage: true } } : {}),
       // 机制 2：content="" 永远序列化（OAI spec 允许,但 prefix-cache hash 会变,
       // 所以这里强制把空字符串序列化为 "",绝不带 omitempty）
       // 实际由 toWireMessage 完成 — 这里只是注释提醒调用者。
@@ -535,31 +541,18 @@ function parseSseEvent(eventRaw: string): ChatChunk | null {
   }
   if (typeof json !== 'object' || json === null) return null;
   const obj = json as Record<string, unknown>;
+
+  // P1 fix (2026-06-03): 之前 usage 解析只在 choices=[] 分支走, 但 OAI/DeepSeek
+  // stream 协议允许最后一个 chunk 同时带 choices (e.g. {delta:{}, finish_reason:"stop"})
+  // 和顶层 usage, 此时 usage 会被丢弃 → 状态栏拿不到 cache/cost 数据。
+  // 改成先解析顶层 usage, 任何 chunk 类型都挂上。
+  // usage-only chunk (choices=[]) 路径保留作为 fallback, 服务端历史兼容。
+  const topLevelUsage = parseSseUsageField(obj);
+
   const choices = obj['choices'];
   if (!Array.isArray(choices) || choices.length === 0) {
-    // usage-only chunk(OAI 协议允许 stream_options.include_usage)
-    const rawUsage = obj['usage'];
-    if (typeof rawUsage === 'object' && rawUsage !== null) {
-      const u = rawUsage as Record<string, unknown>;
-      const prompt = typeof u['prompt_tokens'] === 'number' ? u['prompt_tokens'] : 0;
-      const completion = typeof u['completion_tokens'] === 'number' ? u['completion_tokens'] : 0;
-      const total = typeof u['total_tokens'] === 'number' ? u['total_tokens'] : 0;
-      const cached =
-        typeof u['prompt_cache_hit_tokens'] === 'number' ? u['prompt_cache_hit_tokens'] : undefined;
-      const usage: Usage = {
-        prompt_tokens: prompt,
-        completion_tokens: completion,
-        total_tokens: total,
-      };
-      if (cached !== undefined) usage.cached_tokens = cached;
-      // Sprint 1b: stream usage chunk 同样算 cache_hit_rate / cost_turn / tokens_uncached
-      const breakdown = computeCostBreakdown(prompt, completion, cached);
-      if (breakdown !== undefined) {
-        usage.cache_hit_rate = breakdown.cache_hit_rate;
-        usage.cost_turn = breakdown.cost_turn;
-        usage.tokens_uncached = breakdown.tokens_uncached;
-      }
-      return { delta: {}, usage };
+    if (topLevelUsage !== undefined) {
+      return { delta: {}, usage: topLevelUsage };
     }
     return null;
   }
@@ -614,5 +607,44 @@ function parseSseEvent(eventRaw: string): ChatChunk | null {
   if (toolCalls !== undefined) delta.tool_calls = toolCalls;
   const chunk: ChatChunk = { delta };
   if (finishReason) chunk.finish_reason = finishReason;
+  // P1 fix (2026-06-03): 顶层 usage 在 choices 路径同样挂上,
+  // 让 final chunk (带 finish_reason="stop" + 顶层 usage) 能把 usage 透出。
+  if (topLevelUsage !== undefined) chunk.usage = topLevelUsage;
   return chunk;
+}
+
+/**
+ * 从 SSE event JSON 顶层 usage 字段解析出标准化的 Usage 结构,
+ * 顺手算 Sprint 1b 的 cache_hit_rate / cost_turn / tokens_uncached。
+ *
+ * 返回 undefined 表示该 event 不带 usage (OAI 标准: 只在 stream 末尾出现)。
+ *
+ * P1 fix (2026-06-03): 抽出避免在 choices=[] 和 choices=[...] 两条路径上重复解析。
+ */
+function parseSseUsageField(obj: Record<string, unknown>): Usage | undefined {
+  const rawUsage = obj['usage'];
+  if (typeof rawUsage !== 'object' || rawUsage === null) return undefined;
+  const u = rawUsage as Record<string, unknown>;
+  const prompt = typeof u['prompt_tokens'] === 'number' ? u['prompt_tokens'] : 0;
+  const completion = typeof u['completion_tokens'] === 'number' ? u['completion_tokens'] : 0;
+  const total =
+    typeof u['total_tokens'] === 'number' ? u['total_tokens'] : prompt + completion;
+  const cached =
+    typeof u['prompt_cache_hit_tokens'] === 'number'
+      ? u['prompt_cache_hit_tokens']
+      : undefined;
+  const usage: Usage = {
+    prompt_tokens: prompt,
+    completion_tokens: completion,
+    total_tokens: total,
+  };
+  if (cached !== undefined) usage.cached_tokens = cached;
+  // Sprint 1b: cache_hit_rate / cost_turn / tokens_uncached — 仅当 cached_tokens 存在时算。
+  const breakdown = computeCostBreakdown(prompt, completion, cached);
+  if (breakdown !== undefined) {
+    usage.cache_hit_rate = breakdown.cache_hit_rate;
+    usage.cost_turn = breakdown.cost_turn;
+    usage.tokens_uncached = breakdown.tokens_uncached;
+  }
+  return usage;
 }
