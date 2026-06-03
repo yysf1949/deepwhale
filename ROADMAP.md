@@ -1,28 +1,37 @@
 # 🗺 deepwhale ROADMAP
 
-> **5 阶段版本锚 × 13 个月，单人开发节奏**
+> **6 版本锚 × 13 个月，单人开发节奏**
 >
 > **核心变化**（vs 初版 10 周版）：
 > 1. **时间锚从 10 周改为 13 个月**（v1.0 = Phase 1 = Claude Code Lite，3 个月）
-> 2. **砍掉 18 项延后事项**（详见 [ARCHITECTURE.md §4](./ARCHITECTURE.md)）
+> 2. **砍掉 22 项延后事项**（详见 [ARCHITECTURE.md §4](./ARCHITECTURE.md)）
 > 3. **Docker 沙箱统一替换 Seatbelt/Landlock/Windows Job Object**（v1.0 起）
 > 4. **Session 从 DAG 降级为 Linear**（v1.0），DAG 延后到 v2.0
 > 5. **Constitution 9 层权威砍掉**（个人化产物，不适合 deepwhale）
 > 6. **保留所有已验证的正确决策**：Prefix-cache 4 机制提前到 v1.0 / StormBreaker / SanitizeToolPairing / i18n 第 1 行定对 / 强制 release 节奏
+>
+> **v3 重大架构升级**（2026-06-03，6.5/10 → 8.4/10 基础上进一步升级）：
+> 7. **Code Intelligence Layer 新增**（v1.5 基础 / v2.0 增强）—— 解决"10万行项目失明"
+> 8. **v2.5 独立插档做 Planner**（避免 v2 4 个大件再爆）
+> 9. **Computer Use 改兼容层**（Codex 协议优先，**不自研**）—— 节省 1 个月
+> 10. **Memory Ranking 算法**（importance / last_accessed / decay_score / scope）—— 解决"5000 memories 必崩"
+> 11. **v1.5 砍 4 项**（Automation/Cron/Remote TUI/Compaction 挪到 v2.0）
+> 12. **Browser Agent = 真实 Browser Planner**（不是 Playwright Wrapper）—— 解决"淘宝/京东失败"
 
 ## 总览
 
-| Phase | 版本 | 月份 | 主题 | 关键交付 | 状态 |
-|---|---|---|---|---|---|
-| **Phase 1** | v1.0 | 第 1-3 个月 | **Claude Code Lite** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker | 🚧 进行中 |
-| **Phase 2** | v1.5 | 第 4-5 个月 | **Codex Clone** | Approval + Task + Skills + Extension API + Hooks + StormBreaker + Cron + Compaction | ⏳ 待开始 |
-| **Phase 3** | v2.0 | 第 6-7 个月 | **+Browser Agent** | MCP + Browser Runtime + Plugin 打包 + Session DAG + Memory 三层 | ⏳ 待开始 |
-| **Phase 4** | v3.0 | 第 8-10 个月 | **+Computer Use** | Computer Runtime + Compaction 钩子化 | ⏳ 待开始 |
-| **Phase 5** | v4.0 | 第 11-13 个月 | **Agent OS** | 完整 Multi-Agent + Plugin Marketplace + Desktop + Web + Channels + 文档站 | ⏳ 待开始 |
+| Phase | 版本 | 月份 | 累计 | 主题 | 关键交付 | 状态 |
+|---|---|---|---|---|---|---|
+| **Phase 1** | v1.0 | 第 1-3 个月 | 3 月 | **Claude Code Lite** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker | 🚧 进行中 |
+| **Phase 2** | v1.5 | 第 4-5 个月 | 5 月 | **Codex Core + Code Intel 基础** | Approval + Task + Skills + Extension API + Hooks + StormBreaker + **Code Intelligence 基础**（Tree-sitter + Symbol Graph + Workspace Index） | ⏳ 待开始 |
+| **Phase 3** | v2.0 | 第 6-8 个月 | 8 月 | **+Browser Agent + Code Intel 增强** | **真实 Browser Planner** + MCP + Session DAG + **Memory Ranking 算法** + **Reference Graph + Semantic Search** | ⏳ 待开始 |
+| **Phase 3.5** | **v2.5** | **第 9 个月** | **9 月** | **+Planner（独立插档）** | **双 Agent 模式**（Planner → Executor），可降级为单 Agent 兼容 v1.0 | ⏳ 待开始 |
+| **Phase 4** | v3.0 | 第 10-11 个月 | 11 月 | **+Computer Use 兼容层 + Reviewer** | **Computer Use 兼容层**（Codex 协议优先，**不自研**）+ Reviewer + Compaction 钩子化 | ⏳ 待开始 |
+| **Phase 5** | v4.0 | 第 12-13 个月 | **13 月** | **Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Plugin Marketplace + Desktop + Channels | ⏳ 待开始 |
 
 > **v1.0 = 1 个 release**（不是 5+1 个 Sprint）
 > **v1.5 起 = 每月 1 个 minor release**（每周一 minor 强制节奏）
-> **v1.5 累计 5 个月、v2.0 累计 7 个月、v3.0 累计 10 个月、v4.0 累计 13 个月**
+> **v1.5 累计 5 个月、v2.0 累计 8 个月、v2.5 累计 9 个月、v3.0 累计 11 个月、v4.0 累计 13 个月**
 
 ---
 
@@ -183,13 +192,22 @@ deepwhale>
 
 ---
 
-## Phase 2 — v1.5 Codex Clone（第 4-5 个月）
+## Phase 2 — v1.5 Codex Core + Code Intelligence 基础（第 4-5 个月）
 
-**目标**：100% Codex Client 复刻（**14/14 功能对齐**）。**v1.5 第 5 个月末必发**。
+**目标**：Codex Client 核心功能复刻（**8/14 砍掉 4 项，挪到 v2.0**）+ **让 Agent 理解代码库**（v1.5 基础）。**v1.5 第 5 个月末必发**。
 
-### Sprint 5-6（Skills + Extension API + Hooks，第 4 个月）
+> **v1.5 砍掉的 4 项**（挪到 v2.0）：
+> - ❌ **Cron Automations**（v2.0 做）
+> - ❌ **Remote TUI**（v2.0 做）
+> - ❌ **Compaction**（v2.0 做）
+> - ❌ **MCP**（v2.0 做）
+> 理由：2 个月完成 8 项 Codex Core + Code Intel 基础，**v1.5 不再加任何大件**
+
+### Sprint 5-6（Codex Core：Skills + Extension API + Hooks + Code Intel 基础，第 4 个月）
 
 #### 任务清单
+
+**Codex Core 复刻**（**8 项核心**）：
 - [ ] **🛡 StormBreaker 防死循环**（Reasonix 抄，**工具增多后 P0**）
   - 3 次相同 `(tool, error)` 签名触发暂停 + 用户确认
   - **关键：用 (tool, error) 签名，不用 args 签名**（Reasonix 实战观察）
@@ -217,22 +235,42 @@ deepwhale>
   - 解析 `whale:` / `git:` / 本地路径
   - 资源优先级 4 档
 
+**Code Intelligence 基础**（**v1.5 引入，解决"10万行项目失明"**）：
+- [ ] **Tree-sitter 集成**
+  - npm 包：`tree-sitter` + `tree-sitter-typescript` / `tree-sitter-javascript` / `tree-sitter-python` / `tree-sitter-go` / `tree-sitter-rust`
+  - 多语言 AST 解析
+  - 解析速度 ≥ 100K LOC / 秒（单测验证）
+- [ ] **Symbol Graph**
+  - 基于 AST 提取 symbol（function / class / variable / type）
+  - 持久化：`~/.deepwhale/index/<project-hash>/symbols.jsonl`（JSONL append-only）
+  - 支持查询：按 symbol 找定义 / 按文件找 symbol 列表 / 按 query string 模糊匹配
+- [ ] **Workspace Index**
+  - 项目级元信息（语言分布 / 文件数 / LOC / 依赖图）
+  - 写入时机：v1.5 启动时增量构建，git hook 自动触发
+- [ ] **Code Intelligence 工具暴露**（Agent tool 入口）
+  - `symbol_lookup` 工具：query + kind + max_results
+  - `reference_lookup` 工具（v1.5 基础版）：symbol + kind = definition
+
 #### 验收标准
 - 装 1 个社区 skill 能用
 - 写 1 个 30 行 Extension 注册自定义工具
 - 装 1 个带 hooks 的 plugin，hook 真的触发
 - **StormBreaker 测出死循环场景能暂停**
 - **SanitizeToolPairing 4 种 case 都能处理**
-- Codex 14 项功能 → **8/14**（+ Skills / Plugins / Hooks）
+- **大型项目（10万行）能查 symbol 定义**（symbol_lookup 跑通）
+- Codex 14 项功能 → **8/14**（+ Skills / Plugins / Hooks，**-4 项砍到 v2.0**）
 
 #### ⚠️ Sprint 5-6 红线
 - **Extension tool 重名启动时检测**（pi #5316 教训）
 - **Hook payload 走 JSON on stdin**（Reasonix 抄）
 - **Extension manifest 在 package.json**（pi 抄）/ deepwhale 用 `pyproject.toml` 的 `[tool.deepwhale]`
+- **Tree-sitter 不要写多语言 parser**——只调官方包，5 种语言起步
 
 ---
 
-### Sprint 7-8（Codex 复刻收尾：Approval / Task / Cron / Compaction，第 5 个月）
+### Sprint 7-8（Codex Core 收尾：Approval + Task，第 5 个月）
+
+> **v1.5 第 2 个 Sprint 只做 2 项**：Approval + Task。**Cron/Remote TUI/Compaction 不在 v1.5**。
 
 #### 任务清单
 - [ ] **Approval System**（Codex 抄）
@@ -241,80 +279,230 @@ deepwhale>
 - [ ] **Task Mode**（Codex 抄）
   - `/task <id>` 跳转到指定 session
   - 任务列表 UI
-- [ ] **Cron Automations**（Codex 抄）
-  - `~/.deepwhale/automations/*.yaml` 定义定时任务
-  - 模板：daily-report / code-review / test-runner / dep-update
-- [ ] **Compaction**（v1.5 = **cache-reset point 唯一**）
-  - **Compaction = 唯一 cache-reset point**（Reasonix 抄）
-  - `session_before_compact` 钩子让 extension 完全替换默认
-  - Tail 边界按 token budget 而不是 message count
-- [ ] **Remote TUI**（WebSocket 远程控制）
-  - `deepwhale serve --http` 暴露 `/v1/*`
-  - 远端 TUI 通过 WebSocket 连接
+- [ ] **Code Intelligence 集成进 Agent 循环**
+  - symbol_lookup 默认注入 Agent tool registry
+  - 10 万行项目实测：能用 symbol 找到定义（不再"全靠 grep"）
 - [ ] **v1.5 release**
   - 第 5 个月末 GitHub Release
   - CHANGELOG 完整记录
-  - **Codex 14/14 ✅**
+  - **Codex Core 8/14 ✅**（**v1.5 故意不到 14/14**，剩下 6 项挪到 v2.0/v2.5/v3.0/v4.0）
 
 #### 验收标准
-- **Codex 14/14 ✅**（TUI / 多模型 / Skills / Plugins / MCP-stub / Approval / Task / Automations / Remote TUI / Session / Compaction / Hooks / ...）
-- 装好 daily-report automation，定时跑通
-- 文档：v1.5 release notes + 14/14 对照表
+- **Codex Core 8/14 ✅**（TUI / 多模型 / Skills / Plugins / Hooks / Approval / Task / Session / **Code Intel 基础**）
+- **v1.5 累计功能 = 8 + Code Intel 基础 = 9 项**（**不是 14**）
+- 文档：v1.5 release notes + 8/14 对照表 + **哪些项挪到 v2.0 明确列出**
 
 ---
 
-## Phase 3 — v2.0 +Browser Agent（第 6-7 个月）
+## Phase 3 — v2.0 +Browser Agent + Code Intel 增强（第 6-8 个月）
 
-**目标**：能自动开网页、填表、截图。**v2.0 第 7 个月末必发**。
+**目标**：能自动操作复杂网页（淘宝/京东/Amazon）+ 完整 Memory Ranking + Code Intel 增强 + 补 v1.5 砍的 4 项。**v2.0 第 8 个月末必发**。
 
-### Sprint 9-10（Browser Runtime + MCP + Session DAG，第 6-7 个月）
+> **v2.0 = 4 个大件**（**v2 已经有 4 件不再加 Planner**）：
+> 1. **真实 Browser Agent**（不是 Playwright Wrapper）
+> 2. **Memory Ranking 算法**（importance/decay/scope）
+> 3. **Code Intelligence 增强**（Reference Graph + Semantic Search）
+> 4. **补 v1.5 砍的 4 项**（Cron Automations / Remote TUI / Compaction / MCP）
+>
+> **v2.5 单独做 Planner**（**避免 v2 4 个大件再加 Planner 爆掉**）
+
+### Sprint 9-11（真实 Browser Agent + 补 4 项 + Memory Ranking，第 6-7 个月）
 
 #### 任务清单
+
+**真实 Browser Agent**（**不是 Playwright Wrapper**）：
+- [ ] **Browser Planner**（任务级，**v2.0 关键**）
+  - DOM Understanding（AST 解析当前页面 DOM 结构）
+  - Element Ranking（按用户意图给元素排序）
+  - Visual Grounding（截图标注元素位置）
+  - Action History（避免重复操作已失败的元素）
+  - Page Summarization（长页面压缩成 token 友好的 summary）
+  - Error Recovery（失败回退到上一步 / 改用不同 selector）
+- [ ] **Browser Executor**（操作级，复用 Playwright）
+  - 7 个核心 API：navigate / click / type / extract / screenshot / download / upload
+  - 集成 `@playwright/mcp` 开箱即用
+  - Browser sandbox 走 Docker（与 Tool Runtime 同一沙箱）
+- [ ] **真实场景测试**
+  - 淘宝：搜索"机械键盘" + 点击商品 + 加购
+  - 京东：搜索 + 筛选 + 进入详情
+  - Amazon：搜索 + 看评论 + 加购
+  - 失败时**自动重试 + 改 selector**（不靠人手动修）
+
+**补 v1.5 砍的 4 项**：
+- [ ] **Cron Automations**
+  - `~/.deepwhale/automations/*.yaml` 定义定时任务
+  - 模板：daily-report / code-review / test-runner / dep-update
+- [ ] **Remote TUI**（WebSocket 远程控制）
+  - `deepwhale serve --http` 暴露 `/v1/*`
+  - 远端 TUI 通过 WebSocket 连接
+- [ ] **Compaction**（v2.0 = **cache-reset point 唯一**）
+  - **Compaction = 唯一 cache-reset point**（Reasonix 抄）
+  - `session_before_compact` 钩子让 extension 完全替换默认
+  - Tail 边界按 token budget 而不是 message count
 - [ ] **MCP Runtime**（stdio / http / sse 动态注册）
   - 官方 SDK
   - 配置：`~/.deepwhale/mcp.json`
   - **deepwhale 也可作为 MCP server 暴露**（`deepwhale serve --mcp`）
-- [ ] **Browser Runtime**（Playwright + 统一 API）
-  - 6 个核心 API：navigate / click / type / extract / screenshot / download / upload
-  - 集成 `@playwright/mcp` 开箱即用
-  - Browser sandbox 走 Docker（与 Tool Runtime 同一沙箱）
-- [ ] **Plugin 打包**（`.dwp` 格式，类似 `.vsix`）
-  - 打包 1 个 `.dwp` 文件能跨机安装
-- [ ] **Session DAG**（**v1.0 Linear 升级**）
-  - `parentId + leafId` 的 DAG 形态
-  - 跨分支不丢消息
-- [ ] **MemoryManager**（Short/Long/Summary 三层）
-  - Short：最近会话
-  - Long：向量库
-  - Summary：自动压缩
-- [ ] **v2.0 release**
-  - 第 7 个月末 GitHub Release
-  - 装好 Playwright MCP 后能自动开网页填表截图
-  - Browser Runtime 6 个核心 API 全部跑通
+
+**Memory Ranking 算法**（**解决"5000 memories 必崩"**）：
+- [ ] **Memory Schema**
+  - `{ content, importance, last_accessed, decay_score, scope, created_at }`
+  - scope 显式标记：`user` / `project` / `session`
+- [ ] **Ranking 算法**
+  - `score = importance * decay(last_accessed) * scope_weight`
+  - decay 函数：指数衰减（半衰期 30 天）
+  - scope_weight：user=1.0 / project=0.7 / session=0.4
+- [ ] **回收机制**
+  - score < threshold 自动归档（不删除，可恢复）
+  - 单元测试：1000 条 memory 回收后性能无下降
+- [ ] **hand-edit 优先**
+  - memory 文件直接可编辑
+  - 自动写入不会覆盖 user 手改的字段
+
+**Session DAG**（v1.0 Linear 升级）：
+- [ ] `parentId + leafId` 的 DAG 形态
+- [ ] JSONL append-only（与 v1.0 同套路）
+- [ ] 跨分支不丢消息
+
+**Code Intelligence 增强**（v1.5 基础升级）：
+- [ ] **Reference Graph**：跨文件 symbol 引用图（callers / callees / importers）
+  - 持久化：`~/.deepwhale/index/<project-hash>/references.jsonl`
+  - 支持查询：找 symbol 的所有引用、找死代码、找循环依赖
+- [ ] **Semantic Search**：基于 embeddings 的语义搜索
+  - 复用 DeepSeek V4 embedding API
+  - 索引：`~/.deepwhale/index/<project-hash>/embeddings.bin`（FAISS 或 hnswlib）
+  - 暴露 `semantic_search` 工具
+- [ ] **reference_lookup 完整版**：kind 支持 callers / callees / importers / all
+
+**Plugin 打包**：
+- [ ] `.dwp` 格式（类似 `.vsix`）
+- [ ] 跨机安装测试
+
+#### 验收标准
+- 装好 Browser Agent 后能在淘宝/京东/Amazon 完成"搜索 + 加购"完整流程
+- Browser Planner 失败自动重试（人工不修 selector）
+- 4 项补回功能全部跑通（Automation / Remote TUI / Compaction / MCP）
+- Session DAG 跨分支不丢消息
+- **1000 条 memory 回收测试通过**（无性能下降）
+- 10 万行项目能查 callers/callees 和做语义搜索
+- Codex 14 项功能 → **12/14**（+ MCP / Automation / Remote TUI / Compaction，**+ Session DAG 升级**）
+
+#### ⚠️ Sprint 9-11 红线
+- **Browser Agent 不要做成 Playwright Wrapper**——必须有 Browser Planner
+- **Memory Ranking 不要做复杂 ML**——用显式公式（importance × decay × scope）
+- **Planner 不要在 v2.0 加**——v2.5 独立插档做
 
 ---
 
-## Phase 4 — v3.0 +Computer Use（第 8-10 个月）
-
-**目标**：能操控电脑 GUI。**v3.0 第 10 个月末必发**。
-
-### Sprint 11-15（Computer Runtime + Compaction 钩子化，第 8-10 个月）
+### Sprint 12（v2.0 release 收尾，第 8 个月）
 
 #### 任务清单
-- [ ] **Computer Runtime**（macOS / Linux X11 优先，Windows 不做）
-  - `mouse_move` / `mouse_click` / `keyboard_input` / `keyboard_hotkey` / `screen_capture` / `window_control`
-  - 跑在 Docker sandbox 内
-- [ ] **Compaction 钩子化**（让 extension 完全替换默认）
-  - `session_before_compact` / `session_after_compact` 钩子
-- [ ] **Computer Use MCP 集成**
-  - Computer Use 也可作为 MCP server 暴露
-- [ ] **v3.0 release**
-  - 第 10 个月末 GitHub Release
-  - 在 sandbox 内能开指定应用、点击、输入
-  - Compaction 后 token 下降 70% 但语义保留
+- [ ] **v2.0 release**
+  - 第 8 个月末 GitHub Release
+  - CHANGELOG 完整记录
+  - **Codex 12/14 ✅**（+2 项挪到 v2.5/v3.0/v4.0）
+
+#### 验收标准
+- Codex 12/14 ✅
+- 文档：v2.0 release notes + 12/14 对照表
+
+---
+
+## Phase 3.5 — v2.5 +Planner（**独立插档**，第 9 个月）
+
+**目标**：**双 Agent 模式**（Planner → Executor）—— v2 已经有 4 个大件，**v2.5 独立做 Planner 避免 v2 爆掉**。**v2.5 第 9 个月末必发**。
+
+> **为什么是 v2.5 插档而不是 v2 一起做**：
+> - v2 已经有 4 个大件（Browser Agent + Memory Ranking + Code Intel 增强 + 4 项补回）
+> - 再加 Planner 必然导致 v2 延期
+> - v2.5 是 v2 延期风险的"安全阀"
+> - 独立插档让 v2 / v2.5 / v3.0 各自能发
+
+### Sprint 13（Planner + 双 Agent 模式，第 9 个月）
+
+#### 任务清单
+- [ ] **Planner**（任务拆解 + 依赖分析）
+  - 输入：用户任务（自然语言）
+  - 输出：子任务 DAG（带依赖关系）
+  - 拆解算法：基于 LLM 推理 + 启发式模板
+  - 例：`重构用户模块` → [读 schema(0) → 改 UserService(2) → 改 controller(3) → 写测试(4) → Reviewer(5)]
+- [ ] **双 Agent 流水线**
+  - `Planner → Executor`（双角色）
+  - Planner 拆解后**逐步喂给 Executor**（不是一次性全 dump）
+  - Executor 完成后反馈 Planner，Planner 决定下一步
+- [ ] **降级模式**：`mode=single`
+  - **完全兼容 v1.0 行为**（用户可选择 `deepwhale --mode=single`）
+  - 单测验证：同一任务在 single/planner 模式下输出结果一致
+- [ ] **Planner 工具暴露**
+  - `plan_task`（把自然语言任务转 DAG）
+  - `decompose_task`（细化单个子任务）
+  - `get_subtask_status`（查询子任务进度）
+- [ ] **单测**：拆解 5 个真实场景任务
+  - "重构用户模块" / "修复登录 bug" / "添加支付功能" / "升级依赖" / "写测试"
+  - 验证依赖图正确
+
+#### 验收标准
+- 双 Agent 模式：Planner 把"重构用户模块"拆成 DAG 子任务，Executor 按序执行
+- 降级模式：`deepwhale --mode=single` 行为完全等同 v1.0
+- 5 个真实场景任务拆解测试通过
+- **v2.5 第 9 个月必发**（不拖到 v3.0）
+
+#### ⚠️ v2.5 红线
+- **Planner 不要做复杂推理**——基于 LLM 简单 prompt + 启发式模板
+- **双 Agent = 单 process 内 2 个函数**——不真 spawn 2 个 Agent
+- **降级模式必须可工作**——`--mode=single` 100% 兼容 v1.0
+
+## Phase 4 — v3.0 +Computer Use 兼容层 + Reviewer（第 10-11 个月）
+
+**目标**：操控电脑 GUI（**不自研视觉理解，借用兼容层**）+ 加入 Reviewer 角色。**v3.0 第 11 个月末必发**。
+
+> **vs 初版 v3.0**：
+> - **Computer Use 改兼容层**（Codex 协议优先，**不自研** OCR/UI Detection/Element Localization）
+> - **加 Reviewer 角色**（3 角色流水线：`Planner → Executor → Reviewer`）
+> - **时长从 3 个月改为 2 个月**（不自研省 1 个月）
+
+### Sprint 14-15（Computer Use 兼容层 + Reviewer，第 10-11 个月）
+
+#### 任务清单
+
+**Computer Use 兼容层**（**不自研 OCR/UI Detection**）：
+- [ ] **首选 Codex Computer Use 协议**（Codex 26.527 开源协议）
+  - 实现：与 Codex 协议一致的 screenshot + click + type 接口
+  - 复用 Codex 现成视觉模型（OCR / UI Detection / Element Localization）
+  - **不自研** mouse_move / mouse_click / keyboard_input / screen_capture
+  - 鼠标键盘操作通过兼容层 API 委托给 Codex 协议
+- [ ] **备选 OpenAI Computer Use / Browser Use Desktop**
+  - 兼容层抽象为 interface，Codex 协议为主实现
+  - 用户可配置切换到 OpenAI / Browser Use Desktop
+- [ ] **Computer Use 跑在 Docker sandbox 内**
+  - 与 Tool Runtime 同一沙箱
+  - 屏幕截图 + 操作全部 sandbox 内完成
+
+**Reviewer 角色**（**v3.0 新增**）：
+- [ ] **Reviewer = 验证 agent**
+  - 输入：Coder/Executor 的输出（代码 / diff / 命令结果）
+  - 输出：approve / request_changes + 具体反馈
+  - 三角色流水线：`Planner → Executor → Reviewer`
+- [ ] **Reviewer 工作流**
+  - 自动跑 linter / test / type check
+  - 对比修改前后的语义（防止"看起来 OK 实际坏"）
+  - 失败时反馈给 Planner，Planner 决定重做还是跳过
+
+**Compaction 钩子化**（v2.0 升级）：
+- [ ] 让 extension 完全替换默认 Compaction
+- [ ] `session_before_compact` / `session_after_compact` 钩子
+- [ ] 单元测试覆盖崩溃恢复（JSONL append-only）
+
+#### 验收标准
+- 装好 Codex Computer Use 兼容层后能在 sandbox 内开指定应用、点击、输入
+- Compaction 后 token 下降 70% 但语义保留
+- **Reviewer 能发现 Coder 输出中的明显 bug**（用 5 个真实 bug fixture 测）
+- **v3.0 第 11 个月必发**
 
 #### ⚠️ Phase 4 红线
 - **Windows Computer Use 不做**（OS 差异大，v3.0 主要验证 macOS + Linux X11）
+- **OCR/UI Detection 不自研**——复用 Codex 兼容层现成视觉模型
+- **mouse_move/mouse_click 不自己实现**——通过兼容层 API 委托
 
 ---
 

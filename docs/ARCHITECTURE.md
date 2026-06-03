@@ -1,10 +1,14 @@
 # 🏛 deepwhale 终极架构
 
 > **核心变更（vs 初版）**：
-> 1. **锁定 4 层架构**（LLM / Agent / Runtime / UI）
-> 2. **锁定 5 阶段版本锚**（v1.0 = Claude Code Lite，v1.5 = Codex Clone，v2.0 = +Browser，v3.0 = +Computer Use，v4.0 = Agent OS）
-> 3. **明确砍掉清单**：8 项延后到 vN（详见末节"砍掉清单"）
+> 1. **锁定 5 层架构**（LLM / Code Intelligence / Runtime / Agent / UI）+ **Memory cross-cutting**
+> 2. **锁定 6 版本锚**（v1.0 Claude Code Lite → v1.5 Codex Core+CodeIntel → v2.0 +Browser Agent → v2.5 +Planner → v3.0 +Computer Use 兼容层 → v4.0 Agent OS）
+> 3. **明确砍掉清单**：22 项延后到 vN / 永远不做（详见末节"砍掉清单"）
 > 4. **单人开发 13 个月节奏**（10 周 v1.0 在单人情况下是 scope explosion 后的 90% 失败概率——**已弃**）
+> 5. **Code Intelligence Layer 新增**（v1.5 基础 / v2.0 增强）——解决"10万行项目失明"
+> 6. **Computer Use 改兼容层**（Codex 协议优先，**不自研**）——节省 2 个月开发量
+> 7. **v2.5 插一档做 Planner**（v2 已经有 Browser/DAG/Memory/CodeIntel，不再加 Planner 避免爆）
+> 8. **Memory Ranking 算法**（importance/last_accessed/decay_score/scope）——解决"5000 memories 必崩"
 
 ## 1. 项目定位
 
@@ -12,13 +16,14 @@
 
 目标（按版本锚分阶段交付）：
 
-| 阶段 | 版本 | 目标能力 | 等价于 |
-|---|---|---|---|
-| Phase 1 | v1.0 | Claude Code Lite | Claude Code 替代品 |
-| Phase 2 | v1.5 | Codex Clone | 一比一复刻 Codex Client |
-| Phase 3 | v2.0 | +Browser Agent | 加上 Browser Use |
-| Phase 4 | v3.0 | +Computer Use | 加上 Computer Use |
-| Phase 5 | v4.0 | Agent OS | MCP + Skills + Plugins + Multi-Agent + Desktop |
+| 阶段 | 版本 | 月份 | 累计 | 目标能力 |
+|---|---|---|---|---|
+| Phase 1 | v1.0 | 1-3 月 | 3 月 | Claude Code Lite（CLI + TUI + 6 工具 + Linear Session + Prefix-cache 4 机制 + Docker 沙箱） |
+| Phase 2 | v1.5 | 4-5 月 | 5 月 | **Codex Core**（Approval/Task/Skills/Hook/StormBreaker）+ **Code Intelligence 基础**（Tree-sitter + Symbol Graph + Workspace Index） |
+| Phase 3 | v2.0 | 6-8 月 | 8 月 | + **Browser Agent**（真实 Browser Planner）+ Session DAG + Memory Ranking + Code Intelligence 增强（Reference Graph + Semantic Search） |
+| **Phase 3.5** | **v2.5** | **9 月** | **9 月** | **+ Planner Agent**（双 Agent 模式，**独立插档**） |
+| Phase 4 | v3.0 | 10-11 月 | 11 月 | + **Computer Use 兼容层**（Codex 协议优先，**不自研**）+ Reviewer + Compaction 钩子化 |
+| Phase 5 | v4.0 | 12-13 月 | **13 月** | + Researcher + 5 角色完整 Multi-Agent + TaskGraph + Persistent Memory + Desktop + Channels |
 
 **核心原则**：
 
@@ -28,30 +33,55 @@
 
 ---
 
-## 2. 4 层架构
+## 2. 5 层架构 + Memory cross-cutting
+
+> **vs 初版 4 层架构**：
+> - **新增 Code Intelligence Layer**（v1.5 引入）—— 解决"10 万行项目 Agent 失明"
+> - **Memory 提升为 cross-cutting 关注点**（不是单独一层，5 层都可读写）
+> - Agent Layer 移到 Code Intelligence 之下（**Agent 工具能直接调代码理解能力**）
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  UI Layer（v1 = CLI + TUI；v4 = +Desktop）                    │
-│  CLI │ TUI (Ink) │ Desktop (Tauri, v4) │ Web (v4)            │
+│  UI Layer（v1.0 = CLI + TUI；v4.0 = +Desktop）                │
+│  CLI │ TUI (Ink) │ Desktop (Tauri, v4.0) │ Web (v4.0)        │
 └─────────────────────────┬────────────────────────────────────┘
                           ↓
 ┌──────────────────────────────────────────────────────────────┐
-│  Agent Layer（核心）                                            │
-│  Planner │ Executor │ Reviewer │ Researcher                   │
-│  MemoryManager │ ToolRouter │ SessionManager                 │
+│  Agent Layer                                                 │
+│  v1.0: Executor │ ToolRouter │ SessionManager (Linear)       │
+│  v1.5: + Approval │ Task │ Skills │ Hooks                    │
+│  v2.0: + Memory Ranking (跨 5 角色共享)                       │
+│  v2.5: + Planner (双 Agent 模式)                              │
+│  v3.0: + Reviewer │ Compaction 钩子化                         │
+│  v4.0: + Researcher (完整 5 角色) │ TaskGraph                 │
 └─────────────────────────┬────────────────────────────────────┘
                           ↓
 ┌──────────────────────────────────────────────────────────────┐
-│  Runtime Layer                                                 │
-│  Tool Runtime │ Plugin Runtime │ MCP Runtime                  │
-│  Browser Runtime (v2) │ Computer Runtime (v3) │ Sandbox       │
+│  Code Intelligence Layer（v1.5 引入，v2.0 增强）              │
+│  v1.5: Tree-sitter │ Symbol Graph │ Workspace Index           │
+│  v2.0: + Reference Graph │ Semantic Search                   │
 └─────────────────────────┬────────────────────────────────────┘
                           ↓
 ┌──────────────────────────────────────────────────────────────┐
-│  LLM Layer                                                     │
-│  ModelProvider（v1 = DeepSeek only；v1.x = +OpenAI/Claude/...）│
-│  Prefix Cache 4 大机制 │ StormBreaker │ SanitizeToolPairing   │
+│  Runtime Layer                                               │
+│  v1.0: Tool Runtime │ Docker Sandbox                          │
+│  v1.5: + Plugin Runtime (.dwp)                                │
+│  v2.0: + MCP Runtime │ Browser Agent Runtime (含 Planner)     │
+│  v3.0: + Computer Use Runtime (兼容层, Codex 协议优先)        │
+└─────────────────────────┬────────────────────────────────────┘
+                          ↓
+┌──────────────────────────────────────────────────────────────┐
+│  LLM Layer                                                   │
+│  v1.0: DeepSeek V4-Flash/Pro only                             │
+│  v1.5: + OpenAI/Claude/Gemini/自定义                          │
+│  Prefix-cache 4 大机制 │ StormBreaker │ Sanitize (v1.5)       │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  Memory（cross-cutting，所有层可读写）                         │
+│  v1.0: Session 内 in-memory                                   │
+│  v2.0: Short/Long/Summary 三层 + Ranking (importance/decay)  │
+│  v4.0: Persistent (跨 session + 跨 5 角色 + hand-edit)       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -61,7 +91,7 @@
 
 **v1.0 只支持**：DeepSeek（V4-Flash 默认，V4-Pro `/pro` 升级）
 
-**v1.x 起扩展**：OpenAI / Anthropic / Gemini / 自定义 OpenAI-compatible
+**v1.5 起扩展**：OpenAI / Anthropic / Gemini / 自定义 OpenAI-compatible
 
 **统一接口**：`ModelProvider`（参考 pi `pi-ai/` 抽象）
 
@@ -76,47 +106,108 @@
 
 ### 2.2 Agent Layer
 
-**职责**：核心 agent 循环
+**职责**：核心 agent 循环 + 任务拆解 + 验证 + 角色协作
 
 **v1.0 包含**（单 Agent）：
 - **Executor**（必需）
-- **ToolRouter**（必需）
+- **ToolRouter**（必需，registry 模式）
 - **SessionManager**（必需，v1 = Linear Session）
+- **Approval**（Codex 抄，v1.5 起）
 
-**v1.5 起扩展**：
-- **Planner**（基础规划）
-- **MemoryManager**（Short/Long/Summary 三层）
+**v1.5 包含**（Codex Core 复刻）：
+- **Task**（Codex 抄）
+- **Skills**（Codex 开放标准）
+- **Hooks**（5 事件 + Reasonix 退出码语义）
+- **StormBreaker / SanitizeToolPairing**（Reasonix 抄）
 
-**v4.0 起扩展**（**完整 Multi-Agent = 5 角色**）：
-- **Planner**（任务拆解 + 依赖分析，输出 TaskGraph）
-- **Researcher**（信息收集、Codebase 探索、上下文检索）
-- **Coder**（专用写代码 = v1.0 Executor 特化）
+**v2.0 包含**（Browser Agent + Memory Ranking）：
+- **MemoryManager** + **Ranking 算法**（importance/last_accessed/decay_score/scope）
+- 跨 Executor / Browser Agent / Code Intelligence 三层共享
+
+**v2.5 包含**（**双 Agent 模式**）：
+- **Planner**（任务拆解 + 依赖分析）
+- 流水线：`Planner → Executor`（双角色，可降级为单 Executor 兼容 v1.0）
+
+**v3.0 包含**（Reviewer + Compaction 钩子化）：
 - **Reviewer**（验证、self-check、Code Review 自动化）
-- **Executor**（通用工具执行，Computer/Browser 编排）
-- **流水线**：`Planner → Researcher → Coder → Reviewer → Executor`
-- **单 Agent 模式保留**为 `mode=single`（v1.0 行为完全兼容）
+- 流水线：`Planner → Executor → Reviewer`（三角色）
+- Compaction 钩子化（让 extension 完全替换默认）
 
-**v4.0 关键模块**：
-- **TaskGraph 引擎**：Planner 输出 DAG，跨 session 持久化，**与 Session DAG 正交**
-- **Persistent Memory**：跨 session 知识沉淀，hand-edit 友好，跨 5 角色共享
-- **Tool Router 升级**：v1.0 registry → v4.0 语义路由
+**v4.0 包含**（**完整 5 角色 Multi-Agent**）：
+- **Researcher**（信息收集、Codebase 探索、上下文检索）
+- 流水线：`Planner → Researcher → Coder → Reviewer → Executor`（**5 角色 = 5 函数，单 process 内**）
+- **TaskGraph 引擎**：Planner 输出 DAG，**跨 session 持久化**，与 Session DAG **正交**
+- **Persistent Memory**：v2.0 MemoryManager 升级（跨 session + 跨 5 角色 + hand-edit）
 
 ### 2.3 Runtime Layer
 
+**职责**：工具执行 + 浏览器 + 电脑 + MCP + 插件
+
 **v1.0 包含**：
-- **Tool Runtime**（bash 白名单 + 6 个核心工具）
-- **Plugin Runtime**（v1.0 暂不开 runtime，Extension API 优先）
-- **Sandbox Runtime**（v1.0 = **Docker only**，详见 §4 砍掉清单）
+- **Tool Runtime**（bash 白名单 + 6 个核心工具：read_file / write_file / edit_file / bash / grep / find）
+- **Docker Sandbox**（默认镜像 node:22-alpine，--network=none，--read-only rootfs）
 
-**v1.5 起扩展**：
-- **Plugin Runtime**（`.dwp` 格式）
+**v1.5 包含**：
+- **Plugin Runtime**（`.dwp` 格式，类似 `.vsix`）
 
-**v2.0 起扩展**：
+**v2.0 包含**（**真实 Browser Agent，不是 Playwright Wrapper**）：
 - **MCP Runtime**（stdio / http / sse 动态注册）
-- **Browser Runtime**（Playwright + 统一 API：navigate/click/type/extract/screenshot/download/upload）
+- **Browser Agent Runtime**：
+  - **Browser Planner**（任务级：DOM Understanding / Element Ranking / Visual Grounding / Action History / Page Summarization / Error Recovery）
+  - **Browser Executor**（操作级：navigate / click / type / extract / screenshot / download / upload）
+  - 解决"淘宝/京东/Amazon 复杂页面失败"
+  - 复用 **Playwright**（不自研 DOM 协议）
 
-**v3.0 起扩展**：
-- **Computer Runtime**（mouse_move/mouse_click/keyboard_input/keyboard_hotkey/screen_capture/window_control）
+**v3.0 包含**（**Computer Use 兼容层，不自研**）：
+- **Computer Use Runtime**：
+  - **首选 Codex Computer Use 协议**（Codex 26.527 开源协议，复刻目标一致）
+  - 备选 OpenAI Computer Use / Browser Use Desktop
+  - 复用现成视觉模型（OCR / UI Detection / Element Localization）
+  - **不自研** mouse_move / mouse_click / keyboard_input / screen_capture——避免"3 个月视觉理解黑洞"
+  - 鼠标键盘操作通过兼容层 API 委托
+
+### 2.3.1 Code Intelligence Layer（v1.5 引入）
+
+**职责**：让 Agent 理解代码库，而不是只能 grep
+
+**v1.5 基础**（**Phase 2 引入，解决"10万行项目失明"**）：
+- **Tree-sitter**：多语言 AST 解析（TypeScript / JavaScript / Python / Go / Rust / Java）
+  - npm 包：`tree-sitter` + `tree-sitter-typescript` / `tree-sitter-python` / ...
+  - 解析速度：100K LOC / 秒
+- **Symbol Graph**：基于 AST 提取 symbol（function / class / variable / type）
+  - 持久化：`~/.deepwhale/index/<project-hash>/symbols.jsonl`（JSONL append-only）
+  - 支持查询：按 symbol 找定义 / 按文件找 symbol 列表 / 按 query string 模糊匹配
+- **Workspace Index**：项目级元信息（语言分布 / 文件数 / LOC / 依赖图）
+  - 写入时机：v1.5 启动时增量构建，git hook 自动触发
+
+**v2.0 增强**（**Phase 3 增强**）：
+- **Reference Graph**：跨文件 symbol 引用图（imports / calls / type refs）
+  - 支持查询：找 symbol 的所有引用、找死代码、找循环依赖
+- **Semantic Search**：基于 embeddings 的语义搜索
+  - 复用 DeepSeek V4 embedding API（v1.5 已支持多 provider）
+  - 索引：`~/.deepwhale/index/<project-hash>/embeddings.bin`（FAISS 或 hnswlib）
+
+**Code Intelligence 调用入口**（Agent 工具能直接用）：
+```typescript
+// Agent tool 1: symbol_lookup
+deepwhale.tool('symbol_lookup', {
+  query: 'UserService.authenticate',
+  kind: 'function' | 'class' | 'variable' | 'all',
+  max_results: 10,
+});
+
+// Agent tool 2: reference_lookup
+deepwhale.tool('reference_lookup', {
+  symbol: 'UserService.authenticate',
+  kind: 'callers' | 'callees' | 'importers' | 'all',
+});
+
+// Agent tool 3: semantic_search
+deepwhale.tool('semantic_search', {
+  query: 'JWT 认证中间件',
+  max_results: 10,
+});
+```
 
 ### 2.4 UI Layer
 
@@ -239,6 +330,8 @@
 | 18 | Cross-session 知识图谱 | Sprint 6 | v1 不需要 | v2.0 |
 | 19 | 真实 5 进程 Multi-Agent 编排 | v4.0 风险 | 单 process 内 5 函数，**不真 spawn 5 个 Agent**（避免 Anthropic/OpenAI 那种昂贵编排） | 不评估 |
 | 20 | MCP Marketplace 合并到 Plugin Marketplace | v4.0 风险 | **拆成两个市场**（功能包 vs 纯工具服务） | 不评估 |
+| 21 | **Computer Use 自研**（OCR/UI Detection/Element Localization） | v3.0 风险 | **v3.0 改兼容层**（Codex Computer Use 协议优先），**不自研视觉理解** | 永远不做（v3.0 兼容层足够） |
+| 22 | **Browser Agent = Playwright Wrapper** | v2.0 风险 | **v2.0 做真实 Browser Planner**（DOM Understanding / Element Ranking / Visual Grounding / Action History / Page Summary / Error Recovery） | 不评估 |
 
 ---
 
@@ -265,79 +358,151 @@
 
 **v1.0 不做**：MCP / Browser / Computer / Plugins / Skills / Desktop / 渠道 / DAG / Compaction
 
-### Phase 2 — v1.5 Codex Clone（2 个月）
+### Phase 2 — v1.5 Codex Core + Code Intelligence 基础（2 个月）
 
-**目标**：100% Codex Client 复刻
+**目标**：Codex Client 核心功能复刻 + **让 Agent 理解代码库**（v1.5 基础）
 
 **交付清单**：
+
+**Codex Core 复刻**（**v1.5 = 8/14**，**Automation/Cron/Remote TUI/Compaction 砍到 v2.0**）：
 - Approval System（Codex 抄）
 - Task Mode（Codex 抄）
 - Skills 系统（**对齐 Codex 开放标准**）
 - Extension API + 21 个 `whale.*` 事件
 - Hooks（5 事件 + Reasonix 退出码语义）
 - **StormBreaker** + **SanitizeToolPairing**（**工具增多后 P0**）
-- Cron Automations（4 模板）
-- Remote TUI（WebSocket）
-- Compaction（v1.5 = **cache-reset point 唯一**）
+
+**Code Intelligence 基础**（**v1.5 引入，解决"10万行项目失明"**）：
+- Tree-sitter 多语言 AST 解析
+- Symbol Graph（按 symbol 找定义）
+- Workspace Index（项目元信息）
+- 暴露 `symbol_lookup` / `reference_lookup`（v1.5 基础版，无 reference 增强）
+
+**v1.5 不做**（砍到 v2.0）：
+- ❌ **Automation / Cron**（v2.0 做）
+- ❌ **Remote TUI**（v2.0 做）
+- ❌ **Compaction**（v2.0 做）
+- ❌ **MCP**（v2.0 做）
+- ❌ Browser / Computer / Desktop / 渠道
 
 **验收标准**：
-- **Codex 14/14 功能对齐**
+- Codex Core 8/14 功能对齐
 - 装 1 个社区 skill 能用
 - 写 1 个 30 行 Extension 注册自定义工具
+- **大型项目（10万行）能查 symbol 定义**（symbol_lookup 跑通）
 - 每周一 minor release，**v1.5 第 5 个月必发**
 
-**v1.5 不做**：MCP / Browser / Computer / Desktop / 渠道 / DAG / Plugin Marketplace
+### Phase 3 — v2.0 +Browser Agent + Code Intel 增强（3 个月）
 
-### Phase 3 — v2.0 Browser Agent（2 个月）
-
-**目标**：能自动开网页、填表、截图
+**目标**：能自动操作复杂网页（淘宝/京东/Amazon）+ 完整 Memory Ranking + Code Intel 增强
 
 **交付清单**：
-- **MCP Runtime**（stdio / http / sse 动态注册）
-- **Browser Runtime**（Playwright + 统一 API：navigate/click/type/extract/screenshot/download/upload）
+
+**真实 Browser Agent**（**不是 Playwright Wrapper**）：
+- **Browser Planner**（任务级：DOM Understanding / Element Ranking / Visual Grounding / Action History / Page Summarization / Error Recovery）
+- **Browser Executor**（操作级：navigate / click / type / extract / screenshot / download / upload）
+- 复用 **Playwright**（不自研 DOM 协议）
+
+**Automation / Cron / Remote TUI / Compaction**（**v1.5 砍掉的部分补回**）：
+- Cron Automations（4 模板）
+- Remote TUI（WebSocket）
+- Compaction（v2.0 = **cache-reset point 唯一**）
 - Plugin 打包（`.dwp` 格式）
-- Session DAG（**从 v1 Linear 升级**）
-- MemoryManager（Short/Long/Summary 三层）
+
+**MCP Runtime**：stdio / http / sse 动态注册
+
+**Session DAG**：v1 Linear → v2.0 DAG（`parentId + leafId` JSONL append-only）
+
+**Memory Ranking 算法**（**解决"5000 memories 必崩"**）：
+- Memory Schema：`{ content, importance, last_accessed, decay_score, scope, created_at }`
+- Ranking：`score = importance * decay(last_accessed) * scope_weight`
+- 触发回收：score < threshold 自动归档（不删除，可恢复）
+- 显式 scope 标记（`user` / `project` / `session`），hand-edit 优先于自动写入
+
+**Code Intelligence 增强**（**v1.5 基础升级**）：
+- **Reference Graph**：跨文件 symbol 引用图（callers / callees / importers）
+- **Semantic Search**：基于 embeddings 的语义搜索（DeepSeek V4 embedding API）
+- 暴露 `semantic_search` / `reference_lookup` 完整版
 
 **验收标准**：
-- 装好 Playwright MCP 后能自动开网页填表截图
-- Browser Runtime 6 个核心 API 全部跑通
+- 装好 Browser Agent 后能在淘宝/京东/Amazon 完成"搜索 + 加购"完整流程
+- MCP server 动态注册跑通
 - Session DAG 跨分支不丢消息
+- **1000 条 memory 回收测试通过**（无性能下降）
+- 10 万行项目能查 callers/callees 和做语义搜索
+- **v2.0 第 8 个月必发**
 
-### Phase 4 — v3.0 Computer Use（3 个月）
+### Phase 3.5 — v2.5 +Planner（**独立插档，1 个月**）
 
-**目标**：能操控电脑 GUI
+**目标**：**双 Agent 模式**——v2 已有 Browser/DAG/Memory/CodeIntel 4 个大件，**不再加 Planner 避免爆**
+
+**为什么是 v2.5 插档而不是 v2 一起做**：
+- v2 已经有 4 个大件（Browser Agent + DAG + Memory Ranking + Code Intel 增强）
+- 再加 Planner 必然导致 v2 延期（v2.5 是 v2 延期风险的"安全阀"）
+- 独立插档让 v2 / v2.5 / v3.0 各自能发
 
 **交付清单**：
-- **Computer Runtime**（mouse_move/mouse_click/keyboard_input/keyboard_hotkey/screen_capture/window_control）
+- **Planner**（任务拆解 + 依赖分析）
+- 流水线：`Planner → Executor`（双角色）
+- **降级模式**：`mode=single` 完全兼容 v1.0 行为（用户可选择）
+- Planner 工具：`plan_task` / `decompose_task` / `get_subtask_status`
+- 单测：拆解 5 个真实场景任务，验证依赖图正确
+
+**验收标准**：
+- 双 Agent 模式：Planner 把"重构用户模块"拆成 DAG 子任务，Executor 按序执行
+- 降级模式：`deepwhale --mode=single` 行为完全等同 v1.0
+- **v2.5 第 9 个月必发**（不拖到 v3.0）
+
+### Phase 4 — v3.0 +Computer Use 兼容层 + Reviewer（2 个月）
+
+**目标**：操控电脑 GUI（**不自研视觉理解，借用兼容层**）+ 加入 Reviewer 角色
+
+**交付清单**：
+
+**Computer Use 兼容层**（**不自研 OCR/UI Detection**）：
+- **首选 Codex Computer Use 协议**（Codex 26.527 开源协议）
+- 备选 OpenAI Computer Use / Browser Use Desktop
+- 复用现成视觉模型（OCR / UI Detection / Element Localization）
+- 鼠标键盘操作通过兼容层 API 委托
 - Computer Use 跑在 Docker sandbox 内
-- Compaction 钩子化（让 extension 完全替换默认）
+
+**Reviewer 角色**：
+- 验证、self-check、Code Review 自动化
+- 流水线：`Planner → Executor → Reviewer`（三角色）
+
+**Compaction 钩子化**：
+- 让 extension 完全替换默认 Compaction
+- 单元测试覆盖崩溃恢复（JSONL append-only）
 
 **验收标准**：
 - 在 sandbox 内能开指定应用、点击、输入
 - Compaction 后 token 下降 70% 但语义保留
+- Reviewer 能发现 Coder 输出中的明显 bug
+- **v3.0 第 11 个月必发**
 
-### Phase 5 — v4.0 Agent OS（3 个月）
+#### ⚠️ Phase 4 红线
+- **Windows Computer Use 不做**（OS 差异大，v3.0 主要验证 macOS + Linux X11）
+- **OCR/UI Detection 不自研**（复用 Codex 兼容层现成视觉模型）
+
+### Phase 5 — v4.0 Agent OS（2 个月）
 
 **目标**：从"命令行助手"变成**"长期运行的软件工程 Agent"**（long-running software engineering agent）
 
 **交付清单**：
 
-**5 角色 Multi-Agent 流水线**（`Planner → Researcher → Coder → Reviewer → Executor`）：
-- **Planner**（任务拆解 + 依赖分析 → 输出 TaskGraph）
-- **Researcher**（信息收集、Codebase 探索、上下文检索）
-- **Coder**（专用写代码 = v1.0 Executor 特化）
-- **Reviewer**（验证、self-check、Code Review 自动化）
-- **Executor**（通用工具执行，Computer/Browser 编排）
+**完整 5 角色 Multi-Agent 流水线**（`Planner → Researcher → Coder → Reviewer → Executor`）：
+- **Researcher**（v4.0 新增：信息收集、Codebase 探索、上下文检索）
+- Coder = v1.0 Executor 特化（v3.0 Reviewer 已加）
+- 流水线：`Planner → Researcher → Coder → Reviewer → Executor`（**5 角色 = 5 函数，单 process 内**）
 - 单 Agent 模式保留为 `mode=single`（**v1.0 行为完全兼容**）
 
-**TaskGraph 引擎**（**v4.0 新增独立模块**）：
+**TaskGraph 引擎**（v2.5 Planner 输出升级）：
 - Planner 输出 DAG 表示子任务依赖
 - 任务调度：依赖满足才执行、并行无依赖任务、失败重试、超时中断
 - **跨 session 持久化**（重启不丢任务图）
 - 与 Session DAG **正交**（Session DAG = 消息树，TaskGraph = 工作流图）
 
-**Persistent Memory**（v2.0 MemoryManager 升级）：
+**Persistent Memory**（v2.0 Memory Ranking 升级）：
 - 跨 session 知识沉淀（用户偏好 / 项目决策 / 实体链接）
 - hand-edit 友好
 - 跨 5 角色共享
@@ -355,6 +520,29 @@
 - TaskGraph 跨重启恢复
 - 桌面 GUI 跑起来
 - 文档站上线
+- **v4.0 第 13 个月必发**
+
+---
+
+## 6. 时间锚
+
+| Phase | 版本 | 时长 | 累计 | 核心交付 |
+|---|---|---|---|---|
+| Phase 1 | v1.0 | 3 个月 | 3 个月 | Claude Code Lite |
+| Phase 2 | v1.5 | 2 个月 | 5 个月 | **Codex Core 8/14 + Code Intelligence 基础** |
+| Phase 3 | v2.0 | 3 个月 | 8 个月 | **+Browser Agent + Memory Ranking + Code Intel 增强** |
+| **Phase 3.5** | **v2.5** | **1 个月** | **9 个月** | **+Planner（双 Agent 模式）** |
+| Phase 4 | v3.0 | 2 个月 | 11 个月 | **+Computer Use 兼容层 + Reviewer** |
+| Phase 5 | v4.0 | 2 个月 | **13 个月** | **Agent OS + 5 角色 + TaskGraph** |
+
+**单人开发 13 个月节奏**（vs 初版 10 周 90% 失败）→ **完成概率预估 75-80%**
+
+**vs 上版（5 阶段 13 个月）**：
+- v1.5 砍 4 项（Automation/Cron/Remote TUI/Compaction 挪到 v2.0），加 Code Intel 基础
+- v2.0 月份 +1（因为 Browser Agent + Memory Ranking + Code Intel 增强 = 3 个大件）
+- v2.5 插 1 个月（Planner 单独立项）
+- v3.0 月份 -1（Computer Use 改兼容层不自研，省 1 个月）
+- v4.0 月份 -1（Researcher 从 v4 独立抽出后，v4 收尾 2 个月足够）
 
 ---
 
