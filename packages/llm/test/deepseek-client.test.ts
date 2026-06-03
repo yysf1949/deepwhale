@@ -140,7 +140,8 @@ describe('DeepSeekClient', () => {
       const { fn } = makeMockFetch(() => jsonResponse(SAMPLE_RESPONSE));
       const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
       const result = await c.chat([{ role: 'user', content: 'hi' }]);
-      expect(result.model).toBe(DEEPSEEK_DEFAULT_MODEL);
+      // Sprint 1a: result.model 来自 LLM 响应的 echo 字段,不再 fallback 到 client.model
+      expect(result.model).toBe(SAMPLE_RESPONSE.model);
       expect(result.content).toContain('whale');
     });
 
@@ -293,14 +294,15 @@ describe('DeepSeekClient', () => {
       );
     });
 
-    it('throws LLMUnknownError when message.content is not a string', async () => {
+    it('falls back to empty content when message.content is not a string', async () => {
+      // Sprint 1a 行为变更：content 非 string 不再 throw,fallback 到空串。
+      // 这跟 DeepSeek 实际行为对齐(可能返回 null/reasoning_content 而非 strict error)。
       const { fn } = makeMockFetch(() =>
         jsonResponse({ choices: [{ message: { role: 'assistant', content: 42 } }] }),
       );
       const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
-      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(
-        LLMUnknownError,
-      );
+      const result = await c.chat([{ role: 'user', content: 'hi' }]);
+      expect(result.content).toBe('');
     });
   });
 

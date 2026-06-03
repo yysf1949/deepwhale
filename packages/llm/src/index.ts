@@ -6,13 +6,27 @@
  * - 4 种 LLMError 子类（APIKeyMissing / RateLimit / Auth / Network / Unknown）
  * - fetch 注入 → 单测 100% mock
  *
- * Sprint 1+ 扩：流式、tool_calls、prompt cache、Reasonix、retry/backoff、token 计量。
+ * Sprint 1a 扩展：流式 + tool_calls + retry/backoff + usage + 6 个 LLMError 子类
+ * Sprint 1b 再加：cache_hit_rate、canonical schema
  */
 
 export const DEEPWHALE_LLM_VERSION = '0.1.0';
 export { DeepSeekClient, DEEPSEEK_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-client.js';
 export type { DeepSeekClientOptions } from './deepseek-client.js';
-export type { LLMClient, ChatMessage, ChatResult, ModelId, Role, LLMError } from './types.js';
+export type {
+  LLMClient,
+  ChatMessage,
+  ChatResult,
+  ChatChunk,
+  ToolCall,
+  Usage,
+  ModelId,
+  Role,
+  LLMError,
+  LLMToolSchema,
+  LLMToolParametersSchema,
+  LLMToolParamSchema,
+} from './types.js';
 export { isLLMError } from './types.js';
 export {
   APIKeyMissingError,
@@ -20,4 +34,5 @@ export {
   LLMAuthError,
   LLMNetworkError,
   LLMUnknownError,
+  LLMStreamError,
 } from './types.js';

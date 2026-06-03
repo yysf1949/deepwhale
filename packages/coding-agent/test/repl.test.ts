@@ -180,7 +180,8 @@ describe('runOneTurn', () => {
     const client = makeMockClient(() => ({ model: 'x' as ModelId, content: 'ok' }));
     const ac = new AbortController();
     await runOneTurn(client, 'hi', [], { signal: ac.signal });
-    expect(client.chat).toHaveBeenCalledWith(expect.any(Array), ac.signal);
+    // Sprint 1a: chat() 签名改为 (msgs, { signal, tools, tool_choice })
+    expect(client.chat).toHaveBeenCalledWith(expect.any(Array), { signal: ac.signal });
   });
 
   it('Chinese locale: error message is in zh-CN', async () => {
