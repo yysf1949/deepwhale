@@ -224,6 +224,7 @@
 | **pi**（earendil-works）| 4 包 monorepo / Extension API / EventBus / JSONL Session / Compaction 钩子 | TypeScript + Ink | **栈和 4 包结构全对齐** |
 | **Hermes**（NousResearch）| 多渠道 / MEMORY+library 分层 / i18n 教训 / post 强制策略 | Python + textual | **i18n 教训必学，栈不抄** |
 | **oh-my-pi**（can1357）| **hashline patch 格式 / napi natives 思路 / 自研 edit benchmark** | TS 54w 行 + Rust 27k 行 + Bun + Ink | **借鉴 3 件差异化（不 fork 整套）** |
+| **ECC**（affaan-m）| **SKILL.md 标准化 / 4 维质量模型 / 6 阶段 Verification Loop / continuous-learning-v2** | Shell + TS + Markdown（9 平台兼容）| **学格式不学 9 平台兼容** |
 
 ---
 
@@ -248,6 +249,7 @@ ROADMAP：
   /home/butterfly443/deepwhale/docs/research/04_pi.md
   /home/butterfly443/deepwhale/docs/research/05_hermes.md
   /home/butterfly443/deepwhale/docs/research/06_oh-my-pi.md  ★ 新增
+  /home/butterfly443/deepwhale/docs/research/07_ECC.md  ★ 新增
   /home/butterfly443/deepwhale/docs/research/MASTER_RESEARCH.md  （v2 5 项目整合版）
 
 Reasonix 关键代码（抄的来源）：
@@ -265,6 +267,16 @@ oh-my-pi 关键代码（借鉴的来源）：
   packages/hashline/src/patcher.ts  prepare/commit 两阶段
   crates/pi-natives/src/            napi 架构思路（27k 行）
   packages/typescript-edit-benchmark/  自研 benchmark 设计参考
+
+ECC 关键 skill（借鉴的来源）：
+  skills/agent-harness-construction/SKILL.md  4 维质量模型（v1.0 验收表）
+  skills/verification-loop/SKILL.md           6 阶段 Verification（v1.0 末 /verify）
+  skills/continuous-learning-v2/              v2.0 Tier-1 学习系统
+  skills/rules-distill/                       v2.0 Tier-1 规则提炼
+  skills/iterative-retrieval/                 v2.0 Tier-1 子 agent 模式
+  agent.yaml                                  245 行 catalog manifest 格式
+  hooks/hooks.json                            6 hook 类型参考
+  rules/<lang>/                               19 语言 rules 结构
 ```
 
 ---
@@ -313,6 +325,85 @@ oh-my-pi 关键代码（借鉴的来源）：
 | benchmark 跑得太慢 | 中 | 用 in-process client + 限定 fixture 数量 |
 | upstream drift（fork pi-mono）| 已规避 | **不 fork pi-mono 整套** |
 | oh-my-pi 未来 API 变化 | 低 | **不依赖其包，只学习设计** |
+
+---
+
+## 16. ECC 借鉴的融入（2026-06-03 用户拍板）
+
+**调研**：[research/07_ECC.md](./research/07_ECC.md) + Obsidian `~/ObsidianVault/AI研究/技术文档/ECC/`
+
+### 16.1 颠覆性发现（影响决策）
+
+| 假设 | 真相 | 后果 |
+|---|---|---|
+| ❌ "ECC 是 agent 本体" | ✅ **ECC 是"任何 agent 之上"的 operator 插件系统**（4.5 月 204k star）| **不学 9 平台兼容**（deepwhale 是 agent 本体）|
+| ❌ "skill 是 prompt 就行" | ✅ **SKILL.md = YAML frontmatter + Markdown** 是革命性标准化（249 个 skill 互不污染）| **v1.0 必采用 SKILL.md 格式** |
+| ❌ "agent 质量靠 review" | ✅ **4 维质量模型**（Action / Observation / Recovery / Context Budget）= 第一性原理 | **v1.0 验收表用 4 维打分** |
+| ❌ "verification 是手动的" | ✅ **6 阶段 Verification Loop**（build / types / lint / tests / security / diff）+ 统一报告 = 自动化 | **v1.0 末加 `/verify` slash command** |
+| ❌ "continuous-learning 50-80% 触发" | ✅ **v2 = PreToolUse/PostToolUse 100% 触发 + 原子 instinct + confidence 0.3-0.9** | **v2.0 Tier-1 直接学 v2** |
+
+### 16.2 4 维质量模型（v1.0 验收表）
+
+**`agent-harness-construction` skill 的核心论点**：
+
+| 维度 | 含义 | deepwhale v1.0 实现 |
+|---|---|---|
+| **1. Action Space Quality** | 工具设计 | 6 工具（bash / read / write / edit / grep / find）粒度正确 |
+| **2. Observation Quality** | 工具返回 | **4 字段 schema 强制**（status / summary / artifacts / next_actions）|
+| **3. Recovery Quality** | 错误恢复 | **3 字段 schema 强制**（root_cause_hint / safe_retry / stop_condition）|
+| **4. Context Budget Quality** | token 分配 | system prompt minimal + skills on-demand + phase boundary compact |
+
+**这是 deepwhale v1.0 整个设计的"质量验收表"**，**比"能跑通"严格 10 倍**。
+
+### 16.3 Sprint 0-2 + v1.0 末重新排序（v3 调整）
+
+| Sprint | 原计划 | 优化后（v3 = ECC 借鉴） | 理由 |
+|---|---|---|---|
+| **0** | 4 包 + hashline MVP | **+ SKILL.md 标准化目录**（YAML frontmatter + 首批 3 个 skill）| 与 hashline 配套，标准化 |
+| **1** | 6 工具 + Prefix-cache 4 机制 | **+ Tool 返回 schema 统一**（Observation 4 字段 + Recovery 3 字段）| 4 维模型 v1.0 实现层 |
+| **2** | Cache + napi 调研 | 不变 | - |
+| **v1.0 末** | - | **+ `/verify` slash command + VERIFICATION REPORT** | 6 阶段流程，求职差异化 |
+
+**v2.0 Tier-1 落地** continuous-learning-v2 模式（instinct + confidence），**直接借鉴 ECC v2**（不是 v1 的 Stop hook）。
+
+### 16.4 借鉴清单（按 P0/P1/P2 排序）
+
+| 优先级 | 借鉴 | 落在版本 | 备注 |
+|---|---|---|---|
+| **P0** | **SKILL.md 标准化目录** | Sprint 0 | YAML frontmatter + 首批 3 个 skill（hashline / coding-standards / verification-loop）|
+| **P0** | **Observation 4 字段 schema** | Sprint 1 | tool-result.ts zod 定义 |
+| **P0** | **Recovery 3 字段 schema** | Sprint 1 | tool-error.ts zod 定义 |
+| **P0** | **`/verify` slash command** | v1.0 末 | 6 阶段流程 + VERIFICATION REPORT |
+| **P0** | **统一报告格式** | v1.0 末 | READY / NOT READY 一眼看出 |
+| **P0** | **Security scan**（grep sk-）| v1.0 | scripts/security-scan.sh |
+| **P1** | agent.yaml catalog 机制 | v1.0 末 | 类似 ECC 245 行 manifest |
+| **P1** | 4 种典型 SKILL.md 模式 | Sprint 1 | Reference / Workflow / Pattern / Knowledge |
+| **P1** | Anti-patterns 自查 | v1.5 | CI lint |
+| **P1** | continuous-learning-v2 | v2.0 Tier-1 | instinct + confidence |
+| **P1** | rules-distill 思想 | v2.0 Tier-1 | 从 skills 提炼 rules |
+| **P2** | 9 平台兼容层 | **不做**（偏离主线）| 与决策冲突 |
+| **P2** | Granularity 3 档规则 | 文档化 | 留占位 |
+| **P2** | Continuous mode（每 15 min）| v2.0 末 | 留占位 |
+| **P2** | ECC Pro 商业化 | **永远不做** | 单人项目 |
+
+### 16.5 风险与对策
+
+| 风险 | 等级 | 对策 |
+|---|---|---|
+| SKILL.md 格式过重（v1.0 工具少）| 低 | **v1.0 至少用 frontmatter，body 简化** |
+| 4 维模型执行成本 | 中 | **只用作 v1.0 验收表**，不强制每条规则都有对应代码 |
+| Verification Loop 增加 CI 时间 | 中 | **跑并行**（build + types + lint + test + security + diff）|
+| Security scan 误报 | 低 | **加白名单**（`*.test.ts` / `docs/`）|
+| ECC 249 skills 是噪音 | 低 | **不抄内容**，只抄格式 |
+| ECC 9 平台兼容分散精力 | **高** | **明确不学**（深挖主线） |
+
+### 16.6 不学清单（明确不抄）
+
+- ❌ **249 skills 全部内容**（deepwhale 是 agent 本体，不是 plugin）
+- ❌ **63 agents 完整角色**（只学"agent 描述符"格式）
+- ❌ **9 平台兼容的 9 套配置**（偏离主线）
+- ❌ **ECC Pro / Sponsors 商业化**（单人项目用不上）
+- ❌ **`commands/` legacy shim**（不学 ECC 这套分类）
 
 ---
 

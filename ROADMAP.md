@@ -206,11 +206,17 @@ DeepWhale 6 个版本形成清晰的 5 步能力演进 + 3 个 Release Gates 守
 | **Phase 5** | v4.0 | 第 12-13 个月 | **13 月** | **Research + Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Plugin Marketplace + Desktop + Channels | ⏳ 待开始 |
 
 > ⭐ **2026-06-03 重大调整**：oh-my-pi 借鉴融入 Sprint 0-2（详见 `docs/ROADMAP_DECISIONS.md` §15）
-> - **Sprint 0 新增** hashline patch 格式 MVP（parser + apply + TAG）
+> - **Sprint 0 新增** hashline 格式 MVP（parser + apply + TAG）
 > - **Sprint 1 edit_file 升级** 完整 hashline + Recovery 3-way（替代原"hash 锚定"简化版）
 > - **Sprint 2 新增** napi natives 调研（先 bun 子进程跑 grep 验证可行性）
 > - **v1.0 末新增** 自研 edit benchmark（求职差异化）
 > - **v1.5 落地** napi natives（grep/tokens/ast 走 Rust）
+
+> ⭐ **2026-06-03 重大调整（v3）**：ECC 借鉴融入 Sprint 0-2 + v1.0 末（详见 `docs/ROADMAP_DECISIONS.md` §16）
+> - **Sprint 0 新增** SKILL.md 标准化目录（YAML frontmatter + 首批 3 个 skill）
+> - **Sprint 1 新增** Tool 返回 schema 统一（Observation 4 字段 + Recovery 3 字段，4 维质量模型实现）
+> - **v1.0 末新增** `/verify` slash command + VERIFICATION REPORT 格式（6 阶段流程）
+> - **v2.0 Tier-1 落地** continuous-learning-v2 模式（instinct + confidence，借鉴 ECC v2）
 
 > **v1.0 = 1 个 release**（不是 5+1 个 Sprint）
 > **v1.5 起 = 每月 1 个 minor release**（每周一 minor 强制节奏）
@@ -272,6 +278,11 @@ v2.0 范围内的 4 项"补回"任务（Automation / Remote TUI / Compaction / M
   - `packages/hashline/src/snapshots.ts`（3-hex TAG 抽象）
   - **不实现 Recovery 3-way / block 解析**（Sprint 1 完整版再加）
   - **目的**：Sprint 1 edit_file 工具能直接用，**不写 str_replace 临时方案**
+- [ ] **⭐ SKILL.md 标准化目录**（ECC P0 借鉴，详见 `docs/ROADMAP_DECISIONS.md` §16）
+  - `skills/<name>/SKILL.md`（YAML frontmatter + Markdown body）
+  - **frontmatter 必填字段**：`name` / `description` / `origin`
+  - **首批 skills**：hashline / coding-standards / verification-loop
+  - **目的**：所有 skill 互不污染，**agent 自动按 description 加载**
 - [ ] **CI：GitHub Actions**（lint + typecheck + 基础测试 + 4 包版本同步）
 
 #### 验收标准
@@ -314,6 +325,18 @@ deepwhale>
     - Recovery 3-way merge（base=cached pre-edit / ours=patch 想改的结果 / theirs=当前 live）
     - 3-hex 不透明 TAG 绑定
   - `grep` / `find`
+- [ ] **⭐ Tool 返回 schema 统一**（ECC Observation 4 字段 + Recovery 3 字段借鉴，§16）
+  - **Observation 4 字段**（每个 tool 返回必填）：
+    - `status`: success|warning|error
+    - `summary`: 一句话结果
+    - `artifacts`: 相关文件路径 / IDs
+    - `next_actions`: 推荐下一步操作
+  - **Recovery 3 字段**（错误返回必填）：
+    - `root_cause_hint`: 错误根因
+    - `safe_retry`: 安全重试指令
+    - `stop_condition`: 明确停止条件
+  - **zod schema 强制**：每个 tool 用 zod 定义 input + output schema
+  - **意义**：4 维质量模型的 v1.0 实现层
 - [ ] **3 种运行模式**（CodeWhale 借鉴，先做 3 种）
   - `interactive`（默认，TUI）
   - `print`（`deepwhale -p "..."` 一次性）
@@ -372,6 +395,23 @@ deepwhale>
   - **v0.1 必发**（Sprint 2 末）
   - CHANGELOG.md 起头
   - tag + GitHub Release 流程跑通
+- [ ] **⭐ `/verify` slash command + VERIFICATION REPORT**（ECC P0 借鉴，§16）
+  - 6 阶段流程（**build / types / lint / tests / security / diff**）
+  - **统一报告格式**：
+    ```
+    VERIFICATION REPORT
+    ==================
+    Build:     [PASS/FAIL]
+    Types:     [PASS/FAIL] (X errors)
+    Lint:      [PASS/FAIL] (X warnings)
+    Tests:     [PASS/FAIL] (X/Y passed, Z% coverage)
+    Security:  [PASS/FAIL] (X issues)
+    Diff:      [X files changed]
+    Overall:   [READY/NOT READY] for PR
+    ```
+  - **并行执行**（不串行）
+  - **集成在 CI**（`/verify` 命令也走同一脚本）
+  - **意义**：4 维质量模型的 v1.0 末落地 + 求职差异化
 
 #### 验收标准
 - v0.1 release 发布（`yysf1949/deepwhale` Releases 页面有 tag）
