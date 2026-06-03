@@ -45,19 +45,68 @@ export interface ChatMessage {
 }
 
 /**
- * Token usage 来自 LLM 响应。Sprint 1a 加,Sprint 1b 再加 prompt_cache_* 等字段。
+ * Token usage 来自 LLM 响应。Sprint 1a: OAI 标准 + cached_tokens。
+ * Sprint 1b: 加 cache_hit_rate / cost_turn / tokens_uncached (可观测性)。
  *
  * OAI 标准字段 + DeepSeek 扩展:
  * - prompt_tokens / completion_tokens / total_tokens
- * - cached_tokens (DeepSeek V4 起,命中 cache 的 token 数)
+ * - cached_tokens (DeepSeek V4 起, 命中 cache 的 token 数)
  *
- * Sprint 1a 只用 total 做 cost 估算。Sprint 1b 再加 cache_hit_rate。
+ * Sprint 1b 扩展 (Prefix-cache 可观测性):
+ * - cache_hit_rate: 0..1, cached_tokens / prompt_tokens。LLM 不返 cached_tokens 时 undefined。
+ * - cost_turn: 本次 turn 估算费用 (¥), 按 V4-Flash pricing hardcode。Sprint 1c 抽 config.toml。
+ * - tokens_uncached: prompt_tokens - cached_tokens, 方便人眼扫读"实际新付的 token"。
+ *
+ * Sprint 1a: cache_hit_rate 仅做总 cost 估算, 没暴露。Sprint 1b 起可观测。
  */
 export interface Usage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
   cached_tokens?: number;
+  /** 0..1, cached_tokens / prompt_tokens。LLM 不返 cached_tokens 时 undefined。 */
+  cache_hit_rate?: number;
+  /** 本 turn 估算费用 (¥), V4-Flash pricing hardcode (2026-06)。
+   *  cache hit 价: ¥0.1/M, cache miss 价: ¥0.5/M, completion: ¥1/M。Sprint 1c 抽 config.toml。 */
+  cost_turn?: number;
+  /** prompt_tokens - cached_tokens, "实际新付"的 token 数, 方便人眼扫读。 */
+  tokens_uncached?: number;
+}
+
+/**
+ * Sprint 1b: 根据 prompt/cached/completion token 算 3 个可观测字段。
+ * 输入: prompt/completion/cached tokens (OAI 标准 + DeepSeek cached_tokens)
+ * 输出: cache_hit_rate / cost_turn / tokens_uncached
+ *
+ * 不传 cached_tokens 时, 3 个字段全 undefined(避免假数据, 跟 Sprint 1a Optional 语义对齐)。
+ *
+ * 公式:
+ * - tokens_uncached = max(0, prompt - cached)
+ * - cache_hit_rate = cached / prompt  (prompt=0 时 0, 避免除零)
+ * - cost_turn = tokens_uncached * 0.0005 + cached * 0.0001 + completion * 0.001
+ *   (V4-Flash: cache miss ¥0.5/M, cache hit ¥0.1/M, completion ¥1/M, 单位 ¥/token)
+ */
+export interface CostBreakdown {
+  cache_hit_rate: number;
+  cost_turn: number;
+  tokens_uncached: number;
+}
+
+export function computeCostBreakdown(
+  promptTokens: number,
+  completionTokens: number,
+  cachedTokens: number | undefined,
+): CostBreakdown | undefined {
+  if (cachedTokens === undefined) return undefined;
+  const tokensUncached = Math.max(0, promptTokens - cachedTokens);
+  const hitRate = promptTokens > 0 ? cachedTokens / promptTokens : 0;
+  // V4-Flash pricing (2026-06, 单位: ¥/token)
+  const costTurn = tokensUncached * 0.0005 + cachedTokens * 0.0001 + completionTokens * 0.001;
+  return {
+    cache_hit_rate: hitRate,
+    cost_turn: costTurn,
+    tokens_uncached: tokensUncached,
+  };
 }
 
 /** chat() 完整调用的返回值。Sprint 1a 加 tool_calls + usage。 */

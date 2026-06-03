@@ -13,6 +13,7 @@
 export const DEEPWHALE_LLM_VERSION = '0.1.0';
 export { DeepSeekClient, DEEPSEEK_BASE_URL, DEEPSEEK_DEFAULT_MODEL } from './deepseek-client.js';
 export type { DeepSeekClientOptions } from './deepseek-client.js';
+export { canonicalizeSchema } from './canonicalize-schema.js';
 export type {
   LLMClient,
   ChatMessage,
@@ -20,6 +21,7 @@ export type {
   ChatChunk,
   ToolCall,
   Usage,
+  CostBreakdown,
   ModelId,
   Role,
   LLMError,
@@ -27,7 +29,7 @@ export type {
   LLMToolParametersSchema,
   LLMToolParamSchema,
 } from './types.js';
-export { isLLMError } from './types.js';
+export { isLLMError, computeCostBreakdown } from './types.js';
 export {
   APIKeyMissingError,
   LLMRateLimitError,

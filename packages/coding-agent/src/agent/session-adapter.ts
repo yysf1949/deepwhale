@@ -123,11 +123,26 @@ export async function persistToolLoopSteps(
 /**
  * 加载已有 session 并重建 messages。
  *
- * Sprint 1a 简化：返回 (events, messages) 两份数据，caller 决定要不要 ignore events。
+ * Sprint 1b: 内部自动调 reader.truncate() 把 partial last line 清掉。
+ * 之前 caller 必须自己记得调, Sprint 1a 全部漏调 → partial line 累积,
+ * 下次 append 拼坏 JSON。Sprint 1b 闭环在 adapter 里, 3 个 mode (repl/print/rpc) 自动受益。
+ *
+ * 行为契约:
+ * - 加载完整 events + 重建 messages
+ * - 若文件末尾有 partial line(崩溃恢复), 自动 truncate
+ * - truncate 失败不抛(不阻塞 agent 启动, 跟 Sprint 1a 容错语义一致)
+ *
+ * Sprint 1a 简化:返回 (events, messages) 两份数据, caller 决定要不要 ignore events。
  */
 export async function loadSession(
   reader: SessionReader,
 ): Promise<{ events: ReadonlyArray<SessionEvent>; messages: ChatMessage[] }> {
   const events = await reader.readAll();
+  // Sprint 1b: 闭环 truncate, 防止 partial line 累积污染下次 append
+  try {
+    await reader.truncate();
+  } catch {
+    // truncate 失败不阻塞启动(可能是权限/磁盘满等, 但 events 已读到内存)
+  }
   return { events, messages: sessionEventsToMessages(events) };
 }

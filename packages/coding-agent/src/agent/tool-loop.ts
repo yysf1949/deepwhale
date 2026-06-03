@@ -27,7 +27,7 @@
  */
 
 import type { ChatMessage, ChatResult, LLMClient, LLMToolSchema, ToolCall } from '@deepwhale/llm';
-import { LLMStreamError, LLMUnknownError } from '@deepwhale/llm';
+import { canonicalizeSchema, LLMStreamError, LLMUnknownError } from '@deepwhale/llm';
 import type { Tool, ToolResult } from '../types.js';
 import type { ToolRegistry } from '../tools/registry.js';
 
@@ -198,16 +198,17 @@ export async function runToolLoop(
 
 /**
  * 把 ToolRegistry 里的工具转成 LLM 看得懂的 wire schema。
- * Sprint 1a 极简：直接复用 Tool.schema（结构兼容 LLMToolParametersSchema）。
+ * Sprint 1b (Prefix-cache 机制 4): canonicalizeSchema 让 key 顺序稳定,
+ * LLM 端 hash 稳定 → prefix-cache 命中率不再因 property 顺序抖动归零。
+ * (对齐 Reasonix schema_canonicalize.go:10-67)
  */
 function buildLlmTools(tools: ReadonlyArray<Tool>): ReadonlyArray<LLMToolSchema> {
-  return tools.map(
-    (t) =>
-      ({
-        name: t.name,
-        description: t.description,
-        parameters: t.schema as unknown as LLMToolSchema['parameters'],
-      }) as LLMToolSchema,
+  return tools.map((t) =>
+    canonicalizeSchema({
+      name: t.name,
+      description: t.description,
+      parameters: t.schema as unknown as LLMToolSchema['parameters'],
+    }),
   );
 }
 

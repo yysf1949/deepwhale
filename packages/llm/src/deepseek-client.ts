@@ -24,6 +24,7 @@ import {
   LLMRateLimitError,
   LLMStreamError,
   LLMUnknownError,
+  computeCostBreakdown,
   isLLMError,
 } from './types.js';
 import type {
@@ -457,6 +458,14 @@ function parseOaiChatCompletion(json: unknown, fallbackModel: ModelId): ChatResu
       typeof u['prompt_cache_hit_tokens'] === 'number' ? u['prompt_cache_hit_tokens'] : undefined;
     usage = { prompt_tokens: prompt, completion_tokens: completion, total_tokens: total };
     if (cached !== undefined) usage.cached_tokens = cached;
+    // Sprint 1b: 加 cache_hit_rate / cost_turn / tokens_uncached 3 个可观测字段。
+    // 跟 cached_tokens 同条件: 没 cached_tokens 时不写(避免假数据)。
+    const breakdown = computeCostBreakdown(prompt, completion, cached);
+    if (breakdown !== undefined) {
+      usage.cache_hit_rate = breakdown.cache_hit_rate;
+      usage.cost_turn = breakdown.cost_turn;
+      usage.tokens_uncached = breakdown.tokens_uncached;
+    }
   }
 
   // finish_reason
@@ -532,11 +541,24 @@ function parseSseEvent(eventRaw: string): ChatChunk | null {
     const rawUsage = obj['usage'];
     if (typeof rawUsage === 'object' && rawUsage !== null) {
       const u = rawUsage as Record<string, unknown>;
+      const prompt = typeof u['prompt_tokens'] === 'number' ? u['prompt_tokens'] : 0;
+      const completion = typeof u['completion_tokens'] === 'number' ? u['completion_tokens'] : 0;
+      const total = typeof u['total_tokens'] === 'number' ? u['total_tokens'] : 0;
+      const cached =
+        typeof u['prompt_cache_hit_tokens'] === 'number' ? u['prompt_cache_hit_tokens'] : undefined;
       const usage: Usage = {
-        prompt_tokens: typeof u['prompt_tokens'] === 'number' ? u['prompt_tokens'] : 0,
-        completion_tokens: typeof u['completion_tokens'] === 'number' ? u['completion_tokens'] : 0,
-        total_tokens: typeof u['total_tokens'] === 'number' ? u['total_tokens'] : 0,
+        prompt_tokens: prompt,
+        completion_tokens: completion,
+        total_tokens: total,
       };
+      if (cached !== undefined) usage.cached_tokens = cached;
+      // Sprint 1b: stream usage chunk 同样算 cache_hit_rate / cost_turn / tokens_uncached
+      const breakdown = computeCostBreakdown(prompt, completion, cached);
+      if (breakdown !== undefined) {
+        usage.cache_hit_rate = breakdown.cache_hit_rate;
+        usage.cost_turn = breakdown.cost_turn;
+        usage.tokens_uncached = breakdown.tokens_uncached;
+      }
       return { delta: {}, usage };
     }
     return null;

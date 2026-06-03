@@ -23,7 +23,7 @@ import {
   LLMUnknownError,
 } from '@deepwhale/llm';
 import type { ChatMessage, ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
-import { runOneTurn } from '../src/repl.js';
+import { formatUsageStatus, runOneTurn } from '../src/repl.js';
 
 // ---- 工具：mock LLMClient ----
 
@@ -195,5 +195,82 @@ describe('runOneTurn', () => {
       expect(result.error).toBe(t('cli.error.auth', '401'));
       expect(result.error).toContain('认证失败');
     }
+  });
+});
+
+/**
+ * Sprint 1b: formatUsageStatus — 把 usage 翻译成人类可读一行
+ * 给 REPL 状态栏 / print 退出 summary / RPC 顶层字段共用。
+ *
+ * 覆盖:
+ * - undefined → null (不污染 stderr)
+ * - 无 cached_tokens → 简版 (避免假数据)
+ * - 满 usage → 完整 4 字段
+ * - prompt=0 边界
+ * - tokens_uncached 收敛时去冗余 (Hermes footer 教训)
+ */
+describe('formatUsageStatus (Sprint 1b)', () => {
+  it('usage undefined → null (不污染 stderr)', () => {
+    expect(formatUsageStatus(undefined)).toBeNull();
+  });
+
+  it('无 cached_tokens → 简版 "usage: 1.2k prompt / 200 completion"', () => {
+    const line = formatUsageStatus({
+      prompt_tokens: 1200,
+      completion_tokens: 200,
+      total_tokens: 1400,
+    });
+    expect(line).not.toBeNull();
+    expect(line).toContain('usage:');
+    expect(line).toContain('1.2k');
+    expect(line).toContain('200');
+    // 没 cache_hit_rate 时不显示 cache: 和 ¥
+    expect(line).not.toContain('cache:');
+    expect(line).not.toContain('¥');
+  });
+
+  it('满 usage → 完整 4 字段 "cache: 90% | ¥X.XXX/turn | prompt Xk (Y new)"', () => {
+    const line = formatUsageStatus({
+      prompt_tokens: 1000,
+      completion_tokens: 100,
+      total_tokens: 1100,
+      cached_tokens: 900,
+      cache_hit_rate: 0.9,
+      cost_turn: 0.18,
+      tokens_uncached: 100,
+    });
+    expect(line).not.toBeNull();
+    expect(line).toMatch(/cache: 90%/);
+    expect(line).toMatch(/¥0\.18/);
+    expect(line).toMatch(/turn/);
+    expect(line).toMatch(/prompt 1\.0k/);
+    expect(line).toMatch(/100 new/);
+  });
+
+  it('tokens_uncached == prompt (全 miss, cache_hit_rate=0) 仍正常显示', () => {
+    // 边界: cached=0, 但 cached_tokens 字段存在 (LLM 显式说 0)
+    const line = formatUsageStatus({
+      prompt_tokens: 500,
+      completion_tokens: 50,
+      total_tokens: 550,
+      cached_tokens: 0,
+      cache_hit_rate: 0,
+      cost_turn: 0.3,
+      tokens_uncached: 500,
+    });
+    expect(line).not.toBeNull();
+    expect(line).toMatch(/cache: 0%/);
+    // tokens_uncached == prompt, 显示 "500 new"
+    expect(line).toMatch(/500 new/);
+  });
+
+  it('prompt < 1000 (单数字) 不带 k 后缀', () => {
+    const line = formatUsageStatus({
+      prompt_tokens: 50,
+      completion_tokens: 20,
+      total_tokens: 70,
+    });
+    expect(line).toMatch(/50 prompt/);
+    expect(line).not.toMatch(/50\.0k/);
   });
 });

@@ -246,11 +246,20 @@ async function dispatch(
       // 修 Sprint 1a follow-up: 之前不写回,后续 chat 永远基于空历史。
       workingMessages.length = 0;
       workingMessages.push(...result.messages);
-      return {
+      // Sprint 1b: 顶层暴露 cache_hit_rate / cost_turn, 让 RPC caller 不用 deep dive 到 usage
+      // (跟 print/REPL 状态栏对齐: 关键可观测性 1 层扁平访问)
+      const resultObj: Record<string, unknown> = {
         content: result.final.content,
         usage: result.final.usage,
         steps: result.steps.length,
       };
+      if (result.final.usage?.cache_hit_rate !== undefined) {
+        resultObj['cache_hit_rate'] = result.final.usage.cache_hit_rate;
+      }
+      if (result.final.usage?.cost_turn !== undefined) {
+        resultObj['cost_turn'] = result.final.usage.cost_turn;
+      }
+      return resultObj;
     }
     default:
       throw new Error(`method not found: '${req.method}'`);

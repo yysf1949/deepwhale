@@ -229,6 +229,102 @@ describe('DeepSeekClient', () => {
     });
   });
 
+  describe('usage (Sprint 1b: cache_hit_rate / cost_turn / tokens_uncached)', () => {
+    it('Sprint 1b: 满 usage (含 cached_tokens) → 算对 cache_hit_rate / cost_turn / tokens_uncached', async () => {
+      // 1000 prompt, 80% 命中 cache = 800 cached, 200 uncached; 100 completion
+      // cost = 200 * 0.0005 + 800 * 0.0001 + 100 * 0.001
+      //      = 0.1 + 0.08 + 0.1 = 0.28
+      const response = {
+        ...SAMPLE_RESPONSE,
+        usage: {
+          prompt_tokens: 1000,
+          completion_tokens: 100,
+          total_tokens: 1100,
+          prompt_cache_hit_tokens: 800,
+        },
+      };
+      const { fn } = makeMockFetch(() => jsonResponse(response));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const result = await c.chat([{ role: 'user', content: 'hi' }]);
+      expect(result.usage).toBeDefined();
+      expect(result.usage?.cached_tokens).toBe(800);
+      expect(result.usage?.cache_hit_rate).toBeCloseTo(0.8);
+      expect(result.usage?.tokens_uncached).toBe(200);
+      expect(result.usage?.cost_turn).toBeCloseTo(0.28);
+    });
+
+    it('Sprint 1b: 无 cached_tokens → 3 个新字段全 undefined (不写默认值避免假数据)', async () => {
+      // 模拟 LLM 不返 prompt_cache_hit_tokens(老版 OAI / 不支持 cache 的 provider)
+      const { fn } = makeMockFetch(() => jsonResponse(SAMPLE_RESPONSE));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const result = await c.chat([{ role: 'user', content: 'hi' }]);
+      expect(result.usage).toBeDefined();
+      expect(result.usage?.cached_tokens).toBeUndefined();
+      expect(result.usage?.cache_hit_rate).toBeUndefined();
+      expect(result.usage?.cost_turn).toBeUndefined();
+      expect(result.usage?.tokens_uncached).toBeUndefined();
+    });
+
+    it('Sprint 1b: prompt=0 边界 (避免除零)', async () => {
+      const { fn } = makeMockFetch(() =>
+        jsonResponse({
+          ...SAMPLE_RESPONSE,
+          usage: {
+            prompt_tokens: 0,
+            completion_tokens: 10,
+            total_tokens: 10,
+            prompt_cache_hit_tokens: 0,
+          },
+        }),
+      );
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const result = await c.chat([{ role: 'user', content: 'hi' }]);
+      // 0/0 走 prompt>0 短路, hit rate 0
+      expect(result.usage?.cache_hit_rate).toBe(0);
+      expect(result.usage?.tokens_uncached).toBe(0);
+      // cost = 0 + 0 + 10 * 0.001 = 0.01
+      expect(result.usage?.cost_turn).toBeCloseTo(0.01);
+    });
+
+    it('Sprint 1b: stream usage-only chunk 同样算 cache_hit_rate / cost_turn / tokens_uncached', async () => {
+      // 流式 OAI 协议: stream_options.include_usage=true 时, 最后发一个 usage-only chunk
+      const enc = new TextEncoder();
+      const usageChunk = {
+        id: 'chatcmpl-1',
+        object: 'chat.completion.chunk',
+        created: 1700000000,
+        model: 'deepseek-chat',
+        choices: [],
+        usage: {
+          prompt_tokens: 200,
+          completion_tokens: 50,
+          total_tokens: 250,
+          prompt_cache_hit_tokens: 180,
+        },
+      };
+      const payload = `data: ${JSON.stringify(usageChunk)}\n\ndata: [DONE]\n\n`;
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(enc.encode(payload));
+          controller.close();
+        },
+      });
+      const { fn } = makeMockFetch(() => new Response(stream, { status: 200 }));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const result = await c.stream(
+        [{ role: 'user', content: 'hi' }],
+        { onChunk: () => {} },
+      );
+      expect(result.usage).toBeDefined();
+      expect(result.usage?.cached_tokens).toBe(180);
+      expect(result.usage?.cache_hit_rate).toBeCloseTo(0.9);
+      expect(result.usage?.tokens_uncached).toBe(20);
+      // cost = 20 * 0.0005 + 180 * 0.0001 + 50 * 0.001
+      //      = 0.01 + 0.018 + 0.05 = 0.078
+      expect(result.usage?.cost_turn).toBeCloseTo(0.078);
+    });
+  });
+
   describe('error: API key', () => {
     it('throws APIKeyMissingError when no key in env or options', async () => {
       const c = new DeepSeekClient({

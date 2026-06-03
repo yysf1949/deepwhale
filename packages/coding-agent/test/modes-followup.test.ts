@@ -417,4 +417,126 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
       stdoutSpy.mockRestore();
     }
   });
+
+  // ======================================================================
+  // Sprint 1b: usage 可观测性 wired 到 RPC + print
+  // ======================================================================
+
+  it('Sprint 1b #1: RPC chat response 顶层暴露 cache_hit_rate / cost_turn (caller 不必 deep dive usage)', async () => {
+    // 模拟 LLM 返 usage (含 cached_tokens), RPC mode 必须把 cache_hit_rate 提到顶层方便 caller 1 层访问
+    // 之前: caller 只能读 result.usage.cache_hit_rate, 多层访问
+    // Sprint 1b: 顶层 result.cache_hit_rate + result.cost_turn (跟 usage 字段并存, 0 字段冲突)
+    const { PassThrough } = await import('node:stream');
+    const input = new PassThrough();
+    const stdoutChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((data) => {
+      stdoutChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    // stream mock: 返回 usage (含 cached_tokens) → 走 stream 路径, fill streamResult
+    const usageClient: LLMClient = {
+      model: 'mock' as ModelId,
+      chat: vi.fn(async (): Promise<ChatResult> => okResult('unused')),
+      stream: vi.fn(
+        async (
+          _msgs: ChatMessage[],
+          options: { onChunk: (chunk: ChatChunk) => void },
+        ): Promise<ChatResult> => {
+          options.onChunk({ delta: { content: 'cached hit' } });
+          // 构造带 usage 的 ChatResult, 模拟 DeepSeek V4 返 usage
+          const result: ChatResult = {
+            model: 'mock' as ModelId,
+            content: 'cached hit',
+            finish_reason: 'stop',
+            usage: {
+              prompt_tokens: 1000,
+              completion_tokens: 50,
+              total_tokens: 1050,
+              cached_tokens: 900,
+              cache_hit_rate: 0.9,
+              cost_turn: 0.09,
+              tokens_uncached: 100,
+            },
+          };
+          return result;
+        },
+      ),
+    };
+    try {
+      const codePromise = runRpcMode({ client: usageClient, input });
+      input.write(
+        `${JSON.stringify({ id: '1', method: 'chat', params: { prompt: 'Q', stream: true } })}\n`,
+      );
+      input.end();
+      await codePromise;
+      const all = stdoutChunks.join('');
+      // 顶层 cache_hit_rate 必须出现 (caller 1 层访问)
+      expect(all).toMatch(/"cache_hit_rate"\s*:\s*0\.9/);
+      // 顶层 cost_turn 必须出现
+      expect(all).toMatch(/"cost_turn"\s*:\s*0\.09/);
+      // usage 字段也必须保留 (caller 想要全量数据仍可访问)
+      expect(all).toMatch(/"usage"/);
+    } finally {
+      stdoutSpy.mockRestore();
+    }
+  });
+});
+
+// =====================================================================
+// Sprint 1b: print 退出后打 usage summary 到 stderr
+// =====================================================================
+
+describe('runPrintMode — Sprint 1b usage summary', () => {
+  it('Sprint 1b #2: print 退出后 stderr 必含 cache/cost summary (跟 REPL 状态栏同一格式)', async () => {
+    // 满 usage → 完整 summary "cache: 90% | ¥X/turn | prompt Xk (Y new)"
+    const { client } = makeStreamMockClient({ streamResults: [{ content: 'hi' }] });
+    // 包装 client.stream 让它返带 usage 的 ChatResult
+    const realStream = client.stream as unknown as ReturnType<typeof vi.fn>;
+    const wrappedStream = vi.fn(
+      async (
+        msgs: ChatMessage[],
+        options: { onChunk: (chunk: ChatChunk) => void; [k: string]: unknown },
+      ) => {
+        const r = await realStream(msgs, options);
+        // 注入 usage (模拟真 LLM 返)
+        return {
+          ...r,
+          usage: {
+            prompt_tokens: 1000,
+            completion_tokens: 50,
+            total_tokens: 1050,
+            cached_tokens: 900,
+            cache_hit_rate: 0.9,
+            cost_turn: 0.09,
+            tokens_uncached: 100,
+          },
+        } as ChatResult;
+      },
+    );
+    (client as { stream: typeof wrappedStream }).stream = wrappedStream;
+    const stdoutChunks: string[] = [];
+    const stderrChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((data) => {
+      stdoutChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
+      stderrChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    try {
+      const code = await runPrintMode({ prompt: 'hi', client, enableToolLoop: true });
+      expect(code).toBe(0);
+      // stdout 必含 chat content (Sprint 1a 已有)
+      expect(stdoutChunks.join('')).toContain('hi');
+      // stderr 必含 cache status 关键字段
+      const stderrAll = stderrChunks.join('');
+      expect(stderrAll).toMatch(/cache:\s*90%/);
+      expect(stderrAll).toMatch(/¥/);
+      expect(stderrAll).toMatch(/turn/);
+    } finally {
+      stdoutSpy.mockRestore();
+      stderrSpy.mockRestore();
+    }
+  });
 });

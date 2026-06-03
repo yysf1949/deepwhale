@@ -29,6 +29,7 @@ import {
   type ToolLoopStep,
 } from '../agent/index.js';
 import { createDefaultRegistry } from '../tools/registry.js';
+import { formatUsageStatus } from '../repl.js';
 
 export interface PrintModeOptions {
   prompt: string;
@@ -130,6 +131,13 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
       } catch {
         /* best-effort */
       }
+    }
+
+    // Sprint 1b: 退出后打一行 cache / cost summary 到 stderr (不污染 stdout)
+    // 跟 REPL 状态栏用同一个 formatUsageStatus, 风格统一
+    const usageLine = formatUsageStatus(result.final.usage);
+    if (usageLine !== null) {
+      process.stderr.write(`  ${usageLine}\n`);
     }
 
     return 0;

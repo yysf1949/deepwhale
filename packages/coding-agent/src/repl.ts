@@ -34,6 +34,7 @@ import {
   LLMRateLimitError,
   LLMStreamError,
   LLMUnknownError,
+  type Usage,
 } from '@deepwhale/llm';
 import {
   isToolLoopError,
@@ -283,6 +284,11 @@ export async function runAgentTurn(
   for (const step of result.steps) {
     appendStepSummary(step, out, err);
   }
+
+  // 7) Sprint 1b: Prefix-cache 可观测性 — 每 turn 打印一行 status 到 stderr
+  // 风格: 分两行(跟 plan 拍板), 不污染 stdout 流式输出, 不打 prompt 前面
+  // 字段: cache_hit_rate / cost_turn / prompt / completion, 多字段同值时去冗余(Hermes footer 教训)
+  appendUsageStatus(result.final.usage, err);
 }
 
 function appendStepSummary(
@@ -298,6 +304,43 @@ function appendStepSummary(
     }
   }
   // 'assistant' / 'limit' / 'error' 的 summary 留 Sprint 1b（不污染 Sprint 1a 验收面）
+}
+
+/**
+ * Sprint 1b: 把 usage 翻译成人类可读的一行 status, 写到 stderr (不污染 stdout 流式输出)。
+ *
+ * 显示规则 (Hermes footer 教训应用 — 多字段同值时去冗余):
+ * - 满 usage (有 cached_tokens) → 完整 4 字段: cache: 90% | ¥0.05/turn | prompt 1.2k (1.1k cached)
+ * - 无 cached_tokens → 简化为: usage: 1.2k prompt / 200 completion
+ *   (不打 cache% / cost, 避免没数据时显示 0% 误导)
+ * - 无 usage → 完全不打印 (LLM 没返 usage 时不污染 stderr)
+ *
+ * Sprint 1c 抽 pricing 到 config.toml, 此函数签名不变。
+ */
+export function formatUsageStatus(usage: Usage | undefined): string | null {
+  if (usage === undefined) return null;
+  const { prompt_tokens, completion_tokens } = usage;
+  // 无 cached_tokens: 简版
+  if (usage.cached_tokens === undefined) {
+    return `usage: ${formatTokens(prompt_tokens)} prompt / ${formatTokens(completion_tokens)} completion`;
+  }
+  // 满 usage: 完整 status
+  const hitRatePct = ((usage.cache_hit_rate ?? 0) * 100).toFixed(0);
+  const cost = usage.cost_turn ?? 0;
+  const costStr = cost < 0.01 ? `¥${cost.toFixed(4)}` : `¥${cost.toFixed(3)}`;
+  return `cache: ${hitRatePct}% | ${costStr}/turn | prompt ${formatTokens(prompt_tokens)} (${formatTokens(usage.tokens_uncached ?? prompt_tokens)} new)`;
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+function appendUsageStatus(usage: Usage | undefined, err: NodeJS.WritableStream): void {
+  const line = formatUsageStatus(usage);
+  if (line !== null) {
+    err.write(`  ${line}\n`);
+  }
 }
 
 function formatError(e: unknown): string {
