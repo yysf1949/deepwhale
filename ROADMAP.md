@@ -205,6 +205,13 @@ DeepWhale 6 个版本形成清晰的 5 步能力演进 + 3 个 Release Gates 守
 | **Phase 4** | v3.0 | 第 10-11 个月 | 11 月 | **Execute + Review** | **Browser Agent 增强**（3 件：Visual Grounding / 策略级 Error Recovery / Adaptive Retry）+ Reviewer + **Computer Use 兼容层** | ⏳ 待开始 |
 | **Phase 5** | v4.0 | 第 12-13 个月 | **13 月** | **Research + Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Plugin Marketplace + Desktop + Channels | ⏳ 待开始 |
 
+> ⭐ **2026-06-03 重大调整**：oh-my-pi 借鉴融入 Sprint 0-2（详见 `docs/ROADMAP_DECISIONS.md` §15）
+> - **Sprint 0 新增** hashline patch 格式 MVP（parser + apply + TAG）
+> - **Sprint 1 edit_file 升级** 完整 hashline + Recovery 3-way（替代原"hash 锚定"简化版）
+> - **Sprint 2 新增** napi natives 调研（先 bun 子进程跑 grep 验证可行性）
+> - **v1.0 末新增** 自研 edit benchmark（求职差异化）
+> - **v1.5 落地** napi natives（grep/tokens/ast 走 Rust）
+
 > **v1.0 = 1 个 release**（不是 5+1 个 Sprint）
 > **v1.5 起 = 每月 1 个 minor release**（每周一 minor 强制节奏）
 > **v1.5 累计 5 月、v2.0 累计 8 月、v2.5 累计 9 月、v3.0 累计 11 月、v4.0 累计 13 月**
@@ -259,6 +266,12 @@ v2.0 范围内的 4 项"补回"任务（Automation / Remote TUI / Compaction / M
   - 4 个 Skills 约定目录（v1.0 暂不读，v1.5 启用）：`.deepwhale/skills/`、`.agents/skills/`、`~/.deepwhale/skills/`、`~/.claude/skills/`
 - [ ] **`@deepwhale/llm` OpenAI 兼容客户端**（**v1 = DeepSeek only**）
 - [ ] **`@deepwhale/coding-agent` 最小 CLI 入口**
+- [ ] **⭐ hashline patch 格式 MVP**（oh-my-pi P0 借鉴，详见 `docs/ROADMAP_DECISIONS.md` §15）
+  - `packages/hashline/src/parser.ts`（lark 语法解析 patch 文本）
+  - `packages/hashline/src/apply.ts`（in-memory apply 引擎）
+  - `packages/hashline/src/snapshots.ts`（3-hex TAG 抽象）
+  - **不实现 Recovery 3-way / block 解析**（Sprint 1 完整版再加）
+  - **目的**：Sprint 1 edit_file 工具能直接用，**不写 str_replace 临时方案**
 - [ ] **CI：GitHub Actions**（lint + typecheck + 基础测试 + 4 包版本同步）
 
 #### 验收标准
@@ -294,7 +307,12 @@ deepwhale>
   - **加 cache 可观测性**：控制台实时显示 `cache_hit_rate` + `cost/turn`
 - [ ] **Tool Registry**：内置 6 个核心工具
   - `bash`（**白名单 shell**——v1.0 第一层沙箱）
-  - `read_file` / `write_file` / `edit_file`（hash 锚定）
+  - `read_file` / `write_file`
+  - `edit_file`（**⭐ 完整 hashline + Recovery 3-way**，详见 `docs/ROADMAP_DECISIONS.md` §15）
+    - 替代原"hash 锚定"简化版
+    - 完整 6 个 op：`replace N..M` / `delete N..M` / `insert before/after/head/tail`
+    - Recovery 3-way merge（base=cached pre-edit / ours=patch 想改的结果 / theirs=当前 live）
+    - 3-hex 不透明 TAG 绑定
   - `grep` / `find`
 - [ ] **3 种运行模式**（CodeWhale 借鉴，先做 3 种）
   - `interactive`（默认，TUI）
@@ -344,6 +362,12 @@ deepwhale>
 - [ ] **基础 UX 打磨**
   - 错误信息友好（DeepSeek 限流 / API key 缺失 / Docker 未启动）
   - TUI 流式渲染测试
+- [ ] **⭐ napi natives 调研**（oh-my-pi P0 借鉴，前置到 Sprint 2）
+  - **第一步：bun 子进程跑 grep** 验证性能提升（`bun --filter='*.ts' grep 'TODO'`，对比 TS 实现）
+  - 验证通过 → 决定 napi + Rust 走哪条路径
+  - 验证失败 → 退回纯 TS 实现，**v1.5 再做 napi**
+  - 决策依据写入 `docs/research/native-feasibility.md`
+  - 详见 `docs/ROADMAP_DECISIONS.md` §15
 - [ ] **强制 release 节奏**
   - **v0.1 必发**（Sprint 2 末）
   - CHANGELOG.md 起头
