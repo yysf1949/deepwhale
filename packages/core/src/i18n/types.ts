@@ -8,4 +8,13 @@ export type TranslationKey =
   | 'cli.greeting'
   | 'cli.prompt'
   | 'cli.goodbye'
+  | 'cli.no_api_key_hint'
+  | 'cli.error.network'
+  | 'cli.error.auth'
+  | 'cli.error.rate_limit'
+  | 'cli.error.unknown'
+  | 'cli.empty_input'
+  | 'cli.builtin_help'
+  | 'cli.builtin_exit'
+  | 'cli.builtin_unknown'
   | 'error.api_key_missing';
