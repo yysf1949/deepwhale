@@ -234,41 +234,64 @@ async function executeToolCall(
     };
   }
 
-  // Sprint 1a 简化：tool 自带 timeout 不支持,只走外层 timeout + external abort
-  const ac = new AbortController();
-  const externalAbortHandler = () => ac.abort(externalSignal?.reason);
-  if (externalSignal) {
-    if (externalSignal.aborted) {
-      return {
-        success: false,
-        content: '',
-        error: 'aborted: external signal already triggered',
-      };
-    }
-    externalSignal.addEventListener('abort', externalAbortHandler, { once: true });
-  }
+  // Sprint 1a 修 P2-B:tool 自带 timeout 不支持,通过外层 setTimeout + Promise.race 包一层强制中断。
+  // 不动 Tool.execute() 签名(Sprint 1a 简化),而是 race 出 timeout 时 reject 让上层 catch 包成 tool 错误。
+  // 同步清掉 timer 避免进程 hang。
   let timer: NodeJS.Timeout | undefined;
+  let timeoutReason: unknown;
+  const executePromise = Promise.resolve().then(() => tool.execute(tc.args));
+  let timeoutPromise: Promise<never> | undefined;
   if (toolTimeoutMs !== undefined) {
-    timer = setTimeout(() => ac.abort(new Error('tool-timeout')), toolTimeoutMs);
+    timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        timeoutReason = new Error(`tool-timeout: '${tc.name}' exceeded ${toolTimeoutMs}ms`);
+        reject(timeoutReason);
+      }, toolTimeoutMs);
+    });
   }
+  // externalSignal 一旦 abort,立即 reject 以让 race 收敛
+  const externalAbortPromise: Promise<never> | undefined = externalSignal
+    ? new Promise<never>((_resolve, reject) => {
+        if (externalSignal!.aborted) {
+          reject(new Error('aborted: external signal already triggered'));
+          return;
+        }
+        externalSignal!.addEventListener(
+          'abort',
+          () => reject(new Error('aborted: external signal triggered')),
+          { once: true },
+        );
+      })
+    : undefined;
 
   const start = Date.now();
   try {
-    const result = await tool.execute(tc.args);
+    const raceCandidates: Array<Promise<unknown>> = [executePromise];
+    if (timeoutPromise) raceCandidates.push(timeoutPromise);
+    if (externalAbortPromise) raceCandidates.push(externalAbortPromise);
+    const result = (await Promise.race(raceCandidates)) as ToolResult;
     return {
       ...result,
       meta: { ...(result.meta ?? {}), duration_ms: Date.now() - start },
     };
   } catch (err) {
+    // 区分是 tool 自身抛错,还是 timeout/abort 包出来的错
+    const isSynthetic = err === timeoutReason || (err instanceof Error && /^(aborted:)/.test(err.message));
     return {
       success: false,
       content: '',
-      error: `tool-threw: ${err instanceof Error ? err.message : String(err)}`,
+      error: isSynthetic
+        ? err instanceof Error
+          ? err.message
+          : String(err)
+        : `tool-threw: ${err instanceof Error ? err.message : String(err)}`,
       meta: { duration_ms: Date.now() - start },
     };
   } finally {
     if (timer) clearTimeout(timer);
-    if (externalSignal) externalSignal.removeEventListener('abort', externalAbortHandler);
+    if (externalSignal && externalAbortPromise) {
+      externalSignal.removeEventListener('abort', () => {});
+    }
   }
 }
 

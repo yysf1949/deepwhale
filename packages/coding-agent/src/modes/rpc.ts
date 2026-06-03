@@ -20,7 +20,7 @@
 
 import process from 'node:process';
 import { createInterface, type Interface as RLInterface } from 'node:readline';
-import { DeepSeekClient, isLLMError } from '@deepwhale/llm';
+import { DeepSeekClient, isLLMError, type ChatMessage, type LLMClient } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
 import {
   isToolLoopError,
@@ -34,6 +34,10 @@ import { createDefaultRegistry } from '../tools/registry.js';
 export interface RpcModeOptions {
   sessionPath?: string;
   maxSteps?: number;
+  /** 注入 LLM 客户端（默认 DeepSeekClient）。Sprint 1a follow-up:单测用。 */
+  client?: LLMClient;
+  /** 注入输入流（默认 process.stdin）。Sprint 1a follow-up:单测用。 */
+  input?: NodeJS.ReadableStream;
 }
 
 interface RpcRequest {
@@ -58,7 +62,7 @@ interface RpcNotification {
 }
 
 export async function runRpcMode(options: RpcModeOptions): Promise<number> {
-  const client = new DeepSeekClient();
+  const client: LLMClient = options.client ?? new DeepSeekClient();
   const sessionPath = options.sessionPath;
 
   // session
@@ -79,9 +83,12 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
   process.stderr.write('  methods: chat { prompt, stream? }\n');
   process.stderr.write('  notifications: stderr only\n');
 
-  const rl: RLInterface = createInterface({ input: process.stdin, terminal: false });
+  const rl: RLInterface = createInterface({ input: options.input ?? process.stdin, terminal: false });
   let exitCode = 0;
   let exiting = false;
+  // Sprint 1a follow-up:readline line event 不会 await handler,并发 dispatch 会让 workingMessages race。
+  // 维护一个 in-flight chain,保证 request 串行处理,workingMessages 累积语义稳定。
+  let chain: Promise<void> = Promise.resolve();
 
   const finish = async (code: number): Promise<void> => {
     if (exiting) return;
@@ -97,39 +104,41 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
     exitCode = code;
   };
 
-  rl.on('line', async (line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    let req: RpcRequest;
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (
-        typeof parsed !== 'object' ||
-        parsed === null ||
-        typeof (parsed as RpcRequest).id !== 'string' ||
-        typeof (parsed as RpcRequest).method !== 'string'
-      ) {
-        sendError('invalid_request', 'expected {id, method, params?}', '');
+  rl.on('line', (line: string) => {
+    chain = chain.then(async () => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      let req: RpcRequest;
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          typeof (parsed as RpcRequest).id !== 'string' ||
+          typeof (parsed as RpcRequest).method !== 'string'
+        ) {
+          sendError('invalid_request', 'expected {id, method, params?}', '');
+          return;
+        }
+        req = parsed as RpcRequest;
+      } catch (e) {
+        sendError('parse_error', `invalid JSON: ${String(e)}`, '');
         return;
       }
-      req = parsed as RpcRequest;
-    } catch (e) {
-      sendError('parse_error', `invalid JSON: ${String(e)}`, '');
-      return;
-    }
 
-    try {
-      const result = await dispatch(client, req, workingMessages, writer, options);
-      sendOk(req.id, result);
-    } catch (e) {
-      if (isToolLoopError(e)) {
-        sendError('tool_loop_limit', e.message, req.id);
-      } else if (isLLMError(e)) {
-        sendError('llm_error', e.message, req.id);
-      } else {
-        sendError('internal_error', e instanceof Error ? e.message : String(e), req.id);
+      try {
+        const result = await dispatch(client, req, workingMessages, writer, options);
+        sendOk(req.id, result);
+      } catch (e) {
+        if (isToolLoopError(e)) {
+          sendError('tool_loop_limit', e.message, req.id);
+        } else if (isLLMError(e)) {
+          sendError('llm_error', e.message, req.id);
+        } else {
+          sendError('internal_error', e instanceof Error ? e.message : String(e), req.id);
+        }
       }
-    }
+    });
   });
 
   rl.on('close', () => {
@@ -149,9 +158,9 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
 }
 
 async function dispatch(
-  client: DeepSeekClient,
+  client: LLMClient,
   req: RpcRequest,
-  workingMessages: Awaited<ReturnType<typeof loadSession>>['messages'],
+  workingMessages: ChatMessage[],
   writer: SessionWriter | null,
   options: RpcModeOptions,
 ): Promise<unknown> {
@@ -166,7 +175,12 @@ async function dispatch(
         const userEvent: SessionEvent = { kind: 'user', ts: Date.now(), content: prompt };
         await writer.append(userEvent);
       }
-      const result: ToolLoopResult = await runToolLoop(client, workingMessages, {
+      // 构造 turn 消息:历史 + 本轮 user。Sprint 1a 修 P1 — user 必须进 LLM。
+      const turnMessages: ChatMessage[] = [
+        ...workingMessages,
+        { role: 'user', content: prompt },
+      ];
+      const result: ToolLoopResult = await runToolLoop(client, turnMessages, {
         registry: createDefaultRegistry(),
         ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
         ...(stream
@@ -190,6 +204,10 @@ async function dispatch(
           /* best-effort */
         }
       }
+      // 跑完回写 workingMessages,下一个 request 拿到的是包含本轮 assistant 步骤的 history。
+      // 修 Sprint 1a follow-up: 之前不写回,后续 chat 永远基于空历史。
+      workingMessages.length = 0;
+      workingMessages.push(...result.messages);
       return {
         content: result.final.content,
         usage: result.final.usage,

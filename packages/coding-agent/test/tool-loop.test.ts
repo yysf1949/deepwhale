@@ -209,4 +209,40 @@ describe('runToolLoop', () => {
     await runToolLoop(client, original, { registry: reg });
     expect(original).toEqual(snapshot);
   });
+
+  it('P2-B: toolTimeoutMs 真生效 — tool 卡住时返回 tool-timeout 错误,loop 不挂住', async () => {
+    // mock tool 永远 hang
+    const hangingTool: Tool = {
+      name: 'hanger',
+      description: 'hangs forever',
+      risk: 'low',
+      schema: { type: 'object', properties: {} },
+      execute: (): Promise<ToolResult> => new Promise(() => {}),
+    };
+    const reg = new ToolRegistry();
+    reg.register(hangingTool);
+    // LLM 第一次调 tool,然后收到结果再回 stop
+    const client = mockClient([
+      okResult('', [tc('call_1', 'hanger', {})]),
+      okResult('recovered after timeout'),
+    ]);
+    const start = Date.now();
+    const result = await runToolLoop(client, [], {
+      registry: reg,
+      toolTimeoutMs: 50,
+      maxSteps: 5,
+    });
+    const elapsed = Date.now() - start;
+    // 50ms timeout + 一两次 LLM call,总时长应该明显 < 1s(说明 loop 没被卡住)
+    expect(elapsed).toBeLessThan(2000);
+    // tool step 是失败
+    const toolStep = result.steps.find(
+      (s): s is ToolLoopStep & { kind: 'tool' } => s.kind === 'tool',
+    );
+    expect(toolStep).toBeDefined();
+    expect(toolStep?.result.success).toBe(false);
+    expect(toolStep?.result.error).toMatch(/tool-timeout/);
+    // loop 还能继续,final 拿到 LLM 第二次的回复
+    expect(result.final.content).toBe('recovered after timeout');
+  });
 });

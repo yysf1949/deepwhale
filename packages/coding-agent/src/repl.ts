@@ -216,8 +216,11 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
  * 跑一轮 agent turn:append user → runToolLoop → 持久化 → 打印 final content。
  *
  * workingMessages 由 caller 持有（startRepl 闭包），turn 跑完后 caller 用新 messages 覆盖。
+ *
+ * Sprint 1a 修 P1:user 必须进 LLM。Sprint 1a 修 P2-A:流式不再重复打印 final content。
+ * 单测通过 export 暴露,直接注入 mock LLMClient + WritableStream 验证行为。
  */
-async function runAgentTurn(
+export async function runAgentTurn(
   client: LLMClient,
   userInput: string,
   workingMessages: ChatMessage[],
@@ -236,10 +239,13 @@ async function runAgentTurn(
     await writer.append(userEvent);
   }
 
-  // 2) 调 tool loop
+  // 2) 构造 turn 消息:历史 + 本轮 user。Sprint 1a 修 P1 — user 必须进 LLM。
+  const turnMessages: ChatMessage[] = [...workingMessages, { role: 'user', content: userInput }];
+
+  // 3) 调 tool loop
   let result: ToolLoopResult;
   try {
-    result = await runToolLoop(client, workingMessages, {
+    result = await runToolLoop(client, turnMessages, {
       registry: createDefaultRegistry(),
       onChunk: (chunk) => {
         if (chunk.content) out.write(chunk.content);
@@ -257,10 +263,8 @@ async function runAgentTurn(
     return;
   }
 
-  // 3) 打印 final content 的剩余部分（onChunk 已经增量打印，但保险起见再 print）
-  if (result.final.content) {
-    out.write(`${result.final.content}\n\n`);
-  }
+  // 4) 流式已实时打印;非流式分支此处补打印 final content(给上层 caller 留 fallback)。
+  //    Sprint 1a REPL 总是传 onChunk 走流式,所以这里不再重复打印。
 
   // 4) 持久化 steps
   if (writer) {

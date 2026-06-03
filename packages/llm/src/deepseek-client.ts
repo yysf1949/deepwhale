@@ -155,6 +155,7 @@ export class DeepSeekClient implements LLMClient {
     let finishReason: ChatResult['finish_reason'];
     let lineCount = 0;
     let chunkCount = 0;
+    let sseParseFailures = 0;
 
     try {
       while (true) {
@@ -162,15 +163,24 @@ export class DeepSeekClient implements LLMClient {
         if (done) break;
         lineCount += 1;
         buffer += decoder.decode(value, { stream: true });
-        // SSE: \n\n 分隔 event
-        let sepIdx: number;
-        while ((sepIdx = buffer.indexOf('\n\n')) !== -1) {
-          const event = buffer.slice(0, sepIdx);
-          buffer = buffer.slice(sepIdx + 2);
+        // SSE: event 间以双换行分隔。真实 SSE wire 可能是 LF 或 CRLF(部分 proxy / 旧服务端会发 CRLF)。
+        // Sprint 1a 修 P2-D:用正则一次匹配两种分隔,避免 CRLF 流被延迟到 flush。
+        // 注意:不能 split('\n\n') 然后用 '\r\n\r\n' split,否则会切错最后一个 event。
+        const SSE_DELIM_RE = /\r?\n\r?\n/;
+        let m: RegExpExecArray | null;
+        // lastIndex 在循环里持续推进,直到无匹配
+        const delimRe = new RegExp(SSE_DELIM_RE.source, 'g');
+        while ((m = delimRe.exec(buffer)) !== null) {
+          const event = buffer.slice(0, m.index);
+          buffer = buffer.slice(m.index + m[0].length);
+          delimRe.lastIndex = 0; // 每次切完后 buffer 头部变了,从头再来
           const parsed = parseSseEvent(event);
-          if (parsed === null) continue;
+          if (parsed === null) {
+            sseParseFailures += 1;
+            continue;
+          }
           chunkCount += 1;
-          // Sprint 1a：content 增量直接累加
+          // Sprint 1a:content 增量直接累加
           if (parsed.delta.content) {
             assembledContent += parsed.delta.content;
           }
@@ -182,6 +192,10 @@ export class DeepSeekClient implements LLMClient {
           if (parsed.finish_reason) finishReason = parsed.finish_reason;
           options.onChunk(parsed);
         }
+        // 切完后 buffer 还可能含一个未结束的 event(等下一个 chunk 或 flush)
+        // lastIndex 已经被 reset 为 0;这里把 buffer 截到 delimRe.lastIndex(但 delimRe 已经停,buffer 已经是剩余)
+        // 不需要额外处理,下一轮 read() 时再切。
+        // 但如果 delimRe.exec 一次都没匹配,buffer 没变;下次 read 直接 append。
       }
       // 末尾 flush buffer
       if (buffer.trim().length > 0) {
@@ -193,7 +207,15 @@ export class DeepSeekClient implements LLMClient {
           if (parsed.usage) usage = parsed.usage;
           if (parsed.finish_reason) finishReason = parsed.finish_reason;
           options.onChunk(parsed);
+        } else {
+          sseParseFailures += 1;
         }
+      }
+      // Sprint 1a 修 P2-D:JSON parse 失败不再静默,在 stderr 留一行 warn(运维排查用)。
+      if (sseParseFailures > 0) {
+        process.stderr.write(
+          `[deepwhale] warn: SSE parse failures: ${sseParseFailures} (stream still completed)\n`,
+        );
       }
     } catch (err) {
       throw new LLMStreamError(

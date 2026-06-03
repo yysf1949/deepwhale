@@ -17,6 +17,7 @@
  * - body.model 正确
  * - body.messages 正确
  * - body.stream=false
+ * - stream()：CRLF/LF SSE delimiter 兼容、onChunk 累加、末尾 flush、[DONE] 跳过、JSON 坏行 warn
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -59,6 +60,50 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function textResponse(text: string, status: number): Response {
   return new Response(text, { status, headers: { 'content-type': 'text/plain' } });
+}
+
+/**
+ * 构造一个 SSE 流式 Response。Sprint 1a 修 P2-D 后必须同时验证:
+ * - LF delimiter (\n\n) — OpenAI / DeepSeek 官方
+ * - CRLF delimiter (\r\n\r\n) — 旧 proxy / 某些中间层会发 CRLF
+ *
+ * 用 ReadableStream 喂 Uint8Array,让 mock fetch 返回的 Response.body.getReader()
+ * 能正确逐 chunk 给到 client,模拟真实 wire-level 行为。
+ */
+function makeSseResponse(events: string[], delimiter: '\n' | '\r\n' = '\n'): Response {
+  const joiner = delimiter === '\r\n' ? '\r\n\r\n' : '\n\n';
+  const payload = events.join(joiner) + (events.length > 0 ? joiner : '');
+  const enc = new TextEncoder();
+  // 单 chunk 喂入,简化 reader.read() 调用次数 = 1
+  // 末尾 close() 让 client 看到 done=true
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      if (payload.length > 0) controller.enqueue(enc.encode(payload));
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  });
+}
+
+/** 构造一个 OAI delta chunk JSON 字符串。 */
+function oaiDelta(content: string, finishReason?: 'stop' | 'tool_calls' | 'length'): string {
+  const obj: Record<string, unknown> = {
+    id: 'chatcmpl-1',
+    object: 'chat.completion.chunk',
+    created: 1700000000,
+    model: 'deepseek-chat',
+    choices: [
+      {
+        index: 0,
+        delta: { content, role: 'assistant' },
+        finish_reason: finishReason ?? null,
+      },
+    ],
+  };
+  return `data: ${JSON.stringify(obj)}`;
 }
 
 const SAMPLE_MESSAGES: ChatMessage[] = [
@@ -307,21 +352,30 @@ describe('DeepSeekClient', () => {
   });
 
   describe('abort signal', () => {
-    it('passes the user abort signal through to fetch', async () => {
+    it('passes the user abort signal through to fetch and aborts when triggered', async () => {
       let observedSignal: AbortSignal | undefined;
-      const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
-        observedSignal = init?.signal as AbortSignal | undefined;
-        return jsonResponse(SAMPLE_RESPONSE);
-      });
+      const fetchImpl = vi.fn(
+        async (_url: string, init?: RequestInit): Promise<Response> => {
+          observedSignal = init?.signal as AbortSignal | undefined;
+          // 模拟"客户端持续在等响应,直到 abort 触发才 reject"。
+          // Sprint 1a 修 P2-C:验证 signal 已合成进 fetch,且 abort 真能传到下游。
+          return new Promise<Response>((_resolve, reject) => {
+            observedSignal?.addEventListener('abort', () => {
+              reject(new DOMException('aborted', 'AbortError'));
+            });
+          });
+        },
+      );
       const c = new DeepSeekClient({ apiKey: 'k', fetchImpl, timeoutMs: 30_000 });
       const ac = new AbortController();
-      await c.chat([{ role: 'user', content: 'hi' }], ac.signal);
-      // 我们的实现 AbortSignal.any 合成，外部 signal 必须被合成进
-      expect(observedSignal).toBeDefined();
-      // 合成的 signal 上应能看到外部 controller 调 abort 后的传递（功能层验证）
+      // Sprint 1a 修 P2-C:chat() 新签名是 (msgs, { signal }),旧 chat(msgs, ac.signal) 是误传
+      const promise = c.chat([{ role: 'user', content: 'hi' }], { signal: ac.signal });
+      // 触发 abort
       ac.abort();
-      // 给一个微任务让任何重试/finally 跑完
-      await Promise.resolve();
+      await expect(promise).rejects.toBeInstanceOf(LLMNetworkError);
+      // 验证:实现必须把外部 signal 合成进 fetch 的 init.signal
+      expect(observedSignal).toBeDefined();
+      expect(observedSignal?.aborted).toBe(true);
     });
 
     it('aborts request on timeout', async () => {
@@ -334,6 +388,166 @@ describe('DeepSeekClient', () => {
       await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(
         LLMNetworkError,
       );
+    });
+  });
+
+  describe('stream()', () => {
+    describe('SSE delimiter compatibility (P2-D regression)', () => {
+      it('parses LF-delimited SSE stream and emits incremental onChunk', async () => {
+        // Baseline: 标准 OpenAI / DeepSeek LF delimiter (\n\n)
+        const events = [oaiDelta('Hello'), oaiDelta(' world'), oaiDelta('!', 'stop')];
+        const { fn } = makeMockFetch(() => makeSseResponse(events, '\n'));
+        const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+        const received: string[] = [];
+        const result = await c.stream(
+          [{ role: 'user', content: 'hi' }],
+          { onChunk: (chunk) => received.push(chunk.delta.content ?? '') },
+        );
+        expect(received).toEqual(['Hello', ' world', '!']);
+        expect(result.content).toBe('Hello world!');
+        expect(result.finish_reason).toBe('stop');
+      });
+
+      it('parses CRLF-delimited SSE stream (P2-D regression)', async () => {
+        // 关键回归: 旧实现 split('\n\n') 会把 \r 留在 event 开头导致 JSON.parse 失败
+        // 并被 sseParseFailures 累计 → onChunk 收不到任何 chunk、result.content 为空
+        // Sprint 1a 修复后必须能正常解析。
+        const events = [oaiDelta('a'), oaiDelta('b'), oaiDelta('c', 'stop')];
+        const { fn } = makeMockFetch(() => makeSseResponse(events, '\r\n'));
+        const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+        const received: string[] = [];
+        const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+        try {
+          const result = await c.stream(
+            [{ role: 'user', content: 'hi' }],
+            { onChunk: (chunk) => received.push(chunk.delta.content ?? '') },
+          );
+          // 三个 delta chunk 全部解析成功
+          expect(received).toEqual(['a', 'b', 'c']);
+          // 完整文本拼接正确
+          expect(result.content).toBe('abc');
+          expect(result.finish_reason).toBe('stop');
+          // 没有任何 SSE 解析失败的 warn
+          const warns = stderrSpy.mock.calls
+            .map((c) => String(c[0]))
+            .filter((s) => s.includes('SSE parse failures'));
+          expect(warns).toEqual([]);
+        } finally {
+          stderrSpy.mockRestore();
+        }
+      });
+
+      it('parses mixed LF/CRLF chunks within a single stream (proxy rewrite scenario)', async () => {
+        // 真实场景: 部分 CDN/proxy 会在 chunk 边界重写 line ending
+        // client 必须用 /\\r?\\n\\r?\\n/ 容忍两种结尾
+        const enc = new TextEncoder();
+        const events = [oaiDelta('x'), oaiDelta('y'), oaiDelta('z', 'stop')];
+        // 拼成: event1 用 LF,event2 用 CRLF,event3 用 LF (中间混插)
+        const payload = [events[0], events[1], events[2]]
+          .map((e, i) => (i === 1 ? e + '\r\n\r\n' : e + '\n\n'))
+          .join('');
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(enc.encode(payload));
+            controller.close();
+          },
+        });
+        const { fn } = makeMockFetch(() => new Response(stream, { status: 200 }));
+        const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+        const received: string[] = [];
+        const result = await c.stream(
+          [{ role: 'user', content: 'hi' }],
+          { onChunk: (chunk) => received.push(chunk.delta.content ?? '') },
+        );
+        expect(received).toEqual(['x', 'y', 'z']);
+        expect(result.content).toBe('xyz');
+      });
+    });
+
+    it('skips [DONE] sentinel without emitting a chunk', async () => {
+      // OAI 协议用 data: [DONE] 标记流结束。client 必须识别并终止。
+      const events = [oaiDelta('hi'), 'data: [DONE]'];
+      const { fn } = makeMockFetch(() => makeSseResponse(events, '\n'));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const chunks: ChatChunk[] = [];
+      const result = await c.stream(
+        [{ role: 'user', content: 'hi' }],
+        { onChunk: (chunk) => chunks.push(chunk) },
+      );
+      // [DONE] 不应产生 chunk
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0]?.delta.content).toBe('hi');
+      expect(result.content).toBe('hi');
+    });
+
+    it('flushes trailing buffer even when stream ends without trailing delimiter', async () => {
+      // 真实 OAI 服务端通常 stream 以 \n\n 结尾,但有些实现 (curl --no-buffer) 不发最后一个 delimiter
+      // client 的 "末尾 flush buffer" 分支必须覆盖这种情况
+      const enc = new TextEncoder();
+      // 故意只放一个 event,不加结尾 delimiter,让 client 在 done=true 后 flush
+      const payload = oaiDelta('only');
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(enc.encode(payload));
+          controller.close();
+        },
+      });
+      const { fn } = makeMockFetch(() => new Response(stream, { status: 200 }));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const result = await c.stream(
+        [{ role: 'user', content: 'hi' }],
+        { onChunk: () => {} },
+      );
+      expect(result.content).toBe('only');
+    });
+
+    it('warns to stderr and continues when a chunk has malformed JSON (P2-D)', async () => {
+      // 真实 LLM 服务端偶尔会发 heartbeat (空 data) 或非 JSON 注释行
+      // client 必须: 不抛错、跳过坏行、最终在 stderr 留 warn、其它好行仍能解析
+      const events = [oaiDelta('ok'), 'data: {this is not valid json', oaiDelta('done', 'stop')];
+      const { fn } = makeMockFetch(() => makeSseResponse(events, '\n'));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const received: string[] = [];
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        const result = await c.stream(
+          [{ role: 'user', content: 'hi' }],
+          { onChunk: (chunk) => received.push(chunk.delta.content ?? '') },
+        );
+        // 两个好行仍正确解析
+        expect(received).toEqual(['ok', 'done']);
+        expect(result.content).toBe('okdone');
+        // 1 个坏行被跳过,warn 写到了 stderr
+        const warns = stderrSpy.mock.calls
+          .map((c) => String(c[0]))
+          .filter((s) => s.includes('SSE parse failures'));
+        expect(warns).toHaveLength(1);
+        expect(warns[0]).toContain('SSE parse failures: 1');
+      } finally {
+        stderrSpy.mockRestore();
+      }
+    });
+
+    it('throws LLMUnknownError when onChunk callback is missing', async () => {
+      const c = new DeepSeekClient({
+        apiKey: 'k',
+        fetchImpl: makeMockFetch(() => makeSseResponse([oaiDelta('x')])).fn,
+      });
+      // 强制绕过 TS: stream 类型要求 onChunk,运行时检查
+      await expect(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        c.stream([{ role: 'user', content: 'hi' }], {} as any),
+      ).rejects.toBeInstanceOf(LLMUnknownError);
+    });
+
+    it('sends body.stream=true and forwards onChunk to caller', async () => {
+      // 端到端: 验证 stream=true 标志 + onChunk 完整链路
+      const events = [oaiDelta('one'), oaiDelta('two')];
+      const { fn, calls } = makeMockFetch(() => makeSseResponse(events, '\n'));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      await c.stream([{ role: 'user', content: 'hi' }], { onChunk: () => {} });
+      const body = JSON.parse(calls[0]!.rawBody) as Record<string, unknown>;
+      expect(body['stream']).toBe(true);
     });
   });
 });

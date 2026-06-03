@@ -16,7 +16,7 @@
  */
 
 import process from 'node:process';
-import { DeepSeekClient } from '@deepwhale/llm';
+import { DeepSeekClient, type ChatMessage, type LLMClient } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
 import {
   isToolLoopError,
@@ -33,10 +33,12 @@ export interface PrintModeOptions {
   sessionPath?: string;
   enableToolLoop?: boolean;
   maxSteps?: number;
+  /** 注入 LLM 客户端（默认 DeepSeekClient）。Sprint 1a follow-up:单测用。 */
+  client?: LLMClient;
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<number> {
-  const client = new DeepSeekClient();
+  const client: LLMClient = options.client ?? new DeepSeekClient();
   const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
 
@@ -61,11 +63,17 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
       await writer.append(userEvent);
     }
 
+    // 构造 turn 消息:历史 + 本轮 user。Sprint 1a 修 P1 — user 必须进 LLM。
+    const turnMessages: ChatMessage[] = [
+      ...workingMessages,
+      { role: 'user', content: options.prompt },
+    ];
+
     // 调 tool loop（流式 + 实时打印）
     let result: ToolLoopResult;
     try {
       const maxSteps = enableToolLoop ? options.maxSteps : 1;
-      result = await runToolLoop(client, workingMessages, {
+      result = await runToolLoop(client, turnMessages, {
         registry: createDefaultRegistry(),
         onChunk: (chunk) => {
           if (chunk.content) process.stdout.write(chunk.content);
@@ -81,9 +89,8 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
       return 1;
     }
 
-    if (result.final.content) {
-      process.stdout.write(`${result.final.content}\n`);
-    }
+    // 流式已实时打印 final content;非流式分支(no onChunk)此处补打印一次。
+    // Sprint 1a print 模式总是传 onChunk,所以这里不再重复打印。
     printStepSummary(result.steps);
 
     // 持久化 steps
