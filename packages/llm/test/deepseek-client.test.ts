@@ -75,7 +75,10 @@ const SAMPLE_RESPONSE = {
   choices: [
     {
       index: 0,
-      message: { role: 'assistant', content: 'Why did the whale cross the ocean? To get to the other tide.' },
+      message: {
+        role: 'assistant',
+        content: 'Why did the whale cross the ocean? To get to the other tide.',
+      },
       finish_reason: 'stop',
     },
   ],
@@ -101,7 +104,10 @@ describe('DeepSeekClient', () => {
 
   describe('construction', () => {
     it('uses default model when not given', () => {
-      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: makeMockFetch(() => jsonResponse(SAMPLE_RESPONSE)).fn });
+      const c = new DeepSeekClient({
+        apiKey: 'k',
+        fetchImpl: makeMockFetch(() => jsonResponse(SAMPLE_RESPONSE)).fn,
+      });
       expect(c.model).toBe(DEEPSEEK_DEFAULT_MODEL);
     });
 
@@ -179,8 +185,12 @@ describe('DeepSeekClient', () => {
 
   describe('error: API key', () => {
     it('throws APIKeyMissingError when no key in env or options', async () => {
-      const c = new DeepSeekClient({ fetchImpl: makeMockFetch(() => jsonResponse(SAMPLE_RESPONSE)).fn });
-      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(APIKeyMissingError);
+      const c = new DeepSeekClient({
+        fetchImpl: makeMockFetch(() => jsonResponse(SAMPLE_RESPONSE)).fn,
+      });
+      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(
+        APIKeyMissingError,
+      );
     });
 
     it('APIKeyMissingError implements the LLMError interface', () => {
@@ -270,13 +280,17 @@ describe('DeepSeekClient', () => {
     it('throws LLMUnknownError when response is not valid JSON', async () => {
       const { fn } = makeMockFetch(() => textResponse('not json at all', 200));
       const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
-      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(LLMUnknownError);
+      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(
+        LLMUnknownError,
+      );
     });
 
     it('throws LLMUnknownError when choices is missing', async () => {
       const { fn } = makeMockFetch(() => jsonResponse({ id: 'x' }));
       const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
-      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(LLMUnknownError);
+      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(
+        LLMUnknownError,
+      );
     });
 
     it('throws LLMUnknownError when message.content is not a string', async () => {
@@ -284,7 +298,9 @@ describe('DeepSeekClient', () => {
         jsonResponse({ choices: [{ message: { role: 'assistant', content: 42 } }] }),
       );
       const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
-      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(LLMUnknownError);
+      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(
+        LLMUnknownError,
+      );
     });
   });
 
@@ -313,7 +329,9 @@ describe('DeepSeekClient', () => {
         });
       });
       const c = new DeepSeekClient({ apiKey: 'k', fetchImpl, timeoutMs: 50 });
-      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(LLMNetworkError);
+      await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(
+        LLMNetworkError,
+      );
     });
   });
 });

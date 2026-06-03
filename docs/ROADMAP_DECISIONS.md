@@ -14,14 +14,14 @@
 
 ## 1. 5 阶段版本锚（核心时间线）
 
-| 版本 | 月份 | 主题 | 关键交付 | 状态 |
-|---|---|---|---|---|
-| **v1.0** | 1-3 月 | **Coding Agent** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker | 🚧 Sprint 0 |
-| **v1.5** | 4-5 月 | **大型仓库理解** | Codex Core 8/14 + **Code Intelligence 基础**（Tree-sitter + Symbol Graph） | ⏳ |
-| **v2.0** | 6-8 月 | **Observe** | **真实 Browser Agent 4 件** + Memory Ranking + Code Intel 增强 + 4 项 Tier-2 | ⏳ |
-| **v2.5** | 9 月 | **Plan** | **Planning Framework 4 组件 + DAG** | ⏳ |
-| **v3.0** | 10-11 月 | **Execute + Review** | Browser Agent 增强 3 件 + Reviewer + **Computer Use 兼容层** | ⏳ |
-| **v4.0** | 12-13 月 | **Research + Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Desktop + Channels | ⏳ |
+| 版本     | 月份     | 主题                    | 关键交付                                                                     | 状态        |
+| -------- | -------- | ----------------------- | ---------------------------------------------------------------------------- | ----------- |
+| **v1.0** | 1-3 月   | **Coding Agent**        | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker     | 🚧 Sprint 0 |
+| **v1.5** | 4-5 月   | **大型仓库理解**        | Codex Core 8/14 + **Code Intelligence 基础**（Tree-sitter + Symbol Graph）   | ⏳          |
+| **v2.0** | 6-8 月   | **Observe**             | **真实 Browser Agent 4 件** + Memory Ranking + Code Intel 增强 + 4 项 Tier-2 | ⏳          |
+| **v2.5** | 9 月     | **Plan**                | **Planning Framework 4 组件 + DAG**                                          | ⏳          |
+| **v3.0** | 10-11 月 | **Execute + Review**    | Browser Agent 增强 3 件 + Reviewer + **Computer Use 兼容层**                 | ⏳          |
+| **v4.0** | 12-13 月 | **Research + Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Desktop + Channels      | ⏳          |
 
 **累计功能进度**：v1.0 = 3/14 → v1.5 = 8/14 → v2.0 = 10/14 → v3.0 = 11/14 → v4.0 = 14/14 ✅
 
@@ -29,11 +29,11 @@
 
 ## 2. 3 个 Technical Bets（决定项目成败）
 
-| Bet | 等级 | 验证版本 | 失败后果 |
-|---|---|---|---|
-| **Bet-1 Code Intelligence** | **P0 Kill** | v1.5 | Coding Agent 失败，项目失去核心价值 |
-| **Bet-2 Browser Planner** | **P1 Decision** | v2.0 | 退化为 Claude Code 级产品（仍有价值） |
-| **Bet-3 Long-Horizon Stability** | **P0 Kill** | v3.0 | Multi-Agent 失败，5 角色失去意义 |
+| Bet                              | 等级            | 验证版本 | 失败后果                              |
+| -------------------------------- | --------------- | -------- | ------------------------------------- |
+| **Bet-1 Code Intelligence**      | **P0 Kill**     | v1.5     | Coding Agent 失败，项目失去核心价值   |
+| **Bet-2 Browser Planner**        | **P1 Decision** | v2.0     | 退化为 Claude Code 级产品（仍有价值） |
+| **Bet-3 Long-Horizon Stability** | **P0 Kill**     | v3.0     | Multi-Agent 失败，5 角色失去意义      |
 
 **P0 vs P1**：P0 失败 = **Kill Gate**（暂停主线，优先修复）；P1 失败 = **Decision Gate**（按成功率分支，不暂停）。
 
@@ -42,18 +42,21 @@
 ## 3. 3 个 Release Gates（版本发布硬门槛）
 
 ### Gate-1（v1.5 前）：Code Intelligence Kill Test
+
 - **测试**：Spring Boot / Kubernetes / LangChain / VSCode（任选 1+），**50K+ LOC（必试 100K）**
 - **任务**：定位入口 → 分析调用链 → 找修改点 → 输出方案
 - **要求**：**20 分钟以内**
 - **FAIL** → 停止 Browser/Computer/Desktop，**优先修 Code Intelligence**
 
 ### Gate-1.5（v2.0 前）：Browser Viability Decision Gate
+
 - **场景**：GitHub / 文档站 / Google / Amazon × 5 任务 = 20 样本
 - **≥ 80%** → 继续 v3.0
 - **50-80%** → 降级路线（冻结 Browser 增强，资源转向 Long-Horizon）
 - **< 50%** → 砍 Browser 投资，定位回归 Claude Code + Code Intel + Multi-Agent
 
 ### Gate-2（v3.0 前）：Long-Horizon Kill Test
+
 - **任务**：修复真实 Bug 全流程（8 步）
 - **要求**：**连续 30-50 Tool Calls 保持目标一致**
 - **FAIL** → 暂停 Researcher/TaskGraph/Desktop，**集中修 Planning/Compaction/Reviewer 协同**
@@ -62,10 +65,10 @@
 
 ## 4. v2.0 Tier-1 / Tier-2 拆分（用户 2026-06-03 拍板）
 
-| 优先级 | 包含 | 延期影响 |
-|---|---|---|
-| **Tier-1**（v2.0 核心，**必完成**）| **Browser Agent 4 件** + **Memory Ranking** + **Code Intel 增强** | 延期 → v2.0 失败 |
-| **Tier-2**（v2.0.x 补回）| **Automation** + **Remote TUI** + **Compaction** + **MCP Runtime** | 延期 → v2.0.1/2 补，不影响 v2.0 主旨 |
+| 优先级                              | 包含                                                               | 延期影响                             |
+| ----------------------------------- | ------------------------------------------------------------------ | ------------------------------------ |
+| **Tier-1**（v2.0 核心，**必完成**） | **Browser Agent 4 件** + **Memory Ranking** + **Code Intel 增强**  | 延期 → v2.0 失败                     |
+| **Tier-2**（v2.0.x 补回）           | **Automation** + **Remote TUI** + **Compaction** + **MCP Runtime** | 延期 → v2.0.1/2 补，不影响 v2.0 主旨 |
 
 **理由**：Browser Agent 延期但 Remote TUI 完成 → 用户不会认为 v2.0 成功；反之 Browser 完成而 Remote 延期 → 用户仍认为成功。
 
@@ -73,49 +76,49 @@
 
 ## 5. 15 项关键技术决策（实施前定）
 
-| 决策点 | 选择 | 1 句理由 |
-|---|---|---|
-| 主语言 | **TypeScript（Node ≥ 22）** | pi 验证 58.6k stars |
-| TUI 框架 | **Ink**（React 19） | pi 实战验证，跨平台一致 |
-| 桌面 | **Tauri 2.x**（**v4.0 之前不做**） | 生态成熟，节省早期精力 |
-| **沙箱 v1-v3** | **Docker only** | 跨平台一致 + 单人可维护，**砍掉 Seatbelt/Landlock/Job Object** |
-| **沙箱 v4** | **Docker + 多实例编排** | Multi-Agent 隔离 |
-| 分发 | npm + Homebrew + Docker | 跟 pi/Codex/Reasonix 一致 |
-| 配置 | TOML | CodeWhale 验证 |
-| Skills 格式 | **对齐 Codex 开放标准** | 跨工具复用 |
-| 4 包 monorepo | **对齐 pi** | `llm / agent-core / tui / coding-agent` |
-| ExtensionEvent | **21 个 `whale.*` 事件**（v1.5） | 跟 pi 兼容但区分内/外 |
-| MCP | 官方 SDK（v2.0） | 唯一标准 |
-| **Release 节奏** | **每周一 minor**（v1.5 起）+ 每阶段末必发 | 避免 Reasonix 1.0 6 周未发 |
-| **i18n 路径** | **第 1 行定对**（Sprint 0 红线） | Hermes `gateway.i18n` 错 → 永远英文 fallback |
-| **Constitution 9 层权威** | **砍掉** | 个人化产物，不适合 deepwhale |
-| **Session 形态** | **v1 = Linear，v2.5 = DAG** | 避免 v1 过度复杂；DAG 与 Planner 同链路 |
+| 决策点                    | 选择                                      | 1 句理由                                                       |
+| ------------------------- | ----------------------------------------- | -------------------------------------------------------------- |
+| 主语言                    | **TypeScript（Node ≥ 22）**               | pi 验证 58.6k stars                                            |
+| TUI 框架                  | **Ink**（React 19）                       | pi 实战验证，跨平台一致                                        |
+| 桌面                      | **Tauri 2.x**（**v4.0 之前不做**）        | 生态成熟，节省早期精力                                         |
+| **沙箱 v1-v3**            | **Docker only**                           | 跨平台一致 + 单人可维护，**砍掉 Seatbelt/Landlock/Job Object** |
+| **沙箱 v4**               | **Docker + 多实例编排**                   | Multi-Agent 隔离                                               |
+| 分发                      | npm + Homebrew + Docker                   | 跟 pi/Codex/Reasonix 一致                                      |
+| 配置                      | TOML                                      | CodeWhale 验证                                                 |
+| Skills 格式               | **对齐 Codex 开放标准**                   | 跨工具复用                                                     |
+| 4 包 monorepo             | **对齐 pi**                               | `llm / agent-core / tui / coding-agent`                        |
+| ExtensionEvent            | **21 个 `whale.*` 事件**（v1.5）          | 跟 pi 兼容但区分内/外                                          |
+| MCP                       | 官方 SDK（v2.0）                          | 唯一标准                                                       |
+| **Release 节奏**          | **每周一 minor**（v1.5 起）+ 每阶段末必发 | 避免 Reasonix 1.0 6 周未发                                     |
+| **i18n 路径**             | **第 1 行定对**（Sprint 0 红线）          | Hermes `gateway.i18n` 错 → 永远英文 fallback                   |
+| **Constitution 9 层权威** | **砍掉**                                  | 个人化产物，不适合 deepwhale                                   |
+| **Session 形态**          | **v1 = Linear，v2.5 = DAG**               | 避免 v1 过度复杂；DAG 与 Planner 同链路                        |
 
 ---
 
 ## 6. deepwhale 独家 8 项（vs Codex / 同类）
 
-| 资产 | 来源 | 落在版本 | 价值 |
-|---|---|---|---|
-| **Prefix-cache 4 大机制** | Reasonix 全抄 | **v1.0 必带** | DeepSeek 经济性核心 |
-| **StormBreaker 防死循环** | Reasonix 抄 | v1.5 | 工具增多后 P0 |
-| **SanitizeToolPairing** | Reasonix 抄 | v1.5 | 1 个函数处理 4 cases（不是 4 遍） |
-| **Compaction = 唯一 cache-reset point** | Reasonix 抄 | v1.5 | 防 cache hit rate 暴跌 |
-| **Docker 沙箱统一 v1-v4** | 跨平台决策 | v1.0 起 | Codex 没做 |
-| **JSONL append-only Session** | pi 借鉴 | v1.0 Linear → v2.5 DAG | 简单可恢复 |
-| **21 个 ExtensionEvent 钩子化 Compaction** | pi 借鉴 | v1.5 | 第三方可替换 |
-| **完整 Multi-Agent 5 角色流水线** | 自研 + Planner/Executor/Reviewer 协同 | v4.0 | 长任务稳定性 |
+| 资产                                       | 来源                                  | 落在版本               | 价值                              |
+| ------------------------------------------ | ------------------------------------- | ---------------------- | --------------------------------- |
+| **Prefix-cache 4 大机制**                  | Reasonix 全抄                         | **v1.0 必带**          | DeepSeek 经济性核心               |
+| **StormBreaker 防死循环**                  | Reasonix 抄                           | v1.5                   | 工具增多后 P0                     |
+| **SanitizeToolPairing**                    | Reasonix 抄                           | v1.5                   | 1 个函数处理 4 cases（不是 4 遍） |
+| **Compaction = 唯一 cache-reset point**    | Reasonix 抄                           | v1.5                   | 防 cache hit rate 暴跌            |
+| **Docker 沙箱统一 v1-v4**                  | 跨平台决策                            | v1.0 起                | Codex 没做                        |
+| **JSONL append-only Session**              | pi 借鉴                               | v1.0 Linear → v2.5 DAG | 简单可恢复                        |
+| **21 个 ExtensionEvent 钩子化 Compaction** | pi 借鉴                               | v1.5                   | 第三方可替换                      |
+| **完整 Multi-Agent 5 角色流水线**          | 自研 + Planner/Executor/Reviewer 协同 | v4.0                   | 长任务稳定性                      |
 
 ---
 
 ## 7. Prefix-cache 4 大机制（v1.0 必带，**deepwhale 核心优势**）
 
-| # | 机制 | 出处 | 作用 |
-|---|---|---|---|
-| 1 | **System prompt 一次组装** | Reasonix `boot.go:120-148` | 每 session 只跑 1 次，按 session ID 缓存 |
-| 2 | **`content: ""` 永远序列化**（不带 omitempty）| Reasonix `openai.go:354-368` | 防 wire-level 缓存 hash 变化 |
-| 3 | **Reasoning content 不打 wire** | Reasonix `openai.go:131-137` | DeepSeek V4 thinking tokens session 内保留，wire 不传 |
-| 4 | **Schema canonicalize** | Reasonix `schema_canonicalize.go:10-67` | tool schema build 前跑 `CanonicalizeSchema`，map 顺序稳定 |
+| #   | 机制                                           | 出处                                    | 作用                                                      |
+| --- | ---------------------------------------------- | --------------------------------------- | --------------------------------------------------------- |
+| 1   | **System prompt 一次组装**                     | Reasonix `boot.go:120-148`              | 每 session 只跑 1 次，按 session ID 缓存                  |
+| 2   | **`content: ""` 永远序列化**（不带 omitempty） | Reasonix `openai.go:354-368`            | 防 wire-level 缓存 hash 变化                              |
+| 3   | **Reasoning content 不打 wire**                | Reasonix `openai.go:131-137`            | DeepSeek V4 thinking tokens session 内保留，wire 不传     |
+| 4   | **Schema canonicalize**                        | Reasonix `schema_canonicalize.go:10-67` | tool schema build 前跑 `CanonicalizeSchema`，map 顺序稳定 |
 
 **配套**：Compaction = 唯一 cache-reset point（任何改 system prompt 都 review 缓存策略）
 
@@ -123,28 +126,29 @@
 
 ## 8. 风险登记（高/中/低 + 对策）
 
-| 风险 | 等级 | 对策 |
-|---|---|---|
-| **Scope explosion** | **高** | **本 ROADMAP 就是为压制这个风险**——5 阶段版本锚 + 砍掉清单 18 项 |
-| **Skills 安全** | **高** | Skills 默认只读 + `permissions:` 显式声明 + Hook trust flag 在 `~/.deepwhale/trust.json` |
-| **Code Intelligence 实际效果** | **高 P0** | v1.5 基础先验（Tree-sitter + Symbol Graph），v2.0 增强前先实测 |
-| **DeepSeek 长任务稳定性** | **高 P0** | Compaction + Planning + Reviewer 三者协同（不是单点修复） |
-| Computer Use OS 差异 | 高 | v3.0 主要验证 macOS + Linux X11，Windows v3.0 不做 |
-| DeepSeek API 限流 | 中 | 前缀缓存降耗 + Flash/Pro 智能路由 |
-| Browser Runtime 跨浏览器一致 | 中 | Playwright 抽象足够，**不做自定义协议** |
-| 单人开发 burnout | 中 | Phase 之间预留 1 周缓冲期 |
-| 跨 Phase 时间拖延 | 中 | **强制 release 节奏** |
-| MCP 协议演进 | 低 | pin 官方 SDK minor 版本 |
-| StormBreaker 漏判 | 中 | **用 (tool, error) 签名不用 args** |
-| Hermes footer 数字收敛 bug | 低 | **多字段同值时去冗余/加标签区分** |
-| **Windows 沙箱不完整** | **不评估** | **v1-v4 都不做 Windows 沙箱**（统一 Docker） |
-| CodeWhale "marker-only" Landlock | 不评估 | **deepwhale 走 Docker，不学 CodeWhale 沙箱思路** |
+| 风险                             | 等级       | 对策                                                                                     |
+| -------------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
+| **Scope explosion**              | **高**     | **本 ROADMAP 就是为压制这个风险**——5 阶段版本锚 + 砍掉清单 18 项                         |
+| **Skills 安全**                  | **高**     | Skills 默认只读 + `permissions:` 显式声明 + Hook trust flag 在 `~/.deepwhale/trust.json` |
+| **Code Intelligence 实际效果**   | **高 P0**  | v1.5 基础先验（Tree-sitter + Symbol Graph），v2.0 增强前先实测                           |
+| **DeepSeek 长任务稳定性**        | **高 P0**  | Compaction + Planning + Reviewer 三者协同（不是单点修复）                                |
+| Computer Use OS 差异             | 高         | v3.0 主要验证 macOS + Linux X11，Windows v3.0 不做                                       |
+| DeepSeek API 限流                | 中         | 前缀缓存降耗 + Flash/Pro 智能路由                                                        |
+| Browser Runtime 跨浏览器一致     | 中         | Playwright 抽象足够，**不做自定义协议**                                                  |
+| 单人开发 burnout                 | 中         | Phase 之间预留 1 周缓冲期                                                                |
+| 跨 Phase 时间拖延                | 中         | **强制 release 节奏**                                                                    |
+| MCP 协议演进                     | 低         | pin 官方 SDK minor 版本                                                                  |
+| StormBreaker 漏判                | 中         | **用 (tool, error) 签名不用 args**                                                       |
+| Hermes footer 数字收敛 bug       | 低         | **多字段同值时去冗余/加标签区分**                                                        |
+| **Windows 沙箱不完整**           | **不评估** | **v1-v4 都不做 Windows 沙箱**（统一 Docker）                                             |
+| CodeWhale "marker-only" Landlock | 不评估     | **deepwhale 走 Docker，不学 CodeWhale 沙箱思路**                                         |
 
 ---
 
 ## 9. 砍掉清单（**22 项延后事项**——避免范围爆炸）
 
 ### v1.0 不做（砍 → v1.5/v2.0/v3.0/v4.0）
+
 - ❌ MCP / Browser / Computer / Plugins / Skills / Desktop / 渠道
 - ❌ Session DAG（v1.0 = Linear）
 - ❌ Compaction（v1.5 起）
@@ -152,6 +156,7 @@
 - ❌ 文档站（v1.5 起）
 
 ### v1.5 砍 4 项（挪 → v2.0）
+
 - ❌ Cron Automations → v2.0
 - ❌ Remote TUI → v2.0
 - ❌ Compaction → v2.0
@@ -160,14 +165,17 @@
 ### v2.0 砍 Session DAG（挪 → v2.5，与 Planner 同链路）
 
 ### Constitution 9 层权威（**永久砍掉**）
+
 - ❌ 个人化产物，不适合 deepwhale
 
 ### 沙箱技术（**永久统一为 Docker**）
+
 - ❌ macOS Seatbelt
 - ❌ Linux Landlock
 - ❌ Windows Job Object（v1-v4 都不做 Windows 沙箱）
 
 ### Computer Use（**不自研**）
+
 - ❌ OCR / UI Detection / Element Localization
 - ❌ mouse_move / mouse_click / keyboard_input / screen_capture
 - ✅ 走 Codex 兼容层（v3.0）
@@ -176,27 +184,27 @@
 
 ## 10. Sprint 0 红线（**Sprint 1 翻工预防**）
 
-| 红线 | 教训来源 |
-|---|---|
-| **i18n 路径第 1 行定对**（`from agent.i18n import t`）| Hermes：原 `gateway.i18n` 错 → 永远英文 fallback |
-| **路径迁移兼容机制**写好（旧路径 fallback 模式）| CodeWhale：`~/.deepseek/` → `~/.codewhale/` 重命名教训 |
-| **4 包版本同步 CI** | pi #4908：v0.75.4 跨包类型回归 |
-| **Session 不要做 DAG**（v1.0 = Linear）| v1.0 过度复杂教训 |
-| **沙箱不要做 Seatbelt/Landlock/Job Object**（v1.0 = Docker only）| 跨平台一致 + 单人可维护 |
+| 红线                                                              | 教训来源                                               |
+| ----------------------------------------------------------------- | ------------------------------------------------------ |
+| **i18n 路径第 1 行定对**（`from agent.i18n import t`）            | Hermes：原 `gateway.i18n` 错 → 永远英文 fallback       |
+| **路径迁移兼容机制**写好（旧路径 fallback 模式）                  | CodeWhale：`~/.deepseek/` → `~/.codewhale/` 重命名教训 |
+| **4 包版本同步 CI**                                               | pi #4908：v0.75.4 跨包类型回归                         |
+| **Session 不要做 DAG**（v1.0 = Linear）                           | v1.0 过度复杂教训                                      |
+| **沙箱不要做 Seatbelt/Landlock/Job Object**（v1.0 = Docker only） | 跨平台一致 + 单人可维护                                |
 
 ---
 
 ## 11. 阶段累计 vs 时间预算
 
-| 阶段 | 版本 | 计划 | 实际预估 | 风险点 |
-|---|---|---|---|---|
-| v1.0 | 3 月 | 3 月 | 3-4 月 | i18n / 4 包 monorepo / Prefix-cache 4 机制 |
-| v1.5 | 2 月 | 2 月 | 2-3 月 | 8 项 Codex Core + Code Intel 基础（**比预想多**）|
-| v2.0 | 3 月 | 3 月 | **3-4 月**（DAG 挪走 → 可能降到 3.5）| Browser Agent 4 件 + Memory Ranking + Code Intel 增强 + 4 项 Tier-2 |
-| v2.5 | 1 月 | 1 月 | 1 月 | Planning Framework 4 组件集中 |
-| v3.0 | 2 月 | 2 月 | 2-3 月 | Browser Agent 增强 3 件 + Reviewer + Computer Use 兼容层 |
-| v4.0 | 2 月 | 2 月 | 2-3 月 | 5 角色 + TaskGraph + Persistent Memory + Desktop + Channels |
-| **总计** | **13 月** | **13 月** | **15-17 月（中位数 16）** | — |
+| 阶段     | 版本      | 计划      | 实际预估                              | 风险点                                                              |
+| -------- | --------- | --------- | ------------------------------------- | ------------------------------------------------------------------- |
+| v1.0     | 3 月      | 3 月      | 3-4 月                                | i18n / 4 包 monorepo / Prefix-cache 4 机制                          |
+| v1.5     | 2 月      | 2 月      | 2-3 月                                | 8 项 Codex Core + Code Intel 基础（**比预想多**）                   |
+| v2.0     | 3 月      | 3 月      | **3-4 月**（DAG 挪走 → 可能降到 3.5） | Browser Agent 4 件 + Memory Ranking + Code Intel 增强 + 4 项 Tier-2 |
+| v2.5     | 1 月      | 1 月      | 1 月                                  | Planning Framework 4 组件集中                                       |
+| v3.0     | 2 月      | 2 月      | 2-3 月                                | Browser Agent 增强 3 件 + Reviewer + Computer Use 兼容层            |
+| v4.0     | 2 月      | 2 月      | 2-3 月                                | 5 角色 + TaskGraph + Persistent Memory + Desktop + Channels         |
+| **总计** | **13 月** | **13 月** | **15-17 月（中位数 16）**             | —                                                                   |
 
 > **单人项目 15-17 个月属正常区间**。**严格执行**（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **成功概率 80-85%**。
 
@@ -204,12 +212,12 @@
 
 ## 12. 4 份架构设计文档（2026-06-03 完成）
 
-| 文档 | 主题 | 关键内容 |
-|---|---|---|
-| [AGENT_RUNTIME.md](./design/AGENT_RUNTIME.md) | Agent Runtime | 4 角色契约（Planner/Executor/Reviewer/Coder）+ Task/Message/Context/Observation/Memory |
-| [CAPABILITY_MODEL.md](./design/CAPABILITY_MODEL.md) | 能力抽象 | 5 套能力来源统一抽象（Tool/MCP/Plugin/Browser/Computer）|
-| [CODE_INTELLIGENCE.md](./design/CODE_INTELLIGENCE.md) | 代码智能 | 4 模块关系（Workspace Index / Symbol Graph / Reference Graph / Semantic Search）|
-| [BROWSER_PLANNER.md](./design/BROWSER_PLANNER.md) | 浏览器规划 | Observe→Plan→Act→Recovery 循环 |
+| 文档                                                  | 主题          | 关键内容                                                                               |
+| ----------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------- |
+| [AGENT_RUNTIME.md](./design/AGENT_RUNTIME.md)         | Agent Runtime | 4 角色契约（Planner/Executor/Reviewer/Coder）+ Task/Message/Context/Observation/Memory |
+| [CAPABILITY_MODEL.md](./design/CAPABILITY_MODEL.md)   | 能力抽象      | 5 套能力来源统一抽象（Tool/MCP/Plugin/Browser/Computer）                               |
+| [CODE_INTELLIGENCE.md](./design/CODE_INTELLIGENCE.md) | 代码智能      | 4 模块关系（Workspace Index / Symbol Graph / Reference Graph / Semantic Search）       |
+| [BROWSER_PLANNER.md](./design/BROWSER_PLANNER.md)     | 浏览器规划    | Observe→Plan→Act→Recovery 循环                                                         |
 
 **原则**：只写架构 / 边界 / 职责 / 接口 / 数据流，**不写实现细节**。
 
@@ -217,14 +225,14 @@
 
 ## 13. 4 个项目借鉴一览（一句话）
 
-| 项目 | 借鉴 | 真实栈 | deepwhale 决策 |
-|---|---|---|---|
-| **CodeWhale**（Hmbown）| 沙箱抽象 / 路径兼容 / 飞书桥 SDK 模式 / Skills MD 格式 | Rust + ratatui + Tauri | 沙箱思路**不学**（走 Docker），其余抄 |
-| **Reasonix**（esengine）| **Prefix-cache 4 大机制 / StormBreaker / SanitizeToolPairing** | Go 1.25+ + Bubbletea + Wails | **机制全抄，栈不抄**（TS + Ink + Tauri）|
-| **pi**（earendil-works）| 4 包 monorepo / Extension API / EventBus / JSONL Session / Compaction 钩子 | TypeScript + Ink | **栈和 4 包结构全对齐** |
-| **Hermes**（NousResearch）| 多渠道 / MEMORY+library 分层 / i18n 教训 / post 强制策略 | Python + textual | **i18n 教训必学，栈不抄** |
-| **oh-my-pi**（can1357）| **hashline patch 格式 / napi natives 思路 / 自研 edit benchmark** | TS 54w 行 + Rust 27k 行 + Bun + Ink | **借鉴 3 件差异化（不 fork 整套）** |
-| **ECC**（affaan-m）| **SKILL.md 标准化 / 4 维质量模型 / 6 阶段 Verification Loop / continuous-learning-v2** | Shell + TS + Markdown（9 平台兼容）| **学格式不学 9 平台兼容** |
+| 项目                       | 借鉴                                                                                   | 真实栈                              | deepwhale 决策                           |
+| -------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------- |
+| **CodeWhale**（Hmbown）    | 沙箱抽象 / 路径兼容 / 飞书桥 SDK 模式 / Skills MD 格式                                 | Rust + ratatui + Tauri              | 沙箱思路**不学**（走 Docker），其余抄    |
+| **Reasonix**（esengine）   | **Prefix-cache 4 大机制 / StormBreaker / SanitizeToolPairing**                         | Go 1.25+ + Bubbletea + Wails        | **机制全抄，栈不抄**（TS + Ink + Tauri） |
+| **pi**（earendil-works）   | 4 包 monorepo / Extension API / EventBus / JSONL Session / Compaction 钩子             | TypeScript + Ink                    | **栈和 4 包结构全对齐**                  |
+| **Hermes**（NousResearch） | 多渠道 / MEMORY+library 分层 / i18n 教训 / post 强制策略                               | Python + textual                    | **i18n 教训必学，栈不抄**                |
+| **oh-my-pi**（can1357）    | **hashline patch 格式 / napi natives 思路 / 自研 edit benchmark**                      | TS 54w 行 + Rust 27k 行 + Bun + Ink | **借鉴 3 件差异化（不 fork 整套）**      |
+| **ECC**（affaan-m）        | **SKILL.md 标准化 / 4 维质量模型 / 6 阶段 Verification Loop / continuous-learning-v2** | Shell + TS + Markdown（9 平台兼容） | **学格式不学 9 平台兼容**                |
 
 ---
 
@@ -287,44 +295,44 @@ ECC 关键 skill（借鉴的来源）：
 
 ### 15.1 颠覆性发现（影响决策）
 
-| 假设 | 真相 | 后果 |
-|---|---|---|
-| ❌ "str_replace 是 AI agent 编辑的标配" | ✅ **仅换 patch 格式**（str_replace → hashline）就让 Grok Code Fast 从 6.7% → 68.3%（**10×**） | **edit_file 必须 Sprint 1 用 hashline** |
-| ❌ "fork 知名项目是 5 月拿 10k star 的捷径" | ✅ fork 维护有 **upstream drift** 风险（issue #1736 实证） | **不 fork pi-mono 整套**，**只借鉴原子能力** |
-| ❌ "forkshell / brush vendored 必须学" | ✅ vendored 几 MB bash 解释器，**单人项目成本太高** | **不做**，继续用 Docker bash |
+| 假设                                        | 真相                                                                                           | 后果                                         |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| ❌ "str_replace 是 AI agent 编辑的标配"     | ✅ **仅换 patch 格式**（str_replace → hashline）就让 Grok Code Fast 从 6.7% → 68.3%（**10×**） | **edit_file 必须 Sprint 1 用 hashline**      |
+| ❌ "fork 知名项目是 5 月拿 10k star 的捷径" | ✅ fork 维护有 **upstream drift** 风险（issue #1736 实证）                                     | **不 fork pi-mono 整套**，**只借鉴原子能力** |
+| ❌ "forkshell / brush vendored 必须学"      | ✅ vendored 几 MB bash 解释器，**单人项目成本太高**                                            | **不做**，继续用 Docker bash                 |
 
 ### 15.2 Sprint 0-2 重新排序（按 v2 优化表）
 
-| Sprint | 原计划 | 优化后（用户拍板 2026-06-03） | 理由 |
-|---|---|---|---|
-| **0** | 4 包 monorepo + 基础设施 | **+ hashline 格式 MVP**（parser + apply + TAG） | 提前卡位差异化 |
-| **1** | 6 工具 + Linear Session + Prefix-cache 4 机制 | **edit_file 用完整 hashline + Recovery 3-way**（替代原"hash 锚定"） | 行业瓶颈，10× 提升 |
-| **2** | Cache 可观测性 + Session 打磨 + Docker 优化 | **+ napi natives 调研**（先 bun 子进程跑 grep 验证可行性） | hot path 性能前置 |
+| Sprint | 原计划                                        | 优化后（用户拍板 2026-06-03）                                       | 理由               |
+| ------ | --------------------------------------------- | ------------------------------------------------------------------- | ------------------ |
+| **0**  | 4 包 monorepo + 基础设施                      | **+ hashline 格式 MVP**（parser + apply + TAG）                     | 提前卡位差异化     |
+| **1**  | 6 工具 + Linear Session + Prefix-cache 4 机制 | **edit_file 用完整 hashline + Recovery 3-way**（替代原"hash 锚定"） | 行业瓶颈，10× 提升 |
+| **2**  | Cache 可观测性 + Session 打磨 + Docker 优化   | **+ napi natives 调研**（先 bun 子进程跑 grep 验证可行性）          | hot path 性能前置  |
 
 ### 15.3 借鉴清单（按 P0/P1/P2 排序）
 
-| 优先级 | 借鉴 | 落在版本 | 备注 |
-|---|---|---|---|
-| **P0** | hashline patch 格式 | **Sprint 0 MVP + Sprint 1 完整** | `parser.ts`/`apply.ts`/`snapshots.ts` |
-| **P0** | 自研 edit benchmark | v1.0 末（`bench/edit-benchmark/`）| 求职差异化 |
-| **P0** | napi natives 架构 | **Sprint 2 调研 + v1.5 落地** | grep/tokens/ast 走 Rust |
-| **P1** | Filesystem 抽象（hashline） | Sprint 1 | 同一 patch 在 disk/mem/远程应用 |
-| **P1** | LSP `willRenameFiles` 钩子 | v1.5 | 优于普通 rename |
-| **P1** | 4 入口 RPC（NDJSON stdio） | Sprint 1（已规划） | 对齐 oh-my-pi |
-| **P2** | brush-shell vendored bash | **不做** | 成本太高，留占位 |
-| **P2** | 沙箱 4 后端自动解析 | **不做**（Docker only 已决定）| 与决策冲突 |
-| **P2** | Recovery 3-way merge | Sprint 1（hashline 内置）| 抗陈旧锚点 |
+| 优先级 | 借鉴                        | 落在版本                           | 备注                                  |
+| ------ | --------------------------- | ---------------------------------- | ------------------------------------- |
+| **P0** | hashline patch 格式         | **Sprint 0 MVP + Sprint 1 完整**   | `parser.ts`/`apply.ts`/`snapshots.ts` |
+| **P0** | 自研 edit benchmark         | v1.0 末（`bench/edit-benchmark/`） | 求职差异化                            |
+| **P0** | napi natives 架构           | **Sprint 2 调研 + v1.5 落地**      | grep/tokens/ast 走 Rust               |
+| **P1** | Filesystem 抽象（hashline） | Sprint 1                           | 同一 patch 在 disk/mem/远程应用       |
+| **P1** | LSP `willRenameFiles` 钩子  | v1.5                               | 优于普通 rename                       |
+| **P1** | 4 入口 RPC（NDJSON stdio）  | Sprint 1（已规划）                 | 对齐 oh-my-pi                         |
+| **P2** | brush-shell vendored bash   | **不做**                           | 成本太高，留占位                      |
+| **P2** | 沙箱 4 后端自动解析         | **不做**（Docker only 已决定）     | 与决策冲突                            |
+| **P2** | Recovery 3-way merge        | Sprint 1（hashline 内置）          | 抗陈旧锚点                            |
 
 ### 15.4 风险与对策
 
-| 风险 | 等级 | 对策 |
-|---|---|---|
-| hashline 写出来后 LLM 不会用 | 高 | **prompt.md 完整翻译成中文 + 多示例** |
-| napi build 跨平台麻烦 | 中 | Sprint 2 先用 bun 子进程跑 grep 验证，**不直接上 napi** |
-| 借鉴 hashline 是否侵权 | 低 | MIT 协议，**注明来源 + 保留 © Can Bölük** |
-| benchmark 跑得太慢 | 中 | 用 in-process client + 限定 fixture 数量 |
-| upstream drift（fork pi-mono）| 已规避 | **不 fork pi-mono 整套** |
-| oh-my-pi 未来 API 变化 | 低 | **不依赖其包，只学习设计** |
+| 风险                           | 等级   | 对策                                                    |
+| ------------------------------ | ------ | ------------------------------------------------------- |
+| hashline 写出来后 LLM 不会用   | 高     | **prompt.md 完整翻译成中文 + 多示例**                   |
+| napi build 跨平台麻烦          | 中     | Sprint 2 先用 bun 子进程跑 grep 验证，**不直接上 napi** |
+| 借鉴 hashline 是否侵权         | 低     | MIT 协议，**注明来源 + 保留 © Can Bölük**               |
+| benchmark 跑得太慢             | 中     | 用 in-process client + 限定 fixture 数量                |
+| upstream drift（fork pi-mono） | 已规避 | **不 fork pi-mono 整套**                                |
+| oh-my-pi 未来 API 变化         | 低     | **不依赖其包，只学习设计**                              |
 
 ---
 
@@ -334,68 +342,68 @@ ECC 关键 skill（借鉴的来源）：
 
 ### 16.1 颠覆性发现（影响决策）
 
-| 假设 | 真相 | 后果 |
-|---|---|---|
-| ❌ "ECC 是 agent 本体" | ✅ **ECC 是"任何 agent 之上"的 operator 插件系统**（4.5 月 204k star）| **不学 9 平台兼容**（deepwhale 是 agent 本体）|
-| ❌ "skill 是 prompt 就行" | ✅ **SKILL.md = YAML frontmatter + Markdown** 是革命性标准化（249 个 skill 互不污染）| **v1.0 必采用 SKILL.md 格式** |
-| ❌ "agent 质量靠 review" | ✅ **4 维质量模型**（Action / Observation / Recovery / Context Budget）= 第一性原理 | **v1.0 验收表用 4 维打分** |
-| ❌ "verification 是手动的" | ✅ **6 阶段 Verification Loop**（build / types / lint / tests / security / diff）+ 统一报告 = 自动化 | **v1.0 末加 `/verify` slash command** |
-| ❌ "continuous-learning 50-80% 触发" | ✅ **v2 = PreToolUse/PostToolUse 100% 触发 + 原子 instinct + confidence 0.3-0.9** | **v2.0 Tier-1 直接学 v2** |
+| 假设                                 | 真相                                                                                                 | 后果                                           |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| ❌ "ECC 是 agent 本体"               | ✅ **ECC 是"任何 agent 之上"的 operator 插件系统**（4.5 月 204k star）                               | **不学 9 平台兼容**（deepwhale 是 agent 本体） |
+| ❌ "skill 是 prompt 就行"            | ✅ **SKILL.md = YAML frontmatter + Markdown** 是革命性标准化（249 个 skill 互不污染）                | **v1.0 必采用 SKILL.md 格式**                  |
+| ❌ "agent 质量靠 review"             | ✅ **4 维质量模型**（Action / Observation / Recovery / Context Budget）= 第一性原理                  | **v1.0 验收表用 4 维打分**                     |
+| ❌ "verification 是手动的"           | ✅ **6 阶段 Verification Loop**（build / types / lint / tests / security / diff）+ 统一报告 = 自动化 | **v1.0 末加 `/verify` slash command**          |
+| ❌ "continuous-learning 50-80% 触发" | ✅ **v2 = PreToolUse/PostToolUse 100% 触发 + 原子 instinct + confidence 0.3-0.9**                    | **v2.0 Tier-1 直接学 v2**                      |
 
 ### 16.2 4 维质量模型（v1.0 验收表）
 
 **`agent-harness-construction` skill 的核心论点**：
 
-| 维度 | 含义 | deepwhale v1.0 实现 |
-|---|---|---|
-| **1. Action Space Quality** | 工具设计 | 6 工具（bash / read / write / edit / grep / find）粒度正确 |
-| **2. Observation Quality** | 工具返回 | **4 字段 schema 强制**（status / summary / artifacts / next_actions）|
-| **3. Recovery Quality** | 错误恢复 | **3 字段 schema 强制**（root_cause_hint / safe_retry / stop_condition）|
-| **4. Context Budget Quality** | token 分配 | system prompt minimal + skills on-demand + phase boundary compact |
+| 维度                          | 含义       | deepwhale v1.0 实现                                                     |
+| ----------------------------- | ---------- | ----------------------------------------------------------------------- |
+| **1. Action Space Quality**   | 工具设计   | 6 工具（bash / read / write / edit / grep / find）粒度正确              |
+| **2. Observation Quality**    | 工具返回   | **4 字段 schema 强制**（status / summary / artifacts / next_actions）   |
+| **3. Recovery Quality**       | 错误恢复   | **3 字段 schema 强制**（root_cause_hint / safe_retry / stop_condition） |
+| **4. Context Budget Quality** | token 分配 | system prompt minimal + skills on-demand + phase boundary compact       |
 
 **这是 deepwhale v1.0 整个设计的"质量验收表"**，**比"能跑通"严格 10 倍**。
 
 ### 16.3 Sprint 0-2 + v1.0 末重新排序（v3 调整）
 
-| Sprint | 原计划 | 优化后（v3 = ECC 借鉴） | 理由 |
-|---|---|---|---|
-| **0** | 4 包 + hashline MVP | **+ SKILL.md 标准化目录**（YAML frontmatter + 首批 3 个 skill）| 与 hashline 配套，标准化 |
-| **1** | 6 工具 + Prefix-cache 4 机制 | **+ Tool 返回 schema 统一**（Observation 4 字段 + Recovery 3 字段）| 4 维模型 v1.0 实现层 |
-| **2** | Cache + napi 调研 | 不变 | - |
-| **v1.0 末** | - | **+ `/verify` slash command + VERIFICATION REPORT** | 6 阶段流程，求职差异化 |
+| Sprint      | 原计划                       | 优化后（v3 = ECC 借鉴）                                             | 理由                     |
+| ----------- | ---------------------------- | ------------------------------------------------------------------- | ------------------------ |
+| **0**       | 4 包 + hashline MVP          | **+ SKILL.md 标准化目录**（YAML frontmatter + 首批 3 个 skill）     | 与 hashline 配套，标准化 |
+| **1**       | 6 工具 + Prefix-cache 4 机制 | **+ Tool 返回 schema 统一**（Observation 4 字段 + Recovery 3 字段） | 4 维模型 v1.0 实现层     |
+| **2**       | Cache + napi 调研            | 不变                                                                | -                        |
+| **v1.0 末** | -                            | **+ `/verify` slash command + VERIFICATION REPORT**                 | 6 阶段流程，求职差异化   |
 
 **v2.0 Tier-1 落地** continuous-learning-v2 模式（instinct + confidence），**直接借鉴 ECC v2**（不是 v1 的 Stop hook）。
 
 ### 16.4 借鉴清单（按 P0/P1/P2 排序）
 
-| 优先级 | 借鉴 | 落在版本 | 备注 |
-|---|---|---|---|
-| **P0** | **SKILL.md 标准化目录** | Sprint 0 | YAML frontmatter + 首批 3 个 skill（hashline / coding-standards / verification-loop）|
-| **P0** | **Observation 4 字段 schema** | Sprint 1 | tool-result.ts zod 定义 |
-| **P0** | **Recovery 3 字段 schema** | Sprint 1 | tool-error.ts zod 定义 |
-| **P0** | **`/verify` slash command** | v1.0 末 | 6 阶段流程 + VERIFICATION REPORT |
-| **P0** | **统一报告格式** | v1.0 末 | READY / NOT READY 一眼看出 |
-| **P0** | **Security scan**（grep sk-）| v1.0 | scripts/security-scan.sh |
-| **P1** | agent.yaml catalog 机制 | v1.0 末 | 类似 ECC 245 行 manifest |
-| **P1** | 4 种典型 SKILL.md 模式 | Sprint 1 | Reference / Workflow / Pattern / Knowledge |
-| **P1** | Anti-patterns 自查 | v1.5 | CI lint |
-| **P1** | continuous-learning-v2 | v2.0 Tier-1 | instinct + confidence |
-| **P1** | rules-distill 思想 | v2.0 Tier-1 | 从 skills 提炼 rules |
-| **P2** | 9 平台兼容层 | **不做**（偏离主线）| 与决策冲突 |
-| **P2** | Granularity 3 档规则 | 文档化 | 留占位 |
-| **P2** | Continuous mode（每 15 min）| v2.0 末 | 留占位 |
-| **P2** | ECC Pro 商业化 | **永远不做** | 单人项目 |
+| 优先级 | 借鉴                          | 落在版本             | 备注                                                                                  |
+| ------ | ----------------------------- | -------------------- | ------------------------------------------------------------------------------------- |
+| **P0** | **SKILL.md 标准化目录**       | Sprint 0             | YAML frontmatter + 首批 3 个 skill（hashline / coding-standards / verification-loop） |
+| **P0** | **Observation 4 字段 schema** | Sprint 1             | tool-result.ts zod 定义                                                               |
+| **P0** | **Recovery 3 字段 schema**    | Sprint 1             | tool-error.ts zod 定义                                                                |
+| **P0** | **`/verify` slash command**   | v1.0 末              | 6 阶段流程 + VERIFICATION REPORT                                                      |
+| **P0** | **统一报告格式**              | v1.0 末              | READY / NOT READY 一眼看出                                                            |
+| **P0** | **Security scan**（grep sk-） | v1.0                 | scripts/security-scan.sh                                                              |
+| **P1** | agent.yaml catalog 机制       | v1.0 末              | 类似 ECC 245 行 manifest                                                              |
+| **P1** | 4 种典型 SKILL.md 模式        | Sprint 1             | Reference / Workflow / Pattern / Knowledge                                            |
+| **P1** | Anti-patterns 自查            | v1.5                 | CI lint                                                                               |
+| **P1** | continuous-learning-v2        | v2.0 Tier-1          | instinct + confidence                                                                 |
+| **P1** | rules-distill 思想            | v2.0 Tier-1          | 从 skills 提炼 rules                                                                  |
+| **P2** | 9 平台兼容层                  | **不做**（偏离主线） | 与决策冲突                                                                            |
+| **P2** | Granularity 3 档规则          | 文档化               | 留占位                                                                                |
+| **P2** | Continuous mode（每 15 min）  | v2.0 末              | 留占位                                                                                |
+| **P2** | ECC Pro 商业化                | **永远不做**         | 单人项目                                                                              |
 
 ### 16.5 风险与对策
 
-| 风险 | 等级 | 对策 |
-|---|---|---|
-| SKILL.md 格式过重（v1.0 工具少）| 低 | **v1.0 至少用 frontmatter，body 简化** |
-| 4 维模型执行成本 | 中 | **只用作 v1.0 验收表**，不强制每条规则都有对应代码 |
-| Verification Loop 增加 CI 时间 | 中 | **跑并行**（build + types + lint + test + security + diff）|
-| Security scan 误报 | 低 | **加白名单**（`*.test.ts` / `docs/`）|
-| ECC 249 skills 是噪音 | 低 | **不抄内容**，只抄格式 |
-| ECC 9 平台兼容分散精力 | **高** | **明确不学**（深挖主线） |
+| 风险                             | 等级   | 对策                                                        |
+| -------------------------------- | ------ | ----------------------------------------------------------- |
+| SKILL.md 格式过重（v1.0 工具少） | 低     | **v1.0 至少用 frontmatter，body 简化**                      |
+| 4 维模型执行成本                 | 中     | **只用作 v1.0 验收表**，不强制每条规则都有对应代码          |
+| Verification Loop 增加 CI 时间   | 中     | **跑并行**（build + types + lint + test + security + diff） |
+| Security scan 误报               | 低     | **加白名单**（`*.test.ts` / `docs/`）                       |
+| ECC 249 skills 是噪音            | 低     | **不抄内容**，只抄格式                                      |
+| ECC 9 平台兼容分散精力           | **高** | **明确不学**（深挖主线）                                    |
 
 ### 16.6 不学清单（明确不抄）
 

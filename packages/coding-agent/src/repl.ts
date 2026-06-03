@@ -17,7 +17,14 @@ import { createInterface, type Interface as RLInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
 import { t } from '@deepwhale/core';
 import { DeepSeekClient } from '@deepwhale/llm';
-import { APIKeyMissingError, LLMAuthError, LLMNetworkError, LLMRateLimitError, LLMUnknownError, isLLMError } from '@deepwhale/llm';
+import {
+  APIKeyMissingError,
+  LLMAuthError,
+  LLMNetworkError,
+  LLMRateLimitError,
+  LLMUnknownError,
+  isLLMError,
+} from '@deepwhale/llm';
 import type { LLMClient } from '@deepwhale/llm';
 import type { ChatMessage } from '@deepwhale/llm';
 
@@ -50,9 +57,7 @@ export async function runOneTurn(
   messages: ChatMessage[],
   options: { signal?: AbortSignal } = {},
 ): Promise<
-  | { kind: 'chat'; assistant: string }
-  | { kind: 'error'; error: string }
-  | { kind: 'empty' }
+  { kind: 'chat'; assistant: string } | { kind: 'error'; error: string } | { kind: 'empty' }
 > {
   const trimmed = line.trim();
   if (trimmed === '') return { kind: 'empty' };
@@ -107,7 +112,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       const line = rawLine.trim();
 
       // 内建命令
-      if (line === '' ) {
+      if (line === '') {
         prompt();
         return;
       }

@@ -74,7 +74,12 @@ export class EditFileTool implements Tool {
       return {
         success: true,
         content: `Applied patch via ${result.engine}. ${original.length} → ${result.newText.length} bytes.`,
-        meta: { path, engine: result.engine, bytesBefore: original.length, bytesAfter: result.newText.length },
+        meta: {
+          path,
+          engine: result.engine,
+          bytesBefore: original.length,
+          bytesAfter: result.newText.length,
+        },
       };
     } catch (err) {
       const e = err as Error & { code?: string; stderr?: string; stdout?: string };

@@ -6,13 +6,13 @@
 
 ## 1. 项目概览
 
-| 字段 | 值 |
-|---|---|
-| 仓库 | https://github.com/NousResearch/hermes-agent |
-| 当前版本 | v2026.5.7-476（本地开发版） |
-| 主语言 | **Python** |
-| 部署 | Ubuntu 24.04 VM + s6 容器 |
-| License | MIT |
+| 字段     | 值                                                      |
+| -------- | ------------------------------------------------------- |
+| 仓库     | https://github.com/NousResearch/hermes-agent            |
+| 当前版本 | v2026.5.7-476（本地开发版）                             |
+| 主语言   | **Python**                                              |
+| 部署     | Ubuntu 24.04 VM + s6 容器                               |
+| License  | MIT                                                     |
 | 关键功能 | 多渠道 / Plugins / Cron / Session 持久化 / Context 压缩 |
 
 ## 2. 核心架构
@@ -69,13 +69,13 @@
 
 ## 4. 关键踩坑（5+ 次实战教训）
 
-| # | 坑 | 教训 | deepwhale 怎么避 |
-|---|---|---|---|
-| 1 | **response-footer 插件 hot-reload 失灵** | mtime 检测在 `register()` 内，重载后失效 | **mtime 检测必须在 wrapper 内部** |
-| 2 | **i18n 永远英文 fallback** | 原写 `from gateway.i18n import t`，路径错 | **Sprint 0 第 1 行定对 `from agent.i18n import t`** |
-| 3 | **飞书表格 markdown 不渲染** | 默认 text 消息类型，表格压成行 | **强制走 post payload**（message_id=om_x100b6ee7c17cfca0c2d94a6a3087ac5） |
-| 4 | **footer 数字收敛 bug** | api_calls==1 时 `session_input_tokens` 和 `last_prompt_tokens` 相等，用户报"上下文不对了" | **多字段同值时去冗余/加标签区分**（用户视角 = bug，不辩护语义） |
-| 5 | **Hermes update npm ci 25min 无 stdout** | lifecycle 阶段，CPU 8%，看似卡死 | **别在 25min 内 kill** |
+| #   | 坑                                       | 教训                                                                                      | deepwhale 怎么避                                                          |
+| --- | ---------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1   | **response-footer 插件 hot-reload 失灵** | mtime 检测在 `register()` 内，重载后失效                                                  | **mtime 检测必须在 wrapper 内部**                                         |
+| 2   | **i18n 永远英文 fallback**               | 原写 `from gateway.i18n import t`，路径错                                                 | **Sprint 0 第 1 行定对 `from agent.i18n import t`**                       |
+| 3   | **飞书表格 markdown 不渲染**             | 默认 text 消息类型，表格压成行                                                            | **强制走 post payload**（message_id=om_x100b6ee7c17cfca0c2d94a6a3087ac5） |
+| 4   | **footer 数字收敛 bug**                  | api_calls==1 时 `session_input_tokens` 和 `last_prompt_tokens` 相等，用户报"上下文不对了" | **多字段同值时去冗余/加标签区分**（用户视角 = bug，不辩护语义）           |
+| 5   | **Hermes update npm ci 25min 无 stdout** | lifecycle 阶段，CPU 8%，看似卡死                                                          | **别在 25min 内 kill**                                                    |
 
 ## 5. Hermes 飞书 Post 强制策略
 
@@ -95,38 +95,38 @@ if _MARKDOWN_HINT_RE.search(content) or _MARKDOWN_TABLE_RE.search(content):
 
 ### P0 — 必须抄
 
-| 借鉴点 | 真实出处 | deepwhale 落地 |
-|---|---|---|
-| 多渠道 channel 模式 | `gateway/platforms/*.py` | 飞书/Telegram/邮件/微信 4 个渠道 |
-| MEMORY + library 分层 | `~/.hermes/{MEMORY.md, memories/library/}` | 抄 |
-| Session JSONL 持久化 | `~/.hermes/sessions/` | 跟 pi JSONL DAG 互补 |
-| i18n 路径第一行定对 | `from agent.i18n import t` | **Sprint 0 红线** |
+| 借鉴点                | 真实出处                                   | deepwhale 落地                   |
+| --------------------- | ------------------------------------------ | -------------------------------- |
+| 多渠道 channel 模式   | `gateway/platforms/*.py`                   | 飞书/Telegram/邮件/微信 4 个渠道 |
+| MEMORY + library 分层 | `~/.hermes/{MEMORY.md, memories/library/}` | 抄                               |
+| Session JSONL 持久化  | `~/.hermes/sessions/`                      | 跟 pi JSONL DAG 互补             |
+| i18n 路径第一行定对   | `from agent.i18n import t`                 | **Sprint 0 红线**                |
 
 ### P1 — 强烈建议
 
-| 借鉴点 | 真实出处 | deepwhale 落地 |
-|---|---|---|
-| Plugins 猴子补丁 | 拦截 `GatewayRunner._run_agent` | 类似 deepwhale Extension，但 Hermes 用 monkey patch（不推荐 deepwhale 照搬） |
-| Cron no_agent watchdog | cronjob no_agent=True | Sprint 5 用 |
-| 飞书 post 强制 | `gateway/platforms/feishu.py:4308-4317` | Sprint 4 飞书桥抄 |
-| 多渠道 footer 字段去冗余 | 教训 #4 | Sprint 4 footer 设计红线 |
+| 借鉴点                   | 真实出处                                | deepwhale 落地                                                               |
+| ------------------------ | --------------------------------------- | ---------------------------------------------------------------------------- |
+| Plugins 猴子补丁         | 拦截 `GatewayRunner._run_agent`         | 类似 deepwhale Extension，但 Hermes 用 monkey patch（不推荐 deepwhale 照搬） |
+| Cron no_agent watchdog   | cronjob no_agent=True                   | Sprint 5 用                                                                  |
+| 飞书 post 强制           | `gateway/platforms/feishu.py:4308-4317` | Sprint 4 飞书桥抄                                                            |
+| 多渠道 footer 字段去冗余 | 教训 #4                                 | Sprint 4 footer 设计红线                                                     |
 
 ### P2 — 看情况
 
-| 借鉴点 | 真实出处 | 评估 |
-|---|---|---|
-| s6 容器化 | Hermes 用 s6 跑 daemon | deepwhale 桌面用 Tauri，CLI 用 npm，不需要 |
-| TUI textual（Python） | Hermes 用 textual | deepwhale TS 栈用 Ink |
+| 借鉴点                | 真实出处               | 评估                                       |
+| --------------------- | ---------------------- | ------------------------------------------ |
+| s6 容器化             | Hermes 用 s6 跑 daemon | deepwhale 桌面用 Tauri，CLI 用 npm，不需要 |
+| TUI textual（Python） | Hermes 用 textual      | deepwhale TS 栈用 Ink                      |
 
 ### 不要抄
 
-| 反面教训 | 教训 |
-|---|---|
-| mtime 检测在 register() 内 | **wrapper 内部** |
-| i18n 路径错 | **第 1 行定对** |
-| 飞书走 text 消息类型 | **强制 post** |
-| 辩护 footer 数字收敛"语义正确" | **用户视角 = bug** |
-| 25min 内 kill npm ci | **lifecycle 阶段，CPU 8% = 正常** |
+| 反面教训                       | 教训                              |
+| ------------------------------ | --------------------------------- |
+| mtime 检测在 register() 内     | **wrapper 内部**                  |
+| i18n 路径错                    | **第 1 行定对**                   |
+| 飞书走 text 消息类型           | **强制 post**                     |
+| 辩护 footer 数字收敛"语义正确" | **用户视角 = bug**                |
+| 25min 内 kill npm ci           | **lifecycle 阶段，CPU 8% = 正常** |
 
 ## 7. 关键文件路径速查
 

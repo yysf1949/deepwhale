@@ -61,10 +61,7 @@ export interface LLMError {
 
 /** 类型守卫：通过 isLLMError 标签识别 LLM 派生的 Error。 */
 export function isLLMError(err: unknown): err is LLMError {
-  return (
-    err instanceof Error &&
-    (err as { isLLMError?: unknown }).isLLMError === true
-  );
+  return err instanceof Error && (err as { isLLMError?: unknown }).isLLMError === true;
 }
 
 export class APIKeyMissingError extends Error implements LLMError {

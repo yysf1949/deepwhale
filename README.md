@@ -13,26 +13,26 @@
 
 **路线锚**：
 
-| 版本 | 时长 | 目标 | 关键能力 |
-|---|---|---|---|
-| **v1.0** | 3 个月 | Claude Code Lite | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker 沙箱 |
+| 版本     | 时长    | 目标                          | 关键能力                                                                            |
+| -------- | ------- | ----------------------------- | ----------------------------------------------------------------------------------- |
+| **v1.0** | 3 个月  | Claude Code Lite              | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker 沙箱       |
 | **v1.5** | +2 个月 | Codex Clone（**14/14 复刻**） | Approval + Task + Skills + Extension API + Hooks + StormBreaker + Cron + Compaction |
-| **v2.0** | +2 个月 | +Browser Agent | MCP + Browser Runtime + Session DAG + Memory 三层 |
-| **v3.0** | +3 个月 | +Computer Use | Computer Runtime + Compaction 钩子化 |
-| **v4.0** | +3 个月 | Agent OS | Multi-Agent + Plugin Marketplace + Desktop + Channels |
+| **v2.0** | +2 个月 | +Browser Agent                | MCP + Browser Runtime + Session DAG + Memory 三层                                   |
+| **v3.0** | +3 个月 | +Computer Use                 | Computer Runtime + Compaction 钩子化                                                |
+| **v4.0** | +3 个月 | Agent OS                      | Multi-Agent + Plugin Marketplace + Desktop + Channels                               |
 
 **核心交付节奏**：13 个月 5 阶段，单人开发，完成概率预估 70%（vs 初版 10 周 90% 失败概率）。
 
 ## 为什么需要 deepwhale
 
-| 现状 | 痛点 | deepwhale 解决 |
-|---|---|---|
-| OpenAI Codex CLI 绑定 GPT 模型 | DeepSeek 用户难用 | ✅ **DeepSeek-first**（V4-Flash 默认，V4-Pro `/pro` 升级） |
-| Claude Code 闭源、模型绑定 Anthropic | 不可定制 | ✅ MIT 开源，DeepSeek 优先（v1.0 单模型） |
-| CodeWhale 偏 Rust 极客，无扩展平台 | 难以二次开发 | ✅ **v1.5 起 Extension API** |
-| Reasonix Go 栈入门门槛高 | 社区贡献难 | ✅ **TypeScript 栈**（借鉴 Reasonix 机制，**不抄 Go 栈**） |
-| Hermes 多渠道但不是 coding agent | 渠道割裂 | ✅ **v1-v3 不做渠道，v4.0 重新评估** |
-| Codex Client 不支持多模型 | 锁定 OpenAI | ✅ **v1.0 = DeepSeek only，v1.5 起支持 4 家** |
+| 现状                                 | 痛点              | deepwhale 解决                                             |
+| ------------------------------------ | ----------------- | ---------------------------------------------------------- |
+| OpenAI Codex CLI 绑定 GPT 模型       | DeepSeek 用户难用 | ✅ **DeepSeek-first**（V4-Flash 默认，V4-Pro `/pro` 升级） |
+| Claude Code 闭源、模型绑定 Anthropic | 不可定制          | ✅ MIT 开源，DeepSeek 优先（v1.0 单模型）                  |
+| CodeWhale 偏 Rust 极客，无扩展平台   | 难以二次开发      | ✅ **v1.5 起 Extension API**                               |
+| Reasonix Go 栈入门门槛高             | 社区贡献难        | ✅ **TypeScript 栈**（借鉴 Reasonix 机制，**不抄 Go 栈**） |
+| Hermes 多渠道但不是 coding agent     | 渠道割裂          | ✅ **v1-v3 不做渠道，v4.0 重新评估**                       |
+| Codex Client 不支持多模型            | 锁定 OpenAI       | ✅ **v1.0 = DeepSeek only，v1.5 起支持 4 家**              |
 
 ## 核心特性（v1.0 目标）
 

@@ -5,6 +5,7 @@
 ## 1. 核心问题
 
 DeepWhale v1.0-v4.0 会引入 5 种不同的"能力来源"：
+
 - **Tool**：内置工具（bash, read_file, write_file, edit_file, grep, find, symbol_lookup, ...）
 - **MCP**：外部 MCP server（stdio / http / sse）
 - **Plugin**：用户安装的 .dwp 插件
@@ -12,6 +13,7 @@ DeepWhale v1.0-v4.0 会引入 5 种不同的"能力来源"：
 - **Computer Use**：Computer Runtime（mouse, keyboard, screen_capture, ...）
 
 如果不统一抽象，会出现：
+
 - 5 套不同的注册 API
 - 5 套不同的权限控制
 - 5 套不同的 sandbox 配置
@@ -43,24 +45,24 @@ Capability {
 
 ### 2.2 RiskLevel 等级
 
-| 等级 | 含义 | 默认处理 |
-|---|---|---|
-| **low** | 只读 / 无副作用 | 自动通过 |
-| **medium** | 修改本地文件 | 提示用户 |
-| **high** | 网络请求 / 进程创建 | 必须确认 |
+| 等级         | 含义                           | 默认处理            |
+| ------------ | ------------------------------ | ------------------- |
+| **low**      | 只读 / 无副作用                | 自动通过            |
+| **medium**   | 修改本地文件                   | 提示用户            |
+| **high**     | 网络请求 / 进程创建            | 必须确认            |
 | **critical** | 删文件 / 远程 shell / GUI 操作 | 必须确认 + 二次确认 |
 
 ## 3. Capability Registry
 
 ### 3.1 注册时机
 
-| 来源 | 注册时机 | 注册方式 |
-|---|---|---|
-| **Tool** | 启动时 | 静态注册（import 时声明） |
-| **MCP** | 启动时 + 动态添加 | stdio 启动 / http 拉 manifest |
-| **Plugin** | 启动时 + 热加载 | 扫描 `~/.deepwhale/plugins/*.dwp` |
-| **Browser** | 启动时 | Browser Runtime 启动时注册 |
-| **Computer** | 启动时 | Computer Runtime 启动时注册 |
+| 来源         | 注册时机          | 注册方式                          |
+| ------------ | ----------------- | --------------------------------- |
+| **Tool**     | 启动时            | 静态注册（import 时声明）         |
+| **MCP**      | 启动时 + 动态添加 | stdio 启动 / http 拉 manifest     |
+| **Plugin**   | 启动时 + 热加载   | 扫描 `~/.deepwhale/plugins/*.dwp` |
+| **Browser**  | 启动时            | Browser Runtime 启动时注册        |
+| **Computer** | 启动时            | Computer Runtime 启动时注册       |
 
 ### 3.2 唯一性保证
 
@@ -98,13 +100,13 @@ Agent 请求调用 capability X
 
 ### 4.2 错误处理
 
-| 错误类型 | 行为 | escalate 到 |
-|---|---|---|
-| **capability 不存在** | 启动时报错 | 启动失败 |
-| **参数 schema 不匹配** | 立即拒绝 | Planner 重新规划 |
-| **沙箱启动失败** | 重试 1 次 → 失败 | Planner 重新规划 |
-| **执行超时** | 立即返回 partial result | Executor 重试或 Planner 重新规划 |
-| **执行异常** | 捕获 + 上报 | Reviewer 反馈 → Planner |
+| 错误类型               | 行为                    | escalate 到                      |
+| ---------------------- | ----------------------- | -------------------------------- |
+| **capability 不存在**  | 启动时报错              | 启动失败                         |
+| **参数 schema 不匹配** | 立即拒绝                | Planner 重新规划                 |
+| **沙箱启动失败**       | 重试 1 次 → 失败        | Planner 重新规划                 |
+| **执行超时**           | 立即返回 partial result | Executor 重试或 Planner 重新规划 |
+| **执行异常**           | 捕获 + 上报             | Reviewer 反馈 → Planner          |
 
 ## 5. Skill 声明格式
 
@@ -116,7 +118,7 @@ Skill {
   version:           string
   description:       string
   triggers:          string[]           // 何时自动加载
-  
+
   capabilities:      CapabilityRef[]   // 声明需要哪些 capability
   tools:             ToolImpl[]         // 自带工具实现
   extensions:        ExtensionHandler[] // 监听 21 个 whale.* 事件
@@ -124,12 +126,14 @@ Skill {
 ```
 
 **Skill 加载时**：
+
 1. 扫描 `skill.yaml` / `SKILL.md` frontmatter
 2. 检查 `capabilities:` 声明的每个 capability 是否在 Registry 中
 3. 缺失的 capability → Skill 加载失败（明确报错）
 4. 全部存在 → Skill 启用
 
 **Skill 卸载时**：
+
 1. 注销自带 tools
 2. 注销 extensions
 3. **不**注销 capabilities（其他 Skill 可能在用）
@@ -150,12 +154,12 @@ Skill "commit" 声明 capability: ["shell_exec"]
 
 ### 6.2 用户授权层级
 
-| 层级 | 行为 | 持久化 |
-|---|---|---|
-| **Once** | 单次确认 | 不保存 |
-| **Session** | session 内自动 | 写到 session state |
-| **Project** | 项目级 | 写到 `.deepwhale/trust.json` |
-| **User** | 全局 | 写到 `~/.deepwhale/trust.json` |
+| 层级        | 行为           | 持久化                         |
+| ----------- | -------------- | ------------------------------ |
+| **Once**    | 单次确认       | 不保存                         |
+| **Session** | session 内自动 | 写到 session state             |
+| **Project** | 项目级         | 写到 `.deepwhale/trust.json`   |
+| **User**    | 全局           | 写到 `~/.deepwhale/trust.json` |
 
 **信任 flag 不在项目目录**（避免恶意仓库诱导用户授权），全部在 `~/.deepwhale/trust.json`（Reasonix 抄 + Hermes 教训）。
 
@@ -179,34 +183,34 @@ SandboxProfile {
 
 ## 8. 与现有工具的映射
 
-| 现有工具 | 映射为 |
-|---|---|
-| `bash` | Capability{ name: "shell_exec", risk: high } |
-| `read_file` | Capability{ name: "read_file", risk: low } |
-| `write_file` | Capability{ name: "write_file", risk: medium } |
-| `edit_file` | Capability{ name: "edit_file", risk: medium } |
-| `grep` | Capability{ name: "grep", risk: low } |
-| `find` | Capability{ name: "find", risk: low } |
-| `symbol_lookup` (v1.5) | Capability{ name: "code_intel.symbol_lookup", risk: low } |
-| `semantic_search` (v2.0) | Capability{ name: "code_intel.semantic_search", risk: low } |
-| Browser `navigate` (v2.0) | Capability{ name: "browser.navigate", risk: medium } |
-| Browser `click` (v2.0) | Capability{ name: "browser.click", risk: medium } |
-| Computer `mouse_click` (v3.0) | Capability{ name: "computer.mouse_click", risk: critical } |
-| Computer `keyboard_type` (v3.0) | Capability{ name: "computer.keyboard_type", risk: critical } |
-| MCP tool（动态） | Capability{ name: "mcp.<server>.<tool>", risk: 来自 manifest } |
-| Plugin tool | Capability{ name: "plugin.<plugin>.<tool>", risk: 来自 manifest } |
+| 现有工具                        | 映射为                                                            |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `bash`                          | Capability{ name: "shell_exec", risk: high }                      |
+| `read_file`                     | Capability{ name: "read_file", risk: low }                        |
+| `write_file`                    | Capability{ name: "write_file", risk: medium }                    |
+| `edit_file`                     | Capability{ name: "edit_file", risk: medium }                     |
+| `grep`                          | Capability{ name: "grep", risk: low }                             |
+| `find`                          | Capability{ name: "find", risk: low }                             |
+| `symbol_lookup` (v1.5)          | Capability{ name: "code_intel.symbol_lookup", risk: low }         |
+| `semantic_search` (v2.0)        | Capability{ name: "code_intel.semantic_search", risk: low }       |
+| Browser `navigate` (v2.0)       | Capability{ name: "browser.navigate", risk: medium }              |
+| Browser `click` (v2.0)          | Capability{ name: "browser.click", risk: medium }                 |
+| Computer `mouse_click` (v3.0)   | Capability{ name: "computer.mouse_click", risk: critical }        |
+| Computer `keyboard_type` (v3.0) | Capability{ name: "computer.keyboard_type", risk: critical }      |
+| MCP tool（动态）                | Capability{ name: "mcp.<server>.<tool>", risk: 来自 manifest }    |
+| Plugin tool                     | Capability{ name: "plugin.<plugin>.<tool>", risk: 来自 manifest } |
 
 ## 9. 版本演进
 
-| 版本 | 引入 |
-|---|---|
-| **v1.0** | Tool Runtime（6 个核心工具映射为 Capability） |
-| **v1.5** | Extension API 也能注册 Capability（21 个 whale.* 事件不变） |
-| **v2.0** | MCP server 动态注册为 Capability |
-| **v2.0** | Browser 7 个 API 映射为 Capability |
-| **v2.5** | Skill 加载流程正式走 Capability 检查 |
-| **v3.0** | Computer Use 兼容层映射为 Capability |
-| **v4.0** | Plugin Marketplace 上架的 plugin 全部以 Capability 暴露 |
+| 版本     | 引入                                                         |
+| -------- | ------------------------------------------------------------ |
+| **v1.0** | Tool Runtime（6 个核心工具映射为 Capability）                |
+| **v1.5** | Extension API 也能注册 Capability（21 个 whale.\* 事件不变） |
+| **v2.0** | MCP server 动态注册为 Capability                             |
+| **v2.0** | Browser 7 个 API 映射为 Capability                           |
+| **v2.5** | Skill 加载流程正式走 Capability 检查                         |
+| **v3.0** | Computer Use 兼容层映射为 Capability                         |
+| **v4.0** | Plugin Marketplace 上架的 plugin 全部以 Capability 暴露      |
 
 ## 10. 不做的事
 

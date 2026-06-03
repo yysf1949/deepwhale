@@ -34,6 +34,7 @@ WorkspaceIndex {
 **输出**：项目元信息 + 触发下游模块构建
 
 **构建时机**：
+
 - v1.5 启动时增量构建
 - git hook 触发（commit 后）
 - 用户手动 `deepwhale index`
@@ -66,6 +67,7 @@ SymbolGraph {
 **输出**：可查询的 Symbol 集合
 
 **查询接口**：
+
 - 按 name 模糊匹配（"UserService" → ["UserService", "UserServiceFactory", ...]）
 - 按 file 列所有 symbol
 - 按 kind 过滤
@@ -94,6 +96,7 @@ ReferenceGraph {
 **输出**：可查询的引用关系
 
 **查询接口**：
+
 - 找 symbol 的所有 callers（"谁调用了 UserService.authenticate"）
 - 找 symbol 的所有 callees（"UserService.authenticate 调用了谁"）
 - 找 importers（"哪些文件 import 了 UserService"）
@@ -123,6 +126,7 @@ Chunk {
 **输出**：向量索引
 
 **查询接口**：
+
 - 自然语言 query → top-K 相关 chunks
 - 关联到 Symbol（chunk 知道自己是哪个 symbol）
 
@@ -181,73 +185,73 @@ Semantic Search 检索 → 返回 Chunk[] → Agent
 
 ## 5. 能力暴露（Agent tool 入口）
 
-| Capability | 出现版本 | 输入 | 输出 |
-|---|---|---|---|
-| `code_intel.symbol_lookup` | v1.5 | `{ query, kind?, max_results? }` | `Symbol[]` |
-| `code_intel.reference_lookup` | v1.5 基础 / v2.0 完整 | `{ symbol, kind }` | `Reference[]` |
-| `code_intel.semantic_search` | v2.0 | `{ query, max_results? }` | `Chunk[]` |
-| `code_intel.workspace_summary` | v1.5 | `{}` | `WorkspaceIndex` |
+| Capability                     | 出现版本              | 输入                             | 输出             |
+| ------------------------------ | --------------------- | -------------------------------- | ---------------- |
+| `code_intel.symbol_lookup`     | v1.5                  | `{ query, kind?, max_results? }` | `Symbol[]`       |
+| `code_intel.reference_lookup`  | v1.5 基础 / v2.0 完整 | `{ symbol, kind }`               | `Reference[]`    |
+| `code_intel.semantic_search`   | v2.0                  | `{ query, max_results? }`        | `Chunk[]`        |
+| `code_intel.workspace_summary` | v1.5                  | `{}`                             | `WorkspaceIndex` |
 
 （详细字段定义见 `CAPABILITY_MODEL.md` §8）
 
 ## 6. 与 Agent Layer 的关系
 
-| Code Intelligence 提供 | 被谁用 |
-|---|---|
-| `symbol_lookup` | Executor（查找函数定义）|
-| `reference_lookup` | Executor（改代码前查 callers） |
-| `semantic_search` | Researcher（v4.0 信息收集） |
-| `workspace_summary` | Planner（v2.5 拆解任务时先了解项目） |
+| Code Intelligence 提供 | 被谁用                               |
+| ---------------------- | ------------------------------------ |
+| `symbol_lookup`        | Executor（查找函数定义）             |
+| `reference_lookup`     | Executor（改代码前查 callers）       |
+| `semantic_search`      | Researcher（v4.0 信息收集）          |
+| `workspace_summary`    | Planner（v2.5 拆解任务时先了解项目） |
 
 **关键设计**：Code Intelligence **不直接调 LLM**——它是被动的查询服务，Agent Layer 调它。
 
 ## 7. 增量与全量
 
-| 触发 | 范围 |
-|---|---|
-| 启动 | 增量（只扫变更文件） |
-| git commit hook | 增量（变更文件 + 引用方） |
-| 用户手动 | 全量（`deepwhale index --full`） |
-| 文件数 > 阈值 | 自动触发全量（防增量漂移） |
+| 触发            | 范围                             |
+| --------------- | -------------------------------- |
+| 启动            | 增量（只扫变更文件）             |
+| git commit hook | 增量（变更文件 + 引用方）        |
+| 用户手动        | 全量（`deepwhale index --full`） |
+| 文件数 > 阈值   | 自动触发全量（防增量漂移）       |
 
 ## 8. 跨语言支持
 
-| 语言 | Symbol Graph | Reference Graph | Semantic Search |
-|---|---|---|---|
-| TypeScript | ✅ v1.5 | ✅ v2.0 | ✅ v2.0 |
-| JavaScript | ✅ v1.5 | ✅ v2.0 | ✅ v2.0 |
-| Python | ✅ v1.5 | ✅ v2.0 | ✅ v2.0 |
-| Go | ✅ v1.5 | ✅ v2.0 | ✅ v2.0 |
-| Rust | ✅ v1.5 | ✅ v2.0 | ✅ v2.0 |
+| 语言       | Symbol Graph | Reference Graph | Semantic Search |
+| ---------- | ------------ | --------------- | --------------- |
+| TypeScript | ✅ v1.5      | ✅ v2.0         | ✅ v2.0         |
+| JavaScript | ✅ v1.5      | ✅ v2.0         | ✅ v2.0         |
+| Python     | ✅ v1.5      | ✅ v2.0         | ✅ v2.0         |
+| Go         | ✅ v1.5      | ✅ v2.0         | ✅ v2.0         |
+| Rust       | ✅ v1.5      | ✅ v2.0         | ✅ v2.0         |
 
 **不在 v1.5 范围**：Java / Ruby / C++ / C#（按需扩展）
 
 ## 9. 与 v1.0 工具的关系
 
-| v1.0 工具 | 是否被替代 |
-|---|---|
+| v1.0 工具   | 是否被替代                                   |
+| ----------- | -------------------------------------------- |
 | `read_file` | **不替代**——Code Intelligence 是补充不是替代 |
-| `grep` | **不替代**——精确字符串搜索仍有价值 |
-| `find` | **不替代**——文件路径搜索无依赖 Symbol |
+| `grep`      | **不替代**——精确字符串搜索仍有价值           |
+| `find`      | **不替代**——文件路径搜索无依赖 Symbol        |
 
 **关键**：v1.0 的 3 个核心工具**全部保留**，Code Intelligence 在它们之上**叠加语义层**。
 
 ## 10. 失败模式与降级
 
-| 失败 | 降级策略 |
-|---|---|
-| AST 解析失败（语法错误文件）| 跳过该文件，记 warning |
-| Embedding API 不可用 | Semantic Search 降级为 grep 模糊匹配 |
-| 索引文件损坏 | 触发全量重建 |
-| 大项目索引超时 | 启动时后台异步构建（不阻塞） |
-| 跨文件引用循环 | 不处理（不爆炸） |
+| 失败                         | 降级策略                             |
+| ---------------------------- | ------------------------------------ |
+| AST 解析失败（语法错误文件） | 跳过该文件，记 warning               |
+| Embedding API 不可用         | Semantic Search 降级为 grep 模糊匹配 |
+| 索引文件损坏                 | 触发全量重建                         |
+| 大项目索引超时               | 启动时后台异步构建（不阻塞）         |
+| 跨文件引用循环               | 不处理（不爆炸）                     |
 
 ## 11. 版本演进
 
-| 版本 | 引入模块 |
-|---|---|
+| 版本     | 引入模块                                                                |
+| -------- | ----------------------------------------------------------------------- |
 | **v1.5** | Workspace Index + Symbol Graph + 基础 reference_lookup（只 definition） |
-| **v2.0** | Reference Graph 完整版（callers/callees/importers）+ Semantic Search |
+| **v2.0** | Reference Graph 完整版（callers/callees/importers）+ Semantic Search    |
 
 ## 12. 不做的事
 

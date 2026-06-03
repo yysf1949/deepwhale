@@ -9,6 +9,7 @@
 > **复盘时间**：v1.0 Release 之后
 >
 > **成功概率分层**（4 档，更精确）：
+>
 > - 做出产品：85%
 > - 达到 Claude Code 水平：70%
 > - 达到 Codex 水平：40-50%
@@ -24,6 +25,7 @@
 > **Hypothesis-Driven Roadmap（假设驱动开发路线图）**——3 个 Bets + 3 个 Gates
 >
 > **核心变化**（vs 初版 10 周版）：
+>
 > 1. **时间锚从 10 周改为 13-17 个月**（v1.0 = Phase 1 = Claude Code Lite，3-4 月）
 > 2. **砍掉 22 项延后事项**（详见 [ARCHITECTURE.md §4](./ARCHITECTURE.md)）
 > 3. **Docker 沙箱统一替换 Seatbelt/Landlock/Windows Job Object**（v1.0 起）
@@ -31,23 +33,15 @@
 > 5. **Constitution 9 层权威砍掉**（个人化产物，不适合 deepwhale）
 > 6. **保留所有已验证的正确决策**：Prefix-cache 4 机制提前到 v1.0 / StormBreaker / SanitizeToolPairing / i18n 第 1 行定对 / 强制 release 节奏
 >
-> **v4 架构定型**（2026-06-03，6.5/10 → 8.4/10 → 8.8/10 → 假设驱动）：
-> 7. **Code Intelligence Layer 新增**（v1.5 基础 / v2.0 增强）—— 解决"10万行项目失明"
-> 8. **v2.5 独立插档做 Planning Framework**（Planner + Task Object + Plan Cache + Execution Boundary + DAG）—— 避免 v2 4 件太重
-> 9. **Computer Use 改兼容层**（Codex 协议优先，**不自研**）—— 节省 1 个月
-> 10. **Memory Ranking 算法 + source 字段**（importance / last_accessed / decay_score / scope / source）—— 解决"5000 memories 必崩" + 解决"长期记忆/项目记忆/用户偏好混在一起"
-> 11. **v1.5 砍 4 项**（Automation/Cron/Remote TUI/Compaction 挪到 v2.0）
-> 12. **Browser Agent v2.0/v3.0 拆分**（v2.0 = 4 件基础，v3.0 = 3 件增强）
-> 13. **Capability Model 统一抽象**（Tool/MCP/Plugin/Browser/Computer → 1 套 Capability Registry）
-> 14. **Agent Runtime 架构定型**（4 角色 Execution Boundary 强制、单 process 内 4 函数）
-> 15. **3 个 Technical Bets + 3 个 Release Gates**（**Hypothesis-Driven Roadmap** 关键结构）
+> **v4 架构定型**（2026-06-03，6.5/10 → 8.4/10 → 8.8/10 → 假设驱动）：7. **Code Intelligence Layer 新增**（v1.5 基础 / v2.0 增强）—— 解决"10万行项目失明" 8. **v2.5 独立插档做 Planning Framework**（Planner + Task Object + Plan Cache + Execution Boundary + DAG）—— 避免 v2 4 件太重 9. **Computer Use 改兼容层**（Codex 协议优先，**不自研**）—— 节省 1 个月 10. **Memory Ranking 算法 + source 字段**（importance / last_accessed / decay_score / scope / source）—— 解决"5000 memories 必崩" + 解决"长期记忆/项目记忆/用户偏好混在一起" 11. **v1.5 砍 4 项**（Automation/Cron/Remote TUI/Compaction 挪到 v2.0）12. **Browser Agent v2.0/v3.0 拆分**（v2.0 = 4 件基础，v3.0 = 3 件增强）13. **Capability Model 统一抽象**（Tool/MCP/Plugin/Browser/Computer → 1 套 Capability Registry）14. **Agent Runtime 架构定型**（4 角色 Execution Boundary 强制、单 process 内 4 函数）15. **3 个 Technical Bets + 3 个 Release Gates**（**Hypothesis-Driven Roadmap** 关键结构）
 >
 > **4 份架构设计文档**（2026-06-03 完成）：
+>
 > - [AGENT_RUNTIME.md](./design/AGENT_RUNTIME.md)：4 角色契约 + Task/Message/Context/Observation/Memory
 > - [CAPABILITY_MODEL.md](./design/CAPABILITY_MODEL.md)：5 套能力来源统一抽象
 > - [CODE_INTELLIGENCE.md](./design/CODE_INTELLIGENCE.md)：4 模块关系（Workspace Index / Symbol Graph / Reference Graph / Semantic Search）
 > - [BROWSER_PLANNER.md](./design/BROWSER_PLANNER.md)：Observe→Plan→Act→Recovery 循环
-> **原则**：只写架构 / 边界 / 职责 / 接口 / 数据流，**不写实现细节**
+>   **原则**：只写架构 / 边界 / 职责 / 接口 / 数据流，**不写实现细节**
 
 ---
 
@@ -57,13 +51,14 @@
 
 ### 3 个 Technical Bets（**决定项目成败的 3 个核心赌注**）
 
-| Bet | 等级 | 验证版本 | 失败后果 | 赌的是什么 |
-|---|---|---|---|---|
-| **Bet-1 Code Intelligence** | **P0** | v1.5 | Coding Agent 失败，项目失去核心价值 | Agent 能理解大型代码库（100K LOC） |
-| **Bet-2 Browser Planner** | **P1** | v2.0 | DeepWhale 退化为 Claude Code 级产品（仍有价值）| Agent 能稳定获取外部信息 |
-| **Bet-3 Long-Horizon Stability** | **P0** | v3.0 | Multi-Agent 失败，5 角色失去意义 | Agent 能持续 30-50 步不漂移 |
+| Bet                              | 等级   | 验证版本 | 失败后果                                        | 赌的是什么                         |
+| -------------------------------- | ------ | -------- | ----------------------------------------------- | ---------------------------------- |
+| **Bet-1 Code Intelligence**      | **P0** | v1.5     | Coding Agent 失败，项目失去核心价值             | Agent 能理解大型代码库（100K LOC） |
+| **Bet-2 Browser Planner**        | **P1** | v2.0     | DeepWhale 退化为 Claude Code 级产品（仍有价值） | Agent 能稳定获取外部信息           |
+| **Bet-3 Long-Horizon Stability** | **P0** | v3.0     | Multi-Agent 失败，5 角色失去意义                | Agent 能持续 30-50 步不漂移        |
 
 **P0 vs P1 关键差异**：
+
 - **P0 失败 = 项目核心价值丧失**：必须 Kill Gate（暂停主线，优先修复）
 - **P1 失败 = 项目仍有价值**：Decision Gate（按成功率分支，不暂停）
 
@@ -74,6 +69,7 @@
 **目标**：验证 Bet-1（Code Intelligence）
 
 **测试仓库**（任选 1 个或多个）：
+
 - Spring Boot
 - Kubernetes
 - LangChain
@@ -82,6 +78,7 @@
 **规模**：50K+ LOC（**必须 100K LOC 也试一次**）
 
 **任务**：
+
 1. 定位某功能入口
 2. 分析完整调用链
 3. 找到修改点
@@ -91,12 +88,13 @@
 
 **结果**：
 
-| 状态 | 行动 |
-|---|---|
-| **PASS** | → 进入 v2.0 开发 |
+| 状态     | 行动                                                                                                                    |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **PASS** | → 进入 v2.0 开发                                                                                                        |
 | **FAIL** | → **停止 Browser / Computer Use / Desktop 开发**<br>→ 优先修复 Code Intelligence<br>→ 修好重测 Gate-1，PASS 后再进 v2.0 |
 
 **典型失败症状**（避免主观判断）：
+
 - 重复打开文件
 - 反复搜索
 - 修改错误位置
@@ -110,6 +108,7 @@
 **目标**：验证 Bet-2（Browser Planner）**是否值得继续投资**
 
 **测试场景**（4 类站点）：
+
 - GitHub
 - 官方文档站
 - Google
@@ -121,13 +120,14 @@
 
 **结果**：
 
-| 成功率 | 行动 |
-|---|---|
-| **≥ 80%** | → 继续 Browser Agent 增强（v3.0 的 3 件）<br>→ 走完整路线 v3.0 → v4.0 |
-| **50-80%** | → **进入降级路线**<br>→ 冻结 Browser Agent 增强<br>→ 保留 v2.0 4 件基础能力<br>→ 不开发 Visual Grounding / Adaptive Retry<br>→ 资源转向 Long-Horizon（v3.0 集中） |
-| **< 50%** | → **Browser Runtime 维持最小实现**<br>→ 后续版本不再投入<br>→ DeepWhale 定位回归：<br>　**Claude Code + Code Intelligence + Multi-Agent**<br>→ v3.0/v4.0 砍掉 Browser 增强 / 桌面 / Marketplace 中所有 Browser 相关项 |
+| 成功率     | 行动                                                                                                                                                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **≥ 80%**  | → 继续 Browser Agent 增强（v3.0 的 3 件）<br>→ 走完整路线 v3.0 → v4.0                                                                                                                                                 |
+| **50-80%** | → **进入降级路线**<br>→ 冻结 Browser Agent 增强<br>→ 保留 v2.0 4 件基础能力<br>→ 不开发 Visual Grounding / Adaptive Retry<br>→ 资源转向 Long-Horizon（v3.0 集中）                                                     |
+| **< 50%**  | → **Browser Runtime 维持最小实现**<br>→ 后续版本不再投入<br>→ DeepWhale 定位回归：<br>　**Claude Code + Code Intelligence + Multi-Agent**<br>→ v3.0/v4.0 砍掉 Browser 增强 / 桌面 / Marketplace 中所有 Browser 相关项 |
 
 **为什么是 Decision Gate 而不是 Kill Gate**：
+
 - Browser 不是项目核心价值
 - 即使 < 50% 失败，DeepWhale 仍有：Claude Code Lite + Code Intelligence + Planner + Reviewer + Persistent Memory + MCP + Skills + Computer Use 兼容层
 - 这依然是一个有价值的产品
@@ -141,6 +141,7 @@
 **任务**：修复一个**真实 Bug**
 
 **完整流程**：
+
 1. 读代码
 2. 定位问题
 3. 修改
@@ -154,18 +155,20 @@
 
 **结果**：
 
-| 状态 | 行动 |
-|---|---|
-| **PASS** | → 进入 v4.0（Researcher + 5 角色 + Persistent Memory） |
+| 状态     | 行动                                                                                                                                                |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PASS** | → 进入 v4.0（Researcher + 5 角色 + Persistent Memory）                                                                                              |
 | **FAIL** | → **暂停 Researcher / TaskGraph / Desktop** 开发<br>→ 集中修复 **Planning / Compaction / Reviewer** 三者协同<br>→ 修好重测 Gate-2，PASS 后再进 v4.0 |
 
 **典型失败症状**：
+
 - 第 30 步后忘记目标
 - 重复执行已失败的步骤
 - 无限循环同一工具调用
 - 上下文超出后丢失计划
 
 **为什么 Long-Horizon 是 P0 Kill Gate**：
+
 - Compaction + Planning + Review 三者协同是 Multi-Agent 基础
 - 失败 = 5 角色流水线失去意义
 - DeepSeek 长任务漂移不是模型问题，是**工程问题**（必须靠框架解决）
@@ -205,27 +208,28 @@ v4.0 Autonomous Agent OS
 
 DeepWhale 6 个版本形成清晰的 5 步能力演进 + 3 个 Release Gates 守护：
 
-| 版本 | 能力主题 | 验证什么 | Release Gate | 关键模块 |
-|---|---|---|---|---|
-| **v1.0** | Coding Agent | 6 工具 + Linear Session | — | Executor |
-| **v1.5** | 大型仓库理解 | Tree-sitter + Symbol Graph + Code Intel 基础 | **[Gate-1 Kill Test](#gate-1v15-release-前code-intelligence-kill-test)** | Code Intelligence Layer |
-| **v2.0** | **Observe** | 真实 Browser Planner 4 件 + Memory Ranking + Code Intel 增强 | **[Gate-1.5 Decision](#gate-15v20-release-前browser-viability-decision-gate)** | Browser Agent 基础 + Memory Ranking |
-| **v2.5** | **Plan** | Planning Framework（Planner + DAG + Task Object + Plan Cache + Boundary）| — | Planner Agent |
-| **v3.0** | **Execute + Review** | Browser Agent 增强 3 件 + Reviewer + Computer Use 兼容层 | **[Gate-2 Kill Test](#gate-2v30-release-前long-horizon-kill-test)** | Reviewer + Computer Use 兼容层 |
-| **v4.0** | **Research + Long-running** | 5 角色 + TaskGraph + Persistent Memory + Desktop | — | Researcher + Agent OS |
+| 版本     | 能力主题                    | 验证什么                                                                  | Release Gate                                                                   | 关键模块                            |
+| -------- | --------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------- |
+| **v1.0** | Coding Agent                | 6 工具 + Linear Session                                                   | —                                                                              | Executor                            |
+| **v1.5** | 大型仓库理解                | Tree-sitter + Symbol Graph + Code Intel 基础                              | **[Gate-1 Kill Test](#gate-1v15-release-前code-intelligence-kill-test)**       | Code Intelligence Layer             |
+| **v2.0** | **Observe**                 | 真实 Browser Planner 4 件 + Memory Ranking + Code Intel 增强              | **[Gate-1.5 Decision](#gate-15v20-release-前browser-viability-decision-gate)** | Browser Agent 基础 + Memory Ranking |
+| **v2.5** | **Plan**                    | Planning Framework（Planner + DAG + Task Object + Plan Cache + Boundary） | —                                                                              | Planner Agent                       |
+| **v3.0** | **Execute + Review**        | Browser Agent 增强 3 件 + Reviewer + Computer Use 兼容层                  | **[Gate-2 Kill Test](#gate-2v30-release-前long-horizon-kill-test)**            | Reviewer + Computer Use 兼容层      |
+| **v4.0** | **Research + Long-running** | 5 角色 + TaskGraph + Persistent Memory + Desktop                          | —                                                                              | Researcher + Agent OS               |
 
 **总览表**：
 
-| Phase | 版本 | 月份 | 累计 | 主题 | 关键交付 | 状态 |
-|---|---|---|---|---|---|---|
-| **Phase 1** | v1.0 | 第 1-3 个月 | 3 月 | **Coding Agent** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker + **4 包 monorepo**（`@deepwhale/core` / `@deepwhale/llm` / `@deepwhale/coding-agent` / `@deepwhale/edit-engine`） | 🚧 进行中 |
-| **Phase 2** | v1.5 | 第 4-5 个月 | 5 月 | **大型仓库理解** | Approval + Task + Skills + Extension API + Hooks + StormBreaker + **Code Intelligence 基础**（Tree-sitter + Symbol Graph + Workspace Index） | ⏳ 待开始 |
-| **Phase 3** | v2.0 | 第 6-8 个月 | 8 月 | **Observe** | **真实 Browser Agent 基础**（4 件：DOM Understanding / Element Ranking / Page Summary / Action History）+ Memory Ranking + Code Intel 增强 + 4 项补回 | ⏳ 待开始 |
-| **Phase 3.5** | **v2.5** | **第 9 个月** | **9 月** | **Plan** | **Planning Framework**（Planner + DAG + Task Object + Plan Cache + Execution Boundary） | ⏳ 待开始 |
-| **Phase 4** | v3.0 | 第 10-11 个月 | 11 月 | **Execute + Review** | **Browser Agent 增强**（3 件：Visual Grounding / 策略级 Error Recovery / Adaptive Retry）+ Reviewer + **Computer Use 兼容层** | ⏳ 待开始 |
-| **Phase 5** | v4.0 | 第 12-13 个月 | **13 月** | **Research + Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Plugin Marketplace + Desktop + Channels | ⏳ 待开始 |
+| Phase         | 版本     | 月份          | 累计      | 主题                    | 关键交付                                                                                                                                                                                    | 状态      |
+| ------------- | -------- | ------------- | --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| **Phase 1**   | v1.0     | 第 1-3 个月   | 3 月      | **Coding Agent**        | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker + **4 包 monorepo**（`@deepwhale/core` / `@deepwhale/llm` / `@deepwhale/coding-agent` / `@deepwhale/edit-engine`） | 🚧 进行中 |
+| **Phase 2**   | v1.5     | 第 4-5 个月   | 5 月      | **大型仓库理解**        | Approval + Task + Skills + Extension API + Hooks + StormBreaker + **Code Intelligence 基础**（Tree-sitter + Symbol Graph + Workspace Index）                                                | ⏳ 待开始 |
+| **Phase 3**   | v2.0     | 第 6-8 个月   | 8 月      | **Observe**             | **真实 Browser Agent 基础**（4 件：DOM Understanding / Element Ranking / Page Summary / Action History）+ Memory Ranking + Code Intel 增强 + 4 项补回                                       | ⏳ 待开始 |
+| **Phase 3.5** | **v2.5** | **第 9 个月** | **9 月**  | **Plan**                | **Planning Framework**（Planner + DAG + Task Object + Plan Cache + Execution Boundary）                                                                                                     | ⏳ 待开始 |
+| **Phase 4**   | v3.0     | 第 10-11 个月 | 11 月     | **Execute + Review**    | **Browser Agent 增强**（3 件：Visual Grounding / 策略级 Error Recovery / Adaptive Retry）+ Reviewer + **Computer Use 兼容层**                                                               | ⏳ 待开始 |
+| **Phase 5**   | v4.0     | 第 12-13 个月 | **13 月** | **Research + Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Plugin Marketplace + Desktop + Channels                                                                                                | ⏳ 待开始 |
 
 > ⭐ **2026-06-03 重大调整**：oh-my-pi 借鉴融入 Sprint 0-2（详见 `docs/ROADMAP_DECISIONS.md` §15）
+>
 > - **Sprint 0 新增** Edit Engine 抽象 + hashline MVP（`@deepwhale/edit-engine` 包，`EditEngine` interface + hashline 实现 + unified-diff stub）
 > - **Sprint 1 edit_file 升级** 完整 hashline + Recovery 3-way（替代原"hash 锚定"简化版）
 > - **Sprint 2 新增** napi natives 调研（先 bun 子进程跑 grep 验证可行性）
@@ -233,6 +237,7 @@ DeepWhale 6 个版本形成清晰的 5 步能力演进 + 3 个 Release Gates 守
 > - **v1.5 Native Acceleration Evaluation**（先 Node 跑 Profile 验证瓶颈，再决定是否 Rust NAPI）
 
 > ⭐ **2026-06-03 重大调整（v3）**：ECC 借鉴融入 Sprint 0-2 + v1.0 末（详见 `docs/ROADMAP_DECISIONS.md` §16）
+>
 > - **Sprint 0 新增** SKILL.md 标准化目录（YAML frontmatter + 首批 3 个 skill）
 > - **Sprint 1 新增** Tool 返回 schema 统一（Observation 4 字段 + Recovery 3 字段，4 维质量模型实现）
 > - **v1.0 末新增** `/verify` slash command + VERIFICATION REPORT 格式（6 阶段流程）
@@ -246,24 +251,24 @@ DeepWhale 6 个版本形成清晰的 5 步能力演进 + 3 个 Release Gates 守
 
 v2.0 范围内的 4 项"补回"任务（Automation / Remote TUI / Compaction / MCP）**不作为一级模块**，定义为 Tier-2：
 
-| 优先级 | 包含 | 价值判断 |
-|---|---|---|
-| **Tier-1**（v2.0 核心价值，**必须完成**）| **Browser Agent 基础**（4 件）+ **Memory Ranking** + **Code Intelligence 增强** | Browser Agent 延期 → v2.0 算失败；其他延期 → v2.0.1 补 |
-| **Tier-2**（v2.0 补回项，延期可挪 v2.0.x）| **Automation** + **Remote TUI** + **Compaction** + **MCP Runtime** | 4 项 Codex 复刻的"边角料"——延期不影响 v2.0 主旨 |
+| 优先级                                     | 包含                                                                            | 价值判断                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Tier-1**（v2.0 核心价值，**必须完成**）  | **Browser Agent 基础**（4 件）+ **Memory Ranking** + **Code Intelligence 增强** | Browser Agent 延期 → v2.0 算失败；其他延期 → v2.0.1 补 |
+| **Tier-2**（v2.0 补回项，延期可挪 v2.0.x） | **Automation** + **Remote TUI** + **Compaction** + **MCP Runtime**              | 4 项 Codex 复刻的"边角料"——延期不影响 v2.0 主旨        |
 
 **理由**：如果 Browser Agent 延期但 Remote TUI 完成，用户不会认为 v2.0 成功；反过来 Browser Agent 完成而 Remote TUI 延期，用户仍认为 v2.0 成功。**v2.0.1 / v2.0.2 用来补 Tier-2**。
 
 ## 风险系数（计划 vs 实际）
 
-| 阶段 | 计划 | 实际预估 | 风险点 |
-|---|---|---|---|
-| v1.0 | 3 个月 | 3-4 个月 | i18n 路径 / 4 包 monorepo / Prefix-cache 4 机制 |
-| v1.5 | 2 个月 | 2-3 个月 | 8 项 Codex Core + Code Intel 基础（**比预想多**） |
-| v2.0 | 3 个月 | **3-4 个月**（DAG 挪走 → 可能降到 3.5 月）| Browser Agent 4 件 + Memory Ranking + Code Intel 增强 + 4 项 Tier-2 |
-| v2.5 | 1 个月 | 1 个月 | Planning Framework 4 组件集中 |
-| v3.0 | 2 个月 | 2-3 个月 | Browser Agent 3 件增强 + Reviewer + Computer Use 兼容层 |
-| v4.0 | 2 个月 | 2-3 个月 | 5 角色 + TaskGraph + Persistent Memory + Desktop + Channels |
-| **总计** | **13 个月** | **15-17 个月** | **中位数 16 个月** |
+| 阶段     | 计划        | 实际预估                                   | 风险点                                                              |
+| -------- | ----------- | ------------------------------------------ | ------------------------------------------------------------------- |
+| v1.0     | 3 个月      | 3-4 个月                                   | i18n 路径 / 4 包 monorepo / Prefix-cache 4 机制                     |
+| v1.5     | 2 个月      | 2-3 个月                                   | 8 项 Codex Core + Code Intel 基础（**比预想多**）                   |
+| v2.0     | 3 个月      | **3-4 个月**（DAG 挪走 → 可能降到 3.5 月） | Browser Agent 4 件 + Memory Ranking + Code Intel 增强 + 4 项 Tier-2 |
+| v2.5     | 1 个月      | 1 个月                                     | Planning Framework 4 组件集中                                       |
+| v3.0     | 2 个月      | 2-3 个月                                   | Browser Agent 3 件增强 + Reviewer + Computer Use 兼容层             |
+| v4.0     | 2 个月      | 2-3 个月                                   | 5 角色 + TaskGraph + Persistent Memory + Desktop + Channels         |
+| **总计** | **13 个月** | **15-17 个月**                             | **中位数 16 个月**                                                  |
 
 > **单人项目 15-17 个月属正常区间**。**严格执行**（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **成功概率 80%+**。
 
@@ -278,6 +283,7 @@ v2.0 范围内的 4 项"补回"任务（Automation / Remote TUI / Compaction / M
 **目标**：`pnpm dev` 跑通最小 CLI，调用 DeepSeek V4-Flash 流式输出"hello"。**第 1 行代码就定对路径、i18n、配置**。
 
 #### 任务清单
+
 - [ ] **建 GitHub 仓库** `yysf1949/deepwhale`（Private）✅
 - [ ] **建 4 包 monorepo**（对齐 pi）
   - `packages/llm/` — 多 provider 客户端（v1 = DeepSeek only）
@@ -309,6 +315,7 @@ v2.0 范围内的 4 项"补回"任务（Automation / Remote TUI / Compaction / M
 - [ ] **CI：GitHub Actions**（lint + typecheck + 基础测试 + 4 包版本同步）
 
 #### 验收标准
+
 ```bash
 $ pnpm dev
 deepwhale> hello
@@ -317,6 +324,7 @@ deepwhale>
 ```
 
 #### ⚠️ Sprint 0 红线（避免 Sprint 1 翻工）
+
 - **i18n 路径第 1 行定对**（Hermes 教训）
 - **路径迁移兼容机制**写好（CodeWhale 教训）
 - **4 包版本同步 CI**（pi #4908 教训）
@@ -329,6 +337,7 @@ deepwhale>
 **目标**：能跟 DeepSeek 多轮对话、编辑本地文件、跑 shell 命令、二次启动恢复会话。**5 轮后 cache 命中率 ≥ 90%**。
 
 #### 任务清单
+
 - [ ] **DeepSeek 接入**（`@deepwhale/llm`）
   - OpenAI 兼容客户端
   - 流式响应（SSE）
@@ -375,6 +384,7 @@ deepwhale>
   - 网络默认禁用（`--network=none`），用户可显式开启
 
 #### 验收标准
+
 - 能跟 DeepSeek V4-Flash 多轮对话（10 轮上下文连贯）
 - 能编辑本地文件 + 跑命令（白名单内）
 - 二次启动自动恢复会话（**Linear Session**）
@@ -384,6 +394,7 @@ deepwhale>
 - `rm -rf /` 跑在 Docker 内被 `--network=none` + rootfs 隔离拦截
 
 #### ⚠️ Sprint 1 红线
+
 - **Compaction 还没做，但任何 system prompt 修改要走"cache-reset point review"**（Reasonix 教训）
 - **Cache miss 时不要报错**——未知就显示"unknown"（CodeWhale 教训）
 - **Session 不要做 DAG**（v1.0 = Linear，**v2.0 升级**）
@@ -396,6 +407,7 @@ deepwhale>
 **目标**：v1.0 release-ready。**cache 命中率可观测**、Session 跨崩溃恢复、Docker 冷启动优化。
 
 #### 任务清单
+
 - [ ] **Cache 可观测性升级**
   - 实时显示 `cache_hit_rate` / `cost/turn` / `tokens_cached` / `tokens_uncached`
   - **多字段同值时去冗余/加标签区分**（Hermes footer 教训）
@@ -439,6 +451,7 @@ deepwhale>
   - **意义**：4 维质量模型的 v1.0 末落地 + 求职差异化
 
 #### 验收标准
+
 - v0.1 release 发布（`yysf1949/deepwhale` Releases 页面有 tag）
 - 文档：README + 快速开始 + 4 个 Skills 目录说明 + Docker 前置条件
 - Docker 未启动时给清晰错误（不是 stack trace）
@@ -450,6 +463,7 @@ deepwhale>
 **目标**：v1.0 第 3 个月末必发。**测试覆盖率 ≥ 60%**。
 
 #### 任务清单
+
 - [ ] **测试覆盖**
   - Unit test：Prefix-cache 4 机制 / 6 个工具 / Linear Session / Docker 沙箱
   - Integration test：多轮对话 / 二次启动恢复 / Docker 内跑白名单命令
@@ -467,6 +481,7 @@ deepwhale>
   - Homebrew formula（可选）
 
 #### 验收标准
+
 - v1.0 release 发布
 - npm 包可安装
 - 测试覆盖率 ≥ 60%
@@ -478,14 +493,14 @@ deepwhale>
 
 > v1.0 **只验证 Coding Agent 是否成立**。任何不影响 Coding Agent 成立的功能，都允许延后到 v1.0.x。
 
-| 必须完成（v1.0 内） | 可延期（v1.0.x） |
-|---|---|
+| 必须完成（v1.0 内）                                  | 可延期（v1.0.x）                     |
+| ---------------------------------------------------- | ------------------------------------ |
 | `bash` / `read` / `write` / `edit` / `find` / `grep` | `/verify` slash command（v1.0 末加） |
-| session（Linear JSONL） | 高级 cache 统计（命中率可视化） |
-| docker 沙箱 | 自研 edit benchmark |
-| hashline（Editing Primitive） | 漂亮 UI / 主题 / 动画 |
-| SKILL.md 目录约定（v1.0 不读） | 国际化细节（v1.0 = 中英混排可接受） |
-| TUI 基础渲染 | 文档站 |
+| session（Linear JSONL）                              | 高级 cache 统计（命中率可视化）      |
+| docker 沙箱                                          | 自研 edit benchmark                  |
+| hashline（Editing Primitive）                        | 漂亮 UI / 主题 / 动画                |
+| SKILL.md 目录约定（v1.0 不读）                       | 国际化细节（v1.0 = 中英混排可接受）  |
+| TUI 基础渲染                                         | 文档站                               |
 
 **目的**：防止第 10 周出现"再加一个功能就发版"综合征。v1.0 宁可少、不可晚。
 
@@ -505,17 +520,19 @@ deepwhale>
 **目标**：Codex Client 核心功能复刻（**8/14 砍掉 4 项，挪到 v2.0**）+ **让 Agent 理解代码库**（v1.5 基础）。**v1.5 第 5 个月末必发**。
 
 > **v1.5 砍掉的 4 项**（挪到 v2.0）：
+>
 > - ❌ **Cron Automations**（v2.0 做）
 > - ❌ **Remote TUI**（v2.0 做）
 > - ❌ **Compaction**（v2.0 做）
 > - ❌ **MCP**（v2.0 做）
-> 理由：2 个月完成 8 项 Codex Core + Code Intel 基础，**v1.5 不再加任何大件**
+>   理由：2 个月完成 8 项 Codex Core + Code Intel 基础，**v1.5 不再加任何大件**
 
 ### Sprint 5-6（Codex Core：Skills + Extension API + Hooks + Code Intel 基础，第 4 个月）
 
 #### 任务清单
 
 **Codex Core 复刻**（**8 项核心**）：
+
 - [ ] **🛡 StormBreaker 防死循环**（Reasonix 抄，**工具增多后 P0**）
   - 3 次相同 `(tool, error)` 签名触发暂停 + 用户确认
   - **关键：用 (tool, error) 签名，不用 args 签名**（Reasonix 实战观察）
@@ -544,6 +561,7 @@ deepwhale>
   - 资源优先级 4 档
 
 **Code Intelligence 基础**（**v1.5 引入，解决"10万行项目失明"**）：
+
 - [ ] **Tree-sitter 集成**
   - npm 包：`tree-sitter` + `tree-sitter-typescript` / `tree-sitter-javascript` / `tree-sitter-python` / `tree-sitter-go` / `tree-sitter-rust`
   - 多语言 AST 解析
@@ -560,6 +578,7 @@ deepwhale>
   - `reference_lookup` 工具（v1.5 基础版）：symbol + kind = definition
 
 #### 验收标准
+
 - 装 1 个社区 skill 能用
 - 写 1 个 30 行 Extension 注册自定义工具
 - 装 1 个带 hooks 的 plugin，hook 真的触发
@@ -569,6 +588,7 @@ deepwhale>
 - Codex 14 项功能 → **8/14**（+ Skills / Plugins / Hooks，**-4 项砍到 v2.0**）
 
 #### ⚠️ Sprint 5-6 红线
+
 - **Extension tool 重名启动时检测**（pi #5316 教训）
 - **Hook payload 走 JSON on stdin**（Reasonix 抄）
 - **Extension manifest 在 package.json**（pi 抄）/ deepwhale 用 `pyproject.toml` 的 `[tool.deepwhale]`
@@ -581,6 +601,7 @@ deepwhale>
 > **v1.5 第 2 个 Sprint 只做 2 项**：Approval + Task。**Cron/Remote TUI/Compaction 不在 v1.5**。
 
 #### 任务清单
+
 - [ ] **Approval System**（Codex 抄）
   - 工具调用前弹确认（默认 deny 危险操作）
   - 白名单内自动 approve
@@ -596,6 +617,7 @@ deepwhale>
   - **Codex Core 8/14 ✅**（**v1.5 故意不到 14/14**，剩下 6 项挪到 v2.0/v2.5/v3.0/v4.0）
 
 #### 验收标准
+
 - **Codex Core 8/14 ✅**（TUI / 多模型 / Skills / Plugins / Hooks / Approval / Task / Session / **Code Intel 基础**）
 - **v1.5 累计功能 = 8 + Code Intel 基础 = 9 项**（**不是 14**）
 - 文档：v1.5 release notes + 8/14 对照表 + **哪些项挪到 v2.0 明确列出**
@@ -607,6 +629,7 @@ deepwhale>
 **目标**：能自动操作复杂网页（淘宝/京东/Amazon）+ 完整 Memory Ranking + Code Intel 增强 + 补 v1.5 砍的 4 项。**v2.0 第 8 个月末必发**。
 
 > **v2.0 = 4 个大件**（**v2 已经有 4 件不再加 Planner**）：
+>
 > 1. **真实 Browser Agent**（不是 Playwright Wrapper）
 > 2. **Memory Ranking 算法**（importance/decay/scope）
 > 3. **Code Intelligence 增强**（Reference Graph + Semantic Search）
@@ -621,6 +644,7 @@ deepwhale>
 #### Tier-1 任务清单（**必须完成，延期 → v2.0 失败**）
 
 **真实 Browser Agent 基础**（**4 件能力**——v2.0 只做基础，v3.0 做增强）：
+
 - [ ] **DOM Understanding**（AST 解析当前页面 DOM 结构 + 提取语义）
 - [ ] **Element Ranking**（按用户意图 + 元素语义 + 视觉位置给元素排序）
 - [ ] **Page Summarization**（长页面压缩为 token 友好的 summary）
@@ -636,6 +660,7 @@ deepwhale>
   - 失败时**自动重试 + 改 selector**（v2.0 基础重试，v3.0 升级为策略级）
 
 **Memory Ranking 算法**（**解决"5000 memories 必崩"** + **解决"长期/项目/用户偏好混在一起"**）：
+
 - [ ] **Memory Schema**
   - `{ id, content, source, scope, importance, last_accessed, decay_score, created_at, embedding? }`
   - **source 字段**（v1.5 没加，v2.0 补）：`user_preference` / `project_fact` / `workspace` / `user_explicit` / `auto_extracted`
@@ -653,6 +678,7 @@ deepwhale>
   - 按 source 字段可过滤（只看项目记忆 / 只看用户偏好）
 
 **Code Intelligence 增强**（v1.5 基础升级）：
+
 - [ ] **Reference Graph**：跨文件 symbol 引用图（callers / callees / importers）
   - 持久化：`~/.deepwhale/index/<project-hash>/references.jsonl`
   - 支持查询：找 symbol 的所有引用、找死代码、找循环依赖
@@ -680,6 +706,7 @@ deepwhale>
   - **deepwhale 也可作为 MCP server 暴露**（`deepwhale serve --mcp`）
 
 #### ⚠️ Sprint 9-11 红线
+
 - **Session DAG 不在 v2.0 做**——v2.5 与 Planner 同链路做
 - **Browser Agent 不要做成 Playwright Wrapper**——v2.0 必须有 Browser Planner 4 件
 - **Memory Ranking 不要做复杂 ML**——用显式公式
@@ -690,6 +717,7 @@ deepwhale>
 ### Sprint 12（v2.0 release 收尾，第 8 个月末）
 
 #### 验收标准
+
 - 装好 Browser Agent 后能在淘宝/京东/Amazon 完成"搜索 + 加购"完整流程
 - Browser Planner 4 件能力跑通（DOM/Element/Page Summary/Action History）
 - **Tier-1 全部完成**（Browser Agent 4 件 + Memory Ranking + Code Intel 增强）
@@ -707,6 +735,7 @@ deepwhale>
 **目标**：**Plan** 能力主题——**Planning Framework**（**4 组件 + DAG**）。**v2.5 第 9 个月末必发**。
 
 > **vs 初版"Planner Agent"**：
+>
 > - **范围扩大**为 Planning Framework（4 组件 + DAG），不只 Planner
 > - **DAG 从 v2.0 挪到 v2.5**（DAG 与 Planner 同链路更紧，避免 v2.0 太重）
 > - **加 Task Object / Plan Cache / Execution Boundary**——避免 v2.5 出现 Planner 偷偷执行 / Executor 偷偷规划的耦合
@@ -717,6 +746,7 @@ deepwhale>
 #### 任务清单
 
 **Planner**（**任务拆解 + 依赖分析**）：
+
 - [ ] 输入：用户任务（自然语言）
 - [ ] 输出：子任务 DAG（带依赖关系）
 - [ ] 拆解算法：基于 LLM 推理 + 启发式模板
@@ -727,12 +757,14 @@ deepwhale>
   - `get_subtask_status`（查询子任务进度）
 
 **Task Object**（**任务数据结构**）：
+
 - [ ] Schema：`{ id, goal, subtasks, status, depends_on, result, created_at, ... }`
 - [ ] Subtask Schema：`{ id, description, capability, args, depends_on }`
 - [ ] 状态机：`pending → ready → running → done | failed | blocked`
 - [ ] 详见 [AGENT_RUNTIME.md §2.1](./design/AGENT_RUNTIME.md)
 
 **Session DAG**（**v1.0 Linear 升级，v2.0 挪到 v2.5**）：
+
 - [ ] `parentId + leafId` 的 DAG 形态
 - [ ] JSONL append-only（与 v1.0 同套路）
 - [ ] 跨分支不丢消息
@@ -740,17 +772,20 @@ deepwhale>
 - [ ] **与 TaskGraph 正交**（Session DAG = 消息树，Task DAG = 工作流图，v4.0 升级为 TaskGraph）
 
 **Plan Cache**（**避免重复规划**）：
+
 - [ ] 跨 session 复用规划结果（基于任务 hash）
 - [ ] 失效机制：用户任务变更 → 重新规划
 - [ ] 单测：5 个真实场景任务规划结果跨 session 复用
 
 **Execution Boundary**（**v2.5 关键约束**）：
+
 - [ ] **Planner 不执行**——Planner 调任何 tool 立即报错
 - [ ] **Executor 不规划**——Executor 收到未规划 Task 立即报错
 - [ ] **Reviewer 不执行生产动作**（v3.0 接入时直接用此约束）
 - [ ] 单测覆盖：4 种角色越权场景
 
 #### 验收标准
+
 - 双 Agent 模式：Planner 把"重构用户模块"拆成 DAG 子任务，Executor 按序执行
 - Session DAG 跨分支不丢消息
 - Plan Cache 跨 session 复用 5 个真实场景任务
@@ -760,6 +795,7 @@ deepwhale>
 - **v2.5 第 9 个月必发**（不拖到 v3.0）
 
 #### ⚠️ v2.5 红线
+
 - **Planner 不要做复杂推理**——基于 LLM 简单 prompt + 启发式模板
 - **Execution Boundary 必须强制**——4 角色越权立即报错
 - **4 组件不可拆分**——单 v2.5 必须一次性发布 Planning Framework 完整版
@@ -770,6 +806,7 @@ deepwhale>
 **目标**：操控电脑 GUI（**不自研视觉理解，借用兼容层**）+ 加入 Reviewer 角色。**v3.0 第 11 个月末必发**。
 
 > **vs 初版 v3.0**：
+>
 > - **Computer Use 改兼容层**（Codex 协议优先，**不自研** OCR/UI Detection/Element Localization）
 > - **加 Reviewer 角色**（3 角色流水线：`Planner → Executor → Reviewer`）
 > - **时长从 3 个月改为 2 个月**（不自研省 1 个月）
@@ -779,6 +816,7 @@ deepwhale>
 #### 任务清单
 
 **Computer Use 兼容层**（**不自研 OCR/UI Detection**）：
+
 - [ ] **首选 Codex Computer Use 协议**（Codex 26.527 开源协议）
   - 实现：与 Codex 协议一致的 screenshot + click + type 接口
   - 复用 Codex 现成视觉模型（OCR / UI Detection / Element Localization）
@@ -792,6 +830,7 @@ deepwhale>
   - 屏幕截图 + 操作全部 sandbox 内完成
 
 **Reviewer 角色**（**v3.0 新增**）：
+
 - [ ] **Reviewer = 验证 agent**
   - 输入：Coder/Executor 的输出（代码 / diff / 命令结果）
   - 输出：approve / request_changes + 具体反馈
@@ -803,6 +842,7 @@ deepwhale>
   - 失败时反馈给 Planner，Planner 决定重做还是跳过
 
 **Browser Agent 增强**（**v2.0 4 件基础升级到 7 件完整**）：
+
 - [ ] **Visual Grounding**（截图标注元素位置）
   - 用视觉模型理解截图
   - 解决"selector 多次失败"问题（改用视觉定位）
@@ -817,11 +857,13 @@ deepwhale>
   - 失败 4 次：snapshot 整页 + 回到 Planner
 
 **Compaction 钩子化**（v2.0 升级）：
+
 - [ ] 让 extension 完全替换默认 Compaction
 - [ ] `session_before_compact` / `session_after_compact` 钩子
 - [ ] 单元测试覆盖崩溃恢复（JSONL append-only）
 
 #### 验收标准
+
 - 装好 Codex Computer Use 兼容层后能在 sandbox 内开指定应用、点击、输入
 - Compaction 后 token 下降 70% 但语义保留
 - **Reviewer 能发现 Coder 输出中的明显 bug**（用 5 个真实 bug fixture 测）
@@ -829,6 +871,7 @@ deepwhale>
 - **v3.0 第 11 个月必发**
 
 #### ⚠️ Phase 4 红线
+
 - **Windows Computer Use 不做**（OS 差异大，v3.0 主要验证 macOS + Linux X11）
 - **OCR/UI Detection 不自研**——复用 Codex 兼容层现成视觉模型
 - **mouse_move/mouse_click 不自己实现**——通过兼容层 API 委托
@@ -845,6 +888,7 @@ deepwhale>
 ### Sprint 16-17（Multi-Agent 5 角色 + TaskGraph 引擎，第 11-12 个月）
 
 #### 任务清单
+
 - [ ] **5 角色 Multi-Agent 流水线**
   - **Planner**（任务拆解 + 依赖分析，输出 TaskGraph）
   - **Researcher**（信息收集、Codebase 探索、上下文检索）
@@ -869,6 +913,7 @@ deepwhale>
   - 支持 MCP 工具 + 内置工具 + Plugin 工具三类合并查询
 
 #### ⚠️ Sprint 16-17 红线
+
 - **Coder = Executor 特化，不是新东西**——复用 v1.0 Executor 代码，v4.0 加 Code-aware 工具
 - **TaskGraph ≠ Session DAG**——前者是工作流层，后者是消息持久化层
 - **Persistent Memory 不与 Session 混淆**——Memory 跨 session 共享，Session 是单一线程
@@ -876,6 +921,7 @@ deepwhale>
 ### Sprint 18-20（MCP Marketplace + Desktop + Channels + 文档站，第 12-13 个月）
 
 #### 任务清单
+
 - [ ] **Plugin Marketplace**（功能包市场）
   - npm 命名空间 `@deepwhale/`
   - `deepwhale skill install` / `deepwhale plugin install` 命令
@@ -903,6 +949,7 @@ deepwhale>
   - 文档站上线
 
 #### ⚠️ v4.0 红线
+
 - **5 角色不等于 5 个独立 Agent**——是 5 个**职责**，可以是 1 个 process 内 5 个函数
 - **TaskGraph 持久化必须做**（重启不丢）——避免变成"另一个 in-memory DAG"
 - **MCP Marketplace ≠ Plugin Marketplace**——两类市场分开发布
@@ -911,76 +958,77 @@ deepwhale>
 
 ## 关键架构决策（实施前定）
 
-| 决策点 | 选择 | 理由 |
-|---|---|---|
-| 主语言 | **TypeScript（Node ≥ 22）** | pi 验证 58.6k stars |
-| TUI 框架 | **Ink**（React 19） | pi 实战验证、跨平台一致 |
-| 桌面 | **Tauri 2.x**（v4.0） | 生态成熟，**v4.0 之前不做** |
-| 沙箱（v1-v3） | **Docker only** | 跨平台一致 + 单人可维护 |
-| 沙箱（v4） | **Docker + 多实例编排** | Multi-Agent 隔离 |
-| 分发 | npm + Homebrew + Docker | 跟 pi/Codex/Reasonix 一致 |
-| 配置 | TOML | CodeWhale 验证 |
-| Skills 格式 | **对齐 Codex 开放标准** | 跨工具复用 |
-| 4 包 monorepo | **对齐 pi** | 复用 pi 社区经验 |
-| ExtensionEvent | **21 个 `whale.*` 事件**（v1.5） | 跟 pi 兼容但区分内/外 |
-| MCP | 官方 SDK（v2.0） | 唯一标准 |
-| Release 节奏 | **每周一 minor**（v1.5 起） | 避免 Reasonix 1.0 6 周未发 |
-| i18n 路径 | **第 1 行定对** | Hermes 教训 |
-| License | MIT | 全家桶都是 MIT |
-| **Constitution 9 层权威** | **砍掉** | 个人化产物，不适合 deepwhale |
-| **Session DAG** | **v1 = Linear，v2 = DAG** | 避免 v1 过度复杂 |
+| 决策点                    | 选择                             | 理由                         |
+| ------------------------- | -------------------------------- | ---------------------------- |
+| 主语言                    | **TypeScript（Node ≥ 22）**      | pi 验证 58.6k stars          |
+| TUI 框架                  | **Ink**（React 19）              | pi 实战验证、跨平台一致      |
+| 桌面                      | **Tauri 2.x**（v4.0）            | 生态成熟，**v4.0 之前不做**  |
+| 沙箱（v1-v3）             | **Docker only**                  | 跨平台一致 + 单人可维护      |
+| 沙箱（v4）                | **Docker + 多实例编排**          | Multi-Agent 隔离             |
+| 分发                      | npm + Homebrew + Docker          | 跟 pi/Codex/Reasonix 一致    |
+| 配置                      | TOML                             | CodeWhale 验证               |
+| Skills 格式               | **对齐 Codex 开放标准**          | 跨工具复用                   |
+| 4 包 monorepo             | **对齐 pi**                      | 复用 pi 社区经验             |
+| ExtensionEvent            | **21 个 `whale.*` 事件**（v1.5） | 跟 pi 兼容但区分内/外        |
+| MCP                       | 官方 SDK（v2.0）                 | 唯一标准                     |
+| Release 节奏              | **每周一 minor**（v1.5 起）      | 避免 Reasonix 1.0 6 周未发   |
+| i18n 路径                 | **第 1 行定对**                  | Hermes 教训                  |
+| License                   | MIT                              | 全家桶都是 MIT               |
+| **Constitution 9 层权威** | **砍掉**                         | 个人化产物，不适合 deepwhale |
+| **Session DAG**           | **v1 = Linear，v2 = DAG**        | 避免 v1 过度复杂             |
 
 ---
 
 ## 风险登记
 
-| 风险 | 等级 | 对策 |
-|---|---|---|
-| DeepSeek API 限流 | 中 | 前缀缓存降耗 + Flash/Pro 智能路由 |
-| **Scope explosion** | **高** | **本 ROADMAP 就是为压制这个风险**——5 阶段版本锚 + 砍掉清单 18 项 |
-| 单人开发 burnout | 中 | Phase 之间预留 1 周缓冲期 |
-| **Windows 沙箱不完整** | **不评估** | **v1-v4 都不做 Windows 沙箱**（统一 Docker） |
-| MCP 协议演进 | 低 | pin 官方 SDK minor 版本 |
-| **Skills 安全** | **高** | Skills 默认只读 + `permissions:` 显式声明 + Hook trust flag 在 `~/.deepwhale/trust.json` |
-| 跨 Phase 时间拖延 | 中 | **强制 release 节奏**：每个 Phase 末尾必发版本 |
-| Docker 沙箱冷启动慢 | 低 | Phase 1 接受，Phase 3 优化 |
-| Browser Runtime 跨浏览器一致 | 中 | Playwright 抽象足够，**不做自定义协议** |
-| Computer Use OS 差异 | 高 | v3.0 主要验证 macOS + Linux X11，Windows v3.0 不做 |
-| Reasonix 1.0 6 周未发 | 中 | **强制 release 节奏**（每周一 minor，**v1.0/v1.5/v2.0/v3.0/v4.0 必发**） |
-| **项目成功概率** | 评估 | 严格执行（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **80-85%** |
-| **Bet-1 Code Intelligence**（**P0**）| **P0 Kill** | [Gate-1 守护](./ROADMAP.md#gate-1v15-release-前code-intelligence-kill-test)：v1.5 不通过 → 暂停 Browser/Computer/Desktop，优先修 |
-| **Bet-2 Browser Planner**（**P1**）| **P1 Decision** | [Gate-1.5 守护](./ROADMAP.md#gate-15v20-release-前browser-viability-decision-gate)：v2.0 通过率决定路线（≥80% 完整 / 50-80% 降级 / <50% 砍 Browser 投资） |
-| **Bet-3 Long-Horizon Stability**（**P0**）| **P0 Kill** | [Gate-2 守护](./ROADMAP.md#gate-2v30-release-前long-horizon-kill-test)：v3.0 不通过 → 暂停 Researcher/TaskGraph/Desktop，优先修 Planning/Compaction/Reviewer |
-| **Code Intelligence 实际效果** | 高（P0）| v1.5 基础先验（Tree-sitter + Symbol Graph），v2.0 增强前先实测 |
-| **Browser Planner 鲁棒性** | 中（P1）| Gate-1.5 通过率决定（不是非黑即白——有降级路线） |
-| **DeepSeek 长任务稳定性** | **高（P0）** | Compaction + Planning + Reviewer 三者协同（不是单点修复） |
-| StormBreaker 漏判 | 中 | **用 (tool, error) 签名不用 args** |
-| Hermes footer 数字收敛 bug | 低 | **多字段同值时去冗余/加标签区分** |
-| Hermes i18n 路径错 | 低 | **Sprint 0 第 1 行定对** |
-| CodeWhale "marker-only" Landlock | 不评估 | **deepwhale 走 Docker，不学 CodeWhale 沙箱思路** |
+| 风险                                       | 等级            | 对策                                                                                                                                                         |
+| ------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| DeepSeek API 限流                          | 中              | 前缀缓存降耗 + Flash/Pro 智能路由                                                                                                                            |
+| **Scope explosion**                        | **高**          | **本 ROADMAP 就是为压制这个风险**——5 阶段版本锚 + 砍掉清单 18 项                                                                                             |
+| 单人开发 burnout                           | 中              | Phase 之间预留 1 周缓冲期                                                                                                                                    |
+| **Windows 沙箱不完整**                     | **不评估**      | **v1-v4 都不做 Windows 沙箱**（统一 Docker）                                                                                                                 |
+| MCP 协议演进                               | 低              | pin 官方 SDK minor 版本                                                                                                                                      |
+| **Skills 安全**                            | **高**          | Skills 默认只读 + `permissions:` 显式声明 + Hook trust flag 在 `~/.deepwhale/trust.json`                                                                     |
+| 跨 Phase 时间拖延                          | 中              | **强制 release 节奏**：每个 Phase 末尾必发版本                                                                                                               |
+| Docker 沙箱冷启动慢                        | 低              | Phase 1 接受，Phase 3 优化                                                                                                                                   |
+| Browser Runtime 跨浏览器一致               | 中              | Playwright 抽象足够，**不做自定义协议**                                                                                                                      |
+| Computer Use OS 差异                       | 高              | v3.0 主要验证 macOS + Linux X11，Windows v3.0 不做                                                                                                           |
+| Reasonix 1.0 6 周未发                      | 中              | **强制 release 节奏**（每周一 minor，**v1.0/v1.5/v2.0/v3.0/v4.0 必发**）                                                                                     |
+| **项目成功概率**                           | 评估            | 严格执行（不新增需求 / 每版本强制发布 / Computer Use 不自研 / Browser Agent 分阶段）→ **80-85%**                                                             |
+| **Bet-1 Code Intelligence**（**P0**）      | **P0 Kill**     | [Gate-1 守护](./ROADMAP.md#gate-1v15-release-前code-intelligence-kill-test)：v1.5 不通过 → 暂停 Browser/Computer/Desktop，优先修                             |
+| **Bet-2 Browser Planner**（**P1**）        | **P1 Decision** | [Gate-1.5 守护](./ROADMAP.md#gate-15v20-release-前browser-viability-decision-gate)：v2.0 通过率决定路线（≥80% 完整 / 50-80% 降级 / <50% 砍 Browser 投资）    |
+| **Bet-3 Long-Horizon Stability**（**P0**） | **P0 Kill**     | [Gate-2 守护](./ROADMAP.md#gate-2v30-release-前long-horizon-kill-test)：v3.0 不通过 → 暂停 Researcher/TaskGraph/Desktop，优先修 Planning/Compaction/Reviewer |
+| **Code Intelligence 实际效果**             | 高（P0）        | v1.5 基础先验（Tree-sitter + Symbol Graph），v2.0 增强前先实测                                                                                               |
+| **Browser Planner 鲁棒性**                 | 中（P1）        | Gate-1.5 通过率决定（不是非黑即白——有降级路线）                                                                                                              |
+| **DeepSeek 长任务稳定性**                  | **高（P0）**    | Compaction + Planning + Reviewer 三者协同（不是单点修复）                                                                                                    |
+| StormBreaker 漏判                          | 中              | **用 (tool, error) 签名不用 args**                                                                                                                           |
+| Hermes footer 数字收敛 bug                 | 低              | **多字段同值时去冗余/加标签区分**                                                                                                                            |
+| Hermes i18n 路径错                         | 低              | **Sprint 0 第 1 行定对**                                                                                                                                     |
+| CodeWhale "marker-only" Landlock           | 不评估          | **deepwhale 走 Docker，不学 CodeWhale 沙箱思路**                                                                                                             |
 
 ---
 
 ## 与 Codex 全功能对照表
 
-| Codex 功能 | 状态 | 落在版本 |
-|---|---|---|
-| TUI 交互 | ✅ | v1.0 |
-| 多种模型切换 | ⚠️ v1.0 = DeepSeek only；v1.5 = +OpenAI/Claude | v1.0 / v1.5 |
-| Skills | ✅ | v1.5 |
-| Plugins | ✅ | v1.5 |
-| MCP Client/Server | ✅ | v2.0 |
-| Browser MCP | ✅ | v2.0 |
-| Computer Use | ✅ | v3.0 |
-| Automations | ✅ | v1.5 |
-| Remote TUI | ✅ | v1.5 |
-| Desktop GUI | ✅ | v4.0 |
-| 多渠道接入 | ✅ | v4.0 |
-| Session 持久化/恢复 | ✅ | v1.0（Linear）→ v2.0（DAG） |
-| Compaction | ✅ | v1.5 |
-| Hooks | ✅ | v1.5 |
+| Codex 功能          | 状态                                           | 落在版本                    |
+| ------------------- | ---------------------------------------------- | --------------------------- |
+| TUI 交互            | ✅                                             | v1.0                        |
+| 多种模型切换        | ⚠️ v1.0 = DeepSeek only；v1.5 = +OpenAI/Claude | v1.0 / v1.5                 |
+| Skills              | ✅                                             | v1.5                        |
+| Plugins             | ✅                                             | v1.5                        |
+| MCP Client/Server   | ✅                                             | v2.0                        |
+| Browser MCP         | ✅                                             | v2.0                        |
+| Computer Use        | ✅                                             | v3.0                        |
+| Automations         | ✅                                             | v1.5                        |
+| Remote TUI          | ✅                                             | v1.5                        |
+| Desktop GUI         | ✅                                             | v4.0                        |
+| 多渠道接入          | ✅                                             | v4.0                        |
+| Session 持久化/恢复 | ✅                                             | v1.0（Linear）→ v2.0（DAG） |
+| Compaction          | ✅                                             | v1.5                        |
+| Hooks               | ✅                                             | v1.5                        |
 
 **覆盖率进度**：
+
 - v1.0 = **3/14**（TUI / 多模型-DS-only / Session-Linear）
 - v1.5 = **8/14**（+ Skills / Plugins / Hooks / Approval / Task / Automations / Remote TUI / Compaction）
 - v2.0 = **10/14**（+ MCP / Browser MCP）
@@ -988,6 +1036,7 @@ deepwhale>
 - v4.0 = **14/14 ✅**（+ Desktop / 多渠道 / 完整 Multi-Agent）
 
 **deepwhale 独家（vs Codex）**：
+
 - ✅ **Prefix-cache 4 大机制**（Reasonix 全抄）— **v1.0 必带**
 - ✅ **StormBreaker 防死循环**（Reasonix 抄）— v1.5 工具增多后 P0
 - ✅ **SanitizeToolPairing**（Reasonix 抄）— v1.5

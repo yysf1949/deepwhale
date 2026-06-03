@@ -19,7 +19,9 @@
       "import": "./dist/engines/unified-diff/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "@deepwhale/core": "workspace:*"
   },

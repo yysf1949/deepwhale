@@ -14,7 +14,10 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "bin"],
+  "files": [
+    "dist",
+    "bin"
+  ],
   "dependencies": {
     "@deepwhale/core": "workspace:*",
     "@deepwhale/edit-engine": "workspace:*",

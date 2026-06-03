@@ -4,14 +4,15 @@
 
 ## 1. 角色与责任
 
-| 角色 | 出现版本 | 核心职责 | 不做的事 |
-|---|---|---|---|
-| **Executor** | v1.0 | 调用工具执行具体动作（读文件、跑命令、调用 Browser/Computer Use） | 不拆任务、不验证、不规划 |
-| **Planner** | v2.5 | 接收用户任务 → 输出 Task DAG | 不执行任何工具（**Execution Boundary**） |
-| **Reviewer** | v3.0 | 接收 Executor/Planner 输出 → 验证 / 反馈 / 拒绝 | 不执行生产性动作（只跑 test/lint/compare） |
-| **Researcher** | v4.0 | 信息收集、Codebase 探索、上下文检索 | 不修改文件、不调用生产工具 |
+| 角色           | 出现版本 | 核心职责                                                          | 不做的事                                   |
+| -------------- | -------- | ----------------------------------------------------------------- | ------------------------------------------ |
+| **Executor**   | v1.0     | 调用工具执行具体动作（读文件、跑命令、调用 Browser/Computer Use） | 不拆任务、不验证、不规划                   |
+| **Planner**    | v2.5     | 接收用户任务 → 输出 Task DAG                                      | 不执行任何工具（**Execution Boundary**）   |
+| **Reviewer**   | v3.0     | 接收 Executor/Planner 输出 → 验证 / 反馈 / 拒绝                   | 不执行生产性动作（只跑 test/lint/compare） |
+| **Researcher** | v4.0     | 信息收集、Codebase 探索、上下文检索                               | 不修改文件、不调用生产工具                 |
 
 **核心约束**：
+
 - **Execution Boundary**：Planner 不执行 / Executor 不规划
 - **单向数据流**：Planner → Executor → Reviewer（Reviewer 反馈 Planner，Planner 决定下一步）
 - **单 process 内 4 函数**：v4.0 不 spawn 4 个 Agent，是 1 process 内的 4 个 role 切换
@@ -147,27 +148,28 @@ TaskResult → User
 
 ## 4. Planner ↔ Executor Boundary（v2.5 关键约束）
 
-| Planner 做 | Executor 做 |
-|---|---|
-| 拆解 Task | 读 Task |
-| 输出 Task DAG | 执行 Task 内的 capability |
-| 决定下一步执行哪个 ready Task | 返回 TaskResult + Observation |
-| 接收 Reviewer 反馈并重规划 | **不重新规划**——反馈时返回 Planner |
-| 维护 Plan Cache | **不写 Plan Cache**——Planner 独占 |
+| Planner 做                    | Executor 做                        |
+| ----------------------------- | ---------------------------------- |
+| 拆解 Task                     | 读 Task                            |
+| 输出 Task DAG                 | 执行 Task 内的 capability          |
+| 决定下一步执行哪个 ready Task | 返回 TaskResult + Observation      |
+| 接收 Reviewer 反馈并重规划    | **不重新规划**——反馈时返回 Planner |
+| 维护 Plan Cache               | **不写 Plan Cache**——Planner 独占  |
 
 **反模式**：
+
 - ❌ Planner 调用 read_file / write_file
 - ❌ Executor 拆解新 Task
 - ❌ Reviewer 修改生产文件
 
 ## 5. Reviewer ↔ Executor Boundary（v3.0 关键约束）
 
-| Reviewer 做 | Executor 做 |
-|---|---|
-| 跑 test / lint / type_check | 跑生产命令 |
-| 对比 before/after 语义 | 写文件 |
+| Reviewer 做                    | Executor 做                                |
+| ------------------------------ | ------------------------------------------ |
+| 跑 test / lint / type_check    | 跑生产命令                                 |
+| 对比 before/after 语义         | 写文件                                     |
 | 输出 approve / request_changes | 收到反馈后**可重新执行**（同 Task 重新跑） |
-| 失败时反馈 Planner | **不重新规划**——失败时 escalate 到 Planner |
+| 失败时反馈 Planner             | **不重新规划**——失败时 escalate 到 Planner |
 
 ## 6. Researcher 注入点（v4.0）
 
@@ -197,40 +199,40 @@ SessionEnd: Save Messages + Update Memory
 
 ## 8. Cache Reset Points
 
-| 触发点 | 是否 reset prefix-cache | 理由 |
-|---|---|---|
-| Session 启动 | 是（新 session） | 全新 system prompt |
-| Compaction | **是（唯一 reset point）** | Reasonix 借鉴 |
-| Task 完成 | 否 | 同一 session 内连续 task |
-| Reviewer 反馈 | 否 | 仅追加 message |
-| Planner 重新规划 | 否 | 仅追加 task graph 节点 |
+| 触发点           | 是否 reset prefix-cache    | 理由                     |
+| ---------------- | -------------------------- | ------------------------ |
+| Session 启动     | 是（新 session）           | 全新 system prompt       |
+| Compaction       | **是（唯一 reset point）** | Reasonix 借鉴            |
+| Task 完成        | 否                         | 同一 session 内连续 task |
+| Reviewer 反馈    | 否                         | 仅追加 message           |
+| Planner 重新规划 | 否                         | 仅追加 task graph 节点   |
 
 ## 9. 错误处理协议
 
-| 错误类型 | 处理方式 | escalate 到 |
-|---|---|---|
-| Tool call 失败 | Executor 重试（max_retries） | Planner 重新拆 |
-| Task 依赖未满足 | 状态 = blocked，等待依赖完成 | — |
-| Reviewer 拒绝 | Executor 重新执行（同 Task retry） | Planner 重新拆（多次拒绝） |
-| Token budget 超 | Compaction 触发 | — |
-| Memory 冲突 | hand-edit 优先于自动写入 | — |
-| Browser/Computer 失败 | Error Recovery 循环（看 BROWSER_PLANNER.md） | Planner 重新拆 |
+| 错误类型              | 处理方式                                     | escalate 到                |
+| --------------------- | -------------------------------------------- | -------------------------- |
+| Tool call 失败        | Executor 重试（max_retries）                 | Planner 重新拆             |
+| Task 依赖未满足       | 状态 = blocked，等待依赖完成                 | —                          |
+| Reviewer 拒绝         | Executor 重新执行（同 Task retry）           | Planner 重新拆（多次拒绝） |
+| Token budget 超       | Compaction 触发                              | —                          |
+| Memory 冲突           | hand-edit 优先于自动写入                     | —                          |
+| Browser/Computer 失败 | Error Recovery 循环（看 BROWSER_PLANNER.md） | Planner 重新拆             |
 
 ## 10. 版本演进时间线
 
-| 版本 | 角色 | 数据结构 |
-|---|---|---|
-| v1.0 | Executor（单角色）| Message + Linear Session |
-| v2.0 | + Memory Ranking | + Memory（带 decay/scope/source） |
-| v2.5 | **+ Planner** | + Task + Subtask + Task DAG（**Execution Boundary 强制**） |
-| v3.0 | **+ Reviewer** | + ActionResult + Reviewer.feedback |
-| v4.0 | **+ Researcher** | + Observation + Researcher 可选注入 |
+| 版本 | 角色               | 数据结构                                                   |
+| ---- | ------------------ | ---------------------------------------------------------- |
+| v1.0 | Executor（单角色） | Message + Linear Session                                   |
+| v2.0 | + Memory Ranking   | + Memory（带 decay/scope/source）                          |
+| v2.5 | **+ Planner**      | + Task + Subtask + Task DAG（**Execution Boundary 强制**） |
+| v3.0 | **+ Reviewer**     | + ActionResult + Reviewer.feedback                         |
+| v4.0 | **+ Researcher**   | + Observation + Researcher 可选注入                        |
 
 ## 11. 跨设计文档引用
 
 - **CAPABILITY_MODEL.md**：Task.subtasks.capability 字段引用 Capability
 - **CODE_INTELLIGENCE.md**：Researcher 内部用 Code Intelligence 做信息收集
-- **BROWSER_PLANNER.md**：Executor 调用 browser.* 时由 BROWSER_PLANNER 接管
+- **BROWSER_PLANNER.md**：Executor 调用 browser.\* 时由 BROWSER_PLANNER 接管
 - **ARCHITECTURE.md §2.2**：Agent Layer 5 角色定义
 
 ## 12. 未来扩展点（v4.0+）

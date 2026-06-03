@@ -1,0 +1,11 @@
+# Prettier ignore — pnpm-managed + build output
+# lock files: pnpm owns the canonical ordering, prettier reformatting
+#   breaks `pnpm install --frozen-lockfile` and adds huge no-op diffs.
+# build/cache: not source code, already in .gitignore.
+# .gitattributes: line-ending policy file, not a code formatter input.
+
+pnpm-lock.yaml
+dist/
+node_modules/
+coverage/
+.gitattributes

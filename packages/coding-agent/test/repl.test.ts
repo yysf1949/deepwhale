@@ -27,7 +27,9 @@ import { runOneTurn } from '../src/repl.js';
 
 // ---- 工具：mock LLMClient ----
 
-function makeMockClient(responder: (messages: ChatMessage[]) => Promise<ChatResult> | ChatResult): LLMClient {
+function makeMockClient(
+  responder: (messages: ChatMessage[]) => Promise<ChatResult> | ChatResult,
+): LLMClient {
   return {
     model: 'mock-model' as ModelId,
     chat: vi.fn(async (messages: ChatMessage[]) => responder(messages)),
