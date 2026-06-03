@@ -455,6 +455,7 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
               cached_tokens: 900,
               cache_hit_rate: 0.9,
               cost_turn: 0.00009,
+              cost_currency: 'CNY', // Sprint 1b.5: 锁住新字段
               tokens_uncached: 100,
             },
           };

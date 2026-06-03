@@ -240,6 +240,7 @@ describe('formatUsageStatus (Sprint 1b)', () => {
       cached_tokens: 900,
       cache_hit_rate: 0.9,
       cost_turn: 0.0002,
+      cost_currency: 'CNY', // Sprint 1b.5: 锁住新字段在 Usage 上可用, formatUsageStatus 当前不读但会读 (Step 2)
       tokens_uncached: 100,
     });
     expect(line).not.toBeNull();

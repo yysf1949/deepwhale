@@ -94,7 +94,7 @@ function oaiDelta(content: string, finishReason?: 'stop' | 'tool_calls' | 'lengt
     id: 'chatcmpl-1',
     object: 'chat.completion.chunk',
     created: 1700000000,
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-flash',
     choices: [
       {
         index: 0,
@@ -232,9 +232,10 @@ describe('DeepSeekClient', () => {
   describe('usage (Sprint 1b: cache_hit_rate / cost_turn / tokens_uncached)', () => {
     it('Sprint 1b: 满 usage (含 cached_tokens) → 算对 cache_hit_rate / cost_turn / tokens_uncached', async () => {
       // 1000 prompt, 80% 命中 cache = 800 cached, 200 uncached; 100 completion
-      // cost = 200 * 0.5/1e6 + 800 * 0.1/1e6 + 100 * 1/1e6
-      //      = 0.0001 + 0.00008 + 0.0001 = 0.00028
-      // P1 fix (2026-06-03): 之前算成 0.28 (大 1000×), 修了 ¥/M → ¥/token 单位
+      // cost = 200 * 1.0/1e6 + 800 * 0.02/1e6 + 100 * 2.0/1e6
+      //      = 0.0002 + 0.000016 + 0.0002 = 0.000416
+      // P0 fix (2026-06-03): pricing 数字从 0.5/0.1/1.0 改成官方 1.0/0.02/2.0
+      // (Q 贴官方 api-docs.deepseek.com 截屏纠正, 二手源 / 1b 印象都不可信)
       const response = {
         ...SAMPLE_RESPONSE,
         usage: {
@@ -251,7 +252,7 @@ describe('DeepSeekClient', () => {
       expect(result.usage?.cached_tokens).toBe(800);
       expect(result.usage?.cache_hit_rate).toBeCloseTo(0.8);
       expect(result.usage?.tokens_uncached).toBe(200);
-      expect(result.usage?.cost_turn).toBeCloseTo(0.00028);
+      expect(result.usage?.cost_turn).toBeCloseTo(0.000416);
     });
 
     it('Sprint 1b: 无 cached_tokens → 3 个新字段全 undefined (不写默认值避免假数据)', async () => {
@@ -283,8 +284,8 @@ describe('DeepSeekClient', () => {
       // 0/0 走 prompt>0 短路, hit rate 0
       expect(result.usage?.cache_hit_rate).toBe(0);
       expect(result.usage?.tokens_uncached).toBe(0);
-      // cost = 0 + 0 + 10 * 1/1e6 = 0.00001 (P1 fix: 之前 0.01 大 1000×)
-      expect(result.usage?.cost_turn).toBeCloseTo(0.00001);
+      // cost = 0 + 0 + 10 * 2.0/1e6 = 0.00002 (P0 fix: pricing 改成官方 2.0¥/M output)
+      expect(result.usage?.cost_turn).toBeCloseTo(0.00002);
     });
 
     it('Sprint 1b: stream usage-only chunk 同样算 cache_hit_rate / cost_turn / tokens_uncached', async () => {
@@ -294,7 +295,7 @@ describe('DeepSeekClient', () => {
         id: 'chatcmpl-1',
         object: 'chat.completion.chunk',
         created: 1700000000,
-        model: 'deepseek-chat',
+        model: 'deepseek-v4-flash',
         choices: [],
         usage: {
           prompt_tokens: 200,
@@ -320,9 +321,9 @@ describe('DeepSeekClient', () => {
       expect(result.usage?.cached_tokens).toBe(180);
       expect(result.usage?.cache_hit_rate).toBeCloseTo(0.9);
       expect(result.usage?.tokens_uncached).toBe(20);
-      // cost = 20 * 0.5/1e6 + 180 * 0.1/1e6 + 50 * 1/1e6
-      //      = 0.00001 + 0.000018 + 0.00005 = 0.000078 (P1 fix: 之前 0.078 大 1000×)
-      expect(result.usage?.cost_turn).toBeCloseTo(0.000078);
+      // cost = 20 * 1.0/1e6 + 180 * 0.02/1e6 + 50 * 2.0/1e6
+      //      = 0.00002 + 0.0000036 + 0.0001 = 0.0001236 (P0 fix: pricing 官方化)
+      expect(result.usage?.cost_turn).toBeCloseTo(0.0001236);
     });
 
     it('Sprint 1b P1 fix: 末 chunk 同时带 choices=[{finish_reason:"stop"}] + 顶层 usage → usage 不丢', async () => {
@@ -364,7 +365,9 @@ describe('DeepSeekClient', () => {
       expect(result.usage?.cached_tokens).toBe(180);
       expect(result.usage?.cache_hit_rate).toBeCloseTo(0.9);
       expect(result.usage?.tokens_uncached).toBe(20);
-      expect(result.usage?.cost_turn).toBeCloseTo(0.000078);
+      // cost = 20 * 1.0/1e6 + 180 * 0.02/1e6 + 50 * 2.0/1e6
+      //      = 0.00002 + 0.0000036 + 0.0001 = 0.0001236 (P0 fix: pricing 官方化)
+      expect(result.usage?.cost_turn).toBeCloseTo(0.0001236);
     });
 
     it('Sprint 1b P1 fix: stream 路径 body 必须带 stream_options.include_usage=true (服务端才会回 usage)', async () => {

@@ -17,6 +17,9 @@
 
 import { t } from '@deepwhale/core';
 import process from 'node:process';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import {
   APIKeyMissingError,
   LLMAuthError,
@@ -24,9 +27,13 @@ import {
   LLMRateLimitError,
   LLMStreamError,
   LLMUnknownError,
-  computeCostBreakdown,
   isLLMError,
 } from './types.js';
+import {
+  computeCost,
+  parsePricingConfig,
+  type PricingConfig,
+} from './pricing-config.js';
 import type {
   ChatChunk,
   ChatMessage,
@@ -79,6 +86,12 @@ export interface DeepSeekClientOptions {
   sleepFn?: (ms: number) => Promise<void>;
   /** 自定义 abort 工厂（测试用 fake abort）。 */
   makeAbortController?: () => AbortController;
+  /**
+   * Sprint 1b.5: 注入 pricing config. 缺省 = undefined → 走 R7 中间路径
+   * (base 2 字段, cost 字段 absent). caller 启动期 `await loadPricingConfig()`
+   * 拿到 PricingConfig 后传入. 不阻塞 constructor.
+   */
+  pricing?: PricingConfig;
 }
 
 export class DeepSeekClient implements LLMClient {
@@ -89,6 +102,15 @@ export class DeepSeekClient implements LLMClient {
   private readonly timeoutMs: number;
   private readonly sleepFn: (ms: number) => Promise<void>;
   private readonly makeAbortController: () => AbortController;
+  /**
+   * Sprint 1b.5: pricing config 注入. 缺省 = 启动期 sync 加载 ship-in `pricing.default.toml`.
+   * 加载失败 (file not found / parse error) → `undefined` → 走 R7 中间路径
+   * (base 2 字段, cost 字段 absent, 不静默 fallback).
+   *
+   * 用法: caller 显式 `pricing: await loadPricingConfig()` 可覆盖 ship-in (例如读用户 ~/.deepwhale/pricing.toml).
+   * `DeepSeekClientOptions.pricing` 字段让 caller 控制 (不阻塞 constructor).
+   */
+  private readonly pricing: PricingConfig | undefined;
 
   constructor(options: DeepSeekClientOptions = {}) {
     this.apiKey = options.apiKey ?? process.env['DEEPSEEK_API_KEY'];
@@ -99,6 +121,7 @@ export class DeepSeekClient implements LLMClient {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.sleepFn = options.sleepFn ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms)));
     this.makeAbortController = options.makeAbortController ?? (() => new AbortController());
+    this.pricing = options.pricing ?? loadDefaultPricing();
   }
 
   // ==========================================================================
@@ -179,7 +202,8 @@ export class DeepSeekClient implements LLMClient {
           // 必须在 parseSseEvent 之前拦截,否则正常流也会刷 warn,污染 stderr 日志。
           // 其他返回 null 的情况(heartbeat / comment / JSON 损坏)才是真正需要 warn 的失败。
           if (isSseDoneSentinel(event)) continue;
-          const parsed = parseSseEvent(event);
+          // Sprint 1b.5: 透传 pricing + model 给 module-level parse fn.
+          const parsed = parseSseEvent(event, this.pricing, this.model);
           if (parsed === null) {
             sseParseFailures += 1;
             continue;
@@ -343,7 +367,10 @@ export class DeepSeekClient implements LLMClient {
   }
 
   private parseChatResponse(json: unknown, status: number): ChatResult {
-    const parsed = parseOaiChatCompletion(json, this.model);
+    // Sprint 1b.5: 透传 this.pricing 给 module-level parseOaiChatCompletion,
+    // 让 computeCost 能找到 model pricing 算 cost. 不传 pricing 走 R7 中间路径
+    // (cost 字段 absent, base 2 字段仍在).
+    const parsed = parseOaiChatCompletion(json, this.model, this.pricing);
     if (parsed === null) {
       throw new LLMUnknownError('DeepSeek response missing choices[0].message', { status });
     }
@@ -365,6 +392,35 @@ export class DeepSeekClient implements LLMClient {
       return new LLMNetworkError(`Request aborted: ${msg}`, { cause: err });
     }
     return new LLMNetworkError(`Network error: ${msg}`, { cause: err });
+  }
+}
+
+// ============================================================================
+// 内部 helper: sync 加载 ship-in pricing.default.toml
+// ============================================================================
+
+/**
+ * Sprint 1b.5: 启动期 sync 加载 ship-in `pricing.default.toml`.
+ *
+ * 设计:
+ * - sync 加载 (1 次启动, 不在 hot path, 符合 R3)
+ * - 加载失败 (file not found / parse error) → 返回 `undefined` → caller 走 R7 中间路径
+ *   (不静默 fallback 到硬编码, 不抛错, base 2 字段, cost 字段 absent)
+ * - 文件路径解析: `import.meta.url` → 当前文件 → 同目录 `pricing.default.toml`
+ *   (dev 走 src/, build 后走 dist/, 路径自动对齐)
+ *
+ * 测试环境 (vitest) 时 pricing.default.toml 跟 src/ 在一起, 也能加载。
+ */
+function loadDefaultPricing(): PricingConfig | undefined {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const defaultPath = resolve(here, 'pricing.default.toml');
+    const tomlText = readFileSync(defaultPath, 'utf-8');
+    return parsePricingConfig(tomlText);
+  } catch {
+    // 任何错误 (file not found / parse error / 权限) → 不让 client 启动失败.
+    // 走 R7 中间路径: base 2 字段, cost 字段 absent.
+    return undefined;
   }
 }
 
@@ -410,7 +466,11 @@ function toWireMessage(m: ChatMessage): Record<string, unknown> {
  * 从 OAI chat/completions 非流式响应里提取内容。
  * 返回 null 表示结构异常。
  */
-function parseOaiChatCompletion(json: unknown, fallbackModel: ModelId): ChatResult | null {
+function parseOaiChatCompletion(
+  json: unknown,
+  fallbackModel: ModelId,
+  pricing?: PricingConfig,
+): ChatResult | null {
   if (typeof json !== 'object' || json === null) return null;
   const obj = json as Record<string, unknown>;
   const choices = obj['choices'];
@@ -464,12 +524,15 @@ function parseOaiChatCompletion(json: unknown, fallbackModel: ModelId): ChatResu
       typeof u['prompt_cache_hit_tokens'] === 'number' ? u['prompt_cache_hit_tokens'] : undefined;
     usage = { prompt_tokens: prompt, completion_tokens: completion, total_tokens: total };
     if (cached !== undefined) usage.cached_tokens = cached;
-    // Sprint 1b: 加 cache_hit_rate / cost_turn / tokens_uncached 3 个可观测字段。
-    // 跟 cached_tokens 同条件: 没 cached_tokens 时不写(避免假数据)。
-    const breakdown = computeCostBreakdown(prompt, completion, cached);
+    // Sprint 1b.5: 改用 pricing-config.computeCost, 接 PricingConfig + ModelId,
+    // 返 CostBreakdownResult (undefined / base 2 字段 / 完整 4 字段 3 种).
+    // 公式不变 (V4-Flash pricing 在 default.toml 跟旧 hardcode 一致).
+    // parseOaiChatCompletion 是 module-level, 从参数接 pricing + fallbackModel.
+    const breakdown = computeCost(pricing, fallbackModel, prompt, completion, cached);
     if (breakdown !== undefined) {
       usage.cache_hit_rate = breakdown.cache_hit_rate;
-      usage.cost_turn = breakdown.cost_turn;
+      if (breakdown.cost_turn !== undefined) usage.cost_turn = breakdown.cost_turn;
+      if (breakdown.cost_currency !== undefined) usage.cost_currency = breakdown.cost_currency;
       usage.tokens_uncached = breakdown.tokens_uncached;
     }
   }
@@ -521,7 +584,11 @@ function isSseDoneSentinel(eventRaw: string): boolean {
  * 注意:[DONE] sentinel 由 isSseDoneSentinel 在调用方提前拦截,
  * 本函数不再处理,避免重复路径让 caller 误算 parse failure。
  */
-function parseSseEvent(eventRaw: string): ChatChunk | null {
+function parseSseEvent(
+  eventRaw: string,
+  pricing?: PricingConfig,
+  model?: ModelId,
+): ChatChunk | null {
   const lines = eventRaw.split('\n');
   const dataLines: string[] = [];
   for (const ln of lines) {
@@ -547,7 +614,8 @@ function parseSseEvent(eventRaw: string): ChatChunk | null {
   // 和顶层 usage, 此时 usage 会被丢弃 → 状态栏拿不到 cache/cost 数据。
   // 改成先解析顶层 usage, 任何 chunk 类型都挂上。
   // usage-only chunk (choices=[]) 路径保留作为 fallback, 服务端历史兼容。
-  const topLevelUsage = parseSseUsageField(obj);
+  // Sprint 1b.5: 把 pricing + model 透传给 parseSseUsageField.
+  const topLevelUsage = parseSseUsageField(obj, pricing, model);
 
   const choices = obj['choices'];
   if (!Array.isArray(choices) || choices.length === 0) {
@@ -621,7 +689,11 @@ function parseSseEvent(eventRaw: string): ChatChunk | null {
  *
  * P1 fix (2026-06-03): 抽出避免在 choices=[] 和 choices=[...] 两条路径上重复解析。
  */
-function parseSseUsageField(obj: Record<string, unknown>): Usage | undefined {
+function parseSseUsageField(
+  obj: Record<string, unknown>,
+  pricing?: PricingConfig,
+  model?: ModelId,
+): Usage | undefined {
   const rawUsage = obj['usage'];
   if (typeof rawUsage !== 'object' || rawUsage === null) return undefined;
   const u = rawUsage as Record<string, unknown>;
@@ -639,11 +711,16 @@ function parseSseUsageField(obj: Record<string, unknown>): Usage | undefined {
     total_tokens: total,
   };
   if (cached !== undefined) usage.cached_tokens = cached;
-  // Sprint 1b: cache_hit_rate / cost_turn / tokens_uncached — 仅当 cached_tokens 存在时算。
-  const breakdown = computeCostBreakdown(prompt, completion, cached);
+  // Sprint 1b.5: 改用 pricing-config.computeCost, 公式不变 (default.toml V4-Flash).
+  // parseSseUsageField 是 module-level fn, 不持有 this.pricing. pricing/model 可选
+  // — undefined 时走 R7 中间路径 (base 2 字段, cost 字段 absent, 不静默 fallback).
+  // model undefined 时也安全: computeCost 内部 pricing.models[model] 返 undefined
+  // → 走 base 2 字段分支, cost 字段 absent. 不需要 throw.
+  const breakdown = computeCost(pricing, model, prompt, completion, cached);
   if (breakdown !== undefined) {
     usage.cache_hit_rate = breakdown.cache_hit_rate;
-    usage.cost_turn = breakdown.cost_turn;
+    if (breakdown.cost_turn !== undefined) usage.cost_turn = breakdown.cost_turn;
+    if (breakdown.cost_currency !== undefined) usage.cost_currency = breakdown.cost_currency;
     usage.tokens_uncached = breakdown.tokens_uncached;
   }
   return usage;

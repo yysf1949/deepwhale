@@ -1,0 +1,45 @@
+# deepwhale 默认 pricing (2026-06)
+# 用户可在 ~/.deepwhale/pricing.toml 覆盖 (--pricing-config <path> 后续可加, 1b.5 走 env)。
+# **per-model currency**: DeepSeek CNY, Anthropic USD。不在 UI 层做汇率换算。
+#
+# **当前生产 model 2 个** (Q 拍板 2026-06-03): flash + pro.
+# 不再加 deepseek-chat / deepseek-reasoner 老 alias — 那些是 1a/1b era 历史,
+# 2026-07-24 后服务端 hard-fail, 老 session replay 走 R7 中间路径 (base 2 字段, cost 字段 absent).
+#
+# **信源唯一性**: DeepSeek pricing 永远以 https://api-docs.deepseek.com/quick_start/pricing
+# 为唯一信源。Q 在 2026-06-03 review 时贴出官方 "模型细节" 页截屏纠正我之前 commit 用的
+# 0.5/0.1/1.0 (来自 1b 时代印象 + 二手源, 未核对官方). 实际官方:
+# - cache_miss_per_m = input 缓存未命中 (1M tokens)
+# - cache_hit_per_m  = input 缓存命中 (1M tokens)
+# - completion_per_m = output (1M tokens)
+# 注意: 1b follow-up P1 改的 0.01/0.1 fix 是 **公式 1000× off** — pricing 数字本身的 0.1
+# 看上去像 0.1 ¥/M 但其实只是 0.5→0.1 cache hit 巧合小, 真正的官方是 0.02¥/M (5× off 真实价).
+
+[models.deepseek-v4-flash]
+cache_miss_per_m = 1.0     # ¥1 /M tokens (input 缓存未命中, 官方 api-docs.deepseek.com 2026-06)
+cache_hit_per_m  = 0.02    # ¥0.02 /M tokens (input 缓存命中, 官方)
+completion_per_m = 2.0     # ¥2 /M tokens (output, 官方)
+currency         = "CNY"
+
+[models.deepseek-v4-pro]
+cache_miss_per_m = 3.0     # ¥3 /M tokens (input 缓存未命中, 官方)
+cache_hit_per_m  = 0.025   # ¥0.025 /M tokens (input 缓存命中, 官方)
+completion_per_m = 6.0     # ¥6 /M tokens (output, 官方)
+currency         = "CNY"
+
+# Anthropic Claude Sonnet 4.5 (2026-06 official first-party API pricing)
+# https://platform.claude.com/docs/en/about-claude/pricing
+[models.claude-sonnet-4-5]
+cache_miss_per_m = 3.0    # $3 /M tokens (input)
+cache_hit_per_m  = 0.30   # $0.30 /M tokens (cache read, 1h TTL — 不是 5min ephemeral $0.06)
+completion_per_m = 15.0   # $15 /M tokens
+currency         = "USD"
+
+# Anthropic Claude Opus 4.5 (2026-06 official first-party API pricing)
+# P1 plan correction (2026-06-03): user 核对官方 pricing 页后纠正
+# 之前值 $24/$0.48/$120 是错的 (类似某种旧/特殊模式价格, 不适合 first-party default)
+[models.claude-opus-4-5]
+cache_miss_per_m = 5.0    # $5 /M
+cache_hit_per_m  = 0.50   # $0.50 /M (cache read, 1h TTL — 不是 5min ephemeral $0.48)
+completion_per_m = 25.0   # $25 /M (不是 $120)
+currency         = "USD"

@@ -47,6 +47,7 @@ export interface ChatMessage {
 /**
  * Token usage 来自 LLM 响应。Sprint 1a: OAI 标准 + cached_tokens。
  * Sprint 1b: 加 cache_hit_rate / cost_turn / tokens_uncached (可观测性)。
+ * Sprint 1b.5: 加 cost_currency (¥ / $) 让 UI 决 symbol, 不在 UI 层做汇率换算.
  *
  * OAI 标准字段 + DeepSeek 扩展:
  * - prompt_tokens / completion_tokens / total_tokens
@@ -54,10 +55,13 @@ export interface ChatMessage {
  *
  * Sprint 1b 扩展 (Prefix-cache 可观测性):
  * - cache_hit_rate: 0..1, cached_tokens / prompt_tokens。LLM 不返 cached_tokens 时 undefined。
- * - cost_turn: 本次 turn 估算费用 (¥), 按 V4-Flash pricing hardcode。Sprint 1c 抽 config.toml。
+ * - cost_turn: 本次 turn 估算费用, 按 pricing config 算 (Sprint 1b.5 抽 config.toml)。
  * - tokens_uncached: prompt_tokens - cached_tokens, 方便人眼扫读"实际新付的 token"。
  *
- * Sprint 1a: cache_hit_rate 仅做总 cost 估算, 没暴露。Sprint 1b 起可观测。
+ * Sprint 1b.5 扩展 (per-model currency, 不引入汇率换算):
+ * - cost_currency: 'CNY' | 'USD' — 跟 cost_turn 同步存在或同步 absent。
+ *   UI 读这个字段决定显示 ¥ 还是 $, 不在数字层做换算。
+ *   cost_turn absent 时 cost_currency 也必须 absent (不变量)。
  */
 export interface Usage {
   prompt_tokens: number;
@@ -66,56 +70,31 @@ export interface Usage {
   cached_tokens?: number;
   /** 0..1, cached_tokens / prompt_tokens。LLM 不返 cached_tokens 时 undefined。 */
   cache_hit_rate?: number;
-  /** 本 turn 估算费用 (¥), V4-Flash pricing hardcode (2026-06)。
-   *  cache hit 价: ¥0.1/M, cache miss 价: ¥0.5/M, completion: ¥1/M。Sprint 1c 抽 config.toml。 */
+  /**
+   * 本 turn 估算费用, pricing config 算 (Sprint 1b.5 抽 config.toml)。
+   * 数字单位: currency (CNY ¥ 或 USD $). 不在 UI 层做汇率换算。
+   */
   cost_turn?: number;
+  /** Currency 跟 cost_turn 同步存在, UI 读这个决 symbol (¥ / $). */
+  cost_currency?: 'CNY' | 'USD';
   /** prompt_tokens - cached_tokens, "实际新付"的 token 数, 方便人眼扫读。 */
   tokens_uncached?: number;
 }
 
 /**
- * Sprint 1b: 根据 prompt/cached/completion token 算 3 个可观测字段。
- * 输入: prompt/completion/cached tokens (OAI 标准 + DeepSeek cached_tokens)
- * 输出: cache_hit_rate / cost_turn / tokens_uncached
+ * 旧的 `computeCostBreakdown` (Sprint 1b, hardcode V4-Flash pricing) 已整体迁移到
+ * `pricing-config.ts:computeCost`, 同时:
+ * - 接收 `PricingConfig` + `ModelId` 参数 (per-model currency)
+ * - 接收 `pricing: undefined` (显式表达"没 pricing 也走纯函数 2 字段路径")
+ * - 返 `CostBreakdownResult` 联合类型 (3 种路径, 显式表达无 pricing 也能算 cache 字段)
+ * - 行为兼容: 公式 (V4-Flash pricing 1.0/0.5/0.1 等数字没变) + 边界 (cached=undefined → undefined)
  *
- * 不传 cached_tokens 时, 3 个字段全 undefined(避免假数据, 跟 Sprint 1a Optional 语义对齐)。
+ * R7 设计原则: pricing 是观测, 不让成功 LLM 响应因"缺价格表"失败; silent fallback 制造假成本更危险。
+ * 缺 pricing 时不静默 fallback 到硬编码, 也不抛错, 走"base 2 字段, cost 字段 absent"路径。
+ * 找不到 model 的 warning 责任在 caller (client/mode 边界), 纯函数零副作用。
  *
- * 公式:
- * - tokens_uncached = max(0, prompt - cached)
- * - cache_hit_rate = cached / prompt  (prompt=0 时 0, 避免除零)
- * - cost_turn = tokens_uncached * 0.5/1e6 + cached * 0.1/1e6 + completion * 1/1e6
- *   (V4-Flash: cache miss ¥0.5/M, cache hit ¥0.1/M, completion ¥1/M)
- *
- *   P1 fix (2026-06-03): 早期版本直接用 0.0005/0.0001/0.001 当 ¥/token,
- *   算出来比真实成本大 1000×(1000 prompt + 100 completion 当时给 ¥0.28,
- *   实际应约 ¥0.00028)。改成除 1e6 显式表达 ¥/M → ¥/token,避免下次再写错。
+ * Sprint 1a: cache_hit_rate 仅做总 cost 估算, 没暴露。Sprint 1b 起可观测。
  */
-export interface CostBreakdown {
-  cache_hit_rate: number;
-  cost_turn: number;
-  tokens_uncached: number;
-}
-
-export function computeCostBreakdown(
-  promptTokens: number,
-  completionTokens: number,
-  cachedTokens: number | undefined,
-): CostBreakdown | undefined {
-  if (cachedTokens === undefined) return undefined;
-  const tokensUncached = Math.max(0, promptTokens - cachedTokens);
-  const hitRate = promptTokens > 0 ? cachedTokens / promptTokens : 0;
-  // V4-Flash pricing (2026-06): ¥0.5/M cache miss, ¥0.1/M cache hit, ¥1/M completion.
-  // 把 ¥/M 转 ¥/token 必须除 1e6, 不要直接当 ¥/token 用(会大 1000×)。
-  const costTurn =
-    tokensUncached * (0.5 / 1_000_000) +
-    cachedTokens * (0.1 / 1_000_000) +
-    completionTokens * (1 / 1_000_000);
-  return {
-    cache_hit_rate: hitRate,
-    cost_turn: costTurn,
-    tokens_uncached: tokensUncached,
-  };
-}
 
 /** chat() 完整调用的返回值。Sprint 1a 加 tool_calls + usage。 */
 export interface ChatResult {
