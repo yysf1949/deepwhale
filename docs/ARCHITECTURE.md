@@ -87,10 +87,19 @@
 - **Planner**（基础规划）
 - **MemoryManager**（Short/Long/Summary 三层）
 
-**v4.0 起扩展**（完整 Multi-Agent）：
-- **Researcher**
-- **Reviewer**
-- **完整 Planner-Researcher-Executor-Reviewer 流水线**
+**v4.0 起扩展**（**完整 Multi-Agent = 5 角色**）：
+- **Planner**（任务拆解 + 依赖分析，输出 TaskGraph）
+- **Researcher**（信息收集、Codebase 探索、上下文检索）
+- **Coder**（专用写代码 = v1.0 Executor 特化）
+- **Reviewer**（验证、self-check、Code Review 自动化）
+- **Executor**（通用工具执行，Computer/Browser 编排）
+- **流水线**：`Planner → Researcher → Coder → Reviewer → Executor`
+- **单 Agent 模式保留**为 `mode=single`（v1.0 行为完全兼容）
+
+**v4.0 关键模块**：
+- **TaskGraph 引擎**：Planner 输出 DAG，跨 session 持久化，**与 Session DAG 正交**
+- **Persistent Memory**：跨 session 知识沉淀，hand-edit 友好，跨 5 角色共享
+- **Tool Router 升级**：v1.0 registry → v4.0 语义路由
 
 ### 2.3 Runtime Layer
 
@@ -228,6 +237,8 @@
 | 16 | LSP 集成 | Sprint 3 | v1 不必要 | v1.5 |
 | 17 | Compaction | Sprint 5 | v1 不需要 | v1.5 |
 | 18 | Cross-session 知识图谱 | Sprint 6 | v1 不需要 | v2.0 |
+| 19 | 真实 5 进程 Multi-Agent 编排 | v4.0 风险 | 单 process 内 5 函数，**不真 spawn 5 个 Agent**（避免 Anthropic/OpenAI 那种昂贵编排） | 不评估 |
+| 20 | MCP Marketplace 合并到 Plugin Marketplace | v4.0 风险 | **拆成两个市场**（功能包 vs 纯工具服务） | 不评估 |
 
 ---
 
@@ -308,17 +319,40 @@
 
 ### Phase 5 — v4.0 Agent OS（3 个月）
 
-**目标**：完整 Agent Operating System
+**目标**：从"命令行助手"变成**"长期运行的软件工程 Agent"**（long-running software engineering agent）
 
 **交付清单**：
-- **完整 Multi-Agent**：Planner / Researcher / Executor / Reviewer 流水线
-- **Plugin Marketplace**（npm `@deepwhale/` 命名空间）
-- **Desktop**（Tauri 2.x）+ **Web**（可选）
-- **Channels**（飞书 / Telegram / Discord / Email，重新评估清单）
-- 文档站（VitePress）
+
+**5 角色 Multi-Agent 流水线**（`Planner → Researcher → Coder → Reviewer → Executor`）：
+- **Planner**（任务拆解 + 依赖分析 → 输出 TaskGraph）
+- **Researcher**（信息收集、Codebase 探索、上下文检索）
+- **Coder**（专用写代码 = v1.0 Executor 特化）
+- **Reviewer**（验证、self-check、Code Review 自动化）
+- **Executor**（通用工具执行，Computer/Browser 编排）
+- 单 Agent 模式保留为 `mode=single`（**v1.0 行为完全兼容**）
+
+**TaskGraph 引擎**（**v4.0 新增独立模块**）：
+- Planner 输出 DAG 表示子任务依赖
+- 任务调度：依赖满足才执行、并行无依赖任务、失败重试、超时中断
+- **跨 session 持久化**（重启不丢任务图）
+- 与 Session DAG **正交**（Session DAG = 消息树，TaskGraph = 工作流图）
+
+**Persistent Memory**（v2.0 MemoryManager 升级）：
+- 跨 session 知识沉淀（用户偏好 / 项目决策 / 实体链接）
+- hand-edit 友好
+- 跨 5 角色共享
+
+**Tool Router 升级**：v1.0 registry → v4.0 语义路由
+
+**MCP Marketplace**（**与 Plugin Marketplace 拆开**）：
+- Plugin Marketplace = 功能包市场（UI/事件/工具）
+- MCP Marketplace = 纯工具服务市场
+
+**Desktop**（Tauri 2.x）+ **Web**（可选）+ **Channels** + 文档站（VitePress）
 
 **验收标准**：
-- 4 个 Agent 角色协同跑通
+- **5 个 Agent 角色 + TaskGraph 协同跑通**
+- TaskGraph 跨重启恢复
 - 桌面 GUI 跑起来
 - 文档站上线
 
@@ -370,7 +404,11 @@
 | Docker 沙箱冷启动慢 | 低 | Phase 1 接受，Phase 3 优化 |
 | Browser Runtime 跨浏览器一致 | 中 | Playwright 抽象足够，**不做自定义协议** |
 | Computer Use OS 差异 | 高 | v3.0 主要验证 macOS + Linux X11，Windows v3.0 不做 |
-
+| Reasonix 1.0 6 周未发 | 中 | **强制 release 节奏**（每周一 minor，**v1.0/v1.5/v2.0/v3.0/v4.0 必发**） |
+| **5 角色 Multi-Agent 协同效率** | 高 | v4.0 用单 process 内 5 函数实现，**不真的 spawn 5 个 Agent**（避免 Anthropic/OpenAI 那种昂贵的多 Agent 编排） |
+| **TaskGraph 持久化失败** | 中 | **强制 JSONL append-only**（与 Session 同套路），单元测试覆盖崩溃恢复 |
+| **Persistent Memory 跨 session 污染** | 中 | 显式 scope 标记（`user` / `project` / `session`），hand-edit 优先于自动写入 |
+| **Coder 重复造轮子** | 中 | Coder 复用 v1.0 Executor 代码，**只加 Code-aware 工具**，不写第二套 agent 循环 |
 ---
 
 ## 9. 文档关系

@@ -320,21 +320,56 @@ deepwhale>
 
 ## Phase 5 — v4.0 Agent OS（第 11-13 个月）
 
-**目标**：完整 Agent Operating System。**v4.0 第 13 个月末必发**。
+**目标**：从"命令行助手"变成**"长期运行的软件工程 Agent"**（long-running software engineering agent）。**v4.0 第 13 个月末必发**。
 
-### Sprint 16-20（Multi-Agent + Desktop + Channels + 文档站，第 11-13 个月）
+> **设计理念**：v1.0-v3.0 解决"单次任务能不能完成"，v4.0 解决"**多 session / 跨重启 / 长期演化**"——这是 deepwhale 从"CLI 工具"升维为"Agent OS"的核心标志。
+
+### Sprint 16-17（Multi-Agent 5 角色 + TaskGraph 引擎，第 11-12 个月）
 
 #### 任务清单
-- [ ] **完整 Multi-Agent**
-  - Planner / Researcher / Executor / Reviewer 流水线
-  - 单 Agent 模式保留为 `mode=single`
-- [ ] **Plugin Marketplace**
+- [ ] **5 角色 Multi-Agent 流水线**
+  - **Planner**（任务拆解 + 依赖分析，输出 TaskGraph）
+  - **Researcher**（信息收集、Codebase 探索、上下文检索）
+  - **Coder**（专用写代码 = v1.0 Executor 特化）
+  - **Reviewer**（验证、Coder 输出 review、Code Review 自动化、self-check）
+  - **Executor**（通用工具执行，Computer Use / Browser 编排）
+  - **流水线**：`Planner → Researcher → Coder → Reviewer → Executor`
+  - **单 Agent 模式保留**为 `mode=single`（v1.0 行为完全兼容）
+- [ ] **TaskGraph 引擎**（**v4.0 新增，独立模块**）
+  - Planner 输出**有向无环图（DAG）**表示子任务依赖
+  - 任务调度：依赖满足才执行、并行无依赖任务、失败重试、超时中断
+  - **跨 session 持久化**（重启不丢任务图）
+  - 与 Session DAG **正交**（Session DAG = 消息树，TaskGraph = 工作流图）
+  - 例：`重构用户模块` → [读 schema(0) → 改 UserService(2) → 改 controller(3) → 写测试(4) → Reviewer(5)]
+- [ ] **Persistent Memory**（v2.0 MemoryManager 升级）
+  - 跨 session 知识沉淀（用户偏好 / 项目决策 / 实体链接）
+  - hand-edit 友好（用户可直接改 memory 文件）
+  - **实体链接**：项目 / 文件 / 决策 三类节点的引用图
+  - 跨 session 复用 + 跨 v4.0 Multi-Agent 5 角色共享
+- [ ] **Tool Router 升级**（v1.0 已有）
+  - v4.0 = 语义路由（按意图选工具，而不只是 registry 查找）
+  - 支持 MCP 工具 + 内置工具 + Plugin 工具三类合并查询
+
+#### ⚠️ Sprint 16-17 红线
+- **Coder = Executor 特化，不是新东西**——复用 v1.0 Executor 代码，v4.0 加 Code-aware 工具
+- **TaskGraph ≠ Session DAG**——前者是工作流层，后者是消息持久化层
+- **Persistent Memory 不与 Session 混淆**——Memory 跨 session 共享，Session 是单一线程
+
+### Sprint 18-20（MCP Marketplace + Desktop + Channels + 文档站，第 12-13 个月）
+
+#### 任务清单
+- [ ] **Plugin Marketplace**（功能包市场）
   - npm 命名空间 `@deepwhale/`
-  - `deepwhale search skills` 命令
+  - `deepwhale skill install` / `deepwhale plugin install` 命令
+- [ ] **MCP Marketplace**（工具市场，**与 Plugin Marketplace 拆开**）
+  - 官方 MCP server 目录
+  - `deepwhale mcp install <name>` 命令
+  - 区别：Plugin = 功能包（含 UI/事件/工具），MCP = 纯工具服务
 - [ ] **Desktop**（Tauri 2.x）
   - 多 tab 会话
   - 右侧 panel 显示 agent 读/改过的文件
   - 底部 cost / cache / token meters
+  - **TaskGraph 可视化**（DAG 节点图）
 - [ ] **Web UI**（可选）
   - 浏览器访问 `localhost:7331`
 - [ ] **Channels**（**v4.0 重新评估清单**）
@@ -345,9 +380,14 @@ deepwhale>
   - Quickstart / Skills 开发指南 / Extension API 文档 / FAQ
 - [ ] **v4.0 release**
   - 第 13 个月末 GitHub Release
-  - 4 个 Agent 角色协同跑通
+  - **5 个 Agent 角色 + TaskGraph 协同跑通**
   - 桌面 GUI 跑起来
   - 文档站上线
+
+#### ⚠️ v4.0 红线
+- **5 角色不等于 5 个独立 Agent**——是 5 个**职责**，可以是 1 个 process 内 5 个函数
+- **TaskGraph 持久化必须做**（重启不丢）——避免变成"另一个 in-memory DAG"
+- **MCP Marketplace ≠ Plugin Marketplace**——两类市场分开发布
 
 ---
 
