@@ -1,5 +1,11 @@
 # 🏛 deepwhale 终极架构
 
+> ## 🔒 ROADMAP LOCKED（2026-06-03）— 与 [ROADMAP.md](../ROADMAP.md) 同步
+>
+> 当前成熟度 **9.1/10**。**允许修改**：BUG / 错别字 / 任务拆分细化。**禁止修改**：Phase / Bet / Gate / 版本锚。**复盘时间**：v1.0 Release 之后。
+>
+> **成功概率分层**（4 档）：做出产品 85% / Claude Code 70% / Codex 40-50% / 超过 Codex 10-20%。**最大未知数**：DeepSeek-Reasonix 在 50 Tool Calls+ 复杂任务中的表现。
+
 > **核心变更（vs 初版）**：
 > 1. **锁定 5 层架构**（LLM / Code Intelligence / Runtime / Agent / UI）+ **Memory cross-cutting**
 > 2. **锁定 6 版本锚**（v1.0 Claude Code Lite → v1.5 Codex Core+CodeIntel → v2.0 +Browser Agent → v2.5 +Planner → v3.0 +Computer Use 兼容层 → v4.0 Agent OS）
@@ -223,6 +229,83 @@ deepwhale.tool('semantic_search', {
   max_results: 10,
 });
 ```
+
+### 2.3.2 Edit Engine Interface（v1.0 抽象，**hashline 是 default 不是核心卖点**）
+
+> ⭐ **2026-06-03 用户拍板**：hashline 是 **Editing Primitive（编辑原语）**，**不是核心卖点**。用户购买的是**修改成功率**，不是 patch 格式。因此**必须从一开始就把它当可替换的接口**来设计——**未来可能用 unified diff、AST patch、Search-and-Replace 替代**。
+
+**抽象动机**：
+- v1.0 决定用 hashline（oh-my-pi 借鉴，3-hex TAG + 锚定）作为默认实现，**因为它对模型输出最友好**
+- 但 hashline 不是银弹——**v2.x/v3.0 一旦出现某种 patch 格式明显更优（例如 AST patch 对结构化代码 100% 命中）**，就要能换实现
+- 抽象不抽 = 散落在 6 个工具里 + LLM prompt 模板里 + snapshot 协议里 = 重构成本爆炸
+
+**接口设计**（**v1.0 落地**）：
+
+```typescript
+// packages/edit-engine/src/types.ts
+export interface EditEngine {
+  /** 编辑器名字（hashline / unified-diff / ast-patch） */
+  readonly name: string;
+
+  /**
+   * 把模型的"修改意图"转成可应用的 patch 文本
+   * - hashline: 加 3-hex TAG 锚定
+   * - unified-diff: 走标准 diff 格式
+   * - ast-patch: 走结构化 patch
+   */
+  format(intent: EditIntent): string;
+
+  /**
+   * 把 patch 文本应用到目标文件
+   * - 成功：返回新内容
+   * - 失败：返回 ApplyError（含 recovery 建议）
+   */
+  apply(target: FileContent, patch: string): ApplyResult;
+}
+
+export interface EditIntent {
+  file: string;
+  /** 唯一标识：hashline 用 (line, hash), unified-diff 用 (start, end), ast-patch 用 (node-id) */
+  anchor: EditAnchor;
+  oldText: string;
+  newText: string;
+}
+```
+
+**v1.0 实现矩阵**：
+
+| Engine | 状态 | 适用场景 | 备注 |
+|---|---|---|---|
+| **hashline** | **v1.0 default** | 模型输出 / 高频 edit / 模糊上下文 | 3-hex TAG 锚定，oh-my-pi 借鉴 |
+| **unified diff** | **v1.0 stub**（接口预留）| 大段替换 / 跨文件 | 留给 git diff 风格场景 |
+| **AST patch** | **v1.0 不实现** | 结构化代码 / 高保证率 | 留作 v2.0 候选 |
+| **search-and-replace** | **v1.0 备选** | 短匹配 / 无锚 | 临时回退方案 |
+
+**LLM 侧 prompt 抽象**（**v1.0 必须可切换**）：
+
+```typescript
+// packages/edit-engine/src/prompt.ts
+export interface PatchPromptTemplate {
+  render(engine: EditEngine, intent: EditIntent): string;
+}
+
+// v1.0 实现：HashlinePromptTemplate（v1.0 唯一）
+// v1.x 实现：UnifiedDiffPromptTemplate（v1.0 stub，v1.0.x 启用）
+```
+
+**决策红线**：
+- **v1.0 = 只实现 hashline**（接口 + 1 个实现 + 1 个 stub 占位 unified diff）
+- **AST patch 在 v1.5 之前不要碰**——除非 Profile 显示 hashline 是真瓶颈
+- **未来切换 engine 必须是 0 改 LLM prompt 之外代码**（仅 prompt 模板 + engine 实现 + apply 路径）
+
+**成功标准**（v1.0 release 时）：
+- [ ] `EditEngine` interface 在 `packages/edit-engine/src/types.ts` 定义
+- [ ] `HashlineEngine implements EditEngine` 跑通（parser + apply + recovery）
+- [ ] `UnifiedDiffEngine` 至少是 stub（throw "not implemented"）
+- [ ] `edit_file` tool 内部用 `EditEngine` 抽象调用，**不是直接 import hashline**
+- [ ] 单测：mock 2 个 engine，验证 edit_file 走抽象
+
+**4 份 design 文档映射**：本节是 EDIT 抽象的架构层。详细 hashline 协议在 [AGENT_RUNTIME.md §3](./design/AGENT_RUNTIME.md) 的 Observation schema 里定义；tool 暴露在 [CAPABILITY_MODEL.md §4](./design/CAPABILITY_MODEL.md) 的 `edit_file` capability 里。
 
 ### 2.4 UI Layer
 

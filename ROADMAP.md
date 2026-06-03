@@ -1,5 +1,25 @@
 # 🗺 deepwhale ROADMAP
 
+> ## 🔒 ROADMAP LOCKED（2026-06-03 用户拍板）
+>
+> **当前成熟度 9.1/10**，**已超过绝大多数 Agent 开源项目立项时的成熟度**。继续讨论路线图的收益已明显低于开始写代码的收益。
+>
+> **允许修改**：BUG / 错别字 / 任务拆分细化
+> **禁止修改**：Phase / Bet / Gate / 版本锚
+> **复盘时间**：v1.0 Release 之后
+>
+> **成功概率分层**（4 档，更精确）：
+> - 做出产品：85%
+> - 达到 Claude Code 水平：70%
+> - 达到 Codex 水平：40-50%
+> - 超过 Codex：10-20%
+>
+> **最大未知数**不是架构，而是 **DeepSeek-Reasonix 在 50 Tool Calls+ 复杂任务中的表现**——这部分谁都无法靠规划解决，只能靠实测。
+>
+> **最重要的设计结构**：不是 Browser/Computer Use/Desktop，而是 `Roadmap → Bet → Gate → Implementation` 四层结构。这意味着未来某个功能延期不会影响项目方向。
+>
+> ---
+
 > **6 版本锚 × 13-17 个月（含风险系数），单人开发节奏**
 > **Hypothesis-Driven Roadmap（假设驱动开发路线图）**——3 个 Bets + 3 个 Gates
 >
@@ -198,7 +218,7 @@ DeepWhale 6 个版本形成清晰的 5 步能力演进 + 3 个 Release Gates 守
 
 | Phase | 版本 | 月份 | 累计 | 主题 | 关键交付 | 状态 |
 |---|---|---|---|---|---|---|
-| **Phase 1** | v1.0 | 第 1-3 个月 | 3 月 | **Coding Agent** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker | 🚧 进行中 |
+| **Phase 1** | v1.0 | 第 1-3 个月 | 3 月 | **Coding Agent** | CLI + TUI + 6 工具 + Linear Session + **Prefix-cache 4 大机制** + Docker + **4 包 monorepo**（`@deepwhale/core` / `@deepwhale/llm` / `@deepwhale/coding-agent` / `@deepwhale/edit-engine`） | 🚧 进行中 |
 | **Phase 2** | v1.5 | 第 4-5 个月 | 5 月 | **大型仓库理解** | Approval + Task + Skills + Extension API + Hooks + StormBreaker + **Code Intelligence 基础**（Tree-sitter + Symbol Graph + Workspace Index） | ⏳ 待开始 |
 | **Phase 3** | v2.0 | 第 6-8 个月 | 8 月 | **Observe** | **真实 Browser Agent 基础**（4 件：DOM Understanding / Element Ranking / Page Summary / Action History）+ Memory Ranking + Code Intel 增强 + 4 项补回 | ⏳ 待开始 |
 | **Phase 3.5** | **v2.5** | **第 9 个月** | **9 月** | **Plan** | **Planning Framework**（Planner + DAG + Task Object + Plan Cache + Execution Boundary） | ⏳ 待开始 |
@@ -206,17 +226,17 @@ DeepWhale 6 个版本形成清晰的 5 步能力演进 + 3 个 Release Gates 守
 | **Phase 5** | v4.0 | 第 12-13 个月 | **13 月** | **Research + Agent OS** | 5 角色 Multi-Agent + TaskGraph + Persistent Memory + Plugin Marketplace + Desktop + Channels | ⏳ 待开始 |
 
 > ⭐ **2026-06-03 重大调整**：oh-my-pi 借鉴融入 Sprint 0-2（详见 `docs/ROADMAP_DECISIONS.md` §15）
-> - **Sprint 0 新增** hashline 格式 MVP（parser + apply + TAG）
+> - **Sprint 0 新增** Edit Engine 抽象 + hashline MVP（`@deepwhale/edit-engine` 包，`EditEngine` interface + hashline 实现 + unified-diff stub）
 > - **Sprint 1 edit_file 升级** 完整 hashline + Recovery 3-way（替代原"hash 锚定"简化版）
 > - **Sprint 2 新增** napi natives 调研（先 bun 子进程跑 grep 验证可行性）
 > - **v1.0 末新增** 自研 edit benchmark（求职差异化）
-> - **v1.5 落地** napi natives（grep/tokens/ast 走 Rust）
+> - **v1.5 Native Acceleration Evaluation**（先 Node 跑 Profile 验证瓶颈，再决定是否 Rust NAPI）
 
 > ⭐ **2026-06-03 重大调整（v3）**：ECC 借鉴融入 Sprint 0-2 + v1.0 末（详见 `docs/ROADMAP_DECISIONS.md` §16）
 > - **Sprint 0 新增** SKILL.md 标准化目录（YAML frontmatter + 首批 3 个 skill）
 > - **Sprint 1 新增** Tool 返回 schema 统一（Observation 4 字段 + Recovery 3 字段，4 维质量模型实现）
 > - **v1.0 末新增** `/verify` slash command + VERIFICATION REPORT 格式（6 阶段流程）
-> - **v2.0 Tier-1 落地** continuous-learning-v2 模式（instinct + confidence，借鉴 ECC v2）
+> - **v2.0 Tier-1 落地** continuous-learning-v2 模式（instinct + confidence，借鉴 ECC v2）— **范围严格限定为 Memory Ranking + Plan Cache + Execution Feedback 三件**，**不要扩张**到 Reflection / Self-improvement / Knowledge Base（避免变成"memory 黑洞"）
 
 > **v1.0 = 1 个 release**（不是 5+1 个 Sprint）
 > **v1.5 起 = 每月 1 个 minor release**（每周一 minor 强制节奏）
@@ -272,12 +292,15 @@ v2.0 范围内的 4 项"补回"任务（Automation / Remote TUI / Compaction / M
   - 4 个 Skills 约定目录（v1.0 暂不读，v1.5 启用）：`.deepwhale/skills/`、`.agents/skills/`、`~/.deepwhale/skills/`、`~/.claude/skills/`
 - [ ] **`@deepwhale/llm` OpenAI 兼容客户端**（**v1 = DeepSeek only**）
 - [ ] **`@deepwhale/coding-agent` 最小 CLI 入口**
-- [ ] **⭐ hashline patch 格式 MVP**（oh-my-pi P0 借鉴，详见 `docs/ROADMAP_DECISIONS.md` §15）
-  - `packages/hashline/src/parser.ts`（lark 语法解析 patch 文本）
-  - `packages/hashline/src/apply.ts`（in-memory apply 引擎）
-  - `packages/hashline/src/snapshots.ts`（3-hex TAG 抽象）
+- [ ] **⭐ Edit Engine 抽象 + hashline MVP**（oh-my-pi P0 借鉴，详见 `docs/ROADMAP_DECISIONS.md` §15、[`ARCHITECTURE.md §2.3.2`](./ARCHITECTURE.md)）
+  - **先定义接口再实现**（**hashline 是 Editing Primitive，不是核心卖点**——未来可换 unified diff / AST patch）
+  - `packages/edit-engine/src/types.ts`（`EditEngine` interface + `EditIntent` + `ApplyResult`）
+  - `packages/edit-engine/src/engines/hashline/parser.ts`（lark 语法解析 patch 文本）
+  - `packages/edit-engine/src/engines/hashline/apply.ts`（in-memory apply 引擎）
+  - `packages/edit-engine/src/engines/hashline/snapshots.ts`（3-hex TAG 抽象）
+  - `packages/edit-engine/src/engines/unified-diff/index.ts`（**stub：throw "not implemented"**，v1.0 占位）
   - **不实现 Recovery 3-way / block 解析**（Sprint 1 完整版再加）
-  - **目的**：Sprint 1 edit_file 工具能直接用，**不写 str_replace 临时方案**
+  - **目的**：Sprint 1 edit_file 工具能直接走 `EditEngine` 抽象调用，**不写 str_replace 临时方案**
 - [ ] **⭐ SKILL.md 标准化目录**（ECC P0 借鉴，详见 `docs/ROADMAP_DECISIONS.md` §16）
   - `skills/<name>/SKILL.md`（YAML frontmatter + Markdown body）
   - **frontmatter 必填字段**：`name` / `description` / `origin`
@@ -297,6 +320,7 @@ deepwhale>
 - **i18n 路径第 1 行定对**（Hermes 教训）
 - **路径迁移兼容机制**写好（CodeWhale 教训）
 - **4 包版本同步 CI**（pi #4908 教训）
+- **monorepo 包名定对**：`@deepwhale/llm` / `@deepwhale/coding-agent` / `@deepwhale/edit-engine` / `@deepwhale/core`（**edit-engine 是 Sprint 0 第 4 个包，不是 packages/hashline**——必须从 Sprint 0 第 1 行就叫 `edit-engine`，不要 Sprint 1 再改名）
 
 ---
 
@@ -385,10 +409,11 @@ deepwhale>
 - [ ] **基础 UX 打磨**
   - 错误信息友好（DeepSeek 限流 / API key 缺失 / Docker 未启动）
   - TUI 流式渲染测试
-- [ ] **⭐ napi natives 调研**（oh-my-pi P0 借鉴，前置到 Sprint 2）
+- [ ] **⭐ Native Acceleration 调研**（oh-my-pi P0 借鉴，前置到 Sprint 2）
   - **第一步：bun 子进程跑 grep** 验证性能提升（`bun --filter='*.ts' grep 'TODO'`，对比 TS 实现）
-  - 验证通过 → 决定 napi + Rust 走哪条路径
-  - 验证失败 → 退回纯 TS 实现，**v1.5 再做 napi**
+  - 验证通过 → 列入 v1.5 候选，**Profile 确认是 grep / index / symbol graph 真瓶颈后再上 Rust**
+  - 验证失败 → 退回纯 TS 实现，**v1.5 不做 napi**
+  - **绝不提前承诺 Rust NAPI 一定上线**——正确顺序：Node 实现 → Profile → 确认瓶颈 → Rust
   - 决策依据写入 `docs/research/native-feasibility.md`
   - 详见 `docs/ROADMAP_DECISIONS.md` §15
 - [ ] **强制 release 节奏**
@@ -448,6 +473,24 @@ deepwhale>
 - **Codex 14 项功能 0/14**（**v1.5 才到 14/14**）
 
 #### ⚠️ v1.0 红线
+
+**v1.0 Release Rule**（**2026-06-03 用户拍板，v1.0 范围控制铁律**）：
+
+> v1.0 **只验证 Coding Agent 是否成立**。任何不影响 Coding Agent 成立的功能，都允许延后到 v1.0.x。
+
+| 必须完成（v1.0 内） | 可延期（v1.0.x） |
+|---|---|
+| `bash` / `read` / `write` / `edit` / `find` / `grep` | `/verify` slash command（v1.0 末加） |
+| session（Linear JSONL） | 高级 cache 统计（命中率可视化） |
+| docker 沙箱 | 自研 edit benchmark |
+| hashline（Editing Primitive） | 漂亮 UI / 主题 / 动画 |
+| SKILL.md 目录约定（v1.0 不读） | 国际化细节（v1.0 = 中英混排可接受） |
+| TUI 基础渲染 | 文档站 |
+
+**目的**：防止第 10 周出现"再加一个功能就发版"综合征。v1.0 宁可少、不可晚。
+
+---
+
 - **不要做 MCP / Browser / Computer / Plugins / Skills / Desktop / 渠道**（**砍掉清单**）
 - **不要做 Session DAG**（v1.0 = Linear）
 - **不要做 Compaction**（v1.5 起）
