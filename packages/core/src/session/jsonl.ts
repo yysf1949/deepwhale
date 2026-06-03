@@ -85,6 +85,10 @@ export class SessionWriter {
   }
 
   async close(): Promise<void> {
+    // 关键：先 await writeQueue 排空，否则 doAppend 中的 handle.write/sync
+    // 会在 handle.close() 之后执行，触发 'EBADF' / 'file closed' 错误。
+    // 复现：append 后立刻 close（不 await）→ write 撞上 closed handle
+    await this.writeQueue;
     if (this.handle) {
       await this.handle.close();
       this.handle = null;

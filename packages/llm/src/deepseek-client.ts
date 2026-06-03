@@ -23,7 +23,19 @@ import type { ChatMessage, ChatResult, LLMClient, LLMError, ModelId } from './ty
 
 /** DeepSeek 的 OpenAI 兼容端点。 */
 export const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/v1';
-export const DEEPSEEK_DEFAULT_MODEL = 'deepseek-chat';
+
+/**
+ * 默认模型：DeepSeek-V4-Flash（V4 系列速度/成本优先版本）。
+ *
+ * 迁移背景：
+ * - V4 于 2026-04-24 preview 发布，2026-07-24 15:59 UTC 后 `deepseek-chat`
+ *   和 `deepseek-reasoner` 旧 alias 完全失效（hard-fail，不再是 deprecation warning）。
+ * - 官方推荐路径：保持 base_url 不变，把 model 字段改成 `deepseek-v4-flash` 或
+ *   `deepseek-v4-pro`。
+ * - v4-flash 是 coding agentic 场景的官方推荐（速度/成本/工具调用优化）。
+ * - ref: https://api-docs.deepseek.com/news/news260424
+ */
+export const DEEPSEEK_DEFAULT_MODEL = 'deepseek-v4-flash';
 
 export interface DeepSeekClientOptions {
   /** API key。优先于 process.env.DEEPSEEK_API_KEY。 */
@@ -71,7 +83,9 @@ export class DeepSeekClient implements LLMClient {
     const timeoutController = new AbortController();
     const timer = setTimeout(() => timeoutController.abort(new Error('timeout')), this.timeoutMs);
     const combinedSignal =
-      signal !== undefined ? AbortSignal.any([signal, timeoutController.signal]) : timeoutController.signal;
+      signal !== undefined
+        ? AbortSignal.any([signal, timeoutController.signal])
+        : timeoutController.signal;
 
     let res: Response;
     try {
@@ -103,7 +117,9 @@ export class DeepSeekClient implements LLMClient {
 
     const content = extractContent(json);
     if (content === null) {
-      throw new LLMUnknownError('DeepSeek response missing choices[0].message.content', { status: res.status });
+      throw new LLMUnknownError('DeepSeek response missing choices[0].message.content', {
+        status: res.status,
+      });
     }
     return { model: this.model, content };
   }

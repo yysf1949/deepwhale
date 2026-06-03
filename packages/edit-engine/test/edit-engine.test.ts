@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ApplyResult, EditEngine, EditIntent, FileContent } from '../src/types.js';
-import { createDefaultEngine, createEngine, HashlineEngine, UnifiedDiffEngine } from '../src/index.js';
+import {
+  createDefaultEngine,
+  createEngine,
+  HashlineEngine,
+  UnifiedDiffEngine,
+} from '../src/index.js';
 import { computeLineHashes, hashLine, findAnchor } from '../src/engines/hashline/snapshots.js';
 
 describe('Sprint 0.1: EditEngine abstraction', () => {
@@ -63,7 +68,34 @@ describe('Sprint 0.1: EditEngine abstraction', () => {
         newText: 'B',
       };
       const patch = engine.format(intent);
-      expect(patch).toMatch(/@@\s+2\s+[0-9a-f]{3}\s+@@/);
+      // 协议形态：start-anchor + new lines
+      expect(patch).toMatch(/^@@\s+2\s+[0-9a-f]{3}\s+@@\s*\nB$/);
+
+      // 关键：round-trip 必须真正 apply，否则只是 regex 匹配
+      const result = engine.apply(target, patch);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.newText).toBe('a\nB\nc\n');
+      }
+    });
+
+    it('format() with multi-line newText round-trips through apply()', () => {
+      // 关键回归：多行 newText 不应被 mid-anchor 切成空 block
+      const target: FileContent = { path: 'a', text: 'a\nb\nc\n' };
+      const engine = new HashlineEngine();
+      const line2Hash = computeLineHashes(target.text)[1]!;
+      const intent: EditIntent = {
+        file: 'a',
+        anchor: { kind: 'line-hash', line: 2, hash: line2Hash },
+        oldText: 'b',
+        newText: 'B1\nB2\nB3',
+      };
+      const patch = engine.format(intent);
+      const result = engine.apply(target, patch);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.newText).toBe('a\nB1\nB2\nB3\nc\n');
+      }
     });
   });
 
@@ -88,9 +120,7 @@ describe('Sprint 0.1: EditEngine abstraction', () => {
       const mockEngine: EditEngine = {
         name: 'mock',
         format: vi.fn(() => 'mocked-patch'),
-        apply: vi.fn(
-          (): ApplyResult => ({ ok: true, newText: 'mocked', engine: 'mock' }),
-        ),
+        apply: vi.fn((): ApplyResult => ({ ok: true, newText: 'mocked', engine: 'mock' })),
       };
       // 模拟 edit_file tool 的核心调用
       const target: FileContent = { path: 'a', text: 'old' };

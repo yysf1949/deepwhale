@@ -20,12 +20,7 @@
  * Sprint 0.1 范围：parser + apply + snapshots。不含 Recovery 3-way / block 语法（Sprint 1）。
  */
 
-import type {
-  ApplyResult,
-  EditEngine,
-  EditIntent,
-  FileContent,
-} from '../../types.js';
+import type { ApplyResult, EditEngine, EditIntent, FileContent } from '../../types.js';
 import { computeLineHashes, findAnchor } from './snapshots.js';
 
 const ANCHOR_RE = /^@@\s+(\d+)\s+([0-9a-f]{3})\s+@@\s*$/;
@@ -44,25 +39,22 @@ export class HashlineEngine implements EditEngine {
 
   format(intent: EditIntent): string {
     if (intent.anchor.kind !== 'line-hash') {
-      throw new Error(
-        `HashlineEngine requires anchor kind=line-hash, got: ${intent.anchor.kind}`,
-      );
+      throw new Error(`HashlineEngine requires anchor kind=line-hash, got: ${intent.anchor.kind}`);
     }
     const startLine = intent.anchor.line;
     const startHash = intent.anchor.hash;
     const newLines = intent.newText.split('\n');
-    const blocks: string[] = [];
 
-    for (let i = 0; i < newLines.length; i += 8) {
-      const slice = newLines.slice(i, i + 8);
-      const midLine = startLine + i;
-      const midHash = hashLine(slice[0] ?? '');
-      blocks.push(`@@ ${midLine} ${midHash} @@`);
-      for (const line of slice) {
-        blocks.push(line);
-      }
-    }
-    return [`@@ ${startLine} ${startHash} @@`, ...blocks, `@@ ${startLine + newLines.length - 1} ${hashLine(newLines[newLines.length - 1] ?? '')} @@`].join('\n');
+    // Sprint 0.1 协议（简化版）：
+    //   @@ <line> <hash> @@
+    //   <new-line-1>
+    //   <new-line-2>
+    //   ...
+    // mid-anchor（每 ~10 行一个校验点）挪到 Sprint 1，因为本版 parseBlocks
+    // 把任何相邻 @@ 配对成 start+end，会把首 block 的 lines 吃成空数组。
+    // end-anchor 同样隐式化：下一个 @@ 即 block 边界，patch 末尾的最后一个
+    // block 持有余下所有非 @@ 行。
+    return [`@@ ${startLine} ${startHash} @@`, ...newLines].join('\n');
   }
 
   apply(target: FileContent, patch: string): ApplyResult {
@@ -77,7 +69,10 @@ export class HashlineEngine implements EditEngine {
   private applyWithHashes(target: FileContent, patch: string): ApplyResult {
     const blocks = parseBlocks(patch);
     if (blocks.length === 0) {
-      return { ok: false, error: { kind: 'parse-failed', position: 0, message: 'No valid @@ blocks found' } };
+      return {
+        ok: false,
+        error: { kind: 'parse-failed', position: 0, message: 'No valid @@ blocks found' },
+      };
     }
 
     const targetLines = target.text.split('\n');
@@ -126,17 +121,6 @@ export class HashlineEngine implements EditEngine {
   }
 }
 
-/** 计算一行文本的 3-hex 短 hash（与 snapshots.ts 一致） */
-function hashLine(text: string): string {
-  // 简化：FNV-1a 32-bit，取低 12-bit 转 3-hex
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return ((h >>> 0) & 0xfff).toString(16).padStart(3, '0');
-}
-
 function parseBlocks(patch: string): ParsedBlock[] {
   const lines = patch.split('\n');
   const blocks: ParsedBlock[] = [];
@@ -148,23 +132,21 @@ function parseBlocks(patch: string): ParsedBlock[] {
     if (m) {
       const ln = Number.parseInt(m[1]!, 10);
       const hs = m[2]!;
-      if (current === null) {
-        // start anchor: 开启一个新 block
-        current = {
-          startLine: ln,
-          startHash: hs,
-          endLine: 0,
-          endHash: '',
-          midAnchors: [],
-          lines: [],
-        };
-      } else {
-        // end anchor: 闭合 block
+      if (current !== null) {
+        // 任何相邻 @@ 都闭合当前 block（end 隐式 = 下一个 anchor）
+        // Sprint 1 会改成显式 end-anchor + mid-anchor 校验
         current.endLine = ln;
         current.endHash = hs;
         blocks.push(current);
-        current = null;
       }
+      current = {
+        startLine: ln,
+        startHash: hs,
+        endLine: 0,
+        endHash: '',
+        midAnchors: [],
+        lines: [],
+      };
       continue;
     }
     if (current) {
@@ -173,7 +155,12 @@ function parseBlocks(patch: string): ParsedBlock[] {
     // 非 @@ 行 + 无 current block = patch 开头/结尾的杂项，忽略
   }
 
-  // 兜底：如果 patch 以非 @@ 结尾，current block 持有未闭合的 lines，丢弃（Sprint 1 完整版会报错）
+  // 兜底：Sprint 0.2 简化版接受"无显式 end-anchor 的末尾 block"。
+  // 协议：end 隐式 = 下一个 @@ 或 patch 末尾。
+  // Sprint 1 会改成"end-anchor 缺失则报错"以检测 patch 截断。
+  if (current !== null) {
+    blocks.push(current);
+  }
   return blocks;
 }
 

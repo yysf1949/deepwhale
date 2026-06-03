@@ -1,21 +1,26 @@
 /**
  * grep 工具 — 文本搜索
  *
- * Sprint 0.2 范围：用 grep 命令（execFile，不走 shell）
+ * Sprint 0.2 范围：跨平台 Node 实现（不走 GNU grep，避开 Windows 缺失问题）
  * Sprint 2+ 候选：ripgrep 子进程（oh-my-pi 借鉴）/ Rust napi
+ *
+ * 实现策略：基于 fs.readdirSync({ recursive: true }) + 行级正则匹配。
+ * 比 GNU grep 慢，但 v1.0 单人本地够用，跨平台 0 依赖。
  */
 
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
+import { resolve, join, relative } from 'node:path';
+import { EOL } from 'node:os';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 
-const execFileP = promisify(execFile);
+const MAX_RESULTS_DEFAULT = 100;
+const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB 文本上限（Sprint 0.2 简化：大文件直接跳过）
 
 export class GrepTool implements Tool {
   readonly name = 'grep' as ToolName;
   readonly description =
-    'Search for a text pattern in files. Uses `grep` command via execFile (no shell injection). Supports include glob for file filtering.';
+    'Search for a text pattern in files. Cross-platform Node implementation (no shell). Supports include glob for file filtering.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
 
   readonly schema: ToolInputSchema = {
@@ -34,57 +39,146 @@ export class GrepTool implements Tool {
     const pattern = input['pattern'];
     const path = input['path'];
     const include = input['include'];
-    const regex = input['regex'] !== false; // default true
-    const maxResults = typeof input['maxResults'] === 'number' ? input['maxResults'] : 100;
+    const useRegex = input['regex'] !== false; // default true
+    const maxResults =
+      typeof input['maxResults'] === 'number' && input['maxResults'] > 0
+        ? Math.floor(input['maxResults'])
+        : MAX_RESULTS_DEFAULT;
 
     if (typeof pattern !== 'string' || pattern.length === 0) {
       return { success: false, content: '', error: 'invalid-input: pattern is required' };
     }
 
     const searchPath = typeof path === 'string' && path.length > 0 ? path : '.';
-    const args: string[] = [
-      '-r',
-      '-n',
-      '-I', // skip binary files
-      ...(regex ? ['-E'] : ['-F']),
-      '--',
-      pattern,
-      searchPath,
-    ];
-    if (typeof include === 'string') {
-      args.push('--include', include);
-    }
+    const rootPath = resolve(searchPath);
 
+    let re: RegExp;
     try {
-      const { stdout } = await execFileP('grep', args, {
-        maxBuffer: 10 * 1024 * 1024,
-        timeout: 30_000,
-      });
-      const lines = stdout.split('\n').filter(Boolean);
-      const truncated = lines.length > maxResults;
-      const content = truncated ? lines.slice(0, maxResults).join('\n') : stdout.trim();
-      return {
-        success: true,
-        content: truncated ? `${content}\n\n[truncated to ${maxResults} of ${lines.length} matches]` : content,
-        meta: { pattern, searchPath, matchCount: lines.length, truncated },
-      };
+      re = useRegex ? new RegExp(pattern) : escapeLiteralRegex(pattern);
     } catch (err) {
-      // grep returns exit 1 when no matches found — that's not an error.
-      // promisify(execFile) attaches { code, stdout, stderr, message } to the error.
-      const e = err as Error & { code?: number | string; stdout?: string; stderr?: string };
-      if (e.code === 1 || e.code === '1') {
-        return {
-          success: true,
-          content: '',
-          meta: { pattern, searchPath, matchCount: 0, truncated: false },
-        };
-      }
       return {
         success: false,
         content: '',
-        error: `execution-failed: ${e.message}${e.stderr ? `\nstderr: ${e.stderr}` : ''}`,
-        meta: { pattern, searchPath },
+        error: `invalid-input: pattern is not a valid regex: ${(err as Error).message}`,
       };
     }
+    const includeRe = typeof include === 'string' ? globToRegExp(include) : null;
+
+    let rootStat;
+    try {
+      rootStat = statSync(rootPath);
+    } catch (err) {
+      const e = err as Error & { code?: string };
+      return {
+        success: false,
+        content: '',
+        error: `not-found: ${e.message} (${e.code ?? 'UNKNOWN'})`,
+      };
+    }
+
+    const matches: string[] = [];
+    const filesToScan: string[] = [];
+
+    if (rootStat.isFile()) {
+      filesToScan.push(rootPath);
+    } else if (rootStat.isDirectory()) {
+      collectFiles(rootPath, filesToScan, includeRe, 0, 10);
+    } else {
+      return {
+        success: false,
+        content: '',
+        error: `not-searchable: '${searchPath}' is not a file or directory`,
+      };
+    }
+
+    for (const file of filesToScan) {
+      if (matches.length >= maxResults) break;
+      let text: string;
+      try {
+        const st = statSync(file);
+        if (st.size > MAX_FILE_BYTES) continue; // 跳过超大文件
+        text = readFileSync(file, 'utf8');
+      } catch {
+        continue; // 二进制 / 无权限 / race condition
+      }
+      // 检测 BOM 和 CRLF — CRLF 时 strip trailing \r
+      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+      const sep = text.includes('\r\n') ? '\r\n' : EOL === '\r\n' ? '\r\n' : '\n';
+      const lines = text.split(sep);
+      for (let i = 0; i < lines.length; i++) {
+        const line = (lines[i] ?? '').replace(/\r$/, '');
+        if (re.test(line)) {
+          matches.push(`${relative(process.cwd(), file) || file}:${i + 1}:${line}`);
+          if (matches.length >= maxResults) break;
+        }
+      }
+    }
+
+    const truncated = matches.length >= maxResults;
+    const content = truncated
+      ? matches.join('\n') + `\n\n[truncated to ${maxResults} matches]`
+      : matches.join('\n');
+
+    return {
+      success: true,
+      content,
+      meta: {
+        pattern,
+        searchPath,
+        matchCount: matches.length,
+        truncated,
+        filesScanned: filesToScan.length,
+      },
+    };
   }
+}
+
+function collectFiles(
+  dir: string,
+  out: string[],
+  includeRe: RegExp | null,
+  depth: number,
+  maxDepth: number,
+): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir, { encoding: 'utf8' }) as string[];
+  } catch {
+    return;
+  }
+  for (const name of entries) {
+    const full = join(dir, name);
+    const st = statSyncSafe(full);
+    if (st === null) continue;
+    if (st.isFile()) {
+      if (includeRe === null || includeRe.test(name)) {
+        out.push(full);
+      }
+    } else if (st.isDirectory() && depth < maxDepth) {
+      // 跳过常见噪声目录
+      if (name === 'node_modules' || name === '.git' || name === 'dist') continue;
+      collectFiles(full, out, includeRe, depth + 1, maxDepth);
+    }
+  }
+}
+
+/** 静默 statSync 失败（无权限 / 路径已消失），返回 null 让 caller 跳过。 */
+function statSyncSafe(p: string): Stats | null {
+  try {
+    return statSync(p);
+  } catch {
+    return null;
+  }
+}
+
+function escapeLiteralRegex(s: string): RegExp {
+  return new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+}
+
+function globToRegExp(glob: string): RegExp {
+  const escaped = glob
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^${escaped}$`);
 }

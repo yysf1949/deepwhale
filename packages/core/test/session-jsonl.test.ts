@@ -2,17 +2,16 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  SessionWriter,
-  readSessionEvents,
-  type SessionEvent,
-} from '../src/session/jsonl.js';
+import { SessionWriter, readSessionEvents, type SessionEvent } from '../src/session/jsonl.js';
 
 describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
   let testFile: string;
 
   beforeEach(() => {
-    testFile = join(tmpdir(), `dw-session-${Date.now()}-${Math.random().toString(36).slice(2)}.jsonl`);
+    testFile = join(
+      tmpdir(),
+      `dw-session-${Date.now()}-${Math.random().toString(36).slice(2)}.jsonl`,
+    );
   });
 
   afterEach(async () => {
@@ -58,6 +57,27 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
     it('throws if append called before open', async () => {
       const w = new SessionWriter(testFile);
       await expect(w.append({ kind: 'user', ts: 0, content: 'x' })).rejects.toThrow(/open\(\)/);
+    });
+
+    it('close() drains pending writes (regression: append-then-close)', async () => {
+      // 回归：append 后立刻 close（不 await）必须把那条事件写完。
+      // 旧实现会触发 'EBADF' / 'file closed' 错误。
+      const w = new SessionWriter(testFile);
+      await w.open();
+      const appendP = w.append({ kind: 'user', ts: 42, content: 'pending' });
+      await w.close();
+      await appendP; // 不应 throw
+
+      const content = await fs.readFile(testFile, 'utf8');
+      expect(content).toContain('"ts":42');
+      expect(content).toContain('pending');
+    });
+
+    it('close() is safe to call multiple times', async () => {
+      const w = new SessionWriter(testFile);
+      await w.open();
+      await w.close();
+      await w.close(); // 不应 throw
     });
   });
 

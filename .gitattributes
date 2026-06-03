@@ -1,0 +1,56 @@
+# deepwhale — line ending + diff attribute policy
+#
+# 强制 LF（Unix 换行）。deepwhale 跨 Windows / macOS / Linux 开发，
+# 之前依赖 `core.autocrlf` 全局配置，导致 Windows clean clone 下
+# `prettier --check` 大面积报 66+ 个文件不格式化。
+#
+# 锁定策略：
+# * 文本文件 → checkout=input commit=LF（自动转换 CR/LF → LF on commit）
+# * 需要字节级一致的文件 → -text（不转换）
+# * Windows batch / PowerShell 脚本 → CRLF（这些是 Windows 平台原生）
+
+# 强制 LF（默认即 text，不需要显式列）
+* text=auto eol=lf
+
+# 显式覆盖：以下文件必须保留 LF
+*.ts            text eol=lf
+*.tsx           text eol=lf
+*.js            text eol=lf
+*.cjs           text eol=lf
+*.mjs           text eol=lf
+*.json          text eol=lf
+*.jsonc         text eol=lf
+*.yaml          text eol=lf
+*.yml           text eol=lf
+*.md            text eol=lf
+*.mdx           text eol=lf
+*.css           text eol=lf
+*.scss          text eol=lf
+*.html          text eol=lf
+*.sh            text eol=lf
+*.bash          text eol=lf
+*.toml          text eol=lf
+*.gitignore     text eol=lf
+*.gitattributes text eol=lf
+*.editorconfig  text eol=lf
+.eslintrc*      text eol=lf
+.prettierrc*    text eol=lf
+
+# Windows 原生脚本需要 CRLF
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf
+
+# 二进制（不转换）
+*.png           -text
+*.jpg           -text
+*.jpeg          -text
+*.gif           -text
+*.ico           -text
+*.webp          -text
+*.pdf           -text
+*.zip           -text
+*.tar           -text
+*.gz            -text
+*.woff          -text
+*.woff2         -text
