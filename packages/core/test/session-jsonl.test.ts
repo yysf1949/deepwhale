@@ -339,10 +339,16 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
       const stat = await fs.stat(testFile);
       expect(stat.size).toBe(fullLineLen);
       // 契约 3 (1c.6 新): 没有任何 .tmp 残留 (扫同 dir 找 .tmp 文件)
-      const dir = join(testFile, '..');
-      const entries = await fs.readdir(dir);
+      // 1c.8 (review P2 反馈 2026-06-04): happy path 跟 failure-path 统一成
+      // dirname/basename — 旧写法 testFile.split('/').pop() 在 Windows
+      // 拿到整个 "C:\\…\\test.jsonl" 绝对路径, fs.readdir 返回的是文件名
+      // (不带 dir 前缀), startsWith 永远对不上, "truncate 成功不留 temp"
+      // 断言在 Windows 上是假阴性.
+      const tmpDir = dirname(testFile);
+      const tmpBase = basename(testFile);
+      const entries = await fs.readdir(tmpDir);
       const tmpLeftover = entries.find(
-        (name) => name.startsWith(testFile.split('/').pop() ?? '') && name.endsWith('.tmp'),
+        (name) => name.startsWith(`${tmpBase}.`) && name.endsWith('.tmp'),
       );
       expect(tmpLeftover).toBeUndefined();
     });
