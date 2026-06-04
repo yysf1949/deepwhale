@@ -33,7 +33,8 @@
  *   - ChatResult.usage.total_tokens: === prompt + completion
  *   - ChatResult.usage.cost_turn: > 0 (有 pricing.default.toml)
  *   - ChatResult.usage.cost_currency: 'CNY' (DeepSeek V4 是 ¥)
- *   - ChatResult.usage.tokens_uncached: === prompt_tokens (无 cache, V4 flash 默认)
+ *   - ChatResult.usage.tokens_uncached: === prompt_tokens - cached_tokens (不变量,
+ *     P3 fix 2026-06-04, 跟 cached_tokens undefined / 0 / >0 都兼容, 不再假设 "无 cache")
  *
  * 不验证 (留 Step 3.5):
  *   - cache_hit_rate > 0 (需要重复同 prompt 触发 prefix cache, 多 turn 才有意义)
