@@ -10,13 +10,27 @@
  * Sprint 0.2 范围：
  * - SessionWriter（append + fsync + flush）
  * - SessionReader（line-by-line + partial line truncation）
- * - SessionEvent 联合类型（4 种核心：user/assistant/tool/tool_result）
+ * - SessionEvent 联合类型（4 种核心：user/assistant/tool/system）
  * - v2.0 升级到 Session DAG（DAG 与 Planner 同链路，arch §3.5）
  *
- * Sprint 1+ 扩展：
- * - 压缩（compaction 钩子）
+ * Sprint 1c-revive-2-D-5 已落地（产线代码 packages/core/src/session/compaction.ts）：
+ * - D-5-1 基础 compaction（shouldCompact + compact + 'compaction' event）
+ *   触发：promptTokens >= window * compactRatio (默认 0.8, Reasonix compact.go 拍板)
+ * - D-5-2 stuck latch（CompactionState + runCompactionWithLatch + 'compaction_paused' event）
+ *   连续 N 次失败 (默认 2) → latch 暂停, 防 death loop
+ * - D-5-3 tail token budget（resolveTail, tailMode='token_budget' 默认）
+ *   拍板 source: Reasonix compact.go:271-289 (tail 按 token budget 而非 message count)
+ *
+ * SessionEvent union 当前 6 kind：
+ *   user / assistant / tool / system / compaction / compaction_paused
+ * SessionReader 读 'compaction' / 'compaction_paused' 不重放进 LLM context
+ * (compaction.ts 拍板: 这两种是 runtime/metadata, 不进 context).
+ *
+ * Sprint 1+ 仍待落地（待拍板）：
  * - 索引（按 messageId 加速查询）
  * - 分片（>100MB 自动切文件）
+ * - 加密（at-rest AES-256-GCM）
+ * - 压缩（gzip content > N byte）
  */
 
 import { promises as fs } from 'node:fs';

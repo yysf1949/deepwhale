@@ -23,6 +23,15 @@ export {
   toolLoopStepToSessionEvent,
   sessionEventsToMessages,
   appendUserEvent,
+  appendCompactionEvent,
+  appendCompactionPausedEvent,
   persistToolLoopSteps,
   loadSession,
 } from './session-adapter.js';
+export {
+  runToolLoopWithCompaction,
+  estimateContextTokens,
+  type AgentCompactionConfig,
+} from './agent-compaction.js';
+// Re-export core compaction types for caller convenience
+export { CompactionState, type CompactionConfig } from '@deepwhale/core';

@@ -153,6 +153,59 @@ export async function appendUserEvent(
 }
 
 /**
+ * 写一条 'compaction' event 到 session (Sprint 1c-revive-2-D-5-1 拍板).
+ *
+ * 用途: agent-compaction.ts 在 runCompactionWithLatch 返 kind='ok' 时调,
+ * 把 summary 拍板落盘 (供 reload 重建 messages 时知道哪段被总结过).
+ *
+ * 拍板: SessionReader 读到 kind='compaction' 时**不**重放进 LLM context
+ * (跟 sessionEventsToMessages L132 'system' 跳过 一致 — compaction event 是 metadata,
+ *  不是 LLM 看到的对话轮次).
+ */
+export async function appendCompactionEvent(
+  writer: SessionWriter,
+  summary: string,
+  replacedRange: readonly [number, number],
+  meta?: Record<string, unknown>,
+  ts: number = Date.now(),
+): Promise<void> {
+  await writer.append({
+    kind: 'compaction',
+    ts,
+    summary,
+    replaced_range: replacedRange,
+    ...(meta !== undefined ? { meta } : {}),
+  });
+}
+
+/**
+ * 写一条 'compaction_paused' event 到 session (Sprint 1c-revive-2-D-5-2 拍板).
+ *
+ * 用途: agent-compaction.ts 在 CompactionState latch 触发时调,
+ * 记录"自动暂停, 防 death loop" 拍板 (供 reload 时 caller 知道状态).
+ *
+ * 拍板: SessionReader 读到 kind='compaction_paused' 时**不**重放进 LLM context
+ * (caller 该决定是否 reset CompactionState / 改 summaryFn / 改 config).
+ */
+export async function appendCompactionPausedEvent(
+  writer: SessionWriter,
+  consecutiveFailures: number,
+  reason: string,
+  lastError: string,
+  meta?: Record<string, unknown>,
+  ts: number = Date.now(),
+): Promise<void> {
+  await writer.append({
+    kind: 'compaction_paused',
+    ts,
+    consecutive_failures: consecutiveFailures,
+    reason,
+    last_error: lastError,
+    ...(meta !== undefined ? { meta } : {}),
+  });
+}
+
+/**
  * 把 tool loop 跑完后产出的 steps 全部落盘（assistant + tool）。
  * limit/error 跳过（toSessionEvent 返回 null 时不 append）。
  */
