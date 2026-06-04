@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { SessionWriter, SessionReader, readSessionEvents, type SessionEvent } from '../src/session/jsonl.js';
 
 describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
@@ -15,6 +15,9 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
   });
 
   afterEach(async () => {
+    // Sprint 1c.7 P3: 兜底清理 vi.spyOn, 防止某次 expect 失败时 mock 泄漏到
+    // 后续测试. 各 spy 块自身末尾也有 mockRestore (正常路径), 这里是失败兜底.
+    vi.restoreAllMocks();
     try {
       await fs.unlink(testFile);
     } catch (err) {
@@ -384,10 +387,12 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
       const after = await fs.readFile(testFile, 'utf8');
       expect(after).toBe(originalContent + '\n' + partialLine);
       // 不变量 2: temp 清理 (catch 块 unlink) — 防止垃圾堆
-      const dir = join(testFile, '..');
+      // Sprint 1c.7 P2: 用 dirname/basename 替 split('/'), 修 Windows 反斜杠路径假阴性
+      const dir = dirname(testFile);
+      const base = basename(testFile);
       const entries = await fs.readdir(dir);
       const tmpLeftover = entries.find(
-        (name) => name.startsWith(testFile.split('/').pop() ?? '') && name.endsWith('.tmp'),
+        (name) => name.startsWith(`${base}.`) && name.endsWith('.tmp'),
       );
       expect(tmpLeftover).toBeUndefined();
 
@@ -417,10 +422,12 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
       const after = await fs.readFile(testFile, 'utf8');
       expect(after).toBe(originalContent + '\n' + partialLine);
       // 不变量 2: temp 清理
-      const dir = join(testFile, '..');
+      // Sprint 1c.7 P2: 同上, dirname/basename
+      const dir = dirname(testFile);
+      const base = basename(testFile);
       const entries = await fs.readdir(dir);
       const tmpLeftover = entries.find(
-        (name) => name.startsWith(testFile.split('/').pop() ?? '') && name.endsWith('.tmp'),
+        (name) => name.startsWith(`${base}.`) && name.endsWith('.tmp'),
       );
       expect(tmpLeftover).toBeUndefined();
 
