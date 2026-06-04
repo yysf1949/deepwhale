@@ -413,8 +413,10 @@ export class DeepSeekClient implements LLMClient {
  * - sync 加载 (1 次启动, 不在 hot path, 符合 R3)
  * - 加载失败 (file not found / parse error) → 返回 `undefined` → caller 走 R7 中间路径
  *   (不静默 fallback 到硬编码, 不抛错, base 2 字段, cost 字段 absent)
- * - 文件路径解析: `import.meta.url` → 当前文件 → 同目录 `pricing.default.toml`
- *   (dev 走 src/, build 后走 dist/, 路径自动对齐)
+ * - 文件路径解析: Use sibling pricing.default.toml relative to package location. (Q 拍板 2026-06-04, Task 2 Gap 5 留痕)
+ *   走 `import.meta.url` → 当前文件 → 同目录 `pricing.default.toml`
+ *   (dev 走 src/, build 后走 dist/, 路径自动对齐;
+ *    **不**走 cwd / XDG config dir / env var, 避免 dev-vs-prod 不一致)
  *
  * 测试环境 (vitest) 时 pricing.default.toml 跟 src/ 在一起, 也能加载。
  */

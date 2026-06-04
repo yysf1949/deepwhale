@@ -3,6 +3,7 @@
 # **per-model currency**: DeepSeek CNY, Anthropic USD。不在 UI 层做汇率换算。
 #
 # **当前生产 model 2 个** (Q 拍板 2026-06-03): flash + pro.
+# Only production DeepSeek models are supported. (Q 拍板 2026-06-04, Task 2 Gap 4 留痕)
 # 不再加 deepseek-chat / deepseek-reasoner 老 alias — 那些是 1a/1b era 历史,
 # 2026-07-24 后服务端 hard-fail, 老 session replay 走 R7 中间路径 (base 2 字段, cost 字段 absent).
 #

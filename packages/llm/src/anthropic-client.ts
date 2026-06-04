@@ -67,8 +67,18 @@ export interface AnthropicClientOptions {
   /** 模型 ID，默认 claude-sonnet-4-5。 */
   model?: string;
   /**
-   * Base URL，默认 https://api.deepseek.com/anthropic。
-   * 真实生产不走 api.anthropic.com (那是真的 Anthropic, 需不同 key), 走 DeepSeek shim.
+   * Base URL。
+   *
+   * 拍板 1C (2026-06-04): **DeepSeek-first + Anthropic SDK 协议兼容 + 多 Provider Adapter**。
+   * 默认 `https://api.deepseek.com/anthropic` (DeepSeek 提供的 /anthropic 兼容端点, 单 key 走两家),
+   * 但 caller 可显式指定其他 Anthropic-兼容 provider:
+   *   - `https://api.anthropic.com` — 真 Anthropic API (需 ANTHROPIC_AUTH_TOKEN 真 key, 不走 DEEPSEEK_API_KEY 退路)
+   *   - `https://openrouter.ai/api/v1/anthropic` — OpenRouter Anthropic Route
+   *   - 任何自定义 proxy / 兼容层
+   *
+   * Sprint 1d.5-B 揭示: DeepSeek /anthropic 端点**实际** routing 兜底到 OAI flash (server.model=deepseek-v4-flash),
+   * 行为稳定但 server 协议声明 mis-labeled. 1C 拍板**不**解决这个 routing 问题 — 现状保留, caller
+   * 自选 baseUrl 决定走哪条路.
    */
   baseUrl?: string;
   /** 自定义 fetch (注入 mock 用于测试). 默认走 SDK 内部 fetch. */
