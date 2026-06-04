@@ -63,25 +63,9 @@
 import { describe, expect, it } from 'vitest';
 import { AnthropicClient, type ChatChunk, type ChatMessage } from '@deepwhale/llm';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
+import { integrationSkipReason } from './_helpers/integration-gate.js';
 
-// ---- 红线门 ----
-
-const INTEGRATION_ENABLED = process.env['INTEGRATION'] === '1';
-const HAS_ANTHROPIC_KEY =
-  typeof process.env['ANTHROPIC_AUTH_TOKEN'] === 'string' &&
-  process.env['ANTHROPIC_AUTH_TOKEN'] !== '';
-const HAS_DEEPSEEK_KEY =
-  typeof process.env['DEEPSEEK_API_KEY'] === 'string' &&
-  process.env['DEEPSEEK_API_KEY'] !== '';
-
-const canRun = INTEGRATION_ENABLED && (HAS_ANTHROPIC_KEY || HAS_DEEPSEEK_KEY);
-
-const skipReason = !INTEGRATION_ENABLED
-  ? 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")'
-  : !HAS_ANTHROPIC_KEY && !HAS_DEEPSEEK_KEY
-    ? 'process.env.ANTHROPIC_AUTH_TOKEN and DEEPSEEK_API_KEY both unset ' +
-      '(source ~/.deepwhale/.env first; see README "integration tests")'
-    : 'unknown reason';
+// ---- 红线门 (helper 化, D-9 2026-06-04): 占位符过滤 + 走 it.runIf + 统一 skip reason ----
 
 // ---- test scenario: stream path 1 turn 算术 + 6 tool schema 描述 + system ----
 
@@ -159,8 +143,9 @@ function dumpSnapshot(label: string, snap: StreamSnapshot): void {
 // ---- 主测试: stream path 端到端 跨 Anthropic 协议 ----
 
 describe('coding-agent client — 1c-revive-2-D-1 AnthropicClient stream path 真接 + 跨 Anthropic 协议 (1c-revive 拆分)', () => {
-  if (!canRun) {
-    it.skip(`SKIPPED: ${skipReason}`, () => {
+  const fileSkipReason = integrationSkipReason();
+  if (fileSkipReason !== undefined) {
+    it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop
     });
     return;

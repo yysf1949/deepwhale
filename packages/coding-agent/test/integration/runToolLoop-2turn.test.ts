@@ -92,21 +92,9 @@ import { describe, expect, it } from 'vitest';
 import { DeepSeekClient, type ChatMessage, type ToolCall } from '@deepwhale/llm';
 import { runToolLoop, type ToolLoopStep } from '../../src/agent/tool-loop.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
+import { integrationSkipReason } from './_helpers/integration-gate.js';
 
-// ---- 红线门: 跟 1d.5/1c-revive-1 等真接 test 一致 ----
-
-const INTEGRATION_ENABLED = process.env['INTEGRATION'] === '1';
-const HAS_DEEPSEEK_KEY =
-  typeof process.env['DEEPSEEK_API_KEY'] === 'string' &&
-  process.env['DEEPSEEK_API_KEY'] !== '';
-
-const canRun = INTEGRATION_ENABLED && HAS_DEEPSEEK_KEY;
-
-const skipReason = !INTEGRATION_ENABLED
-  ? 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")'
-  : !HAS_DEEPSEEK_KEY
-    ? 'process.env.DEEPSEEK_API_KEY is unset (source ~/.deepwhale/.env first; see README "integration tests")'
-    : 'unknown reason';
+// ---- 红线门 (helper 化, D-9 2026-06-04) ----
 
 // ---- test scenario: mode layer 端到端 1 turn tool_use ----
 
@@ -229,8 +217,9 @@ function dumpSteps(label: string, steps: ReadonlyArray<ToolLoopStep>, finalResul
 // ---- 主测试: mode layer runToolLoop 端到端 ----
 
 describe('coding-agent mode layer — 1c-revive-2-A runToolLoop 端到端真接 (1c-revive 拆分, mode layer)', () => {
-  if (!canRun) {
-    it.skip(`SKIPPED: ${skipReason}`, () => {
+  const fileSkipReason = integrationSkipReason();
+  if (fileSkipReason !== undefined) {
+    it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop
     });
     return;

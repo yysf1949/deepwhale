@@ -70,7 +70,7 @@ pnpm dev
 corepack pnpm build && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test
 ```
 
-纯 mock / 离线，**不会**调真实 LLM API。当前 191/191 绿。CI 必跑。
+纯 mock / 离线，**不会**调真实 LLM API。当前 257/257 绿。CI 必跑。
 
 ### Integration tests（真接 DeepSeek + Anthropic shim）
 
@@ -81,15 +81,16 @@ corepack pnpm build && corepack pnpm lint && corepack pnpm typecheck && corepack
 项目根 `.env` 文件**自动加载**（loader 见 [`packages/coding-agent/src/env/load-project-env.ts`](./packages/coding-agent/src/env/load-project-env.ts)）—— vitest 启动时调一次 `loadProjectEnv()`，CLI 入口 `bin/deepwhale.js` 同样。**只补缺不覆盖**（`process.env[key] ??= value`），所以 shell `export VAR=...` / CI 显式 set / PowerShell `$env:VAR=...` 永远最高优先。
 
 ```bash
-# 1. 复制模板（仓库根 .env.example 不会进 commit, .env 在 .gitignore 里）
+# 1. 复制模板 (`.env.example` 是可进 commit 的模板; `.env` 在 .gitignore 里)
 cp .env.example .env
 chmod 600 .env
 
-# 2. 填 key（**不**进 commit, 仓库里 .env 在 .gitignore 里）
-#    .env 至少需要:
-#      DEEPSEEK_API_KEY=<your-key>          # DeepSeek OAI shim
-#      ANTHROPIC_AUTH_TOKEN=<your-key>      # Anthropic shim (Sprint 1c-revive-2-B 起)
-#      INTEGRATION=1                        # 显式开启真接 (默认 0 / skip)
+# 2. 填 key (`.env` 永**不**进 commit; 仓库里 `.env.example` 可进 commit)
+#    .env 可**任一**填 (Sprint 1c-revive-2-D-9 改, 2026-06-04): 走 helper `hasUsableApiKey()`
+#    自动过滤占位符 + 区分 provider, DeepSeek 和 Anthropic 子测按 key 分别 skip
+#      DEEPSEEK_API_KEY=sk-xxx      # DeepSeek OAI shim (任一即可)
+#      ANTHROPIC_AUTH_TOKEN=sk-ant  # Anthropic shim (任一即可)
+#      INTEGRATION=1                # 显式开启真接 (默认 0 / skip)
 
 # 3. 跑 integration (默认 skip; INTEGRATION=1 才真接)
 corepack pnpm test

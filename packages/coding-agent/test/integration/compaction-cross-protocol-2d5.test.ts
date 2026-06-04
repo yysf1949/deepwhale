@@ -80,25 +80,13 @@ import {
   type AgentCompactionConfig,
 } from '../../src/agent/index.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
+import {
+  hasAnthropicKey,
+  hasDeepseekKey,
+  integrationSkipReason,
+} from './_helpers/integration-gate.js';
 
-// ---- 红线门: 跟 1c-revive-1 / 1c-revive-2-A / 1c-revive-2-B-3 等真接 test 一致 ----
-
-const INTEGRATION_ENABLED = process.env['INTEGRATION'] === '1';
-const HAS_ANTHROPIC_KEY =
-  typeof process.env['ANTHROPIC_AUTH_TOKEN'] === 'string' &&
-  process.env['ANTHROPIC_AUTH_TOKEN'] !== '';
-const HAS_DEEPSEEK_KEY =
-  typeof process.env['DEEPSEEK_API_KEY'] === 'string' &&
-  process.env['DEEPSEEK_API_KEY'] !== '';
-
-const canRun = INTEGRATION_ENABLED && (HAS_ANTHROPIC_KEY || HAS_DEEPSEEK_KEY);
-
-const skipReason = !INTEGRATION_ENABLED
-  ? 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")'
-  : !HAS_ANTHROPIC_KEY && !HAS_DEEPSEEK_KEY
-    ? 'process.env.ANTHROPIC_AUTH_TOKEN and DEEPSEEK_API_KEY both unset ' +
-      '(source ~/.deepwhale/.env first; see README "integration tests")'
-    : 'unknown reason';
+// ---- 红线门 (helper 化, D-9 2026-06-04) ----
 
 // ---- 跨协议 16 turn 拍板 ----
 
@@ -253,8 +241,9 @@ async function llmSummarize(
 // ---- 主测试: 跨协议 16 turn (DeepSeek 8 + Anthropic 8) ----
 
 describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepSeek 8 + Anthropic 8) + compaction 集成', () => {
-  if (!canRun) {
-    it.skip(`SKIPPED: ${skipReason}`, () => {
+  const fileSkipReason = integrationSkipReason();
+  if (fileSkipReason !== undefined) {
+    it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop
     });
     return;
@@ -387,13 +376,10 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
   }
 
   // ---- 测 1: DeepSeek OAI + 8 turn (4 question × 2 turn) ----
+  // P2-2 拍板 (D-9, 2026-06-04): 跟 Anthropic 测一致改 it.runIf(hasDeepseekKey()),
+  // 不再 console.log + return 假绿. 没 DEEPSEEK key 时显式 SKIPPED (跟 Anthropic 测对称).
 
-  it(`DeepSeek OAI: 8 turn (4 question × 2 turn) + compaction 集成`, async () => {
-    if (!HAS_DEEPSEEK_KEY) {
-      console.log('[SKIP] DEEPSEEK_API_KEY not set, skipping DeepSeek OAI 8 turn test');
-      return;
-    }
-
+  it.runIf(hasDeepseekKey())(`DeepSeek OAI: 8 turn (4 question × 2 turn) + compaction 集成`, async () => {
     const client = new DeepSeekClient();
     const sessionPath = join(tmpdir(), `session-2d5-openai-${randomUUID()}.jsonl`);
 
@@ -460,10 +446,11 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
   }, 300_000); // 300s timeout: 8 turn 真接
 
   // ---- 测 2: Anthropic + 8 turn (4 question × 2 turn) ----
-  // F1 拍板 (D-8, 2026-06-04): 改 it.runIf + 条件注册, 跟 file-level canRun 一致走 Vitest SKIPPED 计数,
-  // 不再 console.log + return 假绿. 没 ANTHROPIC key 时显式 skip (而不是 silently pass).
+  // F1 拍板 (D-8, 2026-06-04) + P2-2 拍板 (D-9, 2026-06-04): 改 it.runIf + 条件注册,
+  // 跟 file-level canRun 一致走 Vitest SKIPPED 计数, 不再 console.log + return 假绿.
+  // 没 ANTHROPIC key 时显式 skip (而不是 silently pass).
 
-  it.runIf(HAS_ANTHROPIC_KEY)(
+  it.runIf(hasAnthropicKey())(
     `Anthropic: 8 turn (4 question × 2 turn) + compaction 集成`,
     async () => {
 

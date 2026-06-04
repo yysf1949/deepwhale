@@ -90,25 +90,9 @@ import {
   persistToolLoopSteps,
 } from '../../src/agent/session-adapter.js';
 import { SessionReader, SessionWriter } from '@deepwhale/core';
+import { integrationSkipReason } from './_helpers/integration-gate.js';
 
-// ---- 红线门: 跟 1c-revive-1 / 1c-revive-2-A / 1c-revive-2-B-3 等真接 test 一致 ----
-
-const INTEGRATION_ENABLED = process.env['INTEGRATION'] === '1';
-const HAS_ANTHROPIC_KEY =
-  typeof process.env['ANTHROPIC_AUTH_TOKEN'] === 'string' &&
-  process.env['ANTHROPIC_AUTH_TOKEN'] !== '';
-const HAS_DEEPSEEK_KEY =
-  typeof process.env['DEEPSEEK_API_KEY'] === 'string' &&
-  process.env['DEEPSEEK_API_KEY'] !== '';
-
-const canRun = INTEGRATION_ENABLED && (HAS_ANTHROPIC_KEY || HAS_DEEPSEEK_KEY);
-
-const skipReason = !INTEGRATION_ENABLED
-  ? 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")'
-  : !HAS_ANTHROPIC_KEY && !HAS_DEEPSEEK_KEY
-    ? 'process.env.ANTHROPIC_AUTH_TOKEN and DEEPSEEK_API_KEY both unset ' +
-      '(source ~/.deepwhale/.env first; see README "integration tests")'
-    : 'unknown reason';
+// ---- 红线门 (helper 化, D-9 2026-06-04) ----
 
 // ---- test scenario: 跨包 session module 集成 + 跨 Anthropic 协议 ----
 
@@ -255,8 +239,9 @@ function dumpSteps(
 // ---- 主测试: 跨包 session module 集成 + 跨 Anthropic 协议 ----
 
 describe('coding-agent mode layer — 1c-revive-2-C+3 跨包 session module 集成 + 跨 Anthropic 协议 (1c-revive 拆分完毕, 1 commit)', () => {
-  if (!canRun) {
-    it.skip(`SKIPPED: ${skipReason}`, () => {
+  const fileSkipReason = integrationSkipReason();
+  if (fileSkipReason !== undefined) {
+    it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop
     });
     return;
