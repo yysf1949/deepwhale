@@ -62,6 +62,14 @@ export interface AgentCompactionConfig extends CompactionConfig {
  *   2. runToolLoop 内部每个 LLM call 前不重复触发 (避免 per-step 开销)
  *   3. 失败 latch → 写 paused event, runToolLoop 继续跑 (不阻塞)
  *
+ * Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): caller-side system prefix
+ * handling. 拍板: REPL/caller 可能把系统提示拼到 messages 最前面 (e.g. integration
+ * test fixture, 或未来 system prompt 注入). 传 compact() 之前先 **剥掉** 连续
+ * system 前缀, 让 compact 看到的 index 跟 session-adapter 累积 messages
+ * (user/assistant/tool + compaction summary) 同 index 空间, replaced_range
+ * 切 reload replay 同步. compact 后把 system 前缀 **原样 prepend 回** 替换后
+ * 的 messages, LLM 看到的 context 跟 caller 拼的一致.
+ *
  * @param client  LLM client
  * @param messages 入口 messages (不变, 内部 copy)
  * @param options runToolLoop 原生 options
@@ -76,11 +84,46 @@ export async function runToolLoopWithCompaction(
   compaction: AgentCompactionConfig,
   summaryFn: SummarizeFn,
 ): Promise<ToolLoopResult> {
-  // 1) 入口测 token, 触发则 compact 替换 messages
-  const compactedMessages = await maybeCompactBeforeLoop(messages, compaction, summaryFn);
+  // 1) 剥掉 caller 拼的连续 system prefix, 保持 replaced_range 跟 JSONL 累积同空间
+  const headSystem = splitSystemPrefix(messages);
 
-  // 2) 跑原生 runToolLoop (内部每个 LLM call 不再重测, 拍板入口一次性)
+  // 2) 入口测 token, 触发则 compact 替换 messages (在剥掉 system 的子集上跑)
+  const compactedTail = await maybeCompactBeforeLoop(headSystem.tail, compaction, summaryFn);
+
+  // 3) 拼回 system prefix → 跑原生 runToolLoop
+  const compactedMessages: ReadonlyArray<ChatMessage> = [...headSystem.prefix, ...compactedTail];
   return runToolLoop(client, compactedMessages, options);
+}
+
+/**
+ * 把 messages 切分为 "caller 自带的连续 system prefix" + "其余".
+ *
+ * 拍板 (D-6 review P1 修复, 2026-06-04):
+ *   - prefix = messages[0..n), n = 头连续 system message 数量
+ *   - tail   = messages[n..)
+ *   - 没 system prefix → prefix=[], tail=messages
+ *   - 全 system (只有 1 条 system 也算) → tail=[] (compaction 看到空, 不触发)
+ *
+ * 用途: caller 把 system prompt 拼前面时, 传给 compact() 前先剥掉, 让
+ * replaced_range 的 index 空间 跟 session-adapter replay JSONL 时累积的
+ * messages (user/assistant/tool + 之前 reload 注入的 summary) 同空间,
+ * reload replay 不会 off-by-one.
+ *
+ * **不动** 中间或末尾的 system message (罕见, 但保留 — 不归 compaction 管).
+ * **不动** tool_call_id 关联, 因为 prefix 是 system role, 不会拖 tool pair.
+ */
+function splitSystemPrefix(messages: ReadonlyArray<ChatMessage>): {
+  readonly prefix: ReadonlyArray<ChatMessage>;
+  readonly tail: ReadonlyArray<ChatMessage>;
+} {
+  let n = 0;
+  while (n < messages.length && messages[n]!.role === 'system') {
+    n++;
+  }
+  return {
+    prefix: messages.slice(0, n),
+    tail: messages.slice(n),
+  };
 }
 
 /**

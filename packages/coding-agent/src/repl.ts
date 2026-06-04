@@ -40,10 +40,13 @@ import {
   loadSession,
   persistToolLoopSteps,
   runToolLoop,
+  runToolLoopWithCompaction,
   ToolLoopLimitError,
+  type AgentCompactionConfig,
   type ToolLoopResult,
   type ToolLoopStep,
 } from './agent/index.js';
+import { CompactionState, type SummarizeFn } from '@deepwhale/core';
 import { createDefaultRegistry } from './tools/registry.js';
 import { createDefaultClient, type Provider } from './llm-factory.js';
 
@@ -74,6 +77,21 @@ export interface ReplOptions {
   sessionPath?: string;
   /** 是否启用 tool loop（默认 true）。false = 退化为 Sprint 0.3 单轮 chat。 */
   enableToolLoop?: boolean;
+  /**
+   * Session compaction 集成 (Sprint 1c-revive-2-D-6, review P1 修复 2026-06-04).
+   *
+   * 传 = 走 runToolLoopWithCompaction, turn 入口测 token 触发则 compact + 写
+   * 'compaction' event 到 SessionWriter. 不传 = 走裸 runToolLoop (向后兼容,
+   * 现有 baseline 244 测试不变).
+   *
+   * 拍板: 提供 AgentCompactionConfig 即可, CompactionState 内部持有 (startRepl
+   * 闭包). writer 字段 REPL 自动注入 (跟 startRepl 内部 sessionPath writer
+   * 同 instance, 让 compaction 事件写到同一 JSONL).
+   *
+   * 拍板 contextWindow=0 = 关闭 (跟 core compact() 行为契约一致). 默认
+   * (不传此参数) = 不接 compaction.
+   */
+  compactionConfig?: Omit<AgentCompactionConfig, 'writer' | 'state'> | null;
 }
 
 /**
@@ -123,24 +141,13 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       ...(options.provider !== undefined ? { provider: options.provider } : {}),
       ...(options.model !== undefined ? { model: options.model } : {}),
     });
-  // Sprint 1b.5 Step 2.5 (F3 拍板, R-G1 修正 2026-06-03): anthropic × tool loop 防护.
-  // - 落点: mode 层 (startRepl / runPrintMode / 后续 runRpcMode), 不**在** factory 改.
-  // - 触发: provider 是 anthropic (client.model 以 'claude-' 开头) + caller **请求** tool loop
-  //   (显式 enableToolLoop=true 或不传 [默认 true])
-  // - 行为: stderr warning + 强制 enableToolLoop=false (温柔降级, 不打断 user 第一轮)
-  // - 关键: 之前用 `?? (isAnthropic ? false : true)` 兜底默认, 让显式 `true` 直接透传,
-  //   CLI 默认路径仍会撞 Anthropic tool loop 未实现的 P1. 修后: 不管 caller 怎么传,
-  //   anthropic 一律走 stream, **不**跑 runToolLoop.
-  // - 设计: 跟 1b 时代 '没 API key' stderr 风格一致, 引导 user 不阻断
-  const isAnthropic = client.model.startsWith('claude-');
-  const requestedToolLoop = options.enableToolLoop ?? true;
-  const enableToolLoop = isAnthropic ? false : requestedToolLoop;
-  if (isAnthropic && requestedToolLoop) {
-    err.write(
-      'warning: Anthropic provider in Sprint 1b.5 does not support tool loop; ' +
-        'auto-disabling tools. Use DeepSeek or wait for Sprint 1c tool schema conversion.\n',
-    );
-  }
+  // Sprint 1c-revive-2-D-6 (review P2 修复, 2026-06-04): 拿掉 anthropic × tool loop
+  // 温柔降级. 拍板: D-4 (commit 80d3fd7/bbf1bf6) 已实装 AnthropicClient tool
+  // schema 转换 (toAnthropicMessages 合并连续 tool 消息), --provider anthropic
+  // 选了 anthropic 就该跑 tool loop. 旧 1b.5 Step 2.5 时代 'Sprint 1b.5 does not
+  // support tool loop' 拍板已废 (Step 2.5 → 1c, Anthropic tool protocol 已 ship).
+  // 兜底: requestedToolLoop 默认 true, caller 显式 false 才不跑.
+  const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
 
   // greeting
@@ -165,6 +172,23 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     } catch (e) {
       err.write(`${t('cli.session_load_warning', String(e))}\n\n`);
     }
+  }
+
+  // Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): CompactionState 闭包持有,
+  // 跨 turn 持续累计 failures (paused 状态跨 turn 生效, 跟 test 1c-revive-2-D-5-2 拍板).
+  // - 传 options.compactionConfig + writer 存在 → 构造完整 AgentCompactionConfig 注入
+  // - 不传 / writer 缺失 → 走 baseline 行为, compactionConfig = null
+  let compactionConfig: AgentCompactionConfig | null = null;
+  if (options.compactionConfig && writer) {
+    compactionConfig = {
+      ...options.compactionConfig,
+      writer,
+      state: new CompactionState(options.compactionConfig.pauseAfterFailures ?? 2),
+    };
+  } else if (options.compactionConfig && !writer) {
+    err.write(
+      'warning: compactionConfig requires sessionPath; falling back to baseline (no compaction).\n',
+    );
   }
 
   const rl: RLInterface = createInterface({
@@ -218,7 +242,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       const ac = new AbortController();
       try {
         if (enableToolLoop) {
-          await runAgentTurn(client, line, workingMessages, writer, out, err, ac.signal);
+          await runAgentTurn(client, line, workingMessages, writer, out, err, ac.signal, compactionConfig);
         } else {
           const turn = await runOneTurn(client, line, [], { signal: ac.signal });
           if (turn.kind === 'error') {
@@ -253,6 +277,10 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
  * workingMessages 由 caller 持有（startRepl 闭包），turn 跑完后 caller 用新 messages 覆盖。
  *
  * Sprint 1a 修 P1:user 必须进 LLM。Sprint 1a 修 P2-A:流式不再重复打印 final content。
+ * Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): 可选 compactionConfig — 传
+ * 时调 runToolLoopWithCompaction (入口测 token, 触发则 compact + 写 event),
+ * 不传 = 走裸 runToolLoop (向后兼容, 单测 baseline 244 不变). summaryFn 内部
+ * 用 client + 固定 prompt 模板生成, 跟 test 1c-revive-2-D-5 cluster 拍板一致.
  * 单测通过 export 暴露,直接注入 mock LLMClient + WritableStream 验证行为。
  */
 export async function runAgentTurn(
@@ -263,6 +291,7 @@ export async function runAgentTurn(
   out: NodeJS.WritableStream,
   err: NodeJS.WritableStream,
   signal: AbortSignal,
+  compactionConfig: AgentCompactionConfig | null = null,
 ): Promise<void> {
   // 1) 持久化 user 输入
   if (writer) {
@@ -277,16 +306,37 @@ export async function runAgentTurn(
   // 2) 构造 turn 消息:历史 + 本轮 user。Sprint 1a 修 P1 — user 必须进 LLM。
   const turnMessages: ChatMessage[] = [...workingMessages, { role: 'user', content: userInput }];
 
-  // 3) 调 tool loop
+  // 3) 调 tool loop. Sprint 1c-revive-2-D-6: 传 compactionConfig 时走
+  //    runToolLoopWithCompaction (带入口 compaction + 写 compaction event),
+  //    不传 = 裸 runToolLoop (向后兼容, baseline 244 不变).
+  const summaryFn: SummarizeFn | null = compactionConfig
+    ? makeLlmSummarizeFn(client, compactionConfig.protocol)
+    : null;
   let result: ToolLoopResult;
   try {
-    result = await runToolLoop(client, turnMessages, {
-      registry: createDefaultRegistry(),
-      onChunk: (chunk) => {
-        if (chunk.content) out.write(chunk.content);
-      },
-      signal,
-    });
+    if (compactionConfig !== null && summaryFn !== null) {
+      result = await runToolLoopWithCompaction(
+        client,
+        turnMessages,
+        {
+          registry: createDefaultRegistry(),
+          onChunk: (chunk) => {
+            if (chunk.content) out.write(chunk.content);
+          },
+          signal,
+        },
+        compactionConfig,
+        summaryFn,
+      );
+    } else {
+      result = await runToolLoop(client, turnMessages, {
+        registry: createDefaultRegistry(),
+        onChunk: (chunk) => {
+          if (chunk.content) out.write(chunk.content);
+        },
+        signal,
+      });
+    }
   } catch (e) {
     if (isToolLoopError(e)) {
       err.write(`${t('cli.tool_loop_limit', e.steps)}\n\n`);
@@ -424,4 +474,40 @@ function formatError(e: unknown): string {
   if (isLLMError(e)) return t('cli.error.unknown', e.message);
   if (e instanceof Error) return t('cli.error.unknown', e.message);
   return t('cli.error.unknown', String(e));
+}
+
+/**
+ * 生成 LLM summary callback (Sprint 1c-revive-2-D-6).
+ *
+ * 跟 1c-revive-2-D-5 cluster test (compaction-cross-protocol-2d5.test.ts:231)
+ * 拍板一致: 走 client.chat 调 LLM 生成 1 short paragraph summary. 跨
+ * openai/anthropic 同形态, 因为 client.chat 是 LLMClient 契约的统一入口.
+ *
+ * 不**在**这里拼 protocol-specific system prompt: Anthropic protocol
+ * 走 client.chat 时已由 client 内部加 (跟 agent-compaction.ts protocol
+ * 字段对齐). 1c-revive-2-D-6 拍板: protocol 字段保留供未来 system
+ * prompt 模板差异化用, 当前 D-6 默认用同 system prompt 模板 (跨协议一致).
+ */
+function makeLlmSummarizeFn(
+  client: LLMClient,
+  _protocol: 'openai' | 'anthropic',
+): SummarizeFn {
+  return async (toSummarize: ReadonlyArray<ChatMessage>): Promise<string> => {
+    const summaryMessages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'You are a concise summarizer. Compress the following conversation into 1 short paragraph ' +
+          '(max 200 words). Preserve key arithmetic results, tool calls, and final answers.',
+      },
+      {
+        role: 'user',
+        content: toSummarize
+          .map((m, i) => `[${i}] ${m.role}: ${m.content ?? '(empty)'}`)
+          .join('\n'),
+      },
+    ];
+    const r = await client.chat(summaryMessages, {});
+    return r.content;
+  };
 }

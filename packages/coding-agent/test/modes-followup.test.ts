@@ -484,21 +484,24 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
 });
 
 // =====================================================================
-// Sprint 1b.5 Step 2.5 (F3 拍板, R-G1 修正): mode 层 anthropic × tool loop 防护
+// Sprint 1c-revive-2-D-6 (review P2 修复, 2026-06-04): 翻转 1b.5 Step 2.5 时代
+// anthropic 温柔降级. D-4 (commit 80d3fd7/bbf1bf6) 已实装 AnthropicClient tool
+// schema 转换 (toAnthropicMessages 合并连续 tool 消息), 1b.5 时代 "Sprint 1b.5
+// does not support tool loop" 拍板作废. 修后: anthropic 跟 deepseek 走完全同
+// 一条路径, 都不打 warning, 都跑 tool loop (runToolLoop 内部 onChunk 必传 → 调
+// client.stream 而非 client.chat).
 // =====================================================================
 
-describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', () => {
+describe('runPrintMode — Sprint 1c-revive-2-D-6 anthropic tool loop parity', () => {
   /**
-   * F3 拍板: anthropic provider + enableToolLoop 不显式传 → mode 层自动关 tool loop + stderr
-   * warning. 设计意图 = 温柔降级, 不阻断 user 第一轮.
-   *
-   * 关键: 验**没**走 runToolLoop 路径 (即 client.chat 没被调), 走了 client.stream 直发路径.
-   * 验 stderr 含特定 warning 文案 (跟 1b 时代 "no API key" stderr 风格一致).
+   * 1b.5 Step 2.5 时代 F3 拍板: anthropic + enableToolLoop 不显式传 → mode 层自动关
+   * tool loop + stderr warning. D-6 review P2 修复: 删温柔降级, 改走 tool loop.
+   * 关键: 跟 F3-B (deepseek + undefined) 行为完全一致 — 不打 warning, 走 stream
+   * (runToolLoop 内部 onChunk 必传 → 调 stream), 不调 chat.
    */
-  it('F3-A: anthropic client + enableToolLoop=undefined → stderr warning + 走 client.stream (不跑 tool loop)', async () => {
-    // mock client model 必须以 'claude-' 开头, 触发 F3 startsWith 检查
+  it('D-6 P2-A: anthropic client + enableToolLoop=undefined → stderr 无 warning + 走 tool loop (runToolLoop → stream)', async () => {
+    // mock client model 'claude-' 开头, 跟 1b.5 时代触发降级的形态一致
     const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'anthropic says hi' }] });
-    // 直接改 model 字段 (不 spread, 保留 vi.fn 引用)
     (client as { model: ModelId }).model = 'claude-sonnet-4-5' as ModelId;
     const stderrChunks: string[] = [];
     const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
@@ -511,16 +514,15 @@ describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', 
       return true;
     });
     try {
-      // 关键: enableToolLoop 不传, 让 mode 层自己判断
       const code = await runPrintMode({ prompt: 'hi', client });
       expect(code).toBe(0);
-      // 验证 1: stderr 必含 F3 warning 文案
+      // 验证 1 (D-6 P2 修复): stderr **不**含 1b.5 时代 warning (温柔降级已删)
       const stderrAll = stderrChunks.join('');
-      expect(stderrAll).toMatch(/warning: Anthropic provider in Sprint 1b\.5 does not support tool loop/);
-      expect(stderrAll).toMatch(/auto-disabling tools/);
-      // 验证 2: 走了 client.stream 路径 (F3 触发 enableToolLoop=false)
+      expect(stderrAll).not.toMatch(/Anthropic provider in Sprint 1b\.5/);
+      expect(stderrAll).not.toMatch(/auto-disabling tools/);
+      // 验证 2: 走了 client.stream 路径 (runToolLoop 内部 onChunk 必传 → stream)
       expect(client.stream).toHaveBeenCalledTimes(1);
-      // 验证 3: client.chat **没**被调 (走 tool loop 才调 chat)
+      // 验证 3: client.chat **没**被调 (跟 F3-B deepseek 一致)
       expect(client.chat).not.toHaveBeenCalled();
       // 验证 4: LLM 看到了 user prompt
       expect(seen.messages).toHaveLength(1);
@@ -531,8 +533,10 @@ describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', 
     }
   });
 
-  it('F3-B: deepseek client + enableToolLoop=undefined → stderr 无 F3 warning + 走 client.chat (tool loop 默认开)', async () => {
-    // 对照: deepseek model 不以 'claude-' 开头, F3 防护**不**触发, 走默认 tool loop 路径
+  it('F3-B (D-6 保留作 deepseek 对照): deepseek client + enableToolLoop=undefined → stderr 无 F3 warning + 走 tool loop (stream)', async () => {
+    // 对照: deepseek model 不以 'claude-' 开头, 1b.5 时代 F3 防护**不**触发,
+    // D-6 时代继续走默认 tool loop 路径. 行为跟 D-6 P2-A (anthropic) 完全一致 —
+    // 跟 D-6 review P2 拍板一致: anthropic/deepseek provider parity.
     const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'deepseek says hi' }] });
     (client as { model: ModelId }).model = 'deepseek-v4-flash' as ModelId;
     const stderrChunks: string[] = [];
@@ -544,7 +548,7 @@ describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', 
     try {
       const code = await runPrintMode({ prompt: 'hi', client });
       expect(code).toBe(0);
-      // 验证 1: stderr **不**含 F3 warning
+      // 验证 1: stderr **不**含 F3 warning (1b.5 时代文案, D-6 仍不出现)
       const stderrAll = stderrChunks.join('');
       expect(stderrAll).not.toMatch(/Anthropic provider in Sprint 1b\.5/);
       // 验证 2: 走了 client.stream 路径 (runToolLoop 内部 runStreamStep 调 stream, 因 onChunk 必传)
@@ -559,12 +563,15 @@ describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', 
     }
   });
 
-  it('F3-C (R-G1 修正): anthropic client + enableToolLoop=true (显式) → stderr warning + 走 client.stream (不跑 tool loop)', async () => {
-    // 之前 P1 bug: 修前 `?? (isAnthropic ? false : true)` 让显式 enableToolLoop=true
-    // 透传, CLI 默认走 tool loop 撞 Anthropic tools 未实现. 修后用
-    // `requestedToolLoop = options.enableToolLoop ?? true; isAnthropic ? false : requestedToolLoop`
-    // 强制覆盖. 关键覆盖 = caller 显式 true 也必须被降级, 不能逃过 mode 层防护.
-    const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'anthropic stream only' }] });
+  it('D-6 P2-C (R-G1 修正翻面): anthropic client + enableToolLoop=true (显式) → stderr 无 warning + 走 tool loop (不警告, 不降级)', async () => {
+    // 1b.5 时代 F3-C (R-G1 修正): anthropic + 显式 enableToolLoop=true 必被降级
+    // 走 client.stream 直发 (因为旧 P1 bug: 修前 `?? (isAnthropic ? false : true)`
+    // 让显式 true 透传, CLI 默认路径会撞 Anthropic tools 未实现).
+    //
+    // D-6 拍板: 1b.5 旧 bug 跟 D-4 已实装的 AnthropicClient tool protocol **都已
+    // 作废** — 显式 enableToolLoop=true 跟 undefined 走完全同一路径, 都不警告,
+    // 都跑 tool loop. 关键覆盖: caller 显式 true 也**不**被降级 (跟 1b.5 时代相反).
+    const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'anthropic tool loop ok' }] });
     (client as { model: ModelId }).model = 'claude-sonnet-4-5' as ModelId;
     const stderrChunks: string[] = [];
     const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
@@ -580,29 +587,28 @@ describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', 
       // 关键: 显式 enableToolLoop=true, 模拟 CLI 默认路径
       const code = await runPrintMode({ prompt: 'hi', client, enableToolLoop: true });
       expect(code).toBe(0);
-      // 验证 1: stderr 必含 F3 warning (caller 请求了 tool loop, anthropic 拒绝)
+      // 验证 1 (D-6 P2 修复): stderr **不**含 1b.5 时代 warning (温柔降级已删,
+      // 不管 caller 显式 true 还是 undefined)
       const stderrAll = stderrChunks.join('');
-      expect(stderrAll).toMatch(/warning: Anthropic provider in Sprint 1b\.5 does not support tool loop/);
-      expect(stderrAll).toMatch(/auto-disabling tools/);
-      // 验证 2: 走了 client.stream 路径 (降级到 stream 直发)
+      expect(stderrAll).not.toMatch(/Anthropic provider in Sprint 1b\.5/);
+      expect(stderrAll).not.toMatch(/auto-disabling tools/);
+      // 验证 2: 走了 client.stream 路径 (runToolLoop 内部 onChunk 必传 → stream)
       expect(client.stream).toHaveBeenCalledTimes(1);
-      // 验证 3: client.chat **没**被调 (走 tool loop 才调 chat) — 关键: 即使 enableToolLoop=true
-      // 也不调 chat, 验证 anthropic 强制覆盖生效
+      // 验证 3: client.chat **没**被调 (走 runToolLoop 而非裸 stream 直发)
       expect(client.chat).not.toHaveBeenCalled();
       // 验证 4: LLM 看到了 user prompt
       expect(seen.messages[0]?.at(-1)).toEqual({ role: 'user', content: 'hi' });
       // 验证 5: stdout 含 chat content
-      expect(stdoutChunks.join('')).toContain('anthropic stream only');
+      expect(stdoutChunks.join('')).toContain('anthropic tool loop ok');
     } finally {
       stdoutSpy.mockRestore();
       stderrSpy.mockRestore();
     }
   });
 
-  it('F3-D (R-G1 修正): anthropic client + enableToolLoop=false (显式) → stderr 无 warning + 走 client.stream (不跑 tool loop, 不重复警告)', async () => {
-    // 验证: caller 显式 false 时, 防护不**重复** warn (warn 只在 caller **请求** tool loop 时打).
-    // 这是 warning 文案的语义正确性: "你说要 tool loop 但 anthropic 不支持" 才警告;
-    // "你显式说要 no tool loop" 走静默 stream, 不打扰.
+  it('F3-D (D-6 保留): anthropic client + enableToolLoop=false (显式) → stderr 无 warning + 走 client.stream (不跑 tool loop, 不重复警告)', async () => {
+    // 验证: caller 显式 false 时, 不打 warning (不管 anthropic / deepseek, --no-tool-loop
+    // 是 user 主动选择, 不该被打扰). 跟 1b.5 时代 + D-6 时代行为一致.
     const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'anthropic no-loop' }] });
     (client as { model: ModelId }).model = 'claude-sonnet-4-5' as ModelId;
     const stderrChunks: string[] = [];
@@ -614,7 +620,7 @@ describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', 
     try {
       const code = await runPrintMode({ prompt: 'hi', client, enableToolLoop: false });
       expect(code).toBe(0);
-      // 验证 1: stderr **不**含 F3 warning (caller 没请求 tool loop, 不该被打扰)
+      // 验证 1: stderr **不**含 F3 warning
       const stderrAll = stderrChunks.join('');
       expect(stderrAll).not.toMatch(/Anthropic provider in Sprint 1b\.5/);
       // 验证 2: 走了 client.stream 路径

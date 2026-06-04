@@ -19,15 +19,18 @@
 
 import process from 'node:process';
 import { type ChatMessage, type LLMClient } from '@deepwhale/llm';
-import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
+import { SessionReader, SessionWriter, type SessionEvent, type SummarizeFn } from '@deepwhale/core';
 import {
   isToolLoopError,
   loadSession,
   persistToolLoopSteps,
   runToolLoop,
+  runToolLoopWithCompaction,
+  type AgentCompactionConfig,
   type ToolLoopResult,
   type ToolLoopStep,
 } from '../agent/index.js';
+import { CompactionState } from '@deepwhale/core';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { formatUsageStatus } from '../repl.js';
 import { createDefaultClient, type Provider } from '../llm-factory.js';
@@ -46,6 +49,12 @@ export interface PrintModeOptions {
   provider?: Provider;
   /** Sprint 1b.5 Step 2.5: 显式 model. 不传则用 provider 默认. */
   model?: string;
+  /**
+   * Session compaction 集成 (Sprint 1c-revive-2-D-6, review P1 修复 2026-06-04).
+   * 不传 = baseline (走 runToolLoop). 传 = 走 runToolLoopWithCompaction.
+   * 拍板: writer 字段 print mode 内部构造 (跟 sessionPath 同 instance).
+   */
+  compactionConfig?: Omit<AgentCompactionConfig, 'writer' | 'state'> | null;
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<number> {
@@ -57,19 +66,10 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
       ...(options.provider !== undefined ? { provider: options.provider } : {}),
       ...(options.model !== undefined ? { model: options.model } : {}),
     });
-  // Sprint 1b.5 Step 2.5 (F3 拍板, R-G1 修正 2026-06-03): anthropic × tool loop 防护 (mode 层).
-  // 跟 startRepl 同款: requestedToolLoop = options.enableToolLoop ?? true,
-  // anthropic 强制 enableToolLoop=false + warn. 之前 `??` 兜底让显式 true 透传,
-  // CLI 默认路径仍会撞 Anthropic tool loop 未实现的 P1.
-  const isAnthropic = client.model.startsWith('claude-');
-  const requestedToolLoop = options.enableToolLoop ?? true;
-  const enableToolLoop = isAnthropic ? false : requestedToolLoop;
-  if (isAnthropic && requestedToolLoop) {
-    process.stderr.write(
-      'warning: Anthropic provider in Sprint 1b.5 does not support tool loop; ' +
-        'auto-disabling tools. Use DeepSeek or wait for Sprint 1c tool schema conversion.\n',
-    );
-  }
+  // Sprint 1c-revive-2-D-6 (review P2 修复, 2026-06-04): 拿掉 anthropic × tool loop
+  // 温柔降级 (跟 startRepl 同拍板, 见 repl.ts). D-4 已实装 AnthropicClient tool
+  // schema 转换, --provider anthropic 选了就该跑 tool loop.
+  const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
 
   // session 加载
@@ -86,6 +86,21 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
     }
   }
 
+  // Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): compaction 集成.
+  // 传 options.compactionConfig + writer 存在 → 注入完整 AgentCompactionConfig.
+  let compactionConfig: AgentCompactionConfig | null = null;
+  if (options.compactionConfig && writer) {
+    compactionConfig = {
+      ...options.compactionConfig,
+      writer,
+      state: new CompactionState(options.compactionConfig.pauseAfterFailures ?? 2),
+    };
+  } else if (options.compactionConfig && !writer) {
+    process.stderr.write(
+      'warning: compactionConfig requires sessionPath; falling back to baseline (no compaction).\n',
+    );
+  }
+
   try {
     // 持久化 user 输入
     if (writer) {
@@ -100,19 +115,39 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
     ];
 
     // 调 LLM。两种模式分支:
-    //   - enableToolLoop=true (默认): 走 runToolLoop, 创 registry, 让 LLM 能调 tool
+    //   - enableToolLoop=true (默认): 走 runToolLoop (有 compactionConfig 时走
+    //     runToolLoopWithCompaction, Sprint 1c-revive-2-D-6 拍板), 创 registry
     //   - enableToolLoop=false (--no-tool-loop): 走 client.stream 直发,
     //     tools 字段不传, 强制 LLM 服务端 schema 里不出现 tool, 不会产生 tool_calls
+    const summaryFn: SummarizeFn | null = compactionConfig
+      ? makeLlmSummarizeFn(client, compactionConfig.protocol)
+      : null;
     let result: ToolLoopResult;
     try {
       if (enableToolLoop) {
-        result = await runToolLoop(client, turnMessages, {
-          registry: createDefaultRegistry(),
-          onChunk: (chunk) => {
-            if (chunk.content) process.stdout.write(chunk.content);
-          },
-          ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
-        });
+        if (compactionConfig !== null && summaryFn !== null) {
+          result = await runToolLoopWithCompaction(
+            client,
+            turnMessages,
+            {
+              registry: createDefaultRegistry(),
+              onChunk: (chunk) => {
+                if (chunk.content) process.stdout.write(chunk.content);
+              },
+              ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
+            },
+            compactionConfig,
+            summaryFn,
+          );
+        } else {
+          result = await runToolLoop(client, turnMessages, {
+            registry: createDefaultRegistry(),
+            onChunk: (chunk) => {
+              if (chunk.content) process.stdout.write(chunk.content);
+            },
+            ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
+          });
+        }
         printStepSummary(result.steps);
       } else {
         // --no-tool-loop: 真关闭 tool calling。流式 + tools=undefined,
@@ -186,4 +221,35 @@ function printStepSummary(steps: ReadonlyArray<ToolLoopStep>): void {
       process.stdout.write(`  ${status} ${step.tool_call.name} (${step.duration_ms}ms)\n`);
     }
   }
+}
+
+/**
+ * 生成 LLM summary callback (Sprint 1c-revive-2-D-6).
+ *
+ * 跟 1c-revive-2-D-5 cluster test (compaction-cross-protocol-2d5.test.ts:231)
+ * + startRepl 同形态 helper 拍板一致. 跨 openai/anthropic 同形态 (走
+ * LLMClient 统一契约).
+ */
+function makeLlmSummarizeFn(
+  client: LLMClient,
+  _protocol: 'openai' | 'anthropic',
+): SummarizeFn {
+  return async (toSummarize: ReadonlyArray<ChatMessage>): Promise<string> => {
+    const summaryMessages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'You are a concise summarizer. Compress the following conversation into 1 short paragraph ' +
+          '(max 200 words). Preserve key arithmetic results, tool calls, and final answers.',
+      },
+      {
+        role: 'user',
+        content: toSummarize
+          .map((m, i) => `[${i}] ${m.role}: ${m.content ?? '(empty)'}`)
+          .join('\n'),
+      },
+    ];
+    const r = await client.chat(summaryMessages, {});
+    return r.content;
+  };
 }

@@ -21,14 +21,17 @@
 import process from 'node:process';
 import { createInterface, type Interface as RLInterface } from 'node:readline';
 import { isLLMError, type ChatMessage, type LLMClient } from '@deepwhale/llm';
-import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
+import { SessionReader, SessionWriter, type SessionEvent, type SummarizeFn } from '@deepwhale/core';
 import {
   isToolLoopError,
   loadSession,
   persistToolLoopSteps,
   runToolLoop,
+  runToolLoopWithCompaction,
+  type AgentCompactionConfig,
   type ToolLoopResult,
 } from '../agent/index.js';
+import { CompactionState } from '@deepwhale/core';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { createDefaultClient, type Provider } from '../llm-factory.js';
 
@@ -49,6 +52,12 @@ export interface RpcModeOptions {
    * 设成 `[]` 跳过 signal handler 注册, 仅靠 stdin close 退出。
    */
   watchSignals?: ReadonlyArray<NodeJS.Signals>;
+  /**
+   * Session compaction 集成 (Sprint 1c-revive-2-D-6, review P1 修复 2026-06-04).
+   * 不传 = baseline. 传 = runToolLoopWithCompaction 跨 chat request 持久化
+   * (CompactionState 闭包持有, writer 复用 sessionPath writer).
+   */
+  compactionConfig?: Omit<AgentCompactionConfig, 'writer' | 'state'> | null;
 }
 
 interface RpcRequest {
@@ -96,6 +105,23 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
     } catch (e) {
       sendError('session_load_failed', `could not load session: ${String(e)}`, '');
     }
+  }
+
+  // Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): CompactionState 闭包持有,
+  // 跨 chat request 持续累计 failures / paused 状态. 跟 startRepl 拍板一致.
+  let compactionConfig: AgentCompactionConfig | null = null;
+  if (options.compactionConfig && writer) {
+    compactionConfig = {
+      ...options.compactionConfig,
+      writer,
+      state: new CompactionState(options.compactionConfig.pauseAfterFailures ?? 2),
+    };
+  } else if (options.compactionConfig && !writer) {
+    sendError(
+      'compaction_requires_session',
+      'compactionConfig requires sessionPath; falling back to baseline (no compaction).',
+      '',
+    );
   }
 
   process.stderr.write('deepwhale rpc mode (Sprint 1a stub)\n');
@@ -157,7 +183,7 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
       }
 
       try {
-        const result = await dispatch(client, req, workingMessages, writer, options);
+        const result = await dispatch(client, req, workingMessages, writer, options, compactionConfig);
         sendOk(req.id, result);
       } catch (e) {
         if (isToolLoopError(e)) {
@@ -214,6 +240,7 @@ async function dispatch(
   workingMessages: ChatMessage[],
   writer: SessionWriter | null,
   options: RpcModeOptions,
+  compactionConfig: AgentCompactionConfig | null,
 ): Promise<unknown> {
   switch (req.method) {
     case 'chat': {
@@ -231,23 +258,56 @@ async function dispatch(
         ...workingMessages,
         { role: 'user', content: prompt },
       ];
-      const result: ToolLoopResult = await runToolLoop(client, turnMessages, {
-        registry: createDefaultRegistry(),
-        ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
-        ...(stream
-          ? {
-              onChunk: (chunk) => {
-                if (chunk.content) {
-                  const notif: RpcNotification = {
-                    method: 'chat.delta',
-                    params: { content: chunk.content },
-                  };
-                  process.stdout.write(`${JSON.stringify(notif)}\n`);
-                }
-              },
-            }
-          : {}),
-      });
+      // Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): compactionConfig 存在
+      // 走 runToolLoopWithCompaction, 跨 chat request 复用 CompactionState (paused
+      // / failures 跨 request 持续, 跟 test 1c-revive-2-D-5-2 拍板).
+      const summaryFn: SummarizeFn | null = compactionConfig
+        ? makeLlmSummarizeFn(client, compactionConfig.protocol)
+        : null;
+      const result: ToolLoopResult = await (async () => {
+        if (compactionConfig !== null && summaryFn !== null) {
+          return runToolLoopWithCompaction(
+            client,
+            turnMessages,
+            {
+              registry: createDefaultRegistry(),
+              ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
+              ...(stream
+                ? {
+                    onChunk: (chunk) => {
+                      if (chunk.content) {
+                        const notif: RpcNotification = {
+                          method: 'chat.delta',
+                          params: { content: chunk.content },
+                        };
+                        process.stdout.write(`${JSON.stringify(notif)}\n`);
+                      }
+                    },
+                  }
+                : {}),
+            },
+            compactionConfig,
+            summaryFn,
+          );
+        }
+        return runToolLoop(client, turnMessages, {
+          registry: createDefaultRegistry(),
+          ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
+          ...(stream
+            ? {
+                onChunk: (chunk) => {
+                  if (chunk.content) {
+                    const notif: RpcNotification = {
+                      method: 'chat.delta',
+                      params: { content: chunk.content },
+                    };
+                    process.stdout.write(`${JSON.stringify(notif)}\n`);
+                  }
+                },
+              }
+            : {}),
+        });
+      })();
       if (writer) {
         try {
           await persistToolLoopSteps(writer, result.steps);
@@ -287,4 +347,33 @@ function sendOk(id: string, result: unknown): void {
 function sendError(code: string, message: string, id: string): void {
   const resp: RpcResponse = { id, error: { code, message } };
   process.stdout.write(`${JSON.stringify(resp)}\n`);
+}
+
+/**
+ * 生成 LLM summary callback (Sprint 1c-revive-2-D-6).
+ * 跟 startRepl / runPrintMode 同形态 helper 拍板一致. 跨 openai/anthropic
+ * 同形态 (走 LLMClient 统一契约).
+ */
+function makeLlmSummarizeFn(
+  client: LLMClient,
+  _protocol: 'openai' | 'anthropic',
+): SummarizeFn {
+  return async (toSummarize: ReadonlyArray<ChatMessage>): Promise<string> => {
+    const summaryMessages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'You are a concise summarizer. Compress the following conversation into 1 short paragraph ' +
+          '(max 200 words). Preserve key arithmetic results, tool calls, and final answers.',
+      },
+      {
+        role: 'user',
+        content: toSummarize
+          .map((m, i) => `[${i}] ${m.role}: ${m.content ?? '(empty)'}`)
+          .join('\n'),
+      },
+    ];
+    const r = await client.chat(summaryMessages, {});
+    return r.content;
+  };
 }
