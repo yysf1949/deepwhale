@@ -1,5 +1,19 @@
 /**
- * @deepwhale/coding-agent — integration test gate helpers
+ * @deepwhale/monorepo — integration test gate helpers
+ *
+ * ⚠️ **位置说明 (Sprint 1c-revive-2-D-10, 2026-06-04)**
+ *
+ * 这个 helper 是 **monorepo-wide** shared helper, 供 `coding-agent` 和 `llm` 包的
+ * integration test 文件使用. **当前托管**在 `packages/llm/test/integration/_helpers/`
+ * 路径下, 因为:
+ *   1. `llm` 是上游包 (被 `coding-agent` 依赖), 先有 integration test 需求
+ *   2. `coding-agent` 跨包相对引用 `'../../../llm/test/integration/_helpers/integration-gate.js'`
+ *      略丑, 但不值得为了这个 test-only helper 新建 `packages/test-utils/` 包
+ *      (会引入 workspace 拓扑变化 + tsconfig 调整, 改动面 ×10)
+ *
+ * 如果以后有更多包 (tui / edit-engine) 也要用, **不要**复制 helper, 而是:
+ *   - 选项 A: 保持现位置, 加 tui/edit-engine 跨包引用
+ *   - 选项 B: 升级 `packages/test-utils/` (视 workspace growth 决定, 1-2 个包不值得)
  *
  * 拍板 (Sprint 1c-revive-2-D-9, 2026-06-04):
  *   - 抽 6 个 integration test 文件**重复**的 boilerplate
@@ -15,9 +29,16 @@
  *   - **不**抽 `describeIntegration()` wrapper (你说"抽 helper"但 6 个文件结构
  *     差异大, 多 case 测, 抽 wrapper 改动面 ×3, 不如直接走 hasXxxKey + it.runIf).
  *
- * 用法 (6 个 integration test 文件统一改成):
- *   import { hasAnthropicKey, hasDeepseekKey, integrationSkipReason } from './_helpers/integration-gate.js';
- *   ...
+ * 用法 (integration test 文件统一改成):
+ *
+ *   llm 包内 (同包):
+ *     import { hasAnthropicKey, hasDeepseekKey, integrationSkipReason }
+ *       from './_helpers/integration-gate.js';
+ *
+ *   coding-agent 包 (跨包, 相对路径):
+ *     import { hasAnthropicKey, hasDeepseekKey, integrationSkipReason }
+ *       from '../../../llm/test/integration/_helpers/integration-gate.js';
+ *
  *   it.runIf(hasAnthropicKey())(`name`, async () => { ... }, 300_000);
  *   // OR
  *   describe(...) {
@@ -33,6 +54,9 @@
  *   - 占位符过滤是 conservative (宁可多 skip, 不可发假请求)
  *   - helper **不**读 .env 文件 (跟红线 1 一致, 只看 process.env)
  *   - helper **不**log key 值 (跟红线 3 一致)
+ *   - helper **不**做 ASCII-only sanitize (你 D-9 review 拍, ByteString 错应该走
+ *     client 层 `APIKeyInvalidError` 显式报错, 不是改写 key)
+ *     真正占位符过滤靠 `hasUsableApiKey` 黑名单正则 (中英文 / <>-bracket / placeholder)
  *
  * @module @deepwhale/coding-agent/test/integration/_helpers/integration-gate
  */

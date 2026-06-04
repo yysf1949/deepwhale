@@ -29,21 +29,23 @@ import type { LLMClient, ChatMessage } from '@deepwhale/llm';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { integrationSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 const ANTHROPIC_BASE_URL = DEEPSEEK_ANTHROPIC_BASE_URL;
 const ANTHROPIC_MODEL = ANTHROPIC_DEFAULT_MODEL;
-const HAS_INTEGRATION = process.env['INTEGRATION'] === '1' && !!process.env['DEEPSEEK_API_KEY'];
 
-const describeIntegration = HAS_INTEGRATION ? describe : describe.skip;
+// D-10 拍板 (2026-06-04): 改 helper integrationSkipReason() 模式, 跟其他 6 文件一致
+const fileSkipReason = integrationSkipReason();
+const describeIntegration = fileSkipReason === undefined ? describe : describe.skip;
 
 describeIntegration('1c-revive-2-D-4: multi-tool_calls 跨 Anthropic 协议', () => {
   let workDir: string;
 
   function makeClient(): LLMClient {
+    // 注: apiKey 不传 (走 AnthropicClient 内部 resolveApiKey 默认读 env), 避免直传占位符 key 撞 401
     return new AnthropicClient({
       baseUrl: ANTHROPIC_BASE_URL,
       model: ANTHROPIC_MODEL,
-      apiKey: process.env['DEEPSEEK_API_KEY'],
     });
   }
 

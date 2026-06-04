@@ -77,7 +77,7 @@ import { describe, expect, it } from 'vitest';
 import { AnthropicClient, type ChatMessage, type ToolCall } from '@deepwhale/llm';
 import { runToolLoop, type ToolLoopStep } from '../../src/agent/tool-loop.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { integrationSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04) ----
 

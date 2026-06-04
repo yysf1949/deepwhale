@@ -84,7 +84,7 @@ import {
   hasAnthropicKey,
   hasDeepseekKey,
   integrationSkipReason,
-} from './_helpers/integration-gate.js';
+} from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04) ----
 

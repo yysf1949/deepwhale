@@ -90,7 +90,7 @@ import {
   persistToolLoopSteps,
 } from '../../src/agent/session-adapter.js';
 import { SessionReader, SessionWriter } from '@deepwhale/core';
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { integrationSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04) ----
 

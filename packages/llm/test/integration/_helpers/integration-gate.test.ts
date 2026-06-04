@@ -1,5 +1,5 @@
 /**
- * @deepwhale/coding-agent — integration-gate helper 单测
+ * @deepwhale/monorepo — integration-gate helper 单测
  *
  * 拍板 (Sprint 1c-revive-2-D-9, 2026-06-04):
  *   - 验 hasUsableApiKey 占位符过滤 (P2-1 拍板)
