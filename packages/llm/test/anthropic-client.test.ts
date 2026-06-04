@@ -280,15 +280,42 @@ describe('AnthropicClient — error mapping (X3 拍板: 不接真, mock fetch �
   });
 });
 
-describe('AnthropicClient — tools 暂未实现 (1c 留)', () => {
-  it('14. tools 参数传非空数组 → LLMUnknownError', async () => {
-    const mockFetch = vi.fn(async () => new Response('', { status: 200 }));
+describe('AnthropicClient — tools 转换 (1c.5 拍板, 1c-revive-2-B-1)', () => {
+  it('14. tools 参数传非空数组 → 不再抛错, 走 Anthropic 协议 schema 转换', async () => {
+    // 1c.5 拍板 (1c-revive-2-B-1, 2026-06-04): AnthropicClient tools 实施, 跟 DeepSeekClient
+    // 同 LLMClient 契约. 1b.5 era 旧测 (期望 LLMUnknownError) 升级为"验 tools schema 已转
+    // Anthropic shape (input_schema)". 走 mock fetch 验 wire body 含 input_schema 字段.
+    let capturedBody: string | undefined;
+    const mockFetch = vi.fn(async (_input: unknown, init?: { body?: string }) => {
+      if (init?.body !== undefined) capturedBody = init.body;
+      return new Response(
+        JSON.stringify({
+          id: 'msg_mock',
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'ok' }],
+          model: 'claude-sonnet-4-5',
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
     const client = new AnthropicClient({ apiKey: TEST_KEY, fetchImpl: mockFetch as unknown as typeof fetch });
-    await expect(
-      client.chat(
-        [{ role: 'user', content: 'hi' }],
-        { tools: [{ name: 'x', description: 'y', parameters: { type: 'object', properties: {} } }] },
-      ),
-    ).rejects.toThrow(LLMUnknownError);
+    const result = await client.chat(
+      [{ role: 'user', content: 'hi' }],
+      { tools: [{ name: 'x', description: 'y', parameters: { type: 'object', properties: {} } }] },
+    );
+    // Anthropic shape 翻译正确: tool schema 转 input_schema (OAI {parameters} → Anthropic)
+    expect(capturedBody).toBeDefined();
+    const body = JSON.parse(capturedBody!);
+    expect(body.tools).toBeDefined();
+    expect(body.tools[0].input_schema).toBeDefined();
+    expect(body.tools[0].name).toBe('x');
+    expect(body.tools[0].description).toBe('y');
+    // OAI 的 parameters 字段**不**应出现 (Anthropic 协议不认)
+    expect(body.tools[0].parameters).toBeUndefined();
+    expect(result.content).toBe('ok');
+    expect(result.finish_reason).toBe('stop');
   });
 });

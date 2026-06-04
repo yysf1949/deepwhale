@@ -144,20 +144,17 @@ export class AnthropicClient implements LLMClient {
       tool_choice?: 'auto' | 'none' | 'required';
     },
   ): Promise<ChatResult> {
-    // Sprint 1c 实施 tool_use schema 映射; Sprint 1b.5 暂不支持 tools
-    // (Sprint 1a 协议调研: Anthropic tool_use schema 跟 OAI function-calling 字段不同,
-    // 需手写 name/description/input_schema 转换. 留 1c.)
-    if (options?.tools !== undefined && options.tools.length > 0) {
-      throw new LLMUnknownError(
-        'AnthropicClient tools 参数暂未实现 (Sprint 1c 添加). 当前仅支持无 tools 的 chat/stream.',
-      );
-    }
-    const body = toAnthropicMessages(messages);
+    // Sprint 1c.5 拍板 (1c-revive-2-B-1, 2026-06-04): tool schema 转换 (OAI {parameters} → Anthropic
+    // {input_schema}), 跟 DeepSeekClient 同 LLMClient 契约 (5-7 行 production 改).
+    // 跟 pi-agent 4-layer 模式: model layer (AnthropicClient) 不知道 tool registry 细节, 只做协议转换.
+    const body = toAnthropicMessages(messages, options?.tools);
     const createParams: Anthropic.Messages.MessageCreateParamsNonStreaming = {
       model: this.model as string,
       messages: body.messages,
       max_tokens: 4096, // Anthropic API 必填, 4096 是合理默认 (Sprint 1c 让 caller 传)
       ...(body.system !== undefined ? { system: body.system } : {}),
+      ...(body.tools !== undefined ? { tools: body.tools } : {}),
+      ...(options?.tool_choice !== undefined ? { tool_choice: mapToolChoice(options.tool_choice) } : {}),
     };
     const sdkOptions: Anthropic.RequestOptions = {
       ...(options?.signal !== undefined ? { signal: options.signal } : {}),
@@ -181,17 +178,14 @@ export class AnthropicClient implements LLMClient {
       onChunk: (chunk: ChatChunk) => void;
     },
   ): Promise<ChatResult> {
-    if (options.tools !== undefined && options.tools.length > 0) {
-      throw new LLMUnknownError(
-        'AnthropicClient tools 参数暂未实现 (Sprint 1c 添加). 当前仅支持无 tools 的 chat/stream.',
-      );
-    }
-    const body = toAnthropicMessages(messages);
+    const body = toAnthropicMessages(messages, options.tools);
     const streamParams: Anthropic.Messages.MessageStreamParams = {
       model: this.model as string,
       messages: body.messages,
       max_tokens: 4096,
       ...(body.system !== undefined ? { system: body.system } : {}),
+      ...(body.tools !== undefined ? { tools: body.tools } : {}),
+      ...(options.tool_choice !== undefined ? { tool_choice: mapToolChoice(options.tool_choice) } : {}),
     };
     const sdkOptions: Anthropic.RequestOptions = {
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
@@ -260,7 +254,8 @@ function mapSdkError(e: unknown): Error {
 /** 拆分 system / 非 system messages (Anthropic 协议 system 是顶层字段). */
 function toAnthropicMessages(
   messages: ChatMessage[],
-): { system: string | undefined; messages: AnthropicMessageParam[] } {
+  tools?: ReadonlyArray<LLMToolSchema>,
+): { system: string | undefined; messages: AnthropicMessageParam[]; tools?: Anthropic.Tool[] } {
   const out: AnthropicMessageParam[] = [];
   let system: string | undefined;
   for (const m of messages) {
@@ -270,28 +265,70 @@ function toAnthropicMessages(
       continue;
     }
     if (m.role === 'tool') {
-      // Sprint 1c 实施: tool_result content block 转换. Sprint 1b.5 抛错 (Sprint 0.3 范围
-      // 也不支持 tool, DeepSeekClient 也是 mock fixture 走 OAI shape).
-      throw new LLMUnknownError(
-        'AnthropicClient tool role 暂未实现 (Sprint 1c 添加). 1b.5 范围: user/assistant only.',
-      );
+      // Sprint 1c.5 (1c-revive-2-B-1): tool 消息 → Anthropic tool_result content block
+      // Anthropic 协议: { type: 'tool_result', tool_use_id, content }  (tool_use_id = OAI tool_call_id)
+      out.push({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: m.tool_call_id ?? '',
+            content: m.content,
+          },
+        ],
+      });
+      continue;
     }
     if (m.role === 'user') {
       out.push({ role: 'user', content: m.content });
       continue;
     }
-    // assistant: OAI tool_calls 字段暂不支持, 1b.5 范围
+    // assistant: OAI tool_calls → Anthropic content blocks (text + tool_use)
     if (m.role === 'assistant') {
       if (m.tool_calls !== undefined && m.tool_calls.length > 0) {
-        throw new LLMUnknownError(
-          'AnthropicClient assistant tool_calls 暂未实现 (Sprint 1c 添加).',
-        );
+        const blocks: Anthropic.ToolUseBlockParam[] = m.tool_calls.map((tc) => ({
+          type: 'tool_use',
+          id: tc.id,
+          name: tc.name,
+          input: tc.args,
+        }));
+        out.push({
+          role: 'assistant',
+          // ToolUseBlockParam[] 在 SDK 类型上是 ContentBlockParam[] 的子集, 但 TS 4.x 推断不到
+          // (SDK 用 union 反推, 编译期会失配). 显式 cast: 真实运行时 server 接受.
+          content: blocks as unknown as Array<Anthropic.ContentBlockParam>,
+        });
+        continue;
       }
       out.push({ role: 'assistant', content: m.content });
       continue;
     }
   }
-  return { system, messages: out };
+  // tool schema: OAI {name, description, parameters} → Anthropic {name, description, input_schema}
+  // 1c.5 拍板: 走 Tool 类型 (跟 SDK 对齐), 不拆 ToolUnion (Bash20250124 等 built-in 工具暂不用).
+  let anthropicTools: Anthropic.Tool[] | undefined;
+  if (tools !== undefined && tools.length > 0) {
+    anthropicTools = tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.parameters as unknown as Anthropic.Tool.InputSchema,
+    }));
+  }
+  const out2: { system: string | undefined; messages: AnthropicMessageParam[]; tools?: Anthropic.Tool[] } = { system, messages: out };
+  if (anthropicTools !== undefined) out2.tools = anthropicTools;
+  return out2;
+}
+
+/** Map LLMClient 通用 tool_choice (OAI 风格) → Anthropic ToolChoice. */
+function mapToolChoice(choice: 'auto' | 'none' | 'required'): Anthropic.ToolChoice {
+  switch (choice) {
+    case 'auto':
+      return { type: 'auto' };
+    case 'none':
+      return { type: 'none' };
+    case 'required':
+      return { type: 'any' }; // Anthropic 协议 'any' 强制至少调 1 个, 跟 OAI 'required' 等价
+  }
 }
 
 // ---- 解析层: Anthropic.Message / RawMessageStreamEvent → ChatResult / ChatChunk ----
@@ -309,14 +346,23 @@ export function parseAnthropicMessage(
   fallbackModel: ModelId,
   pricing?: PricingConfig,
 ): ChatResult {
-  // 拼 text + 提取 tool_use (1c 实施, 1b.5 留空)
+  // 拼 text + 提取 tool_use (1c.5 实施, 1b.5 留空)
   let content = '';
   const toolCalls: ToolCall[] = [];
   for (const block of message.content) {
     if (block.type === 'text') {
       content = content === '' ? block.text : `${content}${block.text}`;
+    } else if (block.type === 'tool_use') {
+      // Sprint 1c.5 (1c-revive-2-B-1): tool_use block → OAI-style ToolCall (跟 DeepSeek shape 对齐)
+      // Anthropic SDK 给 input: unknown, 我们假设是 parsed object (runToolLoop 给 args object)
+      const input = block.input;
+      const args: Record<string, unknown> =
+        typeof input === 'object' && input !== null
+          ? (input as Record<string, unknown>)
+          : {};
+      toolCalls.push({ id: block.id, name: block.name, args });
     }
-    // tool_use / thinking / redacted_thinking 1b.5 跳过. tool_use 留 1c.
+    // thinking / redacted_thinking 跳过 (跟 1b.5 范围一致)
   }
 
   const finishReason: ChatResult['finish_reason'] = mapStopReason(message.stop_reason);
