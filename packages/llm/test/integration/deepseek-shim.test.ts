@@ -17,7 +17,7 @@
  * Skip 行为 (避免污染 pnpm test):
  *   - INTEGRATION !== '1'           → it.skip (整个文件)
  *   - process.env.DEEPSEEK_API_KEY undefined → it.skip
- *   - 缺 key 时**不**fail, 单测保持 191/191 绿
+ *   - 缺 key 时**不**fail, 单测保持全绿 (测试数以 \`pnpm test\` 当前输出为准, 持续漂移, 硬编码会过期)
  *
  * 真接最小化:
  *   - 1 turn: "Reply with the single word: OK"
