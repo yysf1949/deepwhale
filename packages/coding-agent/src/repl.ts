@@ -41,6 +41,7 @@ import {
   persistToolLoopSteps,
   runToolLoop,
   runToolLoopWithCompaction,
+  appendVerificationEvent,
   ToolLoopLimitError,
   type AgentCompactionConfig,
   type ToolLoopResult,
@@ -49,6 +50,7 @@ import {
 import { CompactionState, type SummarizeFn } from '@deepwhale/core';
 import { createDefaultRegistry } from './tools/registry.js';
 import { createDefaultClient, type Provider } from './llm-factory.js';
+import { buildSummaryAndNext, formatReport, runVerify } from './verify/index.js';
 
 const VERSION = '0.1.0';
 
@@ -92,6 +94,12 @@ export interface ReplOptions {
    * (不传此参数) = 不接 compaction.
    */
   compactionConfig?: Omit<AgentCompactionConfig, 'writer' | 'state'> | null;
+  /**
+   * Sprint 1c-revive-2-D-11-4 (2026-06-04): verify 自定义 check.
+   * 不传 = 走 runVerify() 默认 4 步 (corepack pnpm build/lint/typecheck/test).
+   * 单测用: 传 4 个简单 pass check, 避免 30-60s 真跑 build.
+   */
+  verifyChecks?: import('./verify/index.js').VerifyCheck[];
 }
 
 /**
@@ -229,6 +237,44 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       }
       if (line === '/help') {
         out.write(`${t('cli.builtin_help')}\n`);
+        prompt();
+        return;
+      }
+      if (line === '/verify') {
+        // Sprint 1c-revive-2-D-11-4 (2026-06-04): REPL `/verify` 内建命令.
+        // 跟 CLI `deepwhale --verify` 走同一 runVerify() — 不走 LLM / tool loop.
+        // 拍板 (D-11-4 review, 2026-06-04): REPL 里 /verify 走**异步** runVerify,
+        // 跑完打 formatReport 到 out (跟其它内建命令风格一致), 然后**写 verification
+        // event 到 session JSONL** (因为用户在 REPL 里跑了 verify, session 走 audit
+        // 轨迹, 跟 CLI 不写 session 形成差异).
+        // 退出: REPL 不退, 跑完回到 prompt 继续.
+        try {
+          const report = await runVerify(
+            options.verifyChecks !== undefined
+              ? { checks: options.verifyChecks }
+              : {},
+          );
+          const filled = buildSummaryAndNext(report);
+          const text = formatReport({
+            ...report,
+            summary: filled.summary,
+            nextSuggestedAction: filled.nextSuggestedAction,
+          });
+          out.write(`${text}\n`);
+          if (writer) {
+            // 写 verification event 到 session (跟 CLI 不同: REPL 用户有 session, 应该审计)
+            const failedCount = report.checks.filter((c) => c.status !== 'passed').length;
+            await appendVerificationEvent(writer, {
+              status: report.overallStatus,
+              durationMs: report.durationMs,
+              commandCount: report.checks.length,
+              failedCount,
+              summary: filled.summary,
+            });
+          }
+        } catch (e) {
+          err.write(`error: verify failed to start: ${e instanceof Error ? e.message : String(e)}\n\n`);
+        }
         prompt();
         return;
       }

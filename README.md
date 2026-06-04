@@ -121,6 +121,73 @@ corepack pnpm test
 - Anthropic 原生直连（非 shim）— 等 1b.5 Step 4 启动
 - v1.5 tool loop live 验收
 
+### Verify（项目本地验证，不走 LLM）
+
+> **Sprint 1c-revive-2-D-11**（2026-06-04）：`deepwhale --verify` 跟 REPL `/verify` 走同一 `runVerify()` —— 跑 4 步真验证（`corepack pnpm build` / `lint` / `typecheck` / `test`），**不走 LLM**、**不走 tool loop**、**不依赖 key**。生成 `VerificationReport` 摘要 + 退出码（0=pass / 1=fail）。
+
+**CLI 用法**（CI 友好）：
+
+```bash
+deepwhale --verify            # 跑 4 步默认, 退出码 0=pass / 1=fail
+if deepwhale --verify; then
+  echo "all green, ready to commit"
+else
+  echo "fix failing check, see stderr tail above"
+fi
+```
+
+**REPL 用法**（交互式）：
+
+```bash
+deepwhale                            # 启 REPL
+deepwhale> /verify                  # 跑 4 步验证, 印 formatReport 到 stdout
+                                     # 写 'verification' event 到 session JSONL (audit 轨迹)
+deepwhale> /help                    # 看其它内建命令
+deepwhale> /exit                    # 退
+```
+
+**VerificationReport schema**（`packages/coding-agent/src/verify/verify-runner.ts`）：
+
+```ts
+{
+  startedAt: number;         // epoch ms
+  endedAt: number;           // epoch ms
+  durationMs: number;
+  overallStatus: 'passed' | 'failed';
+  checks: ReadonlyArray<{
+    name: string;            // 'build' / 'lint' / 'typecheck' / 'test'
+    command: string;         // 人类可读 (e.g. "corepack pnpm build")
+    status: 'passed' | 'failed' | 'timed-out' | 'spawn-error';
+    exitCode: number | null;
+    startedAt: number;
+    endedAt: number;
+    durationMs: number;
+    stdoutTail: string;      // 截断 4 KB 尾, 防 session JSONL 撑爆
+    stderrTail: string;      // 截断 4 KB 尾
+    errorMessage?: string;   // timeout / spawn 错
+  }>;
+  summary: string;           // "N/N checks passed" (formatter 拍)
+  nextSuggestedAction: string; // "fix failing check: lint" 等
+}
+```
+
+**拍板**（D-11 review, 2026-06-04）：
+
+- **fail-fast**：任一 step 失败立即 break, 后续 step 不跑 (build fail 时 typecheck/test 必挂, 显式 fail-fast 比假绿诚实)
+- **stdout/stderr 截断 4 KB 尾**（[D-11 review 必做红线]）
+- **不写 .env，不动 LLM，不调 tool loop**——本地真 CLI 验证
+- **CLI 不写 session event**（verify 不是 chat 行为, session JSONL 是 chat 持久化），**REPL 写 verification event**（用户在 REPL 跑了 verify, session 走 audit 轨迹, 跟 CLI 形成差异）
+
+**Verification session event**（`packages/core/src/session/jsonl.ts` 'verification' kind, D-11-3 加）：
+
+```ts
+{ kind: 'verification'; ts: number; status: 'passed'|'failed';
+  durationMs: number; command_count: number; failed_count: number;
+  summary: string; meta?: Record<string, unknown>; }
+```
+
+跟 `compaction_paused` 同语义：metadata, reload session 时 `sessionEventsToMessages` 跳过, 不污染 LLM 看到的 messages。**旧 session reload 不崩**（strict union 兜底, D-11-3 拍板红线）。
+
 ## 4 包 Monorepo 结构（对齐 pi）
 
 ```

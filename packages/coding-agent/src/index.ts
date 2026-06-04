@@ -20,5 +20,6 @@ export * from './tools/registry.js';
 export * from './types.js';
 export * from './agent/index.js';
 export * from './modes/index.js';
+export * from './verify/index.js'; // Sprint 1c-revive-2-D-11-4 (2026-06-04): verify module
 export { startRepl, runOneTurn } from './repl.js';
 export type { ReplOptions } from './repl.js';

@@ -31,10 +31,12 @@ loadProjectEnv();
 import { startRepl } from '../dist/index.js';
 import { runPrintMode } from '../dist/modes/print.js';
 import { runRpcMode } from '../dist/modes/rpc.js';
+import { runVerify } from '../dist/verify/index.js';
+import { buildSummaryAndNext, formatReport } from '../dist/verify/index.js';
 
 /**
  * @typedef {Object} CliArgs
- * @property {'interactive'|'print'|'rpc'} mode
+ * @property {'interactive'|'print'|'rpc'|'verify'} mode
  * @property {string|undefined} prompt
  * @property {string|undefined} sessionPath
  * @property {string|undefined} provider
@@ -71,6 +73,15 @@ function parseArgs(argv) {
     }
     if (a === '--rpc') {
       args.mode = 'rpc';
+      i += 1;
+      continue;
+    }
+    if (a === '--verify') {
+      // Sprint 1c-revive-2-D-11-4 (2026-06-04): CLI 接入 verify 模式.
+      // 走 runVerify() → formatReport() 印到 stdout, 不走 LLM / tool loop / session.
+      // 退出码: 0 = passed, 1 = failed (跟 runVerify overallStatus 对应),
+      //         2 = 参数错 (跟现有 mode 退出码一致)
+      args.mode = 'verify';
       i += 1;
       continue;
     }
@@ -130,6 +141,7 @@ const HELP_TEXT = `deepwhale — Coding Agent CLI
 Usage:
   deepwhale                         Start interactive REPL (default)
   deepwhale -p "<prompt>"           Print mode: single-shot chat + tool loop
+  deepwhale --verify                Verify mode: run build/lint/typecheck/test, no LLM
   deepwhale --rpc                   RPC mode: NDJSON over stdio (Sprint 1a stub)
 
 Options:
@@ -148,7 +160,7 @@ Environment:
   DEEPWHALE_LANG          Optional. 'en' (default) or 'zh-CN'.
 
 Built-in REPL commands:
-  /help, /exit, exit, quit
+  /help, /verify, /exit, exit, quit
 `;
 
 /**
@@ -189,6 +201,19 @@ async function main() {
         ...(args.model !== undefined ? { model: args.model } : {}),
         maxSteps: args.maxSteps,
       });
+    case 'verify':
+      // Sprint 1c-revive-2-D-11-4: 走 runVerify (4 步 default), formatReport 印到 stdout.
+      // 退出码: passed=0, failed=1 (跟 runVerify overallStatus 对应). 跟 Unix
+      // 惯例一致 (CI 脚本 \`if deepwhale --verify; then ...\`).
+      // 注: 不写 session event (verify 不是 chat 行为, session JSONL 是 chat 持久化,
+      //     verify 跑完不污染 session). 后续 sprint 如要 audit log, 留 --verify-log 选项.
+      {
+        const report = await runVerify();
+        const filled = buildSummaryAndNext(report);
+        const text = formatReport({ ...report, summary: filled.summary, nextSuggestedAction: filled.nextSuggestedAction });
+        process.stdout.write(text + '\n');
+        return report.overallStatus === 'passed' ? 0 : 1;
+      }
   }
 }
 
