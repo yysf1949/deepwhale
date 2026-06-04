@@ -112,15 +112,14 @@ describe('DeepSeek shim — Step 3 真接 1 turn (X1 b + X4 c 拍板)', () => {
     //    1 turn 没 cache → cost_turn > 0, cost_currency = 'CNY' (DeepSeek V4 default)
     expect(result.usage.cost_turn).toBeGreaterThan(0);
     expect(result.usage.cost_currency).toBe('CNY');
-    // 7) tokens_uncached: 1 turn 无 cache → === prompt_tokens
-    expect(result.usage.tokens_uncached).toBe(result.usage.prompt_tokens);
-    // 8) cached_tokens: 无 cache 时 LLM 不返 (DeepSeek V4 行为) — undefined 允许,
-    //    但如果 LLM 返了 0, 也要保证不变量 tokens_uncached = prompt - cached
-    if (result.usage.cached_tokens !== undefined) {
-      expect(result.usage.tokens_uncached).toBe(
-        result.usage.prompt_tokens - result.usage.cached_tokens,
-      );
-    }
+    // 7) tokens_uncached 不变量: tokens_uncached = prompt_tokens - cached_tokens
+    //    (P3 fix 2026-06-04, R-G1 经验: 预条件式断言 line 116 旧版 `=== prompt_tokens`
+    //    假设了 "无 cache", 如果真实服务某天返非零 cached_tokens, line 116 会先失败
+    //    即便客户端公式是对的. 修后只断言不变量, 跟 cached_tokens undefined / 0 / >0 都兼容.)
+    //    本次 1 turn 通常 cached_tokens === undefined (DeepSeek V4 行为), 但不强制.
+    expect(result.usage.tokens_uncached).toBe(
+      result.usage.prompt_tokens - (result.usage.cached_tokens ?? 0),
+    );
 
     // 红线: 任何断言 / log 都不该含 key, 也不该把 content echo 到 console.
     // 此处不调用 console.log(result.content) — 字段断言足够.

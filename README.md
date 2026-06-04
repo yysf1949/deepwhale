@@ -105,7 +105,7 @@ INTEGRATION=1 corepack pnpm test
 
 **当前覆盖**：
 
-- `packages/llm/test/integration/deepseek-shim.test.ts` — DeepSeek V4 flash 1 turn 流式真接，验 `content` / `usage` / `cost_currency=CNY` / `cost_turn > 0` / `tokens_uncached=prompt_tokens`（无 cache）
+- `packages/llm/test/integration/deepseek-shim.test.ts` — DeepSeek V4 flash 1 turn 流式真接，验 `content` / `usage` / `cost_currency=CNY` / `cost_turn > 0` / `tokens_uncached` 满足不变量 `prompt_tokens - cached_tokens`（本次 1 turn 通常 `cached_tokens === undefined`）
 
 **未覆盖**（留 Step 3.5+）：
 
