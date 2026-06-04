@@ -143,10 +143,10 @@ describe('coding-agent mode layer — 1c-revive-2-D-2 错误恢复 3 子场景 +
   }
 
   // ===========================================================================
-  // 子场景 A: soft-fail path — LLM 调黑名单 command → tool 软失败 → LLM 收敛
+  // 子场景 A: soft-fail path — LLM 调黑名单 command → tool 软失败 → **允许** LLM 反复尝试不收敛
   // ===========================================================================
 
-  it(`A. soft-fail path: LLM 调黑名单 command → tool 软失败 → LLM 收敛 (跨 Anthropic 协议)`, async () => {
+  it(`A. soft-fail path: LLM 调黑名单 command → tool 软失败 → 允许 maxSteps 触顶 (跨 Anthropic 协议)`, async () => {
     // 1c.5 拍板 (1c-revive-2-B-1) 让 runToolLoop 跨 Anthropic 协议 走通
     // → 1c-revive-2-D-2-A 验 soft-fail path 跨 Anthropic 协议 走通
     //
