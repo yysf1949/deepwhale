@@ -412,7 +412,11 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
       expect(userEvents.length).toBeGreaterThanOrEqual(QUESTIONS_PER_PROTOCOL); // >= 4
 
       // 3) 跨 8 turn compaction 集成: 'compaction' / 'compaction_paused' event 视情况出现
-      // 拍板: 8 turn 累积 messages 可能触发 compaction (短 question 难触发, 软断言允许 0)
+      // 拍板 (review P3, 2026-06-04): integration test 走真接 LLM 16 turn, 不**强**
+      // 断言 compaction 次数 — LLM 行为非确定, 短 question 难触发. 强断言
+      // 走 packages/core/test/session-compaction.test.ts 的 P1 修复测
+      // (deterministic 触发, 强断言 afterTokens < beforeTokens + replaced range
+      // 内容被删). integration 这里保留软断言 (>= 0) 当作非必触发 sanity check.
       const compactionEvents = verifyEvents.filter((e) => e.kind === 'compaction');
       const pausedEvents = verifyEvents.filter((e) => e.kind === 'compaction_paused');
       // 软断言: 至少 0 条 (短 question 不一定触发, 跨协议行为应当一致)

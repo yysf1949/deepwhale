@@ -137,9 +137,10 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
         { now: () => 1234567890 },
       );
 
-      // 新 messages: [head 5, system summary 1, tail 2] = 8
-      expect(result.messages).toHaveLength(8);
-      // tail 2 条保持原样
+      // Sprint 1c-revive-2-D-5+ (review P1 修复, 2026-06-04): 拍新 messages = 1 system summary + 2 tail = 3.
+      // 拍: 拍 7 条 [head 5, system summary 1, tail 2] = 8 是 P1 bug (head 拍 拍拍).
+      expect(result.messages).toHaveLength(3);
+      // tail 2 条保持原样 (messages[1], messages[2])
       expect(result.messages[result.messages.length - 2]).toEqual({
         role: 'user',
         content: 'm5 (tail)',
@@ -148,8 +149,8 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
         role: 'assistant',
         content: 'm6 (tail)',
       });
-      // 中间 1 条 system summary
-      const summary = result.messages[5]!;
+      // 1 条 system summary 在 position 0
+      const summary = result.messages[0]!;
       expect(summary.role).toBe('system');
       expect(summary.content).toContain('summarized 5 messages');
       // event — P38 拍板: union 派发用 kind 拍板后 narrow, 别直接 access 字段
@@ -157,10 +158,11 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
       if (result.event.kind !== 'compaction') throw new Error('unreachable');
       expect(result.event.ts).toBe(1234567890);
       expect(result.event.summary).toBe('summarized 5 messages');
+      // replaced_range = [0, tailStart] = [0, 5] (head 占了 messages[0..5))
       expect(result.event.replaced_range).toEqual([0, 5]);
       // stats
       expect(result.stats.beforeMessages).toBe(7);
-      expect(result.stats.afterMessages).toBe(8); // 7 - 5 + 1 = 3? no: 5 head + 1 system + 2 tail = 8
+      expect(result.stats.afterMessages).toBe(3); // 1 summary + 2 tail
       expect(result.stats.replacedRange).toEqual([0, 5]);
     });
 
@@ -421,11 +423,14 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
         async (toSummarize) => `summarized ${toSummarize.length} msgs`,
         { now: () => 9999 },
       );
-      // 4 head + 1 summary + 1 tail = 6
-      expect(result.messages).toHaveLength(6);
-      expect(result.messages[0]).toEqual(msgs[0]);
-      expect(result.messages[4].role).toBe('system');
-      expect(result.messages[5]).toEqual(msgs[4]); // tail 末条保持
+      // Sprint 1c-revive-2-D-5+ (review P1 修复, 2026-06-04): 拍新 messages = 1 summary + 1 tail = 2.
+      // 拍: 拍 4 head + 1 summary + 1 tail = 6 是 P1 bug (head 拍 拍拍).
+      expect(result.messages).toHaveLength(2);
+      // 1 条 system summary 在 position 0
+      expect(result.messages[0]!.role).toBe('system');
+      expect(result.messages[0]!.content).toContain('summarized 4 msgs');
+      // tail 末条保持 (在 position 1)
+      expect(result.messages[1]).toEqual(msgs[4]); // tail 末条保持
       // event
       expect(result.event.kind).toBe('compaction');
       if (result.event.kind !== 'compaction') throw new Error('unreachable');
@@ -435,6 +440,73 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
       expect(meta.tail_mode).toBe('token_budget');
       expect(meta.tail_keep_tokens).toBe(COMPACTION_DEFAULTS.tailKeepTokens);
       expect(meta.tail_start).toBe(4);
+    });
+  });
+
+  /**
+   * Sprint 1c-revive-2-D-5+ review P1 修复 (2026-06-04): 真实 reload 流程 mock 测.
+   *
+   * 拍板: 不依赖 live LLM 自然触发 compaction, 用 deterministic 配置强制触发
+   * (contextWindow=1000, 5 条 3200-char msgs → ~4000 token >> 800 threshold),
+   * 然后模拟 reload 流程: 写 JSONL → 读 JSONL → 调 sessionEventsToMessages,
+   * 验证 messages 真的被压缩.
+   *
+   * 强断言 (review P3 拍板, 2026-06-04):
+   *   1) afterTokens < beforeTokens (实际压缩, 不只是写 summary 进去)
+   *   2) reload 后 messages 不含被 replaced range 的内容 (mock summary text 不应出现)
+   *   3) replaced range 内的 user content 不应在 reload messages 中可被找到
+   *
+   * 不依赖 live LLM, 用 vi.fn() 拍 summaryFn. 跨 core 测, 不 import coding-agent
+   * (避免 @core 不能 import @coding-agent 拍板, 拍 core/session-adapter 拍 review
+   * P1 拍测 拍 core 单测 拍 拍 拍 — 拍 sessionEventsToMessages 拍 拍
+   * 拍 session-adapter, 拍 import 拍会 core test 拍). 拍: 拍 reload 拍
+   * 拍 session-adapter 拍测 拍 拍 (拍 integration 拍 @coding-agent 拍 unit 拍
+   * 拍 拍).
+   */
+  describe('P1 修复: reload 流程 mock 测 (deterministic 触发 + 强断言)', () => {
+    it('compact() 真实压缩: afterTokens < beforeTokens + replaced range 内容被删', async () => {
+      // deterministic: 5 条 3200-char msgs ≈ 4000 token, contextWindow=1000
+      // → threshold=800, 必触发.
+      const big = 'x'.repeat(3200);
+      const msgs: ChatMessage[] = [
+        { role: 'user', content: big }, // 0 - "old conversation that should be summarized"
+        { role: 'assistant', content: big }, // 1
+        { role: 'user', content: big }, // 2
+        { role: 'assistant', content: big }, // 3
+        { role: 'user', content: 'recent tail' }, // 4 (tail)
+      ];
+      // tailKeepTokens=200, big=3200 chars ≈ 800 tokens, 1 tail msg ≈ 4 tokens.
+      // resolveTail: 从末尾 i=4 累 mTokens=4 → accTokens=4, tailStart=4.
+      //   i=3: mTokens=800, accTokens+800=804 > 200 但 i < length-1=4 → break.
+      // 所以 tailStart=4, head=msgs[0..4] = 4 条, tail=[msgs[4]] = 1 条.
+      const beforeTokens = estimateTokens(msgs);
+      const summaryFn = vi.fn(async (toSummarize: ReadonlyArray<ChatMessage>) => {
+        // mock summary, 内容应**不**含 big content
+        return `[mock summary of ${toSummarize.length} msgs]`;
+      });
+      const result = await compact(
+        msgs,
+        { contextWindow: 1000, tailMode: 'token_budget', tailKeepTokens: 200 },
+        summaryFn,
+        { now: () => 1 },
+      );
+      const afterTokens = estimateTokens(result.messages);
+      // 强断言 1: token 真的下降
+      expect(afterTokens).toBeLessThan(beforeTokens);
+      // 强断言 2: messages 长度 < 原长度 (4 head 被删, 1 summary + 1 tail = 2)
+      expect(result.messages).toHaveLength(2);
+      // 强断言 3: replaced range 的内容 'x'.repeat(3200) 不在新 messages 中
+      const allContent = result.messages.map((m) => m.content).join('|');
+      expect(allContent).not.toContain('x'.repeat(3200));
+      expect(allContent).toContain('recent tail');
+      // event 拍板
+      expect(result.event.kind).toBe('compaction');
+      if (result.event.kind !== 'compaction') throw new Error('unreachable');
+      expect(result.event.replaced_range).toEqual([0, 4]);
+      // stats
+      expect(result.stats.beforeMessages).toBe(5);
+      expect(result.stats.afterMessages).toBe(2);
+      expect(result.stats.afterTokens).toBeLessThan(result.stats.beforeTokens);
     });
   });
 });

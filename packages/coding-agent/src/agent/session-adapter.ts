@@ -86,10 +86,10 @@ export function toolLoopStepToSessionEvent(step: ToolLoopStep): SessionEvent | n
  * → 整体 roll back (不 push); pending 空 → push buffer.
  *
  * Sprint 1c-revive-2-D-5+ reload 修复 (review P1, 2026-06-04):
- *   - JSONL 里的 'compaction' event 必须 **replay** 到 LLM context, 否则
+ *   - JSONL 中的 'compaction' event 必须 **replay** 到 LLM context, 否则
  *     reload 后 messages 会从原始 user/assistant/tool events 重建, 旧
- *     compacted head 重新出现, 上下文不被压缩 (内存压缩成功但 reload 失效
- *     = P1).
+ *     compacted head 重新出现, 上下文不被压缩 (内存压缩成功但 reload
+ *     失效 = P1).
  *   - replay 协议: 见到 'compaction' event 时, 把当前累积 messages 的
  *     `replaced_range[0..replaced_range[1])` 段 (按 JSONL 累积 index)
  *     替换为 1 条 system summary.
@@ -102,8 +102,8 @@ export function toolLoopStepToSessionEvent(step: ToolLoopStep): SessionEvent | n
  *     index 空间, 不偏移. (多个 'compaction' event 串行: 第 1 次 applied
  *     后累积 messages = 1 summary + N tail, 第 2 次 compact 入参就是
  *     reload 后的累积, index 重新从 0 计 — protocol 自洽.)
- *   - 'compaction_paused' event: 不入 messages (caller 决定是否 reset
- *     latch / 改 summaryFn; UI/footer 状态可读 paused event 显式提示).
+ *   - 'compaction_paused' event: 不入 messages. caller 决定是否 reset
+ *     latch; UI/footer 可读 paused event 显式提示.
  */
 export function sessionEventsToMessages(events: ReadonlyArray<SessionEvent>): ChatMessage[] {
   // Sprint 1c P2 修复: 过滤 dangling tool_call transcript. 延迟 push 模式
@@ -154,24 +154,30 @@ export function sessionEventsToMessages(events: ReadonlyArray<SessionEvent>): Ch
       // 孤儿 tool (没匹配 assistant tool_call): 丢 — 不会出现无主 tool message
     } else if (ev.kind === 'compaction') {
       // Sprint 1c-revive-2-D-5+ (review P1 修复, 2026-06-04): replay 到 messages.
-      // 协议 (拍板 L88-L102 index 空间):
-      //   1. flushBuffer 先把当前未结算的 assistant(tool_calls) 拍完, 防 dangling
-      //      (tool_call 中途 + compaction event = 半个 transcript, 不该算合法).
-      //   2. replaced_range 拍 JSONL 累积 index 空间 = out 当前累积.
-      //   3. 把 out[start..end) 拍掉, 插 1 条 system summary 在 position start.
-      // 容错:
-      //   - start > out.length (out 还没积累到 replaced_range 拍那么多) →
-      //     跳过 (replaced_range 是 trailing tail 的 index, 已被前一次 compaction
-      //     覆盖; 这种事件不会发生除非 JSONL 被人手改坏, 我们走稳健路径).
-      //   - end > out.length 但 start <= out.length → 把 out 末位都拍掉, 插 summary
-      //     在 position start (防 1 条新 user event 把 tail 推走).
-      //   - start < 0 或 end < start → 跳过 (损坏 event).
-      // 'compaction_paused' event: 不入 messages (caller 决定是否 reset latch;
-      // UI/footer 可读 paused event 显式提示).
+      // 协议 (see header comment L88-L102 for index space):
+      //   1. flushBuffer first, to flush any un-settled assistant(tool_calls)
+      //      and prevent a dangling transcript (tool_call mid-way + compaction
+      //      event = invalid half-transcript).
+      //   2. replaced_range is the JSONL-accumulated index space, equal to
+      //      the current out accumulation.
+      //   3. Splice out[start..end) and insert 1 system summary at position
+      //      start.
+      // 容错 (safe-fail):
+      //   - start > out.length: skip (replaced_range is the trailing-tail
+      //     index, already covered by a prior compaction; this event
+      //     shouldn't occur unless JSONL was hand-edited, we take the
+      //     safe path).
+      //   - end > out.length but start <= out.length: splice out the
+      //     remaining tail and insert summary at position start (a new
+      //     user event may have pushed the tail off the end).
+      //   - start < 0 or end < start: skip (corrupt event).
+      // 'compaction_paused' event: does NOT enter messages. The caller
+      // decides whether to reset the latch; UI/footer reads paused event
+      // explicitly for status display.
       flushBuffer();
       const [start, end] = ev.replaced_range;
       if (start < 0 || end < start) continue; // 损坏 event
-      if (start > out.length) continue; // 拍不到, 跳过 (见上)
+      if (start > out.length) continue; // out 没积累到, 跳过 (见上)
       const removeCount = Math.min(end - start, out.length - start);
       out.splice(start, removeCount, {
         role: 'system',
