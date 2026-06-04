@@ -319,7 +319,13 @@ describe('coding-agent mode layer — 1c-revive-2-A runToolLoop 端到端真接 
 
       // ---- 收集 turn snapshot (用于 R-G2 揭示 + 不变量验证) ----
       // 跨 2 个 assistant step: turn 1 (tool_call) + turn 2 (final)
-      const toolResultInfo = toolSteps[0]?.result;
+      const toolStepForSnapshot =
+        toolSteps
+          .slice()
+          .reverse()
+          .find((s) => s.result.success && s.result.content.length > 0) ??
+        toolSteps[toolSteps.length - 1];
+      const toolResultInfo = toolStepForSnapshot?.result;
       snaps.push(
         snapshotTurn(
           i * 2,
@@ -327,7 +333,7 @@ describe('coding-agent mode layer — 1c-revive-2-A runToolLoop 端到端真接 
           assistantSteps[0]?.result ?? result.final,
           toolResultInfo
             ? {
-                name: toolSteps[0]?.tool_call.name,
+                name: toolStepForSnapshot?.tool_call.name,
                 success: toolResultInfo.success,
                 content: toolResultInfo.content,
               }
