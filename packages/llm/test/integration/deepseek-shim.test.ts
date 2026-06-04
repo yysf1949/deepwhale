@@ -5,11 +5,11 @@
  * 之前 X3 mock-only 风险 (1b.5-s2.5 meta-rule "test passed ≠ production works")
  * 要求 1 个真接验证 Step 2.5 的 cache_hit_rate / cost_turn 公式在真实响应上对得上.
  *
- * 触发条件 (X4 拍板 c: key 永不出 ~/.deepwhale/, 只通过 process.env):
- *   INTEGRATION=1 pnpm test           # 用户先 source ~/.deepwhale/.env
+ * 触发条件 (X4 拍板 c: key 永**不**入仓 (.env 在 .gitignore 里, .env.example 是模板可入仓), 只通过 process.env (走 loadProjectEnv)):
+ *   INTEGRATION=1 pnpm test           # 用户在 .env 填 key (D-7 loadProjectEnv 自动加载)
  *
  * 红线 (X1 b + X4 c 拍板):
- *   1. test 代码**不**直接读 ~/.deepwhale/.env 文件 — 用户自己 source
+ *   1. test 代码**不**直接读 .env 文件 (项目根, D-7 loadProjectEnv 自动加载) — 用户自己 source
  *   2. test 代码**不**接受 apiKey 选项 — 只能通过 process.env['DEEPSEEK_API_KEY']
  *   3. test 任何断言 / log**不**含 key 字符串 — 防 console.log 误打
  *   4. 文件权限: 写 key 文件必须是 mode 600 (用户责任, 文档提示)
@@ -45,29 +45,16 @@ import { describe, expect, it } from 'vitest';
 import { DeepSeekClient } from '../../src/deepseek-client.js';
 import type { ChatMessage } from '../../src/types.js';
 
-// ---- 红线门: INTEGRATION=1 + DEEPSEEK_API_KEY 都满足才进 describe ----
-
-const INTEGRATION_ENABLED = process.env['INTEGRATION'] === '1';
-const HAS_DEEPSEEK_KEY =
-  typeof process.env['DEEPSEEK_API_KEY'] === 'string' &&
-  process.env['DEEPSEEK_API_KEY'] !== '';
-
-const canRun = INTEGRATION_ENABLED && HAS_DEEPSEEK_KEY;
-
-// ---- skip 描述: 不写 'skip' (写消息让用户知道为什么) ----
-
-const skipReason = !INTEGRATION_ENABLED
-  ? 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")'
-  : !HAS_DEEPSEEK_KEY
-    ? 'process.env.DEEPSEEK_API_KEY is unset (source ~/.deepwhale/.env first; see README "integration tests")'
-    : 'unknown reason';
+// ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
+import { integrationSkipReason } from './_helpers/integration-gate.js';
 
 // ---- 主测试: 1 turn 流式真接, 验 shape + cost 公式 ----
 
 describe('DeepSeek shim — Step 3 真接 1 turn (X1 b + X4 c 拍板)', () => {
-  if (!canRun) {
-    it.skip(`SKIPPED: ${skipReason}`, () => {
-      // noop — vitest 看见 it.skip 就标 skipped, 不进 beforeEach / 调 client
+  const fileSkipReason = integrationSkipReason();
+  if (fileSkipReason !== undefined) {
+    it.skip(`SKIPPED: ${fileSkipReason}`, () => {
+      // noop
     });
     return;
   }

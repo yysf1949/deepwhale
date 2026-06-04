@@ -30,7 +30,7 @@
  *   INTEGRATION=1 pnpm vitest run packages/llm/test/integration/deepseek-tool-use-2turn.test.ts
  *
  * 红线 (跟 1d.5-A/1d.5-A.5/1d.5-D-3 等真接 test 一致):
- *   1. test 代码**不**直接读 ~/.deepwhale/.env 文件
+ *   1. test 代码**不**直接读 .env 文件 (项目根, D-7 loadProjectEnv 自动加载)
  *   2. test 代码**不**接受 apiKey 选项
  *   3. test 任何断言 / log**不**含 key 字符串
  *   4. 1 turn 不出 1 turn (1c-revive-1 = **2 turn** tool_use 端到端)
@@ -85,20 +85,8 @@ import { describe, expect, it } from 'vitest';
 import { DeepSeekClient } from '../../src/deepseek-client.js';
 import type { ChatMessage, LLMToolSchema, ToolCall } from '../../src/types.js';
 
-// ---- 红线门: 跟 1d.5-A/1d.5-A.5/1d.5-D-3 等真接 test 一致 ----
-
-const INTEGRATION_ENABLED = process.env['INTEGRATION'] === '1';
-const HAS_DEEPSEEK_KEY =
-  typeof process.env['DEEPSEEK_API_KEY'] === 'string' &&
-  process.env['DEEPSEEK_API_KEY'] !== '';
-
-const canRun = INTEGRATION_ENABLED && HAS_DEEPSEEK_KEY;
-
-const skipReason = !INTEGRATION_ENABLED
-  ? 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")'
-  : !HAS_DEEPSEEK_KEY
-    ? 'process.env.DEEPSEEK_API_KEY is unset (source ~/.deepwhale/.env first; see README "integration tests")'
-    : 'unknown reason';
+// ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
+import { integrationSkipReason } from './_helpers/integration-gate.js';
 
 // ---- calculate tool schema (跟 1d.5-D-3 一样) ----
 
@@ -209,8 +197,9 @@ function dumpSnapshots(label: string, snaps: TurnSnapshot[]): void {
 // ---- 主测试: 2 turn tool_use 端到端流程 ----
 
 describe('DeepSeek shim — 1c-revive-1 tool_use 2 turn 端到端真接 (1c-revive 拆分, 不动 mode layer)', () => {
-  if (!canRun) {
-    it.skip(`SKIPPED: ${skipReason}`, () => {
+  const fileSkipReason = integrationSkipReason();
+  if (fileSkipReason !== undefined) {
+    it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop
     });
     return;

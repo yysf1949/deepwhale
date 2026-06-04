@@ -22,7 +22,7 @@
  *   INTEGRATION=1 pnpm vitest run packages/llm/test/integration/deepseek-error.test.ts
  *
  * 红线 (跟 1d/1d.5-A/1d.5-A.5/1d.5-D-1/1d.5-D-2/1d.5-D-3 一致):
- *   1. test 代码**不**直接读 ~/.deepwhale/.env 文件
+ *   1. test 代码**不**直接读 .env 文件 (项目根, D-7 loadProjectEnv 自动加载)
  *   2. test 代码**不**接受 apiKey 选项
  *   3. test 任何断言 / log**不**含 key 字符串
  *   4. 1 turn 不出 1 turn (1d.5-D-4 = 1 turn 故意 error 触发, **不**累积)
@@ -63,20 +63,8 @@ import { DeepSeekClient } from '../../src/deepseek-client.js';
 import { LLMNetworkError } from '../../src/types.js';
 import type { ChatMessage } from '../../src/types.js';
 
-// ---- 红线门: 跟 1d/1d.5-A/1d.5-A.5/1d.5-D-1/1d.5-D-2/1d.5-D-3 一致 ----
-
-const INTEGRATION_ENABLED = process.env['INTEGRATION'] === '1';
-const HAS_DEEPSEEK_KEY =
-  typeof process.env['DEEPSEEK_API_KEY'] === 'string' &&
-  process.env['DEEPSEEK_API_KEY'] !== '';
-
-const canRun = INTEGRATION_ENABLED && HAS_DEEPSEEK_KEY;
-
-const skipReason = !INTEGRATION_ENABLED
-  ? 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")'
-  : !HAS_DEEPSEEK_KEY
-    ? 'process.env.DEEPSEEK_API_KEY is unset (source ~/.deepwhale/.env first; see README "integration tests")'
-    : 'unknown reason';
+// ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
+import { integrationSkipReason } from './_helpers/integration-gate.js';
 
 // ---- 1 turn 短 prompt (happy path 验 4xx 错误触发) ----
 
@@ -106,8 +94,9 @@ function dumpError(label: string, error: unknown): void {
 // ---- 主测试: 3 个 error 真接触发 ----
 
 describe('DeepSeek shim — 1d.5-D-4 error handling 真接 (D.4 cluster)', () => {
-  if (!canRun) {
-    it.skip(`SKIPPED: ${skipReason}`, () => {
+  const fileSkipReason = integrationSkipReason();
+  if (fileSkipReason !== undefined) {
+    it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop
     });
     return;
