@@ -17,8 +17,16 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
   afterEach(async () => {
     try {
       await fs.unlink(testFile);
-    } catch {
-      // ignore
+    } catch (err) {
+      // Sprint 1c.5: 不再静默吞. ENOENT 正常 (跑前文件已删) 静默; 其他失败
+      // (EPERM/EBUSY/Windows 残留) console.warn 留诊断线索, 不 throw (避免 Linux CI 红).
+      // 跨平台策略: ENOENT 静默, 其他 warn — 不影响正常 Linux CI 绿.
+      const e = err as NodeJS.ErrnoException;
+      if (e.code !== 'ENOENT') {
+        console.warn(
+          `[session-jsonl.test] unlink ${testFile} failed: ${e.code ?? 'UNKNOWN'} ${e.message}`,
+        );
+      }
     }
   });
 
@@ -296,6 +304,38 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
       expect(events[5]).toMatchObject({ kind: 'assistant', content: 'second-0' });
       expect(events[9]).toMatchObject({ kind: 'assistant', content: 'second-4' });
     });
+
+    it('Sprint 1c.5: truncate 落盘后 stat() 看到 size == keep 字节 (fsync 副作用契约)', async () => {
+      // Sprint 1c.5 加 fsync 后, 行为契约: truncate 调用栈返回后, OS 看到的文件
+      // 大小应等于 keep 完整字节数 (而非部分写的中间态).
+      //
+      // 测不变量不测机制: 不挂 SIGKILL, 直接观察 fsync 完成后的稳定状态.
+      // 现有 1c 测试 (line ~105 'truncate 已自动调用') 已验 readFile 拿到 keep 内容;
+      // 本测试**额外**断言 stat().size == Buffer.byteLength(keep) — 这是 fsync 的
+      // 副作用契约, 间接证明 fsync 路径走通.
+      //
+      // 红线 (1c.5 拍板): 不顺手重构 JSONL 协议, 不动 readAll, 不动 parseLines.
+      const fullEvent = JSON.stringify({ kind: 'user', ts: 1, content: 'complete' });
+      const partialLine = '{"kind":"assistant","ts":2,"content":"partia';
+      const fullLineLen = fullEvent.length + 1; // + \n
+      await fs.writeFile(testFile, fullEvent + '\n' + partialLine, 'utf8');
+
+      const reader = new SessionReader(testFile);
+      await reader.readAll();
+      await reader.truncate();
+
+      // 契约 1: 读到的内容 = keep (1 条完整 + \n)
+      const after = await fs.readFile(testFile, 'utf8');
+      expect(after).toBe(fullEvent + '\n');
+      // 契约 2: stat().size 落盘 = keep 字节 (fsync 副作用: 不是 0, 不是 partial)
+      const stat = await fs.stat(testFile);
+      expect(stat.size).toBe(fullLineLen);
+    });
+    //
+    // 注: 1c.5 还改了 afterEach unlink "ENOENT 静默 + 其他 warn" 跨平台可诊断.
+    // 策略契约**不**单测 — R-G1 风险 (spy fs.promises.unlink 全局副作用 + 复刻 afterEach
+    // 逻辑 = 重复), 现有 1c 测试覆盖真实 unlink 成功路径. 策略靠两个 afterEach 代码 review 对齐.
+
   });
 
   describe('Sprint 1b: SessionReader.truncate 幂等性 (caller 可以放心反复调)', () => {

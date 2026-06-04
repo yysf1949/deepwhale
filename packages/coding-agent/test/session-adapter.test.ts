@@ -454,8 +454,15 @@ describe('session-adapter', () => {
     afterEach(async () => {
       try {
         await fs.unlink(testFile);
-      } catch {
-        // ignore
+      } catch (err) {
+        // Sprint 1c.5: 不再静默吞. ENOENT 正常静默; 其他 (EPERM/EBUSY/Windows 残留) warn.
+        // 不 throw, 避免 Linux CI 红. 跨平台策略与 session-jsonl.test.ts 一致.
+        const e = err as NodeJS.ErrnoException;
+        if (e.code !== 'ENOENT') {
+          console.warn(
+            `[session-adapter.test] unlink ${testFile} failed: ${e.code ?? 'UNKNOWN'} ${e.message}`,
+          );
+        }
       }
     });
 

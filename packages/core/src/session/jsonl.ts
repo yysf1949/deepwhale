@@ -152,7 +152,16 @@ export class SessionReader {
     const lines = text.split('\n');
     const keep = lines.slice(0, this.lastIncompleteLineIndex).join('\n') + '\n';
     const truncatedBytes = Buffer.byteLength(text, 'utf8') - Buffer.byteLength(keep, 'utf8');
-    await fs.writeFile(this.path, keep, 'utf8');
+    // Sprint 1c.5: 写回加 fsync, 防止 truncate 中途 crash 把文件写空/部分写.
+    // 旧实现用 fs.writeFile 不保证 fsync; 新实现用 handle 路径显式 sync.
+    // 不顺手重构 JSONL 协议, 不动 readAll, 不动 parseLines.
+    const handle = await fs.open(this.path, 'w');
+    try {
+      await handle.writeFile(keep, 'utf8');
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
     return { truncated: truncatedBytes };
   }
 }
