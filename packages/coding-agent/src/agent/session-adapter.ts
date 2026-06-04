@@ -131,9 +131,12 @@ export function sessionEventsToMessages(events: ReadonlyArray<SessionEvent>): Ch
     }
     // 'system' 跳过 — caller 决定要不要用
   }
-  // EOF: 残余 buffer (dangling assistant) 整体丢
-  buffer = [];
-  pendingToolCalls = new Set();
+  // EOF: 调 flushBuffer 而非硬清空.
+  // 修复: 旧实现 `buffer = []` 把"assistant(tool_calls) → tool 已配对完成但
+  // final assistant 还没落盘" 的合法 transcript 也丢了 — 这种 crash 真实存在
+  // (工具结果已 fsync, 进程在生成最终回答前被杀, LLM 续聊需要看到 tool result
+  // 才能继续生成). 现在 EOF 走 flushBuffer, pending 空时正常 push buffer.
+  flushBuffer();
   return out;
 }
 

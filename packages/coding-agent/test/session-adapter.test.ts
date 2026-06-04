@@ -275,8 +275,12 @@ describe('session-adapter', () => {
       expect(messages[2]).toMatchObject({ role: 'assistant', content: 'done' });
     });
 
-    it('EOF dangling: 文件末尾 dangling assistant 整体丢', () => {
-      // 跟 "user 边界" 类似, EOF 也是结算点 — 残余 buffer 整体丢
+    it('EOF dangling: 文件末尾 dangling assistant 整体丢 (P2.5 仍正确)', () => {
+      // 修复 (P2.5 review): EOF 改调 flushBuffer 而非硬清空.
+      // 这里 "assistant(c1) 无 tool result" 末尾, 走 flushBuffer 走
+      // pending.size > 0 分支 → roll back → 仍返 1 message (user).
+      // 本测试**仍**通过, 行为不变; 跟下面 "EOF 已配对" 测试一起, 覆盖
+      // 两种 EOF 状态: dangling 仍丢, 已配对保留.
       const events: SessionEvent[] = [
         { kind: 'user', ts: 1, content: 'q' },
         {
@@ -285,11 +289,97 @@ describe('session-adapter', () => {
           content: '',
           tool_calls: [{ id: 'c1', name: 'bash', args: { command: 'ls' } }],
         },
-        // 无 tool, 文件结束
+        // 无 tool, 文件结束 → pending={c1} → 仍 roll back
       ];
       const messages = sessionEventsToMessages(events);
       expect(messages).toHaveLength(1);
       expect(messages[0]).toMatchObject({ role: 'user' });
+    });
+
+    it('EOF 已配对: assistant(tool_calls) → tool 已 fsync 末尾, 仍保留 (P2.5 修复)', () => {
+      // P2.5 review 修复点: 旧实现 EOF 硬清空 buffer, 误丢"已配对完成
+      // 但 final assistant 还没落盘" 的合法 transcript.
+      // 真实 crash 场景: 工具结果已 fsync, 进程在生成最终回答前被杀.
+      // LLM 续聊需要看到 user + assistant(tool_calls) + tool (3 条) 才能
+      // 继续生成最终回答.
+      const events: SessionEvent[] = [
+        { kind: 'user', ts: 1, content: 'list files' },
+        {
+          kind: 'assistant',
+          ts: 2,
+          content: '',
+          tool_calls: [{ id: 'c1', name: 'bash', args: { command: 'ls' } }],
+        },
+        {
+          kind: 'tool',
+          ts: 3,
+          tool_call_id: 'c1',
+          name: 'bash',
+          result: { success: true, content: 'a.ts\nb.ts' },
+          duration_ms: 1,
+        },
+        // final assistant 还没落盘 (crash), 文件以 tool 结尾
+      ];
+      const messages = sessionEventsToMessages(events);
+      // 修复后: EOF flushBuffer 走 pending.size===0 → push buffer → 3 messages
+      expect(messages).toHaveLength(3);
+      expect(messages[0]).toMatchObject({ role: 'user', content: 'list files' });
+      expect(messages[1]).toMatchObject({
+        role: 'assistant',
+        tool_calls: [{ id: 'c1', name: 'bash' }],
+      });
+      expect(messages[2]).toMatchObject({
+        role: 'tool',
+        content: 'a.ts\nb.ts',
+        tool_call_id: 'c1',
+      });
+      // 关键: 最后一条是 tool, transcript 合法 (LLM 续聊可继续生成 final assistant)
+    });
+
+    it('EOF multi tool_calls 已配对: 全部 tool 落盘后文件结束, 全部保留', () => {
+      // 极端: multi tool_calls (并行调用) 全部 tool 已 fsync, final assistant 未落盘
+      const events: SessionEvent[] = [
+        { kind: 'user', ts: 1, content: 'parallel' },
+        {
+          kind: 'assistant',
+          ts: 2,
+          content: '',
+          tool_calls: [
+            { id: 'c1', name: 'bash', args: { command: 'ls' } },
+            { id: 'c2', name: 'read_file', args: { path: 'a.ts' } },
+          ],
+        },
+        {
+          kind: 'tool',
+          ts: 3,
+          tool_call_id: 'c1',
+          name: 'bash',
+          result: { success: true, content: 'a.ts' },
+          duration_ms: 1,
+        },
+        {
+          kind: 'tool',
+          ts: 4,
+          tool_call_id: 'c2',
+          name: 'read_file',
+          result: { success: true, content: 'export const a = 1' },
+          duration_ms: 1,
+        },
+        // final assistant 还没落盘
+      ];
+      const messages = sessionEventsToMessages(events);
+      // 4 messages: user, assist(tool_calls c1/c2), tool c1, tool c2
+      expect(messages).toHaveLength(4);
+      expect(messages[0]).toMatchObject({ role: 'user' });
+      expect(messages[1]).toMatchObject({
+        role: 'assistant',
+        tool_calls: expect.arrayContaining([
+          expect.objectContaining({ id: 'c1' }),
+          expect.objectContaining({ id: 'c2' }),
+        ]),
+      });
+      expect(messages[2]).toMatchObject({ role: 'tool', tool_call_id: 'c1' });
+      expect(messages[3]).toMatchObject({ role: 'tool', tool_call_id: 'c2' });
     });
 
     it('P2 spec: 后续 append tool(c2) 后, assist2(c2) 自动恢复 (不改写 events)', () => {
