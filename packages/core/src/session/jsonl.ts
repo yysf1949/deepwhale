@@ -61,6 +61,30 @@ export type SessionEvent =
       summary: string;
       replaced_range: readonly [number, number];
       meta?: Record<string, unknown>;
+    }
+  | {
+      /**
+       * Compaction paused event (Sprint 1c-revive-2-D-5-2):
+       * 连续 N 次 compaction 失败 (默认 2) → latch 自动暂停, 写 1 条 paused event.
+       * 防止 death loop (每次 LLM context 涨 → 触发 compact → 失败 → 再涨 → 再触发...).
+       *
+       * 字段:
+       *   - consecutive_failures: 失败次数 (触发 latch 时 = 阈值)
+       *   - reason: 拍板暂停原因 (给上层 UI/log 用)
+       *   - last_error: 最后一次失败 error.message
+       *
+       * 不变量: SessionReader 读到 paused event 不重放进 LLM context
+       * (caller 该决定是否重置 latch / 改配置 / 改 summaryFn 拍板).
+       *
+       * Reasonix compact.go:88-93 拍板 source: consecutiveCompacts >= 2 → latch compactStuck,
+       * 自动暂停 + 拍板"say why, once".
+       */
+      kind: 'compaction_paused';
+      ts: number;
+      consecutive_failures: number;
+      reason: string;
+      last_error: string;
+      meta?: Record<string, unknown>;
     };
 
 /**

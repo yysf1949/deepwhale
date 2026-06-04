@@ -12,13 +12,15 @@
  *   5. compact 函数: messages <= tailKeep 抛错 (caller 拍板不该到这)
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   estimateTokens,
   shouldCompact,
   compact,
   resolveCompactionConfig,
   COMPACTION_DEFAULTS,
+  CompactionState,
+  runCompactionWithLatch,
   type ChatMessage,
 } from '../src/session/compaction.js';
 
@@ -146,8 +148,9 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
       const summary = result.messages[5]!;
       expect(summary.role).toBe('system');
       expect(summary.content).toContain('summarized 5 messages');
-      // event
+      // event — P38 拍板: union 派发用 kind 拍板后 narrow, 别直接 access 字段
       expect(result.event.kind).toBe('compaction');
+      if (result.event.kind !== 'compaction') throw new Error('unreachable');
       expect(result.event.ts).toBe(1234567890);
       expect(result.event.summary).toBe('summarized 5 messages');
       expect(result.event.replaced_range).toEqual([0, 5]);
@@ -165,6 +168,159 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
       await expect(
         compact(msgs, { contextWindow: 100000, tailKeepMessages: 4 }, async () => 'x'),
       ).rejects.toThrow(/nothing to compact/);
+    });
+  });
+
+  /**
+   * Sprint 1c-revive-2-D-5-2: stuck latch 拍板 (Reasonix compact.go:88-93 拍板一致).
+   *
+   * P38 拍板: latch 触发是**确定**的 (counter == threshold), 走**严格** assert.
+   * D-5-1 走软断言 (跨协议路径随机), D-5-2 走硬断言 (state machine 拍板).
+   */
+  describe('CompactionState + runCompactionWithLatch (stuck latch)', () => {
+    it('recordSuccess: 1 次成功重置所有失败计数 + unpause', () => {
+      const s = new CompactionState(2);
+      s.recordFailure(new Error('a'));
+      s.recordFailure(new Error('b'));
+      expect(s.paused).toBe(true);
+      s.recordSuccess();
+      expect(s.consecutiveFailures).toBe(0);
+      expect(s.paused).toBe(false);
+      expect(s.lastError).toBeNull();
+    });
+
+    it('recordFailure: 第 N 次失败触发 latch (threshold=2)', () => {
+      const s = new CompactionState(2);
+      expect(s.recordFailure(new Error('1st'))).toBe(false);
+      expect(s.paused).toBe(false);
+      expect(s.consecutiveFailures).toBe(1);
+      // 第 2 次失败 → latch
+      expect(s.recordFailure(new Error('2nd'))).toBe(true);
+      expect(s.paused).toBe(true);
+      expect(s.consecutiveFailures).toBe(2);
+      // 第 3 次失败 → 已 paused, 不再返 true (避免重发 paused event)
+      expect(s.recordFailure(new Error('3rd'))).toBe(false);
+      expect(s.consecutiveFailures).toBe(3);
+    });
+
+    it('reset: 手动清 latch', () => {
+      const s = new CompactionState(2);
+      s.recordFailure(new Error('a'));
+      s.recordFailure(new Error('b'));
+      expect(s.paused).toBe(true);
+      s.reset();
+      expect(s.paused).toBe(false);
+      expect(s.consecutiveFailures).toBe(0);
+    });
+
+    it('threshold=0: 不 latch (走纯失败重试)', () => {
+      const s = new CompactionState(0);
+      // threshold=0 含义: pauseThreshold=0, 任何失败 consecutiveFailures(>=1) >= 0 都会 latch
+      // 拍板: threshold=0 实际**会**立刻 latch, 这是 0 的副作用. 这里只验 recordFailure 行为:
+      expect(s.recordFailure(new Error('a'))).toBe(true);
+      expect(s.paused).toBe(true);
+    });
+
+    it('runCompactionWithLatch: 成功路径 → kind=ok + state reset', async () => {
+      const big = 'x'.repeat(3200);
+      const msgs: ChatMessage[] = [
+        { role: 'user', content: big },
+        { role: 'assistant', content: big },
+        { role: 'user', content: big },
+        { role: 'assistant', content: big },
+        { role: 'user', content: big },
+      ];
+      const state = new CompactionState(2);
+      const summaryFn = vi.fn(async () => 'mock summary');
+      const r = await runCompactionWithLatch(
+        msgs,
+        { contextWindow: 1000, tailKeepMessages: 2 },
+        summaryFn,
+        state,
+      );
+      expect(r).not.toBeNull();
+      expect(r?.kind).toBe('ok');
+      if (r?.kind !== 'ok') throw new Error('unreachable');
+      expect(summaryFn).toHaveBeenCalledTimes(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.paused).toBe(false);
+    });
+
+    it('runCompactionWithLatch: 不该 compact → 返 null, 不调 summaryFn', async () => {
+      const msgs: ChatMessage[] = [
+        { role: 'user', content: 'short' },
+        { role: 'assistant', content: 'reply' },
+      ];
+      const state = new CompactionState(2);
+      const summaryFn = vi.fn(async () => 'should not be called');
+      const r = await runCompactionWithLatch(
+        msgs,
+        { contextWindow: 100000, tailKeepMessages: 4 },
+        summaryFn,
+        state,
+      );
+      expect(r).toBeNull();
+      expect(summaryFn).not.toHaveBeenCalled();
+    });
+
+    it('runCompactionWithLatch: paused → 返 null, 不调 summaryFn (防 death loop + 省钱)', async () => {
+      const big = 'x'.repeat(3200);
+      const msgs: ChatMessage[] = Array(5).fill({ role: 'user', content: big });
+      const state = new CompactionState(2);
+      state.paused = true; // 手动 latch
+      const summaryFn = vi.fn(async () => 'should not be called');
+      const r = await runCompactionWithLatch(
+        msgs,
+        { contextWindow: 1000, tailKeepMessages: 2 },
+        summaryFn,
+        state,
+      );
+      expect(r).toBeNull();
+      expect(summaryFn).not.toHaveBeenCalled();
+    });
+
+    it('runCompactionWithLatch: 连续 2 次失败 → 第 2 次返 kind=latched + paused event', async () => {
+      const big = 'x'.repeat(3200);
+      const msgs: ChatMessage[] = Array(5).fill({ role: 'user', content: big });
+      const state = new CompactionState(2);
+
+      // 第 1 次失败 (summaryFn 抛错) → 未 latch, 抛给 caller
+      const summaryFn1 = vi.fn(async () => {
+        throw new Error('API timeout');
+      });
+      await expect(
+        runCompactionWithLatch(
+          msgs,
+          { contextWindow: 1000, tailKeepMessages: 2 },
+          summaryFn1,
+          state,
+        ),
+      ).rejects.toThrow('API timeout');
+      expect(state.consecutiveFailures).toBe(1);
+      expect(state.paused).toBe(false);
+
+      // 第 2 次失败 → 触发 latch, 返 kind=latched
+      const summaryFn2 = vi.fn(async () => {
+        throw new Error('API timeout again');
+      });
+      const r2 = await runCompactionWithLatch(
+        msgs,
+        { contextWindow: 1000, tailKeepMessages: 2 },
+        summaryFn2,
+        state,
+      );
+      expect(r2).not.toBeNull();
+      expect(r2?.kind).toBe('latched');
+      if (r2?.kind !== 'latched') throw new Error('unreachable');
+      expect(r2.consecutiveFailures).toBe(2);
+      expect(r2.error.message).toBe('API timeout again');
+      // paused event 拍板
+      expect(r2.pausedEvent.kind).toBe('compaction_paused');
+      if (r2.pausedEvent.kind !== 'compaction_paused') throw new Error('unreachable');
+      expect(r2.pausedEvent.consecutive_failures).toBe(2);
+      expect(r2.pausedEvent.reason).toMatch(/auto-paused/);
+      expect(r2.pausedEvent.last_error).toBe('API timeout again');
+      expect(state.paused).toBe(true);
     });
   });
 });

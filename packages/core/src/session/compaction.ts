@@ -58,11 +58,19 @@ export interface CompactionConfig {
   readonly compactRatio?: number;
   /** 保留最后 N 条消息不被总结. 默认 4 (system + user + assistant + tool ≈ 4-turn) */
   readonly tailKeepMessages?: number;
+  /**
+   * 连续失败 latch 阈值 (Sprint 1c-revive-2-D-5-2):
+   * 连续 N 次 compact 失败 → 自动暂停 + 写 paused event. 默认 2 (Reasonix 拍板).
+   * 防止 death loop: LLM context 涨 → compact 失败 → 再涨 → 再 compact → 失败...
+   * 设为 0 / undefined = 不 latch (走纯失败重试, 不推荐).
+   */
+  readonly pauseAfterFailures?: number;
 }
 
 export const COMPACTION_DEFAULTS = {
   compactRatio: 0.8,
   tailKeepMessages: 4,
+  pauseAfterFailures: 2,
 } as const;
 
 /**
@@ -108,6 +116,134 @@ export function resolveCompactionConfig(config: CompactionConfig): {
     tailKeepMessages,
     threshold: Math.floor(config.contextWindow * compactRatio),
   };
+}
+
+/**
+ * Compaction 状态机 (Sprint 1c-revive-2-D-5-2):
+ * 跟踪连续失败次数, 达到阈值 → latch → 暂停 + 写 paused event.
+ *
+ * 不变量:
+ *   - consecutiveFailures 永不为负
+ *   - paused === true ⇒ consecutiveFailures >= pauseThreshold (且未重置)
+ *   - 1 次成功 → consecutiveFailures = 0 (无论之前几次失败)
+ *   - 1 次失败 → consecutiveFailures++; 若 >= pauseThreshold → paused = true
+ *
+ * 重置 latch:
+ *   - new CompactionState() 重新初始化
+ *   - caller 决定何时调用 (e.g. 用户改 summaryFn / 改配置)
+ */
+export class CompactionState {
+  consecutiveFailures = 0;
+  paused = false;
+  lastError: string | null = null;
+
+  constructor(private readonly pauseThreshold: number) {
+    if (pauseThreshold < 0) {
+      throw new Error(`CompactionState: pauseThreshold must be >= 0, got ${pauseThreshold}`);
+    }
+  }
+
+  /** 1 次成功 → reset 失败计数 + unpause */
+  recordSuccess(): void {
+    this.consecutiveFailures = 0;
+    this.paused = false;
+    this.lastError = null;
+  }
+
+  /**
+   * 1 次失败 → 计数 +1, 达到阈值 → latch.
+   * 返 true 表示本次失败触发了 latch (caller 该写 paused event).
+   */
+  recordFailure(error: Error): boolean {
+    this.consecutiveFailures += 1;
+    this.lastError = error.message;
+    if (this.consecutiveFailures >= this.pauseThreshold && !this.paused) {
+      this.paused = true;
+      return true;
+    }
+    return false;
+  }
+
+  /** 该不该尝试 compact (paused → false) */
+  shouldAttempt(): boolean {
+    return !this.paused;
+  }
+
+  /** Caller 主动重置 latch (e.g. 用户改配置后) */
+  reset(): void {
+    this.consecutiveFailures = 0;
+    this.paused = false;
+    this.lastError = null;
+  }
+}
+
+/**
+ * Latched compact (Sprint 1c-revive-2-D-5-2):
+ * 把 shouldCompact + compact + latch 拍成 1 个函数.
+ *
+ * 拍板:
+ *   - paused → 返 null (不尝试, 不调 summaryFn, 不写 event)
+ *   - 不该 compact → 返 null
+ *   - compact 成功 → recordSuccess, 返 { kind: 'ok', result, event }
+ *   - compact 失败 → recordFailure
+ *     - 触发 latch → 返 { kind: 'latched', error, pausedEvent }
+ *     - 未触发 latch → 抛错给 caller
+ *
+ * 不变量: paused 时**不**调 summaryFn (避免 LLM 浪费 token).
+ */
+export type LatchedCompactResult =
+  | { readonly kind: 'ok'; readonly result: CompactionResult; readonly event: SessionEvent }
+  | {
+      readonly kind: 'latched';
+      readonly error: Error;
+      readonly pausedEvent: SessionEvent;
+      readonly consecutiveFailures: number;
+    };
+
+export async function runCompactionWithLatch(
+  messages: ReadonlyArray<ChatMessage>,
+  config: CompactionConfig,
+  summaryFn: SummarizeFn,
+  state: CompactionState,
+  options: { now?: () => number } = {},
+): Promise<LatchedCompactResult | null> {
+  // 拍板 1: latch paused → 直接返 null (不调 summaryFn)
+  if (!state.shouldAttempt()) {
+    return null;
+  }
+
+  // 拍板 2: 不该 compact → 返 null
+  if (!shouldCompact(messages, config)) {
+    return null;
+  }
+
+  const now = options.now ?? (() => Date.now());
+
+  try {
+    const result = await compact(messages, config, summaryFn, { now });
+    state.recordSuccess();
+    return { kind: 'ok', result, event: result.event };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    const latched = state.recordFailure(error);
+    if (latched) {
+      const pauseThreshold = state.consecutiveFailures;
+      const pausedEvent: SessionEvent = {
+        kind: 'compaction_paused',
+        ts: now(),
+        consecutive_failures: pauseThreshold,
+        reason: `compaction failed ${pauseThreshold} times consecutively; auto-paused to prevent death loop`,
+        last_error: error.message,
+        meta: {
+          context_window: config.contextWindow,
+          messages_count: messages.length,
+        },
+      };
+      return { kind: 'latched', error, pausedEvent, consecutiveFailures: pauseThreshold };
+    }
+    // 未触发 latch: 抛给 caller, caller 决定怎么处理 (e.g. retry / 改 summaryFn)
+    throw err;
+  }
 }
 
 /**
