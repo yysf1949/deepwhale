@@ -412,4 +412,117 @@ describe('AnthropicClient — tools 转换 (1c.5 拍板, 1c-revive-2-B-1)', () =
       args: { expression: '17*23' },
     });
   });
+
+  // ============================================================================
+  // Sprint 1c-revive-2-D-4-2 (P38, 2026-06-04): mock fetch 单测验证 toAnthropicMessages
+  // 合并连续 tool 消息行为 (修 1c.5 拍板 bug, N≥2 tool_calls path 揭示)
+  // ============================================================================
+
+  it('19. 连续 2 tool 消息 → 1 个 user 消息含 2 个 tool_result blocks (P38 拍板)', async () => {
+    // 1c-revive-2-D-4-1 修 1c.5 拍板 bug: 之前每个 tool 消息 push 独立 user 消息,
+    // Anthropic 协议要求 N 个 tool_use 紧跟 1 个 user 消息含 N 个 tool_result blocks.
+    const { mock, getBody } = makeMockFetch([{ type: 'text', text: 'after' }]);
+    const client = new AnthropicClient({ apiKey: TEST_KEY, fetchImpl: mock });
+    await client.chat([
+      { role: 'user', content: 'multi' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          { id: 'call_A', name: 'bash', args: { command: 'echo a' } },
+          { id: 'call_B', name: 'find', args: { pattern: '*.txt' } },
+        ],
+      },
+      { role: 'tool', content: 'a-result', tool_call_id: 'call_A' },
+      { role: 'tool', content: 'b-result', tool_call_id: 'call_B' },
+    ]);
+    const body = getBody()!;
+    const messages = body['messages'] as Array<{ role: string; content: unknown }>;
+    // 拍板: 1 user + 1 assistant + 1 user (含 2 tool_result) = 3 个消息
+    expect(messages.length).toBe(3);
+    // 拍板: 第 3 个消息是 user, content 是 array 含 2 个 tool_result blocks
+    const toolResultsMsg = messages[2]!;
+    expect(toolResultsMsg.role).toBe('user');
+    const blocks = toolResultsMsg.content as Array<{
+      type: string;
+      tool_use_id?: string;
+      content?: string;
+    }>;
+    expect(blocks.length).toBe(2);
+    expect(blocks[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'call_A', content: 'a-result' });
+    expect(blocks[1]).toMatchObject({ type: 'tool_result', tool_use_id: 'call_B', content: 'b-result' });
+  });
+
+  it('20. 单 tool 消息 (回归测) → 1 user 消息含 1 tool_result (不变)', async () => {
+    // P38 拍板: 1-tool-call 路径应保持 1c.5 拍板行为 (1 个 user 消息含 1 个 tool_result).
+    const { mock, getBody } = makeMockFetch([{ type: 'text', text: 'after' }]);
+    const client = new AnthropicClient({ apiKey: TEST_KEY, fetchImpl: mock });
+    await client.chat([
+      { role: 'user', content: 'single' },
+      { role: 'assistant', content: '', tool_calls: [{ id: 'call_X', name: 'bash', args: {} }] },
+      { role: 'tool', content: 'x-result', tool_call_id: 'call_X' },
+    ]);
+    const body = getBody()!;
+    const messages = body['messages'] as Array<{ role: string; content: unknown }>;
+    expect(messages.length).toBe(3);
+    const toolResultsMsg = messages[2]!;
+    expect(toolResultsMsg.role).toBe('user');
+    const blocks = toolResultsMsg.content as Array<{
+      type: string;
+      tool_use_id?: string;
+      content?: string;
+    }>;
+    expect(blocks.length).toBe(1);
+    expect(blocks[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'call_X', content: 'x-result' });
+  });
+
+  it('21. tool 消息后接 user 消息 → flush pending tool_results 在 user 前', async () => {
+    // P38 拍板: flushToolResults() 触发条件: 遇到非 tool 角色.
+    const { mock, getBody } = makeMockFetch([{ type: 'text', text: 'ok' }]);
+    const client = new AnthropicClient({ apiKey: TEST_KEY, fetchImpl: mock });
+    await client.chat([
+      { role: 'user', content: 'first' },
+      { role: 'tool', content: 't1', tool_call_id: 'call_1' },
+      { role: 'user', content: 'second user msg' },
+    ]);
+    const body = getBody()!;
+    const messages = body['messages'] as Array<{ role: string; content: unknown }>;
+    // 拍板: tool 消息 (变 user with tool_result) → 第 2 个 user 消息原文
+    // 顺序: user, user (含 tool_result), user
+    expect(messages.length).toBe(3);
+    expect(messages[0]!.role).toBe('user');
+    expect(messages[0]!.content).toBe('first');
+    // 第 2 个消息: user 含 tool_result (因 tool 消息 → 紧跟 user 消息前 flush)
+    expect(messages[1]!.role).toBe('user');
+    const blocks = messages[1]!.content as Array<{
+      type: string;
+      tool_use_id?: string;
+      content?: string;
+    }>;
+    expect(blocks[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'call_1', content: 't1' });
+    // 第 3 个消息: 原 user 消息
+    expect(messages[2]!.role).toBe('user');
+    expect(messages[2]!.content).toBe('second user msg');
+  });
+
+  it('22. 末尾 tool 消息 (loop 结束) → flush 触发, 不丢失末尾 tool_result', async () => {
+    // P38 拍板: loop 结束后 flushToolResults() 必触发, 避免末尾独立 tool 消息丢失.
+    const { mock, getBody } = makeMockFetch([{ type: 'text', text: 'ok' }]);
+    const client = new AnthropicClient({ apiKey: TEST_KEY, fetchImpl: mock });
+    await client.chat([
+      { role: 'user', content: 'first' },
+      { role: 'tool', content: 'end', tool_call_id: 'call_end' },
+    ]);
+    const body = getBody()!;
+    const messages = body['messages'] as Array<{ role: string; content: unknown }>;
+    // 拍板: 末尾 tool 消息 → user (含 1 tool_result)
+    expect(messages.length).toBe(2);
+    expect(messages[1]!.role).toBe('user');
+    const blocks = messages[1]!.content as Array<{
+      type: string;
+      tool_use_id?: string;
+      content?: string;
+    }>;
+    expect(blocks[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'call_end', content: 'end' });
+  });
 });
