@@ -258,13 +258,27 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
     it('reopen writer append 后顺序连续: kill 中间不丢 (≤ 1 条边界)', async () => {
       // 模拟"写完 5 条, kill 进程 (close 未调用), 二次启动 reopen 同一个文件再写 5 条"
       // 验证: 二次启动后 readAll 拿到至少前 5 条 (fsync 边界后可能丢 1 条, 接受)
+      //
+      // 模拟语义的精度说明 (P3 反馈后):
+      //   真实 kill -9 = 5 条 fsync 中途 / 完成后任意点死, handle 泄漏.
+      //   本测试用 "5 条全 await 完 + close 排空" 模拟, 不是 100% kill -9 语义.
+      //   接受这个弱化的原因:
+      //     1) append 内部 await sync — 5 条全部落盘, 跟"kill 在 fsync 前" 测试场景不在此覆盖
+      //     2) close() 不再 await 后还有未完成的写 (writeQueue 已空) — 跟真 kill 的差异
+      //        主要是 fd 泄漏, 不影响落盘事实
+      //   如要测"kill 在 fsync 前"边界, 需用 raw handle.write 不 sync 模拟, 后续 Sprint 处理.
       const w1 = new SessionWriter(testFile);
-      await w1.open();
-      for (let i = 0; i < 5; i++) {
-        await w1.append({ kind: 'user', ts: i, content: `first-${i}` });
+      try {
+        await w1.open();
+        for (let i = 0; i < 5; i++) {
+          await w1.append({ kind: 'user', ts: i, content: `first-${i}` });
+        }
+        // 模拟 "进程被 kill 前 append 全部 fsync 完成": 不再显式 close, 走 finally 兜底
+      } finally {
+        // P3 cleanup: Windows 上未释放 handle 让 afterEach unlink 失败 (虽被吞, 留 tmp 文件).
+        // .catch 兜底 — w1 可能因异常处于不一致状态, 释放失败不应让测试 fail.
+        await w1.close().catch(() => {});
       }
-      // 模拟 kill: 不 close, 抛弃 handle (Sprint 1b 已知: close 排空 writeQueue, 不 close 可能丢 pending)
-      // 实际情况: 5 条都 sync 完 (append 内部 await sync), 所以 5 条全落盘
 
       // === 二次启动 ===
       const w2 = new SessionWriter(testFile);
