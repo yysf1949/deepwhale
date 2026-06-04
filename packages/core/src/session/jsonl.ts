@@ -21,10 +21,23 @@
  * - D-5-3 tail token budget（resolveTail, tailMode='token_budget' 默认）
  *   拍板 source: Reasonix compact.go:271-289 (tail 按 token budget 而非 message count)
  *
- * SessionEvent union 当前 6 kind：
- *   user / assistant / tool / system / compaction / compaction_paused
- * SessionReader 读 'compaction' / 'compaction_paused' 不重放进 LLM context
- * (compaction.ts 拍板: 这两种是 runtime/metadata, 不进 context).
+ * SessionEvent union 当前 7 kind：
+ *   user / assistant / tool / system / compaction / compaction_paused / verification
+ * SessionReader 读 'compaction' / 'compaction_paused' / 'verification' 不重放进 LLM context
+ * (compaction.ts 拍板: 这三种是 runtime/metadata, 不进 context).
+ *
+ * 'verification' event (Sprint 1c-revive-2-D-11-3, 2026-06-04): `deepwhale --verify`
+ * 或 REPL `/verify` 跑完生成的 VerificationReport 摘要写到 session JSONL.
+ *   - 跟 'compaction'/'compaction_paused' 同语义: metadata, 不重放进 LLM context.
+ *     用户 reload session 看不到 verification event 拼成 message (跟 paused event 一致).
+ *   - 字段: report (VerificationReport 形态) + status (passed / failed) — 给 viewer
+ *     / audit log 留口.
+ *   - Sprint 1c-revive-2-D-11-3 拍板: 旧 session 文件 (没有 verification event)
+ *     reload 不崩, 因为 SessionReader 走 kind discriminator union type,
+ *     旧 kind 解析流程不变. 新 kind 在旧 reader 读不到 (kind 不在 union),
+ *     但新 reader 读旧 JSONL 也不会试图 parse 缺失字段 — 严格 union 兜底.
+ *   - 拍板 (D-11, 2026-06-04): 不**不**新增 session event 子表 / 不**不**新建 verification.jsonl,
+ *     跟 user/assistant/tool 同 append-only 1 JSONL 走, 简单且对旧 loader 透明.
  *
  * Sprint 1+ 仍待落地（待拍板）：
  * - 索引（按 messageId 加速查询）
@@ -98,6 +111,37 @@ export type SessionEvent =
       consecutive_failures: number;
       reason: string;
       last_error: string;
+      meta?: Record<string, unknown>;
+    }
+  | {
+      /**
+       * Verification event (Sprint 1c-revive-2-D-11-3, 2026-06-04):
+       * `deepwhale --verify` 或 REPL `/verify` 跑完生成的 VerificationReport 摘要
+       * 写到 session JSONL. 跟 compaction_paused 同语义: metadata, 不重放进 LLM context.
+       *
+       * 字段:
+       *   - status: 'passed' / 'failed' (整体结果, 跟 VerificationReport.overallStatus 一致)
+       *   - durationMs: 整体耗时 (跟 VerificationReport.durationMs 一致)
+       *   - command_count: 跑的 step 数 (e.g. 4 = build/lint/typecheck/test)
+       *   - failed_count: 失败 step 数
+       *   - summary: 人类可读 summary (跟 VerificationReport.summary 一致)
+       *   - meta: 给 viewer / audit 留的可选扩展字段 (e.g. log file path, git sha)
+       *
+       * 不变量:
+       *   - SessionReader 读 'verification' 不重放进 LLM context
+       *     (跟 compaction_paused 一致, 跟 tool/user/assistant 不同).
+       *   - 旧 session reload 不崩: 旧 event 没 'verification' kind, 新 reader union
+       *     不会试图 parse 缺失字段; 新 reader 读旧 event 完全不感知.
+       *   - stdout/stderrTail 不在 event 里 (cap 4KB 内嵌到 event 也会撑爆 JSONL);
+       *     要看详细就 reload 时读 `meta.logFilePath` (后续 sprint 加).
+       */
+      kind: 'verification';
+      ts: number;
+      status: 'passed' | 'failed';
+      durationMs: number;
+      command_count: number;
+      failed_count: number;
+      summary: string;
       meta?: Record<string, unknown>;
     };
 
@@ -239,9 +283,8 @@ export class SessionReader {
     } catch (err) {
       // 写 temp 失败: 清理垃圾, 原文件**不动**, 抛错给 caller.
       // 拍板 (review P2, 2026-06-04): 失败**保留** lastIncompleteLineIndex,
-      // caller 之后重试, 拍板 "still needs fix" 拍拍 抹掉. 拍板
-      // lastIncompleteLineIndex 拍拍 拍 拍 拍 拍 拍 拍, 拍 拍 拍 拍 拍
-      // 拍 拍.
+      // caller 之后重试 truncate 仍能清掉这个 partial line. 抹掉的话会
+      // "成功一次后忘记清" 反复 leak, 更难诊断.
       await handle.close().catch(() => {});
       await fs.unlink(tempPath).catch(() => {});
       throw err;
@@ -253,13 +296,13 @@ export class SessionReader {
       await fs.rename(tempPath, this.path);
     } catch (err) {
       // rename 失败: 清理 temp, 原文件**不动** (rename 没成功), 抛错给 caller.
-      // 拍板: 同样**保留** lastIncompleteLineIndex.
+      // 拍板: 同样**保留** lastIncompleteLineIndex, 跟写 temp 失败同语义.
       await fs.unlink(tempPath).catch(() => {});
       throw err;
     }
     // 成功: 清零 lastIncompleteLineIndex (拍板 review P2, 2026-06-04).
-    // 拍板: 拍拍 truncate 拍拍, 拍 拍拍 拍 拍 拍 拍 拍 拍 拍 拍 拍
-    // 拍 拍, 拍 拍 拍 拍 拍 拍 拍 拍 拍 拍 拍.
+    // 下次 parseLines 入口本来就会重置 (review P2 fix), 这里额外清零
+    // 是给 truncate 后的二次调用兜底 (虽然实际不会发生, 但防御编程).
     this.lastIncompleteLineIndex = -1;
     return { truncated: truncatedBytes };
   }

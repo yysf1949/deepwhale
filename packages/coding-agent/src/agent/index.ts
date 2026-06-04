@@ -25,6 +25,7 @@ export {
   appendUserEvent,
   appendCompactionEvent,
   appendCompactionPausedEvent,
+  appendVerificationEvent,
   persistToolLoopSteps,
   loadSession,
 } from './session-adapter.js';

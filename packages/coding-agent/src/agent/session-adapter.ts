@@ -184,8 +184,11 @@ export function sessionEventsToMessages(events: ReadonlyArray<SessionEvent>): Ch
         content: `[Session compaction summary]\n${ev.summary}`,
       });
     }
-    // 'system' / 'compaction_paused' 跳过 — 'system' caller 决定要不要用;
-    // 'compaction_paused' 是 metadata, 由 UI/footer 显式读.
+    // 'system' / 'compaction_paused' / 'verification' 跳过 — 三种都是 metadata, 不进 LLM context:
+    //   - 'system' caller 决定要不要用
+    //   - 'compaction_paused' UI/footer 显式读
+    //   - 'verification' (Sprint 1c-revive-2-D-11-3, 2026-06-04) audit log / viewer 显式读
+    //     reload session 时验证历史不污染 LLM 看到的 messages 列表
   }
   // EOF: 调 flushBuffer 而非硬清空.
   // 修复: 旧实现 `buffer = []` 把"assistant(tool_calls) → tool 已配对完成但
@@ -302,4 +305,48 @@ export async function loadSession(
     // truncate 失败不阻塞启动(可能是权限/磁盘满等, 但 events 已读到内存)
   }
   return { events, messages: sessionEventsToMessages(events) };
+}
+
+/**
+ * 写一个 'verification' event 到 session (Sprint 1c-revive-2-D-11-3, 2026-06-04).
+ *
+ * 调用场景: `deepwhale --verify` 或 REPL `/verify` 跑完, 把 VerificationReport
+ * 摘要写 1 条到 session JSONL. 跟 `appendUserEvent` / `appendCompactionEvent` 模式一致.
+ *
+ * 字段 (跟 core/src/session/jsonl.ts 'verification' union 一致):
+ *   - status: 整体结果 passed / failed
+ *   - durationMs: 整体耗时
+ *   - command_count: 跑的 step 数
+ *   - failed_count: 失败 step 数
+ *   - summary: 人类可读 summary (来自 formatter.buildSummaryAndNext)
+ *   - meta: 可选扩展 (e.g. log file path, git sha)
+ *
+ * 不变量 (跟其它 event 写入一致):
+ *   - ts 默认 Date.now(), 单测可注入
+ *   - 走 SessionWriter.append → fsync 串行化, 顺序保证
+ *   - 'verification' 是 metadata, reload session 时 sessionEventsToMessages 跳过
+ *     (跟 compaction_paused 同语义), 不污染 LLM 看到的 messages
+ */
+export async function appendVerificationEvent(
+  writer: SessionWriter,
+  args: {
+    status: 'passed' | 'failed';
+    durationMs: number;
+    commandCount: number;
+    failedCount: number;
+    summary: string;
+    meta?: Record<string, unknown>;
+    ts?: number;
+  },
+): Promise<void> {
+  await writer.append({
+    kind: 'verification',
+    ts: args.ts ?? Date.now(),
+    status: args.status,
+    durationMs: args.durationMs,
+    command_count: args.commandCount,
+    failed_count: args.failedCount,
+    summary: args.summary,
+    ...(args.meta !== undefined ? { meta: args.meta } : {}),
+  });
 }
