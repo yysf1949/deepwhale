@@ -58,10 +58,13 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
       ...(options.model !== undefined ? { model: options.model } : {}),
     });
   // Sprint 1b.5 Step 2.5 (F3 拍板, R-G1 修正 2026-06-03): anthropic × tool loop 防护 (mode 层).
+  // 跟 startRepl 同款: requestedToolLoop = options.enableToolLoop ?? true,
+  // anthropic 强制 enableToolLoop=false + warn. 之前 `??` 兜底让显式 true 透传,
+  // CLI 默认路径仍会撞 Anthropic tool loop 未实现的 P1.
   const isAnthropic = client.model.startsWith('claude-');
-  const enableToolLoop =
-    options.enableToolLoop ?? (isAnthropic ? false : true);
-  if (isAnthropic && options.enableToolLoop !== false) {
+  const requestedToolLoop = options.enableToolLoop ?? true;
+  const enableToolLoop = isAnthropic ? false : requestedToolLoop;
+  if (isAnthropic && requestedToolLoop) {
     process.stderr.write(
       'warning: Anthropic provider in Sprint 1b.5 does not support tool loop; ' +
         'auto-disabling tools. Use DeepSeek or wait for Sprint 1c tool schema conversion.\n',

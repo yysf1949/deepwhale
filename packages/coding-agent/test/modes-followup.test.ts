@@ -484,7 +484,7 @@ describe('runRpcMode — Sprint 1a follow-up', () => {
 });
 
 // =====================================================================
-// Sprint 1b.5 Step 2.5 (F3 拍板): mode 层 anthropic × tool loop 防护
+// Sprint 1b.5 Step 2.5 (F3 拍板, R-G1 修正): mode 层 anthropic × tool loop 防护
 // =====================================================================
 
 describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', () => {
@@ -550,6 +550,76 @@ describe('runPrintMode — Sprint 1b.5 F3 anthropic × tool loop auto-disable', 
       // 验证 2: 走了 client.stream 路径 (runToolLoop 内部 runStreamStep 调 stream, 因 onChunk 必传)
       expect(client.stream).toHaveBeenCalledTimes(1);
       // 验证 3: client.chat **没**被调 (runToolLoop 不会走 chat 分支, 因 onChunk 必传)
+      expect(client.chat).not.toHaveBeenCalled();
+      // 验证 4: LLM 看到了 user prompt
+      expect(seen.messages[0]?.at(-1)).toEqual({ role: 'user', content: 'hi' });
+    } finally {
+      stdoutSpy.mockRestore();
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it('F3-C (R-G1 修正): anthropic client + enableToolLoop=true (显式) → stderr warning + 走 client.stream (不跑 tool loop)', async () => {
+    // 之前 P1 bug: 修前 `?? (isAnthropic ? false : true)` 让显式 enableToolLoop=true
+    // 透传, CLI 默认走 tool loop 撞 Anthropic tools 未实现. 修后用
+    // `requestedToolLoop = options.enableToolLoop ?? true; isAnthropic ? false : requestedToolLoop`
+    // 强制覆盖. 关键覆盖 = caller 显式 true 也必须被降级, 不能逃过 mode 层防护.
+    const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'anthropic stream only' }] });
+    (client as { model: ModelId }).model = 'claude-sonnet-4-5' as ModelId;
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
+      stderrChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    const stdoutChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((data) => {
+      stdoutChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    try {
+      // 关键: 显式 enableToolLoop=true, 模拟 CLI 默认路径
+      const code = await runPrintMode({ prompt: 'hi', client, enableToolLoop: true });
+      expect(code).toBe(0);
+      // 验证 1: stderr 必含 F3 warning (caller 请求了 tool loop, anthropic 拒绝)
+      const stderrAll = stderrChunks.join('');
+      expect(stderrAll).toMatch(/warning: Anthropic provider in Sprint 1b\.5 does not support tool loop/);
+      expect(stderrAll).toMatch(/auto-disabling tools/);
+      // 验证 2: 走了 client.stream 路径 (降级到 stream 直发)
+      expect(client.stream).toHaveBeenCalledTimes(1);
+      // 验证 3: client.chat **没**被调 (走 tool loop 才调 chat) — 关键: 即使 enableToolLoop=true
+      // 也不调 chat, 验证 anthropic 强制覆盖生效
+      expect(client.chat).not.toHaveBeenCalled();
+      // 验证 4: LLM 看到了 user prompt
+      expect(seen.messages[0]?.at(-1)).toEqual({ role: 'user', content: 'hi' });
+      // 验证 5: stdout 含 chat content
+      expect(stdoutChunks.join('')).toContain('anthropic stream only');
+    } finally {
+      stdoutSpy.mockRestore();
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it('F3-D (R-G1 修正): anthropic client + enableToolLoop=false (显式) → stderr 无 warning + 走 client.stream (不跑 tool loop, 不重复警告)', async () => {
+    // 验证: caller 显式 false 时, 防护不**重复** warn (warn 只在 caller **请求** tool loop 时打).
+    // 这是 warning 文案的语义正确性: "你说要 tool loop 但 anthropic 不支持" 才警告;
+    // "你显式说要 no tool loop" 走静默 stream, 不打扰.
+    const { client, seen } = makeStreamMockClient({ streamResults: [{ content: 'anthropic no-loop' }] });
+    (client as { model: ModelId }).model = 'claude-sonnet-4-5' as ModelId;
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
+      stderrChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      const code = await runPrintMode({ prompt: 'hi', client, enableToolLoop: false });
+      expect(code).toBe(0);
+      // 验证 1: stderr **不**含 F3 warning (caller 没请求 tool loop, 不该被打扰)
+      const stderrAll = stderrChunks.join('');
+      expect(stderrAll).not.toMatch(/Anthropic provider in Sprint 1b\.5/);
+      // 验证 2: 走了 client.stream 路径
+      expect(client.stream).toHaveBeenCalledTimes(1);
+      // 验证 3: client.chat **没**被调
       expect(client.chat).not.toHaveBeenCalled();
       // 验证 4: LLM 看到了 user prompt
       expect(seen.messages[0]?.at(-1)).toEqual({ role: 'user', content: 'hi' });

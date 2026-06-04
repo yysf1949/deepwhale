@@ -125,13 +125,17 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     });
   // Sprint 1b.5 Step 2.5 (F3 拍板, R-G1 修正 2026-06-03): anthropic × tool loop 防护.
   // - 落点: mode 层 (startRepl / runPrintMode / 后续 runRpcMode), 不**在** factory 改.
-  // - 触发: provider 是 anthropic (client.model 以 'claude-' 开头) + enableToolLoop !== false
-  // - 行为: stderr warning + 设 enableToolLoop=false (温柔降级, 不打断 user 第一轮)
+  // - 触发: provider 是 anthropic (client.model 以 'claude-' 开头) + caller **请求** tool loop
+  //   (显式 enableToolLoop=true 或不传 [默认 true])
+  // - 行为: stderr warning + 强制 enableToolLoop=false (温柔降级, 不打断 user 第一轮)
+  // - 关键: 之前用 `?? (isAnthropic ? false : true)` 兜底默认, 让显式 `true` 直接透传,
+  //   CLI 默认路径仍会撞 Anthropic tool loop 未实现的 P1. 修后: 不管 caller 怎么传,
+  //   anthropic 一律走 stream, **不**跑 runToolLoop.
   // - 设计: 跟 1b 时代 '没 API key' stderr 风格一致, 引导 user 不阻断
   const isAnthropic = client.model.startsWith('claude-');
-  const enableToolLoop =
-    options.enableToolLoop ?? (isAnthropic ? false : true); // anthropic 默认不**开** tool loop
-  if (isAnthropic && options.enableToolLoop !== false) {
+  const requestedToolLoop = options.enableToolLoop ?? true;
+  const enableToolLoop = isAnthropic ? false : requestedToolLoop;
+  if (isAnthropic && requestedToolLoop) {
     err.write(
       'warning: Anthropic provider in Sprint 1b.5 does not support tool loop; ' +
         'auto-disabling tools. Use DeepSeek or wait for Sprint 1c tool schema conversion.\n',
