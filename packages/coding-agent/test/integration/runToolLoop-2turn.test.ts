@@ -255,7 +255,7 @@ describe('coding-agent mode layer — 1c-revive-2-A runToolLoop 端到端真接 
       // 1 turn runToolLoop 内部可能跑多个 step (1 tool_call + 1 final) = 至少 2 step
       const result = await runToolLoop(client, messages, {
         registry,
-        maxSteps: 5, // 1c-revive-2-A 1 turn 算术足够, 不需要多 step
+        maxSteps: 10, // Live LLM may retry tool calls before converging; keep the test on loop semantics.
       });
       allRuns.push({ question, result });
 

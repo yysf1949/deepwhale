@@ -24,6 +24,20 @@ import { loadProjectEnv } from '../src/env/load-project-env.js';
 
 let tmpDir: string;
 let envPath: string;
+const originalGateEnv = {
+  INTEGRATION: process.env['INTEGRATION'],
+  DEEPSEEK_API_KEY: process.env['DEEPSEEK_API_KEY'],
+  ANTHROPIC_AUTH_TOKEN: process.env['ANTHROPIC_AUTH_TOKEN'],
+};
+
+function restoreEnv(key: keyof typeof originalGateEnv): void {
+  const value = originalGateEnv[key];
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'load-env-test-'));
@@ -47,6 +61,9 @@ afterEach(() => {
   delete process.env['LOAD_ENV_TEST_H'];
   delete process.env['LOAD_ENV_TEST_I'];
   delete process.env['LOAD_ENV_TEST_PRESET'];
+  restoreEnv('INTEGRATION');
+  restoreEnv('DEEPSEEK_API_KEY');
+  restoreEnv('ANTHROPIC_AUTH_TOKEN');
 });
 
 function writeEnv(content: string): void {
@@ -127,6 +144,8 @@ describe('loadProjectEnv', () => {
   });
 
   it('9. 多行混合 (上面所有形态一次性跑) → 跟 1+2+3+4 组合语义一致', () => {
+    delete process.env['INTEGRATION'];
+    delete process.env['DEEPSEEK_API_KEY'];
     process.env['LOAD_ENV_TEST_H'] = 'shell-export-wins';
     writeEnv(
       [

@@ -409,9 +409,10 @@ describe('coding-agent mode layer — 1c-revive-2-C+3 跨包 session module 集�
 
       // 1c-revive-3 跨包集成验证 2: messages 重建完整
       expect(reloadedMessages.length).toBeGreaterThan(0);
-      // 期望: system (caller 拼) + 2 user + 2 assistant(tool_calls) + 2 tool + 2 final assistant = 9 messages
-      // (跟 1c-revive-2-B-3 4 turn 模式一致, 实际可能略多)
-      expect(reloadedMessages.length).toBeGreaterThanOrEqual(9);
+      // loadSession() returns only JSONL-backed messages; caller prepends system separately below.
+      // 期望: 2 user + 2 assistant(tool_calls) + 2 tool + 2 final assistant = 8 messages
+      // (跟 session-adapter.ts 协议一致: system prompt 不进 JSONL)
+      expect(reloadedMessages.length).toBeGreaterThanOrEqual(8);
 
       // 1c-revive-3 跨包集成验证 3: 跨 session tool_call_id 保持
       const allToolCallIds = reloadedMessages
