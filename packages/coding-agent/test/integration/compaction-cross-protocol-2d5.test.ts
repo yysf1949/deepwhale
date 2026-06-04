@@ -1,7 +1,9 @@
 /**
  * Sprint 1c-revive-2-D-5-3: 跨协议 16 turn 复测 (P21 / P27 拍板一致)
  *
- * 目的: 验证 D-5 compaction 集成 (runToolLoopWithCompaction) 跨 2 协议端到端
+ * 目的: 验证 D-5 compaction (runToolLoopWithCompaction) 跨 2 协议端到端 — D-10b 改名:
+ *   integration test 不强断言 compaction 次数 (LLM 自由行为), 走 optional smoke.
+ *   强断言见 packages/core/test/session-compaction.test.ts (deterministic 触发)
  *   - DeepSeek OAI (protocol='openai') + 8 turn
  *   - Anthropic (protocol='anthropic') + 8 turn
  *   - 总 16 turn 跨协议 (跟 P21 6 cell 拍板升级一致: 2 protocol × 8 turn)
@@ -240,7 +242,7 @@ async function llmSummarize(
 
 // ---- 主测试: 跨协议 16 turn (DeepSeek 8 + Anthropic 8) ----
 
-describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepSeek 8 + Anthropic 8) + compaction 集成', () => {
+describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepSeek 8 + Anthropic 8) + compaction optional smoke (D-10b truthfulness wording, 2026-06-04)', () => {
   const fileSkipReason = integrationSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
@@ -249,7 +251,7 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
     return;
   }
 
-  /** 跑 1 协议 × 8 turn + compaction 集成, 返 TurnSnapshot[] */
+  /** 跑 1 协议 × 8 turn + compaction optional smoke, 返 TurnSnapshot[] */
   async function runProtocol8Turn(
     protocol: 'openai' | 'anthropic',
     questions: ReadonlyArray<{ question: string; expectedAnswer: string }>,
@@ -284,7 +286,7 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
         // appendUserEvent 写 user event (跟 1a 模式一致, 统一审计)
         await appendUserEvent(writer, question);
 
-        // ---- D-5 拍板: 跑 compaction 集成 runToolLoop ----
+        // ---- D-5 拍板: 跑 compaction optional smoke runToolLoop ----
         // summaryFn 走 LLM (用同一 client, 跨协议一致 — P21 拍板)
         const summaryFn = async (toSummarize: ReadonlyArray<ChatMessage>): Promise<string> =>
           llmSummarize(client, toSummarize);
@@ -379,7 +381,7 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
   // P2-2 拍板 (D-9, 2026-06-04): 跟 Anthropic 测一致改 it.runIf(hasDeepseekKey()),
   // 不再 console.log + return 假绿. 没 DEEPSEEK key 时显式 SKIPPED (跟 Anthropic 测对称).
 
-  it.runIf(hasDeepseekKey())(`DeepSeek OAI: 8 turn (4 question × 2 turn) + compaction 集成`, async () => {
+  it.runIf(hasDeepseekKey())(`DeepSeek OAI: 8 turn (4 question × 2 turn) + compaction optional smoke (D-10b)`, async () => {
     const client = new DeepSeekClient();
     const sessionPath = join(tmpdir(), `session-2d5-openai-${randomUUID()}.jsonl`);
 
@@ -397,7 +399,7 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
       const userEvents = verifyEvents.filter((e) => e.kind === 'user');
       expect(userEvents.length).toBeGreaterThanOrEqual(QUESTIONS_PER_PROTOCOL); // >= 4
 
-      // 3) 跨 8 turn compaction 集成
+      // 3) 跨 8 turn compaction optional smoke
       // F4 拍板 (D-8, 2026-06-04): 改名为 "optional smoke" 显式声明非必触发,
       // 断言降级为 "跑完不挂, event 数组可空" — 不要再加 >= 0 这种 no-op 断言.
       // 强断言走 packages/core/test/session-compaction.test.ts 的 P1 修复测
@@ -451,7 +453,7 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
   // 没 ANTHROPIC key 时显式 skip (而不是 silently pass).
 
   it.runIf(hasAnthropicKey())(
-    `Anthropic: 8 turn (4 question × 2 turn) + compaction 集成`,
+    `Anthropic: 8 turn (4 question × 2 turn) + compaction optional smoke (D-10b)`,
     async () => {
 
     const client = new AnthropicClient();
@@ -471,7 +473,7 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
       const userEvents = verifyEvents.filter((e) => e.kind === 'user');
       expect(userEvents.length).toBeGreaterThanOrEqual(QUESTIONS_PER_PROTOCOL);
 
-      // 3) 跨 8 turn compaction 集成
+      // 3) 跨 8 turn compaction optional smoke
       // F4 拍板 (D-8, 2026-06-04): 跟 DeepSeek 测同上 — optional smoke, 不强求非空
       const compactionEvents = verifyEvents.filter((e) => e.kind === 'compaction');
       const pausedEvents = verifyEvents.filter((e) => e.kind === 'compaction_paused');

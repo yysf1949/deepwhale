@@ -70,7 +70,7 @@ pnpm dev
 corepack pnpm build && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test
 ```
 
-纯 mock / 离线，**不会**调真实 LLM API。当前 257/257 绿。CI 必跑。
+纯 mock / 离线，**不会**调真实 LLM API。CI 必跑, 测试数以 `pnpm test` 当前输出为准 (持续漂移, 硬编码会过期).
 
 ### Integration tests（真接 DeepSeek + Anthropic shim）
 
