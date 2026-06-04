@@ -135,6 +135,222 @@ describe('session-adapter', () => {
     });
   });
 
+  describe('Sprint 1c P2: dangling tool_call 过滤 (恢复正确性)', () => {
+    // Sprint 1c P2 修复 (commit ref): 二次启动恢复时, JSONL 可能含 dangling
+    // assistant(tool_calls) (crash 时还没写 tool result). 旧实现直接 push →
+    // LLM continuation 看到无对应 tool result 的 tool_call, 非法 transcript.
+    //
+    // 修复规则 (commit ref 同步):
+    //   1. assistant(tool_calls) 必须在下一个 user/assistant 前所有 tool_call_id
+    //      都有对应 tool event, 才保留 (整个 assistant message)
+    //   2. tool 的 tool_call_id 找不到对应 assistant tool_calls → 丢 (孤儿)
+    //   3. 普通 assistant(content) / user 不受影响
+    //   4. 不改写 JSONL events, 只在重建 messages 时过滤
+
+    it('completed assistant → tool → assistant: 全部保留', () => {
+      // 正常 1 turn: 已有测试 (reconstructs ChatMessage list) 覆盖.
+      // 这里用 P2 视角再补一个, 确认无回归.
+      const events: SessionEvent[] = [
+        { kind: 'user', ts: 1, content: 'list' },
+        {
+          kind: 'assistant',
+          ts: 2,
+          content: '',
+          tool_calls: [{ id: 'c1', name: 'bash', args: { command: 'ls' } }],
+        },
+        {
+          kind: 'tool',
+          ts: 3,
+          tool_call_id: 'c1',
+          name: 'bash',
+          result: { success: true, content: 'a.ts' },
+          duration_ms: 1,
+        },
+        { kind: 'assistant', ts: 4, content: 'I see a.ts' },
+      ];
+      const messages = sessionEventsToMessages(events);
+      expect(messages).toHaveLength(4);
+      expect(messages[1]).toMatchObject({
+        role: 'assistant',
+        tool_calls: [{ id: 'c1', name: 'bash' }],
+      });
+      expect(messages[2]).toMatchObject({ role: 'tool', tool_call_id: 'c1' });
+      expect(messages[3]).toMatchObject({ role: 'assistant', content: 'I see a.ts' });
+    });
+
+    it('dangling assistant(tool_calls): 整体 roll back (含 content)', () => {
+      // 模拟: turn1 完整, turn2 partial (assist2(c2) 无 tool)
+      // 期望: turn1 4 完整 + turn2 user = 5, 不含 dangling assist2(c2)
+      const events: SessionEvent[] = [
+        { kind: 'user', ts: 1, content: 'list' },
+        {
+          kind: 'assistant',
+          ts: 2,
+          content: '',
+          tool_calls: [{ id: 'c1', name: 'bash', args: { command: 'ls' } }],
+        },
+        {
+          kind: 'tool',
+          ts: 3,
+          tool_call_id: 'c1',
+          name: 'bash',
+          result: { success: true, content: 'a.ts' },
+          duration_ms: 1,
+        },
+        { kind: 'assistant', ts: 4, content: 'I see a.ts' },
+        { kind: 'user', ts: 5, content: 'now read a.ts' },
+        {
+          kind: 'assistant',
+          ts: 6,
+          content: '',
+          tool_calls: [{ id: 'c2', name: 'read_file', args: { path: 'a.ts' } }],
+        },
+        // 缺 tool(c2) — 模拟 crash
+      ];
+      const messages = sessionEventsToMessages(events);
+      expect(messages).toHaveLength(5);
+      // 最后一条是 user2, 不是 dangling assist2
+      expect(messages[4]).toMatchObject({ role: 'user', content: 'now read a.ts' });
+      // 关键: transcript 不含 tool_call_id='c2' (无 assistant tool_calls 引用 c2)
+      const dangling = messages.find(
+        (m) =>
+          m.role === 'assistant' &&
+          m.tool_calls?.some((tc) => tc.id === 'c2'),
+      );
+      expect(dangling).toBeUndefined();
+    });
+
+    it('multi tool_calls: 任一未配对 → 整个 assistant roll back (保守)', () => {
+      // 规则: 多个 tool_call_id 中**任一**未在 user/assistant 边界前配对 → 整体丢
+      // (简化实现, 不部分保留. 后续 Sprint 可做精细化)
+      const events: SessionEvent[] = [
+        { kind: 'user', ts: 1, content: 'parallel calls' },
+        {
+          kind: 'assistant',
+          ts: 2,
+          content: '',
+          tool_calls: [
+            { id: 'c1', name: 'bash', args: { command: 'ls' } },
+            { id: 'c2', name: 'read_file', args: { path: 'a.ts' } },
+          ],
+        },
+        {
+          kind: 'tool',
+          ts: 3,
+          tool_call_id: 'c1',
+          name: 'bash',
+          result: { success: true, content: 'a.ts' },
+          duration_ms: 1,
+        },
+        // 缺 tool(c2) → c1 已配对, c2 未配对 → 整个 assistant 丢
+        { kind: 'user', ts: 4, content: 'next turn' },
+      ];
+      const messages = sessionEventsToMessages(events);
+      // user1 + user2 = 2 (assistant 被 roll back, tool(c1) 孤儿也丢)
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).toMatchObject({ role: 'user', content: 'parallel calls' });
+      expect(messages[1]).toMatchObject({ role: 'user', content: 'next turn' });
+    });
+
+    it('孤儿 tool (tool_call_id 不在 pending): 丢', () => {
+      // 极端: 出现 tool 事件, 但前一个 assistant 没 tool_calls / tool_call_id 不匹配
+      const events: SessionEvent[] = [
+        { kind: 'user', ts: 1, content: 'q' },
+        { kind: 'assistant', ts: 2, content: 'no tool calls' },
+        {
+          kind: 'tool',
+          ts: 3,
+          tool_call_id: 'orphan_id',
+          name: 'bash',
+          result: { success: true, content: 'x' },
+          duration_ms: 1,
+        },
+        { kind: 'assistant', ts: 4, content: 'done' },
+      ];
+      const messages = sessionEventsToMessages(events);
+      // 3 messages, 孤儿 tool 丢
+      expect(messages).toHaveLength(3);
+      expect(messages[0]).toMatchObject({ role: 'user' });
+      expect(messages[1]).toMatchObject({ role: 'assistant', content: 'no tool calls' });
+      expect(messages[2]).toMatchObject({ role: 'assistant', content: 'done' });
+    });
+
+    it('EOF dangling: 文件末尾 dangling assistant 整体丢', () => {
+      // 跟 "user 边界" 类似, EOF 也是结算点 — 残余 buffer 整体丢
+      const events: SessionEvent[] = [
+        { kind: 'user', ts: 1, content: 'q' },
+        {
+          kind: 'assistant',
+          ts: 2,
+          content: '',
+          tool_calls: [{ id: 'c1', name: 'bash', args: { command: 'ls' } }],
+        },
+        // 无 tool, 文件结束
+      ];
+      const messages = sessionEventsToMessages(events);
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toMatchObject({ role: 'user' });
+    });
+
+    it('P2 spec: 后续 append tool(c2) 后, assist2(c2) 自动恢复 (不改写 events)', () => {
+      // 关键不变性 (user 拍板): 不改写 JSONL events, 只过滤 messages.
+      // 补 tool(c2) 后, 之前被丢的 assist2(c2) 重新进入 messages.
+      // 这是 P2 spec 的核心 (commit ref): "补上 tool result 后, 完整 tool-call
+      // 组自然重新合法化".
+      const events1: SessionEvent[] = [
+        { kind: 'user', ts: 1, content: 'q1' },
+        {
+          kind: 'assistant',
+          ts: 2,
+          content: '',
+          tool_calls: [{ id: 'c1', name: 'bash', args: { command: 'ls' } }],
+        },
+        {
+          kind: 'tool',
+          ts: 3,
+          tool_call_id: 'c1',
+          name: 'bash',
+          result: { success: true, content: 'a.ts' },
+          duration_ms: 1,
+        },
+        { kind: 'assistant', ts: 4, content: 'I see a.ts' },
+        { kind: 'user', ts: 5, content: 'now read a.ts' },
+        {
+          kind: 'assistant',
+          ts: 6,
+          content: '',
+          tool_calls: [{ id: 'c2', name: 'read_file', args: { path: 'a.ts' } }],
+        },
+        // 缺 tool(c2) — crash 状态
+      ];
+      const m1 = sessionEventsToMessages(events1);
+      expect(m1).toHaveLength(5); // 不含 dangling
+
+      // 后续补 tool(c2) + assist2(stop) (events 列表累加, JSONL 不改写)
+      const events2: SessionEvent[] = [
+        ...events1,
+        {
+          kind: 'tool',
+          ts: 7,
+          tool_call_id: 'c2',
+          name: 'read_file',
+          result: { success: true, content: 'export const a = 1' },
+          duration_ms: 1,
+        },
+        { kind: 'assistant', ts: 8, content: 'a.ts exports a = 1' },
+      ];
+      const m2 = sessionEventsToMessages(events2);
+      // 现在 8 messages, assist2(c2) 不再 dangling, 完整 tool-call 组恢复
+      expect(m2).toHaveLength(8);
+      expect(m2[5]).toMatchObject({
+        role: 'assistant',
+        tool_calls: [{ id: 'c2', name: 'read_file' }],
+      });
+      expect(m2[6]).toMatchObject({ role: 'tool', content: 'export const a = 1' });
+      expect(m2[7]).toMatchObject({ role: 'assistant', content: 'a.ts exports a = 1' });
+    });
+  });
+
   describe('end-to-end: write steps → read back as messages', () => {
     let testFile: string;
 
@@ -283,14 +499,17 @@ describe('session-adapter', () => {
         'utf8',
       );
 
-      // === 二次启动 ===
+      // === 二次启动 (crash 后) ===
+      // Sprint 1c P2 修复: 重建 messages 时过滤 dangling assistant tool_call.
+      // turn2 partial (assist2(tool_c2) 但 tool(c2) 没落盘) 整体 roll back,
+      // 恢复后看到 5 条 messages, 不含 dangling c2.
       const reader = new SessionReader(testFile);
       const { events, messages } = await loadSession(reader);
 
       // 不变量 1: events 长度 = 6 (turn1 4 步 + turn2 user + turn2 assistant 完整), tool(c2) partial 被截
       expect(events).toHaveLength(6);
-      // 不变量 2: 二次启动看到 messages 序列, turn1 完整, turn2 user/assistant(未完成 tool_call) 也保留
-      // 注: sessionEventsToMessages **不**做"未完成 tool_call"过滤 — 这是已知 gap, 本测试不强求
+      // 不变量 2 (P2 修复后): 5 条 messages — turn1 完整 + turn2 user, dangling assist2(c2) 被丢
+      expect(messages).toHaveLength(5);
       expect(messages[0]).toMatchObject({ role: 'user', content: 'list files' });
       expect(messages[1]).toMatchObject({
         role: 'assistant',
@@ -299,17 +518,18 @@ describe('session-adapter', () => {
       expect(messages[2]).toMatchObject({ role: 'tool', content: 'a.ts\nb.ts', tool_call_id: 'c1' });
       expect(messages[3]).toMatchObject({ role: 'assistant', content: 'I see a.ts and b.ts' });
       expect(messages[4]).toMatchObject({ role: 'user', content: 'now read a.ts' });
-      expect(messages[5]).toMatchObject({
-        role: 'assistant',
-        tool_calls: [{ id: 'c2', name: 'read_file', args: { path: 'a.ts' } }],
-      });
+      // 不变量 2.5: 无 dangling — 最后一条消息的 role 是 'user', 不是 assistant(tool_calls)
+      expect(messages[4]?.role).toBe('user');
+      // 二次启动看到 transcript 不含孤立 tool_call (OpenAI API 不会拒)
 
       // 不变量 3: 文件已 truncate (Sprint 1b 闭环)
       const after = await fs.readFile(testFile, 'utf8');
       expect(after).not.toContain('PARTIAL_MARKER_XYZZY');
       expect(after.endsWith('\n')).toBe(true);
 
-      // 不变量 4: 二次启动后, 续写 c2 tool result 不拼到损坏字节
+      // 不变量 4: 二次启动后, 续写 c2 tool result, transcript 重新合法化为 8 messages
+      // 关键洞察 (user 拍板): 不改写 JSONL events, 只过滤 messages. 补 tool result 后
+      // 完整 tool-call 组自然重新合法化, 之前被丢的 assist2(c2) 重新进入 messages.
       const w3 = new SessionWriter(testFile);
       await w3.open();
       const recoverySteps: ToolLoopStep[] = [
@@ -334,14 +554,19 @@ describe('session-adapter', () => {
       await persistToolLoopSteps(w3, recoverySteps);
       await w3.close();
 
-      // 重新加载: 应当能拿到完整 2 turn 对话
+      // 重新加载: 应当能拿到完整 2 turn 对话 (assist2(c2) 不再 dangling, 自动恢复)
       // 事件计数: turn1 (4) + turn2 partial (2) + recovery (2) = 8
-      // messages 顺序: user1/assist1(tool_c1)/tool1/assist1/stop/user2/assist2(tool_c2) + recovery [tool_c2, assist2/stop]
-      // 索引:           0       1                   2      3              4       5                       6        7
+      // messages 顺序: user1/assist1(tool_c1)/tool1/assist1-stop/user2/assist2(tool_c2)/tool2/assist2-stop
+      // 索引:           0       1                   2      3              4       5                       6       7
       const reader2 = new SessionReader(testFile);
       const recovered = await loadSession(reader2);
       expect(recovered.events).toHaveLength(8);
       expect(recovered.messages).toHaveLength(8);
+      // 不变量 5: transcript 完整 — 最后一条是 'a.ts exports a = 1', 不再是 dangling
+      expect(recovered.messages[5]).toMatchObject({
+        role: 'assistant',
+        tool_calls: [{ id: 'c2', name: 'read_file', args: { path: 'a.ts' } }],
+      });
       expect(recovered.messages[6]).toMatchObject({ role: 'tool', content: 'export const a = 1' });
       expect(recovered.messages[7]).toMatchObject({ role: 'assistant', content: 'a.ts exports a = 1' });
     });

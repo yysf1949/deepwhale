@@ -65,30 +65,75 @@ export function toolLoopStepToSessionEvent(step: ToolLoopStep): SessionEvent | n
 /**
  * 把 SessionEvent 列表重建为 LLM 的 ChatMessage 列表（用于 LLM 续聊）。
  *
- * 跳过 'system' 事件（system prompt 由 caller 重新组装）。
- * 'user' → ChatMessage({ role: 'user' })
- * 'assistant' → ChatMessage({ role: 'assistant', content, tool_calls? })
- * 'tool'      → ChatMessage({ role: 'tool', content, tool_call_id, name })
+ * Sprint 1c P2 修复: 过滤 dangling tool_call transcript.
+ *
+ * 背景: 二次启动恢复时, JSONL 里可能存在 "assistant(tool_calls=[c2]) 但
+ * tool(c2) 没落盘" 的孤立 assistant (crash 写完 assistant 还没写 tool result
+ * 就被杀). 旧实现直接 push 这个 assistant → LLM continuation 看到无对应
+ * tool result 的 tool_call, 形成非法 transcript, OpenAI API 拒收.
+ *
+ * 修复规则 (按 user 拍板 2026-06-04):
+ *   1. assistant(tool_calls): 只有在下一个 user/assistant 前, 所有
+ *      tool_call_id 都有对应 tool event, 才保留 (整个 assistant message)
+ *   2. tool: 只有它的 tool_call_id 属于"当前未结算的 assistant tool_calls",
+ *      才保留; 否则丢 (孤儿)
+ *   3. 普通 assistant(content) / user 不受影响
+ *   4. **不改写 JSONL events**, 只在重建 messages 时过滤 — 后续补 tool
+ *      result 后完整 tool_call 组自然重新合法化 (Sprint 1c P2 spec)
+ *
+ * 实现: 延迟 push 模式 — assistant(tool_calls) 进入 buffer, tool events
+ * 配对删除 pending. user/assistant 边界触发 buffer 结算: pending 非空
+ * → 整体 roll back (不 push); pending 空 → push buffer.
  */
 export function sessionEventsToMessages(events: ReadonlyArray<SessionEvent>): ChatMessage[] {
   const out: ChatMessage[] = [];
+  let buffer: ChatMessage[] = [];
+  let pendingToolCalls = new Set<string>();
+
+  const flushBuffer = (): void => {
+    if (pendingToolCalls.size > 0) {
+      // 上一个 assistant(tool_calls) 未完成 (user/assistant 边界), 整个 roll back
+      buffer = [];
+    } else {
+      out.push(...buffer);
+      buffer = [];
+    }
+    pendingToolCalls = new Set();
+  };
+
   for (const ev of events) {
     if (ev.kind === 'user') {
+      flushBuffer();
       out.push({ role: 'user', content: ev.content });
     } else if (ev.kind === 'assistant') {
-      const msg: ChatMessage = { role: 'assistant', content: ev.content };
-      if (ev.tool_calls) msg.tool_calls = [...ev.tool_calls] as ToolCall[];
-      out.push(msg);
+      flushBuffer();
+      if (ev.tool_calls && ev.tool_calls.length > 0) {
+        // 进入延迟 push 模式
+        pendingToolCalls = new Set(ev.tool_calls.map((tc) => tc.id));
+        const msg: ChatMessage = { role: 'assistant', content: ev.content };
+        msg.tool_calls = [...ev.tool_calls] as ToolCall[];
+        buffer.push(msg);
+      } else {
+        // 普通 assistant(content) 无 tool_calls, 立即 commit
+        out.push({ role: 'assistant', content: ev.content });
+      }
     } else if (ev.kind === 'tool') {
-      out.push({
-        role: 'tool',
-        content: ev.result.content,
-        tool_call_id: ev.tool_call_id,
-        name: ev.name,
-      });
+      if (pendingToolCalls.has(ev.tool_call_id)) {
+        pendingToolCalls.delete(ev.tool_call_id);
+        buffer.push({
+          role: 'tool',
+          content: ev.result.content,
+          tool_call_id: ev.tool_call_id,
+          name: ev.name,
+        });
+      }
+      // 孤儿 tool (没匹配 assistant tool_call): 丢 — 不会出现无主 tool message
     }
     // 'system' 跳过 — caller 决定要不要用
   }
+  // EOF: 残余 buffer (dangling assistant) 整体丢
+  buffer = [];
+  pendingToolCalls = new Set();
   return out;
 }
 
