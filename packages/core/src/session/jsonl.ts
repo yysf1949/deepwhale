@@ -152,15 +152,42 @@ export class SessionReader {
     const lines = text.split('\n');
     const keep = lines.slice(0, this.lastIncompleteLineIndex).join('\n') + '\n';
     const truncatedBytes = Buffer.byteLength(text, 'utf8') - Buffer.byteLength(keep, 'utf8');
-    // Sprint 1c.5: 写回加 fsync, 防止 truncate 中途 crash 把文件写空/部分写.
-    // 旧实现用 fs.writeFile 不保证 fsync; 新实现用 handle 路径显式 sync.
-    // 不顺手重构 JSONL 协议, 不动 readAll, 不动 parseLines.
-    const handle = await fs.open(this.path, 'w');
+    // Sprint 1c.6: temp file + atomic rename (修 1c.5 'w' flag 漏洞)
+    //
+    // 1c.5 用 fs.open(this.path, 'w') — 'w' = O_TRUNC 立即截 0 字节.
+    // fsync 救不了"open → write"窗口: 进程在这段被杀, session 变 0 字节,
+    // 比不 truncate 更坏. 1c.5 test 只验了"成功路径 stat().size",
+    // 没覆盖最坏窗口, 是 R-G1 "test passed ≠ production works" 反例.
+    //
+    // 修法: write to temp + atomic rename. 关键不变量:
+    //   - 写 temp 阶段崩 → 原文件**完整保留** (没动), 可能有 .tmp 垃圾待清理
+    //   - rename 阶段崩 → POSIX 原子 (要么旧要么新, 没有中间态),
+    //                    Windows MoveFileEx 覆盖原子
+    //   - truncate 返回后, 文件系统状态 ∈ {原文件不变, 原文件 = keep}
+    //     — 绝不会有 0 字节第三态
+    //
+    // temp path 唯一性: pid + timestamp + 随机, 避免并发 truncate 同文件
+    // (v1.0 单人本地不并发, 但保险). 同 dir 保证 rename atomic.
+    const tempPath = `${this.path}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+    const handle = await fs.open(tempPath, 'w');
     try {
       await handle.writeFile(keep, 'utf8');
       await handle.sync();
-    } finally {
-      await handle.close();
+    } catch (err) {
+      // 写 temp 失败: 清理垃圾, 原文件**不动**, 抛错给 caller
+      await handle.close().catch(() => {});
+      await fs.unlink(tempPath).catch(() => {});
+      throw err;
+    }
+    await handle.close();
+    // atomic rename: 旧文件要么没被替换 (进程在 rename 前被杀, 原文件 = 旧 keep+partial),
+    // 要么被替换 (rename 完成, 原文件 = new keep). 不会有 0 字节.
+    try {
+      await fs.rename(tempPath, this.path);
+    } catch (err) {
+      // rename 失败: 清理 temp, 原文件**不动** (rename 没成功), 抛错给 caller
+      await fs.unlink(tempPath).catch(() => {});
+      throw err;
     }
     return { truncated: truncatedBytes };
   }

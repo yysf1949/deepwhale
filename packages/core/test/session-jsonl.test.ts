@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -305,16 +305,21 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
       expect(events[9]).toMatchObject({ kind: 'assistant', content: 'second-4' });
     });
 
-    it('Sprint 1c.5: truncate 落盘后 stat() 看到 size == keep 字节 (fsync 副作用契约)', async () => {
-      // Sprint 1c.5 加 fsync 后, 行为契约: truncate 调用栈返回后, OS 看到的文件
-      // 大小应等于 keep 完整字节数 (而非部分写的中间态).
+    it('Sprint 1c.6: truncate atomic rename, 不留 .tmp 残留 + 永不写空文件', async () => {
+      // Sprint 1c.6 修 1c.5 漏洞 (review P2 反馈 2026-06-04): 旧实现
+      // fs.open(this.path, 'w') — 'w' = O_TRUNC 立即截 0. fsync 救不了
+      // "open → write" 窗口 (进程被杀 → 0 字节). 1c.5 test 只验了
+      // "成功路径 stat().size", 没覆盖最坏窗口, 是 R-G1 反例.
       //
-      // 测不变量不测机制: 不挂 SIGKILL, 直接观察 fsync 完成后的稳定状态.
-      // 现有 1c 测试 (line ~105 'truncate 已自动调用') 已验 readFile 拿到 keep 内容;
-      // 本测试**额外**断言 stat().size == Buffer.byteLength(keep) — 这是 fsync 的
-      // 副作用契约, 间接证明 fsync 路径走通.
+      // 新实现: temp + atomic rename. 关键不变量 (1c.6 spec):
+      //   1. truncate 返回后, 文件内容 = keep (happy path)
+      //   2. 没有任何 .tmp 残留 (happy + 写失败都清理)
+      //   3. 文件不可能 0 字节 (R-G1 真核心: rename 没成功时原文件没动)
       //
-      // 红线 (1c.5 拍板): 不顺手重构 JSONL 协议, 不动 readAll, 不动 parseLines.
+      // 本测试覆盖 (1)+(2)+(3). (3) 的不变量通过以下 2 条路径保证:
+      //   - 写 temp 失败: catch 块 unlink temp, 原文件**没动** (没 open 原文件)
+      //   - rename 失败: catch 块 unlink temp, rename 没成功原文件**没动**
+      // 两种情况都抛错给 caller, 但 caller (session-adapter.loadSession) 已 try/catch 吞.
       const fullEvent = JSON.stringify({ kind: 'user', ts: 1, content: 'complete' });
       const partialLine = '{"kind":"assistant","ts":2,"content":"partia';
       const fullLineLen = fullEvent.length + 1; // + \n
@@ -324,13 +329,104 @@ describe('Sprint 0.2: Session JSONL (append-only + crash recovery)', () => {
       await reader.readAll();
       await reader.truncate();
 
-      // 契约 1: 读到的内容 = keep (1 条完整 + \n)
+      // 契约 1: 文件内容 = keep
       const after = await fs.readFile(testFile, 'utf8');
       expect(after).toBe(fullEvent + '\n');
-      // 契约 2: stat().size 落盘 = keep 字节 (fsync 副作用: 不是 0, 不是 partial)
+      // 契约 2: stat().size 落盘 = keep 字节 (跟 1c.5 兼容, 加固)
       const stat = await fs.stat(testFile);
       expect(stat.size).toBe(fullLineLen);
+      // 契约 3 (1c.6 新): 没有任何 .tmp 残留 (扫同 dir 找 .tmp 文件)
+      const dir = join(testFile, '..');
+      const entries = await fs.readdir(dir);
+      const tmpLeftover = entries.find(
+        (name) => name.startsWith(testFile.split('/').pop() ?? '') && name.endsWith('.tmp'),
+      );
+      expect(tmpLeftover).toBeUndefined();
     });
+
+    it('Sprint 1c.6: 写 temp 阶段失败时, 原文件完整保留 + temp 清理 (不变量覆盖)', async () => {
+      // 1c.6 核心不变量: "写 temp 失败 → 原文件**完整保留**" — R-G1 必测.
+      // 模拟方式: spy handle.writeFile 让它抛 ENOSPC (磁盘满).
+      // 实际 fs 行为: 写 temp 失败 → catch 块清理 + 抛错 + 原文件**没动** (没 open).
+      // 难点: spy handle.writeFile 需要先拿到 handle. 改用更稳的方式:
+      //   spy fs.promises.open 当 path 含 '.tmp' 时返回的 handle 写失败.
+      //   实际实现里 handle 是 fs.open(tempPath, 'w') 来的, 我们能区分 path.
+      //
+      // R-G1 折中: spy 模拟 "temp 写失败" 的副作用, 验证**不变量**(原文件保留 +
+      // temp 清理) 而不是机制.
+      const originalContent = JSON.stringify({ kind: 'user', ts: 1, content: 'keep-me' });
+      const partialLine = '{"kind":"assistant","ts":2,"content":"partia';
+      await fs.writeFile(testFile, originalContent + '\n' + partialLine, 'utf8');
+
+      // spy fs.open: 当目标是 .tmp path 时, 返回的 handle.writeFile 抛错
+      const realOpen = fs.open;
+      const writeFileSpy = vi.fn().mockRejectedValueOnce(
+        Object.assign(new Error('no space left on device'), { code: 'ENOSPC' }),
+      );
+      const fakeHandle = {
+        writeFile: writeFileSpy,
+        sync: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+      const openSpy = vi.spyOn(fs, 'open').mockImplementation(async (path, flags) => {
+        if (typeof path === 'string' && path.endsWith('.tmp')) {
+          return fakeHandle as never;
+        }
+        return realOpen(path, flags);
+      });
+
+      const reader = new SessionReader(testFile);
+      await reader.readAll();
+      // 写 temp 失败 → truncate 抛错
+      await expect(reader.truncate()).rejects.toThrow(/no space/);
+
+      // 不变量 1: 原文件**完整保留** (没动) — 1c.6 核心
+      const after = await fs.readFile(testFile, 'utf8');
+      expect(after).toBe(originalContent + '\n' + partialLine);
+      // 不变量 2: temp 清理 (catch 块 unlink) — 防止垃圾堆
+      const dir = join(testFile, '..');
+      const entries = await fs.readdir(dir);
+      const tmpLeftover = entries.find(
+        (name) => name.startsWith(testFile.split('/').pop() ?? '') && name.endsWith('.tmp'),
+      );
+      expect(tmpLeftover).toBeUndefined();
+
+      openSpy.mockRestore();
+    });
+
+    it('Sprint 1c.6: rename 失败时, 原文件不动 + temp 清理 (不变量覆盖)', async () => {
+      // 1c.6 另一个不变量: "rename 失败 → 原文件**不动**" — POSIX atomic 保证.
+      // 模拟方式: 让 fs.rename 抛错. 实际原子性是 OS 层, 我们只测清理路径.
+      // R-G1 折中: spy fs.rename 抛错, 验证不变量 (原文件完整 + temp 清理).
+      const originalContent = JSON.stringify({ kind: 'user', ts: 1, content: 'keep-me' });
+      const partialLine = '{"kind":"assistant","ts":2,"content":"partia';
+      await fs.writeFile(testFile, originalContent + '\n' + partialLine, 'utf8');
+
+      const renameSpy = vi
+        .spyOn(fs, 'rename')
+        .mockRejectedValueOnce(
+          Object.assign(new Error('cross-device link'), { code: 'EXDEV' }),
+        );
+
+      const reader = new SessionReader(testFile);
+      await reader.readAll();
+      // rename 失败 → truncate 抛错
+      await expect(reader.truncate()).rejects.toThrow(/cross-device/);
+
+      // 不变量 1: 原文件**完整保留** (rename 没成功)
+      const after = await fs.readFile(testFile, 'utf8');
+      expect(after).toBe(originalContent + '\n' + partialLine);
+      // 不变量 2: temp 清理
+      const dir = join(testFile, '..');
+      const entries = await fs.readdir(dir);
+      const tmpLeftover = entries.find(
+        (name) => name.startsWith(testFile.split('/').pop() ?? '') && name.endsWith('.tmp'),
+      );
+      expect(tmpLeftover).toBeUndefined();
+
+      renameSpy.mockRestore();
+    });
+
     //
     // 注: 1c.5 还改了 afterEach unlink "ENOENT 静默 + 其他 warn" 跨平台可诊断.
     // 策略契约**不**单测 — R-G1 风险 (spy fs.promises.unlink 全局副作用 + 复刻 afterEach
