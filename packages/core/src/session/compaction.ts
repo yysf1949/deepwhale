@@ -374,8 +374,14 @@ export type SummarizeFn = (
  * 流程:
  *   1. 拍定 [head, tail) 中间段要被总结
  *   2. 调 summaryFn 生成 summary text
- *   3. 拼成新 messages: [...head, { role: 'system', content: summary }, ...tail]
- *   4. 拍 'compaction' event: { summary, replaced_range: [head_end, tail_start) }
+ *   3. 拼成新 messages: [{ role: 'system', content: summary }, ...tail]
+ *      **删** head (旧实现 [...head, summary, ...tail] 把 head 留下来了 → 上下文反而
+ *      继续膨胀, 反复总结同一批旧 messages. 拍板 2026-06-04 review: summary 必须
+ *      **替代** head, 不并存.)
+ *   4. 拍 'compaction' event: { summary, replaced_range: [0, head.length) }
+ *      不变量: replaced_range 拍的是"基于入参 messages 的 index", caller 调 compact()
+ *      时传什么 messages, replaced_range 就拍什么 index. 拍板 session reload 时
+ *      replay 此 event 拍一致.
  *   5. 返回 CompactionResult (不写盘, 由 caller append event)
  */
 export async function compact(
@@ -395,15 +401,18 @@ export async function compact(
     );
   }
 
-  const replacedRange: readonly [number, number] = [0, head.length];
+  // replacedRange 拍的是"原始 messages 哪些被 head 占据" — 跟 resolveTail 拍板一致.
+  // tailStart 就是 head 的结束 index (head 拍 messages[0..tailStart)).
+  const replacedRange: readonly [number, number] = [0, tailStart];
   const summaryText = await summaryFn(head);
 
-  // 拼新 messages: 1 条 system 替代中间段
+  // 拍新 messages: 1 条 system summary 替代 head, tail 拍原样保留.
+  // 关键: head 拍被删, 不再保留. 旧实现 [...head, summary, ...tail] 是 P1 bug.
   const summaryMessage: ChatMessage = {
     role: 'system',
     content: `[Session compaction summary]\n${summaryText}`,
   };
-  const newMessages: ReadonlyArray<ChatMessage> = [...head, summaryMessage, ...tail];
+  const newMessages: ReadonlyArray<ChatMessage> = [summaryMessage, ...tail];
 
   const event: SessionEvent = {
     kind: 'compaction',
