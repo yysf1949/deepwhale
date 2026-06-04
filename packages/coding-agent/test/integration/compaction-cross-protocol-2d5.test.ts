@@ -411,17 +411,17 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
       const userEvents = verifyEvents.filter((e) => e.kind === 'user');
       expect(userEvents.length).toBeGreaterThanOrEqual(QUESTIONS_PER_PROTOCOL); // >= 4
 
-      // 3) 跨 8 turn compaction 集成: 'compaction' / 'compaction_paused' event 视情况出现
-      // 拍板 (review P3, 2026-06-04): integration test 走真接 LLM 16 turn, 不**强**
-      // 断言 compaction 次数 — LLM 行为非确定, 短 question 难触发. 强断言
-      // 走 packages/core/test/session-compaction.test.ts 的 P1 修复测
+      // 3) 跨 8 turn compaction 集成
+      // F4 拍板 (D-8, 2026-06-04): 改名为 "optional smoke" 显式声明非必触发,
+      // 断言降级为 "跑完不挂, event 数组可空" — 不要再加 >= 0 这种 no-op 断言.
+      // 强断言走 packages/core/test/session-compaction.test.ts 的 P1 修复测
       // (deterministic 触发, 强断言 afterTokens < beforeTokens + replaced range
-      // 内容被删). integration 这里保留软断言 (>= 0) 当作非必触发 sanity check.
+      // 内容被删). integration 这里只做类型可枚举, 不强求非空.
       const compactionEvents = verifyEvents.filter((e) => e.kind === 'compaction');
       const pausedEvents = verifyEvents.filter((e) => e.kind === 'compaction_paused');
-      // 软断言: 至少 0 条 (短 question 不一定触发, 跨协议行为应当一致)
-      expect(compactionEvents.length).toBeGreaterThanOrEqual(0);
-      expect(pausedEvents.length).toBeGreaterThanOrEqual(0);
+      // optional smoke: 类型守卫, 不强求非空 (LLM 自由行为不保证触发)
+      expect(Array.isArray(compactionEvents)).toBe(true);
+      expect(Array.isArray(pausedEvents)).toBe(true);
 
       // 4) 跨 8 turn 工具成功执行 (BashTool)
       // P28 软断言: 至少 1 次成功
@@ -460,12 +460,12 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
   }, 300_000); // 300s timeout: 8 turn 真接
 
   // ---- 测 2: Anthropic + 8 turn (4 question × 2 turn) ----
+  // F1 拍板 (D-8, 2026-06-04): 改 it.runIf + 条件注册, 跟 file-level canRun 一致走 Vitest SKIPPED 计数,
+  // 不再 console.log + return 假绿. 没 ANTHROPIC key 时显式 skip (而不是 silently pass).
 
-  it(`Anthropic: 8 turn (4 question × 2 turn) + compaction 集成`, async () => {
-    if (!HAS_ANTHROPIC_KEY) {
-      console.log('[SKIP] ANTHROPIC_AUTH_TOKEN not set, skipping Anthropic 8 turn test');
-      return;
-    }
+  it.runIf(HAS_ANTHROPIC_KEY)(
+    `Anthropic: 8 turn (4 question × 2 turn) + compaction 集成`,
+    async () => {
 
     const client = new AnthropicClient();
     const sessionPath = join(tmpdir(), `session-2d5-anthropic-${randomUUID()}.jsonl`);
@@ -485,10 +485,11 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
       expect(userEvents.length).toBeGreaterThanOrEqual(QUESTIONS_PER_PROTOCOL);
 
       // 3) 跨 8 turn compaction 集成
+      // F4 拍板 (D-8, 2026-06-04): 跟 DeepSeek 测同上 — optional smoke, 不强求非空
       const compactionEvents = verifyEvents.filter((e) => e.kind === 'compaction');
       const pausedEvents = verifyEvents.filter((e) => e.kind === 'compaction_paused');
-      expect(compactionEvents.length).toBeGreaterThanOrEqual(0);
-      expect(pausedEvents.length).toBeGreaterThanOrEqual(0);
+      expect(Array.isArray(compactionEvents)).toBe(true);
+      expect(Array.isArray(pausedEvents)).toBe(true);
 
       // 4) 跨 8 turn 工具成功执行
       const successCount = snaps.filter((s) => s.toolSuccess === true).length;

@@ -72,46 +72,53 @@ corepack pnpm build && corepack pnpm lint && corepack pnpm typecheck && corepack
 
 纯 mock / 离线，**不会**调真实 LLM API。当前 191/191 绿。CI 必跑。
 
-### Integration tests（真接 DeepSeek shim）
+### Integration tests（真接 DeepSeek + Anthropic shim）
 
-> **Sprint 1b.5 Step 3**（2026-06-04）：X3 mock-only 风险（`1b5-s2.5` meta-rule "test passed ≠ production works"）要求 1 个真接验证 Step 2.5 修的 `cache_hit_rate` / `cost_turn` 公式在真实响应上对得上。
+> **Sprint 1b.5 Step 3**（2026-06-04）：X3 mock-only 风险（`1b5-s2.5` meta-rule "test passed ≠ production works"）要求真接验证 `cache_hit_rate` / `cost_turn` / `compaction` / `tool loop` 在真实响应上对得上。
 
-**触发**：
+**配置**（Sprint 1c-revive-2-D-7 起，2026-06-04）：
+
+项目根 `.env` 文件**自动加载**（loader 见 [`packages/coding-agent/src/env/load-project-env.ts`](./packages/coding-agent/src/env/load-project-env.ts)）—— vitest 启动时调一次 `loadProjectEnv()`，CLI 入口 `bin/deepwhale.js` 同样。**只补缺不覆盖**（`process.env[key] ??= value`），所以 shell `export VAR=...` / CI 显式 set / PowerShell `$env:VAR=...` 永远最高优先。
 
 ```bash
-# 一次性：把 key 写进 ~/.deepwhale/.env（**不**写进 repo 内 .env，**不**进 commit）
-chmod 600 ~/.deepwhale/.env
-# 在 ~/.deepwhale/.env 里放一行: DEEPSEEK_API_KEY=<你的 key>
+# 1. 复制模板（仓库根 .env.example 不会进 commit, .env 在 .gitignore 里）
+cp .env.example .env
+chmod 600 .env
 
-# 跑测试的 shell 里临时把 key 注入 env（不**持久化**到 repo shell rc）
-export $(grep -v '^#' ~/.deepwhale/.env | xargs)
+# 2. 填 key（**不**进 commit, 仓库里 .env 在 .gitignore 里）
+#    .env 至少需要:
+#      DEEPSEEK_API_KEY=<your-key>          # DeepSeek OAI shim
+#      ANTHROPIC_AUTH_TOKEN=<your-key>      # Anthropic shim (Sprint 1c-revive-2-B 起)
+#      INTEGRATION=1                        # 显式开启真接 (默认 0 / skip)
 
-# 跑 integration（默认 skip；要显式开）
-INTEGRATION=1 corepack pnpm test
+# 3. 跑 integration (默认 skip; INTEGRATION=1 才真接)
+corepack pnpm test
 ```
 
 **Skip 行为**：
 
 - `INTEGRATION !== 1` → 整个 integration test 文件 `it.skip`（**不**fail）
-- `process.env.DEEPSEEK_API_KEY` 未设 → `it.skip`（提示"先 source `~/.deepwhale/.env`"）
+- `process.env.DEEPSEEK_API_KEY` / `process.env.ANTHROPIC_AUTH_TOKEN` 未设 → 对应 `it.skip`（Vitest 报 SKIPPED 计数）
+- 没设 key 不会打印 fake-pass 假绿 —— F1 拍板 (D-8, 2026-06-04)
 
-**红线**（X1 b + X4 c 拍板，2026-06-04）：
+**红线**（X1 b + X4 c + D-8 拍板，2026-06-04）：
 
-1. **test 代码不直接读 `~/.deepwhale/.env` 文件** — 用户自己 `source` / `export`，key 通过 `process.env` 流动
-2. **test 不接受 `apiKey` 选项** — 只能通过 `process.env['DEEPSEEK_API_KEY']`
+1. **test 代码不直接读 `.env` 文件** — 走 `loadProjectEnv()` → `process.env` 流动, test 只看 `process.env`
+2. **test 不接受 `apiKey` 选项** — 只能通过 `process.env['DEEPSEEK_API_KEY' | 'ANTHROPIC_AUTH_TOKEN']`
 3. **test 任何断言 / log 不含 key 字符串** — 防 `console.log(result)` 误打
-4. **文件权限** — `~/.deepwhale/.env` 必须是 `mode 600`（用户责任）
-5. **真接最小化** — 1 turn，prompt 模板 `"Reply with the single word: OK"`，model `deepseek-v4-flash`（单 turn < ¥0.001）
+4. **文件权限** — `.env` 必须是 `mode 600`（用户责任）
+5. **真接最小化** — 单测 < ¥0.001 / turn (deepseek-v4-flash)；多 turn 测单次封顶 300s timeout
 
-**当前覆盖**：
+**当前覆盖**（D-8 2026-06-04 拍板）：
 
-- `packages/llm/test/integration/deepseek-shim.test.ts` — DeepSeek V4 flash 1 turn 流式真接，验 `content` / `usage` / `cost_currency=CNY` / `cost_turn > 0` / `tokens_uncached` 满足不变量 `prompt_tokens - cached_tokens`（本次 1 turn 通常 `cached_tokens === undefined`）
+- `packages/llm/test/integration/deepseek-shim.test.ts` — DeepSeek V4 flash 1 turn 流式真接
+- `packages/coding-agent/test/integration/*.test.ts` — 8 个跨协议 / 错误恢复 / 8-turn compaction / tool loop 真接
 
 **未覆盖**（留 Step 3.5+）：
 
-- `cache_hit_rate > 0`（需要多 turn / 重复 prompt 触发 prefix cache）
-- Anthropic shim（`baseURL=api.deepseek.com/anthropic`）真接 — 等 1b.5 Step 4 启动
-- Tool loop 真接 — 等 Step 1c tool schema 转换
+- `cache_hit_rate > 0`（需要多 turn / 重复 prompt 触发 prefix cache；8-turn 测已部分覆盖）
+- Anthropic 原生直连（非 shim）— 等 1b.5 Step 4 启动
+- v1.5 tool loop live 验收
 
 ## 4 包 Monorepo 结构（对齐 pi）
 
