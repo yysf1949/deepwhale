@@ -62,6 +62,57 @@ echo "DEEPSEEK_API_KEY=***" > .env
 pnpm dev
 ```
 
+## 测试
+
+### 单测（默认）
+
+```bash
+corepack pnpm build && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test
+```
+
+纯 mock / 离线，**不会**调真实 LLM API。当前 191/191 绿。CI 必跑。
+
+### Integration tests（真接 DeepSeek shim）
+
+> **Sprint 1b.5 Step 3**（2026-06-04）：X3 mock-only 风险（`1b5-s2.5` meta-rule "test passed ≠ production works"）要求 1 个真接验证 Step 2.5 修的 `cache_hit_rate` / `cost_turn` 公式在真实响应上对得上。
+
+**触发**：
+
+```bash
+# 一次性：把 key 写进 ~/.deepwhale/.env（**不**写进 repo 内 .env，**不**进 commit）
+chmod 600 ~/.deepwhale/.env
+# 在 ~/.deepwhale/.env 里放一行: DEEPSEEK_API_KEY=<你的 key>
+
+# 跑测试的 shell 里临时把 key 注入 env（不**持久化**到 repo shell rc）
+export $(grep -v '^#' ~/.deepwhale/.env | xargs)
+
+# 跑 integration（默认 skip；要显式开）
+INTEGRATION=1 corepack pnpm test
+```
+
+**Skip 行为**：
+
+- `INTEGRATION !== 1` → 整个 integration test 文件 `it.skip`（**不**fail）
+- `process.env.DEEPSEEK_API_KEY` 未设 → `it.skip`（提示"先 source `~/.deepwhale/.env`"）
+
+**红线**（X1 b + X4 c 拍板，2026-06-04）：
+
+1. **test 代码不直接读 `~/.deepwhale/.env` 文件** — 用户自己 `source` / `export`，key 通过 `process.env` 流动
+2. **test 不接受 `apiKey` 选项** — 只能通过 `process.env['DEEPSEEK_API_KEY']`
+3. **test 任何断言 / log 不含 key 字符串** — 防 `console.log(result)` 误打
+4. **文件权限** — `~/.deepwhale/.env` 必须是 `mode 600`（用户责任）
+5. **真接最小化** — 1 turn，prompt 模板 `"Reply with the single word: OK"`，model `deepseek-v4-flash`（单 turn < ¥0.001）
+
+**当前覆盖**：
+
+- `packages/llm/test/integration/deepseek-shim.test.ts` — DeepSeek V4 flash 1 turn 流式真接，验 `content` / `usage` / `cost_currency=CNY` / `cost_turn > 0` / `tokens_uncached=prompt_tokens`（无 cache）
+
+**未覆盖**（留 Step 3.5+）：
+
+- `cache_hit_rate > 0`（需要多 turn / 重复 prompt 触发 prefix cache）
+- Anthropic shim（`baseURL=api.deepseek.com/anthropic`）真接 — 等 1b.5 Step 4 启动
+- Tool loop 真接 — 等 Step 1c tool schema 转换
+
 ## 4 包 Monorepo 结构（对齐 pi）
 
 ```
