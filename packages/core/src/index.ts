@@ -8,3 +8,4 @@
 export * from './i18n/index.js';
 export * from './types/index.js';
 export * from './session/jsonl.js';
+export * from './session/compaction.js';

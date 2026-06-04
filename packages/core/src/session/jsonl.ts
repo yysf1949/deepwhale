@@ -42,7 +42,26 @@ export type SessionEvent =
       duration_ms: number;
       meta?: Record<string, unknown>;
     }
-  | { kind: 'system'; ts: number; content: string; meta?: Record<string, unknown> };
+  | { kind: 'system'; ts: number; content: string; meta?: Record<string, unknown> }
+  | {
+      /**
+       * Compaction event (Sprint 1c-revive-2-D-5-1):
+       * LLM context 超 window×0.8 触发, 总结前 N 条 message 写 1 条 summary event.
+       * SessionReader 读到 kind='compaction' 时不重放进 LLM context (给 caller 拍板).
+       *
+       * 字段:
+       *   - summary: 总结文本 (caller 用 LLM 生成)
+       *   - replaced_range: [start, end) 索引, 拍板原 messages 哪段被替代
+       *   - meta: 统计 (before/after token, message count) 供调试
+       *
+       * 不变量: replaced_range[1] - replaced_range[0] >= 1 (有东西被总结)
+       */
+      kind: 'compaction';
+      ts: number;
+      summary: string;
+      replaced_range: readonly [number, number];
+      meta?: Record<string, unknown>;
+    };
 
 /**
  * JSONL Writer — append + fsync。
