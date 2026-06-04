@@ -35,7 +35,7 @@
  *   INTEGRATION=1 pnpm vitest run packages/coding-agent/test/integration/compaction-cross-protocol-2d5.test.ts
  *
  * 红线 (跟 1c-revive-1 / 1c-revive-2-A / 1c-revive-2-B-3 等真接 test 一致):
- *   1. test 代码**不**直接读 ~/.deepwhale/.env 文件
+ *   1. test 代码**不**直接读 .env 文件 (D-7 loadProjectEnv 自动加载项目根 .env)
  *   2. test 代码**不**接受 apiKey 选项
  *   3. test 任何断言 / log**不**含 key 字符串
  *   4. 1 turn 不出 1 turn (本 test = **16 turn 跨协议 + 跨 session**, 8 + 8)
@@ -85,7 +85,7 @@ import { createDefaultRegistry } from '../../src/tools/registry.js';
 import {
   hasAnthropicKey,
   hasDeepseekKey,
-  integrationSkipReason,
+  anyProviderSkipReason,
 } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04) ----
@@ -243,7 +243,7 @@ async function llmSummarize(
 // ---- 主测试: 跨协议 16 turn (DeepSeek 8 + Anthropic 8) ----
 
 describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepSeek 8 + Anthropic 8) + compaction optional smoke (D-10b truthfulness wording, 2026-06-04)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = anyProviderSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

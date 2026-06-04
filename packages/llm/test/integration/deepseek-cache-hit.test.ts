@@ -53,7 +53,7 @@ import { DeepSeekClient } from '../../src/deepseek-client.js';
 import type { ChatMessage } from '../../src/types.js';
 
 // ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { deepseekSkipReason } from './_helpers/integration-gate.js';
 
 // ---- 共享 prompt: 触发 prefix cache 的最小设置 ----
 
@@ -126,7 +126,7 @@ function dumpSnapshots(label: string, snaps: TurnSnapshot[]): void {
 // ---- 主测试: 2 turn 同 prompt, 验 shape 稳定 + cache 字段类型 + 揭示真实行为 ----
 
 describe('DeepSeek shim — 1d.5-A 多 turn cache hit 真接 (X1 b + X4 c 拍板)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = deepseekSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

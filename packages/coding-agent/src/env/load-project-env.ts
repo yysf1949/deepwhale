@@ -13,7 +13,7 @@
  *     - `export KEY=...` 前缀 → 忽略前缀 (dotenv 兼容)
  *     - `KEY=` 后无值 → 设为空字符串 (但仍占位置, 不再被覆盖)
  *   - 文件不存在 / 读失败 → silent return (不抛, 不污染启动)
- *   - **不**读 `~/.deepwhale/.env` (那条路径是 user-managed secret store,
+ *   - **不**读 user-managed secret store (`~/.deepwhale/` 是 product 设计; loadProjectEnv 走项目根 .env, 见 .env.example),
  *     跟 .env loader 职责分离 — 跟 llm/test 红线 1 一致: test 代码不直接读 secret 文件)
  *
  * 用法:

@@ -64,12 +64,12 @@ import { AnthropicClient } from '../../src/anthropic-client.js';
 import type { ChatMessage } from '../../src/types.js';
 
 // ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { deepseekAnthropicShimSkipReason } from './_helpers/integration-gate.js';
 
 // ---- 主测试: 1 turn 真接, 验 R7 揭示后的跨协议 shape ----
 
 describe('Anthropic shim — 1d.5-B 1 turn 真接 (R7 揭示: DeepSeek /anthropic 当前是 OAI 兜底)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = deepseekAnthropicShimSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

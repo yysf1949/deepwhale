@@ -65,7 +65,7 @@ import { DeepSeekClient } from '../../src/deepseek-client.js';
 import type { ChatMessage, LLMToolSchema, ToolCall } from '../../src/types.js';
 
 // ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { deepseekSkipReason } from './_helpers/integration-gate.js';
 
 // ---- calculate tool schema (跟 1a tool_calls 1 字段 tool 一致) ----
 
@@ -140,7 +140,7 @@ function dumpSnapshots(label: string, snaps: ToolCallSnapshot[]): void {
 // ---- 主测试: 3 turn tool_calls 触发 (calculate 工具) ----
 
 describe('DeepSeek shim — 1d.5-D-3 tool_calls schema 真接 (D.3 cluster)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = deepseekSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

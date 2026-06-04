@@ -64,7 +64,7 @@ import { LLMNetworkError } from '../../src/types.js';
 import type { ChatMessage } from '../../src/types.js';
 
 // ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { deepseekSkipReason } from './_helpers/integration-gate.js';
 
 // ---- 1 turn 短 prompt (happy path 验 4xx 错误触发) ----
 
@@ -94,7 +94,7 @@ function dumpError(label: string, error: unknown): void {
 // ---- 主测试: 3 个 error 真接触发 ----
 
 describe('DeepSeek shim — 1d.5-D-4 error handling 真接 (D.4 cluster)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = deepseekSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

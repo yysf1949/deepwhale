@@ -15,39 +15,55 @@
  *   - 选项 A: 保持现位置, 加 tui/edit-engine 跨包引用
  *   - 选项 B: 升级 `packages/test-utils/` (视 workspace growth 决定, 1-2 个包不值得)
  *
- * 拍板 (Sprint 1c-revive-2-D-9, 2026-06-04):
- *   - 抽 6 个 integration test 文件**重复**的 boilerplate
- *     (INTEGRATION_ENABLED / HAS_ANTHROPIC_KEY / HAS_DEEPSEEK_KEY / canRun / skipReason)
- *     到一个 shared helper. 6 个文件**完全**等价, 抽完删 boilerplate.
- *   - 占位符过滤 (P2-1 拍板 D-9, 2026-06-04):
- *     `hasUsableApiKey(value)` 过滤 `***` / `<your-*` / `your-*` / 空 / 纯占位
- *     → 用户复制 .env.example 后只改 INTEGRATION=1, 不会因为残留 `***你的 key***`
- *       被当作"非空 = 可用"撞出 401 / 假 key 真请求
- *   - `it.runIf(hasXxxKey())` 走 Vitest SKIPPED 计数, 跟 file-level canRun 一致
- *     (P2-2 拍板 D-9, 2026-06-04)
- *   - `integrationSkipReason()` 提供一致的 skip reason 字符串
- *   - **不**抽 `describeIntegration()` wrapper (你说"抽 helper"但 6 个文件结构
- *     差异大, 多 case 测, 抽 wrapper 改动面 ×3, 不如直接走 hasXxxKey + it.runIf).
+ * ─── Sprint 1c-revive-2-D-10c hotfix (2026-06-04) ───
+ *
+ * **D-9 拍板的 `integrationSkipReason()` 语义过宽**: 任一 key 存在就允许文件运行.
+ * 但实际测试用例语义更细:
+ *
+ *   - **DeepSeek-only 测试** (打 `api.deepseek.com` 走 `DeepSeekClient`):
+ *     **必须**要求 `DEEPSEEK_API_KEY`. 用户即使只有 `ANTHROPIC_AUTH_TOKEN`
+ *     (没有 DEEPSEEK) 也不能跑 — 否则撞 401.
+ *
+ *   - **DeepSeek /anthropic shim 测试** (打 DeepSeek 提供的 `/anthropic` 端点,
+ *     走 `AnthropicClient` 但 `baseUrl=DEEPSEEK_ANTHROPIC_BASE_URL`):
+ *     **也必须**要求 `DEEPSEEK_API_KEY`. 因为 DeepSeek /anthropic 端点认证用
+ *     DEEPSEEK_API_KEY, 不是 ANTHROPIC_AUTH_TOKEN. R7 揭示: server 端
+ *     authentication 走 DEEPSEEK key 走 OAI 协议兜底.
+ *
+ *   - **真 Anthropic native 测试** (打 `api.anthropic.com`):
+ *     走 `ANTHROPIC_AUTH_TOKEN`. 当前 deepwhale 仓库没有这种测试, 但 helper
+ *     仍暴露 `hasAnthropicKey()` 供未来用.
+ *
+ * **D-10c 拍板拆 4 gate function**:
+ *   - `hasDeepseekKey()`: DEEPSEEK_API_KEY 真有
+ *   - `hasAnthropicKey()`: ANTHROPIC_AUTH_TOKEN 真有
+ *   - `deepseekSkipReason()`: 严格 deepseek gate (用于 DeepSeek-only 测试)
+ *   - `deepseekAnthropicShimSkipReason()`: 严格要求 DEEPSEEK_API_KEY 的 Anthropic shim
+ *     (说明: 跟 deepseekSkipReason 实际**同语义**, 拆 2 函数是给 reviewer 显式
+ *     标识"这个 AnthropicClient 走的是 DeepSeek /anthropic 端点, 不是真 Anthropic")
+ *   - `anyProviderSkipReason()`: 真正支持任一 provider 的测试用 (跟之前
+ *     `integrationSkipReason()` 同语义, 但**改名**强制 reviewer 显式选)
+ *
+ * **`integrationSkipReason()` 删**: D-9 留的 "any key 都能跑" 拍板已废, 留会
+ * 让 reviewer 无意中误用. 17 个集成测文件必须**显式**选上面 4 个 gate 之一.
  *
  * 用法 (integration test 文件统一改成):
  *
  *   llm 包内 (同包):
- *     import { hasAnthropicKey, hasDeepseekKey, integrationSkipReason }
- *       from './_helpers/integration-gate.js';
+ *     import { deepseekSkipReason } from './_helpers/integration-gate.js';        // DeepSeek-only
+ *     import { deepseekAnthropicShimSkipReason } from './_helpers/integration-gate.js';  // DeepSeek shim
+ *     import { anyProviderSkipReason, hasAnthropicKey, hasDeepseekKey } from './_helpers/integration-gate.js';  // 混合
  *
  *   coding-agent 包 (跨包, 相对路径):
- *     import { hasAnthropicKey, hasDeepseekKey, integrationSkipReason }
- *       from '../../../llm/test/integration/_helpers/integration-gate.js';
+ *     import { deepseekSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
  *
- *   it.runIf(hasAnthropicKey())(`name`, async () => { ... }, 300_000);
- *   // OR
  *   describe(...) {
- *     if (!integrationSkipReason()) {
- *       it.skip(integrationSkipReason()!);
+ *     const reason = deepseekSkipReason();  // 或 deepseekAnthropicShimSkipReason() / anyProviderSkipReason()
+ *     if (reason !== undefined) {
+ *       it.skip(`SKIPPED: ${reason}`, () => {});
  *       return;
  *     }
- *     it.runIf(hasAnthropicKey())(...);
- *     it.runIf(hasDeepseekKey())(...);
+ *     it.runIf(hasDeepseekKey())(...);  // 或 hasAnthropicKey() / it (无 gate)
  *   }
  *
  * 不变量:
@@ -57,6 +73,7 @@
  *   - helper **不**做 ASCII-only sanitize (你 D-9 review 拍, ByteString 错应该走
  *     client 层 `APIKeyInvalidError` 显式报错, 不是改写 key)
  *     真正占位符过滤靠 `hasUsableApiKey` 黑名单正则 (中英文 / <>-bracket / placeholder)
+ *   - helper **不**默认允许 OR 任一 key 存在就 skip (D-10c 拍板, 必须显式选 gate)
  *
  * @module @deepwhale/coding-agent/test/integration/_helpers/integration-gate
  */
@@ -115,16 +132,73 @@ export function hasDeepseekKey(): boolean {
   return hasUsableApiKey(process.env['DEEPSEEK_API_KEY']);
 }
 
-/** file-level 整文件 skip 原因: 跟 6 个文件原 skipReason 字符串一致. */
-export function integrationSkipReason(): string | undefined {
-  if (isIntegrationEnabled()) {
-    if (!hasAnthropicKey() && !hasDeepseekKey()) {
-      return (
-        'process.env.ANTHROPIC_AUTH_TOKEN and DEEPSEEK_API_KEY both unset or placeholder ' +
-        '(see README "integration tests" + .env.example)'
-      );
-    }
-    return undefined; // 可跑, 但具体 case 用 it.runIf 自身 gate
+/**
+ * DeepSeek-only gate skip reason.
+ *
+ * 用法: 任何走 `DeepSeekClient` 打 `api.deepseek.com` 的测试.
+ *
+ * 拍板 (D-10c, 2026-06-04): 严格 DEEPSEEK_API_KEY gate, **不**用 ANTHROPIC_AUTH_TOKEN.
+ * 即使用户只有 ANTHROPIC_AUTH_TOKEN, 也不能跑 DeepSeek-only 测试 — 否则撞 401.
+ */
+export function deepseekSkipReason(): string | undefined {
+  if (!isIntegrationEnabled()) {
+    return 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")';
   }
-  return 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")';
+  if (!hasDeepseekKey()) {
+    return 'process.env.DEEPSEEK_API_KEY is unset or placeholder (see README "integration tests" + .env.example)';
+  }
+  return undefined;
+}
+
+/**
+ * DeepSeek /anthropic shim gate skip reason.
+ *
+ * 用法: 走 `AnthropicClient` 但 `baseUrl=DEEPSEEK_ANTHROPIC_BASE_URL` 的测试
+ * (e.g. llm/anthropic-shim.test.ts, ca/multi-tool-calls-2d4.test.ts,
+ *  ca/schema-validation-2d3.test.ts).
+ *
+ * 拍板 (D-10c, 2026-06-04):
+ *   - 跟 deepseekSkipReason **同语义** (都要求 DEEPSEEK_API_KEY), 因为
+ *     DeepSeek /anthropic 端点认证用 DEEPSEEK key 走 OAI 协议兜底 (R7 揭示).
+ *   - 拆 2 函数是给 reviewer **显式**标识"这个 AnthropicClient 走的是 DeepSeek
+ *     /anthropic 端点, 不是真 Anthropic", 防止后续真 Anthropic 测试混入
+ *     ANTHROPIC_AUTH_TOKEN 误用.
+ */
+export function deepseekAnthropicShimSkipReason(): string | undefined {
+  if (!isIntegrationEnabled()) {
+    return 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")';
+  }
+  if (!hasDeepseekKey()) {
+    return 'process.env.DEEPSEEK_API_KEY is unset or placeholder (see README "integration tests" + .env.example)';
+  }
+  return undefined;
+}
+
+/**
+ * Any-provider gate skip reason.
+ *
+ * 用法: 真正支持任一 provider 的测试 (e.g. compaction-cross-protocol-2d5
+ * 混合 DS OAI + Anthropic shim, file-level skip 用 any-provider, 但具体 case
+ * 用 `it.runIf(hasDeepseekKey())` / `it.runIf(hasAnthropicKey())` 自身 gate).
+ *
+ * 拍板 (D-10c, 2026-06-04): 取代 D-9 `integrationSkipReason()`, 改名为
+ * `anyProviderSkipReason` **强制** reviewer 显式选. 即任一 key 存在就允许
+ * 文件运行, 具体 case 由 `it.runIf` 自行 gate.
+ *
+ * 注意: D-10c 拍板**仅**对真正 mixed-provider 测试用此 gate.
+ * 单 provider 测试 (deepseek-only / DeepSeek shim) **必须**用
+ * `deepseekSkipReason()` / `deepseekAnthropicShimSkipReason()` — 不能
+ * 用 anyProvider 偷懒, 否则用户只配 DEEPSEEK 也能跑 ANTHROPIC native 撞 401.
+ */
+export function anyProviderSkipReason(): string | undefined {
+  if (!isIntegrationEnabled()) {
+    return 'INTEGRATION !== 1 (set INTEGRATION=1 to run; see README "integration tests")';
+  }
+  if (!hasAnthropicKey() && !hasDeepseekKey()) {
+    return (
+      'process.env.ANTHROPIC_AUTH_TOKEN and DEEPSEEK_API_KEY both unset or placeholder ' +
+      '(see README "integration tests" + .env.example)'
+    );
+  }
+  return undefined; // 可跑, 但具体 case 用 it.runIf 自身 gate
 }

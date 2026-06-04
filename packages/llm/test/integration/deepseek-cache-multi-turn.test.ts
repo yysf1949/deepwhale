@@ -59,7 +59,7 @@ import { DeepSeekClient } from '../../src/deepseek-client.js';
 import type { ChatMessage } from '../../src/types.js';
 
 // ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { deepseekSkipReason } from './_helpers/integration-gate.js';
 
 // ---- 长 system prompt (跟 1d.5-A.5 一样 4185 token) ----
 
@@ -150,7 +150,7 @@ function dumpSnapshots(label: string, snaps: TurnSnapshot[]): void {
 // ---- 主测试: 4 turn 长 prompt 累积 context 验 cache 跨 turn 累积 + prompt 严格递增 ----
 
 describe('DeepSeek shim — 1d.5-D-1 长 prompt multi-turn 累积 context 真接 (D.1 分步走)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = deepseekSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

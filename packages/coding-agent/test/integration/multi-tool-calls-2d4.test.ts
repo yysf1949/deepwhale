@@ -29,13 +29,13 @@ import type { LLMClient, ChatMessage } from '@deepwhale/llm';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { integrationSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
+import { deepseekAnthropicShimSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 const ANTHROPIC_BASE_URL = DEEPSEEK_ANTHROPIC_BASE_URL;
 const ANTHROPIC_MODEL = ANTHROPIC_DEFAULT_MODEL;
 
-// D-10 拍板 (2026-06-04): 改 helper integrationSkipReason() 模式, 跟其他 6 文件一致
-const fileSkipReason = integrationSkipReason();
+// D-10 拍板 (2026-06-04): 改 helper deepseekAnthropicShimSkipReason() 模式, 跟其他 6 文件一致
+const fileSkipReason = deepseekAnthropicShimSkipReason();
 const describeIntegration = fileSkipReason === undefined ? describe : describe.skip;
 
 describeIntegration('1c-revive-2-D-4: multi-tool_calls 跨 Anthropic 协议', () => {

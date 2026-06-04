@@ -86,7 +86,7 @@ import { DeepSeekClient } from '../../src/deepseek-client.js';
 import type { ChatMessage, LLMToolSchema, ToolCall } from '../../src/types.js';
 
 // ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { deepseekSkipReason } from './_helpers/integration-gate.js';
 
 // ---- calculate tool schema (跟 1d.5-D-3 一样) ----
 
@@ -197,7 +197,7 @@ function dumpSnapshots(label: string, snaps: TurnSnapshot[]): void {
 // ---- 主测试: 2 turn tool_use 端到端流程 ----
 
 describe('DeepSeek shim — 1c-revive-1 tool_use 2 turn 端到端真接 (1c-revive 拆分, 不动 mode layer)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = deepseekSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

@@ -59,7 +59,7 @@ import { DeepSeekClient } from '../../src/deepseek-client.js';
 import type { ChatMessage, ChatChunk } from '../../src/types.js';
 
 // ---- 红线门 (helper 化, D-10a-2 2026-06-04) ----
-import { integrationSkipReason } from './_helpers/integration-gate.js';
+import { deepseekSkipReason } from './_helpers/integration-gate.js';
 
 // ---- 1 turn streaming 短 prompt (不验 cache, 验流式 chunk 累积) ----
 
@@ -108,7 +108,7 @@ function dumpStreamSnapshot(label: string, snap: StreamSnapshot): void {
 // ---- 主测试: 1 turn streaming 短 prompt 验 partial chunks + cost 公式 ----
 
 describe('DeepSeek shim — 1d.5-D-2 streaming SSE partial chunks 真接 (D.2 分步走)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = deepseekSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

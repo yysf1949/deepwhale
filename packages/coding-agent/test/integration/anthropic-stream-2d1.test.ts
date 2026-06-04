@@ -26,7 +26,7 @@
  *   INTEGRATION=1 pnpm vitest run packages/coding-agent/test/integration/anthropic-stream-2d1.test.ts
  *
  * 红线 (跟 1c-revive-1 / 1c-revive-2-A / 1c-revive-2-B-3 / 1c-revive-2-C+3 一致):
- *   1. test 代码**不**直接读 ~/.deepwhale/.env 文件
+ *   1. test 代码**不**直接读 .env 文件 (D-7 loadProjectEnv 自动加载项目根 .env)
  *   2. test 代码**不**接受 apiKey 选项
  *   3. test 任何断言 / log**不**含 key 字符串
  *   4. 1 turn 不出 1 turn (本 test = **1 turn stream 端到端**)
@@ -63,7 +63,7 @@
 import { describe, expect, it } from 'vitest';
 import { AnthropicClient, type ChatChunk, type ChatMessage } from '@deepwhale/llm';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
-import { integrationSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
+import { anyProviderSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04): 占位符过滤 + 走 it.runIf + 统一 skip reason ----
 
@@ -143,7 +143,7 @@ function dumpSnapshot(label: string, snap: StreamSnapshot): void {
 // ---- 主测试: stream path 端到端 跨 Anthropic 协议 ----
 
 describe('coding-agent client — 1c-revive-2-D-1 AnthropicClient stream path 真接 + 跨 Anthropic 协议 (1c-revive 拆分)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = anyProviderSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

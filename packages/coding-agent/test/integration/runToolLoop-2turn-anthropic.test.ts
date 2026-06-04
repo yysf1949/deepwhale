@@ -33,7 +33,7 @@
  *   INTEGRATION=1 pnpm vitest run packages/coding-agent/test/integration/runToolLoop-2turn-anthropic.test.ts
  *
  * 红线 (跟 1c-revive-1 / 1c-revive-2-A / 1d.5 等真接 test 一致):
- *   1. test 代码**不**直接读 ~/.deepwhale/.env 文件
+ *   1. test 代码**不**直接读 .env 文件 (D-7 loadProjectEnv 自动加载项目根 .env)
  *   2. test 代码**不**接受 apiKey 选项
  *   3. test 任何断言 / log**不**含 key 字符串
  *   4. 1 turn 不出 1 turn (本 test = **2 turn** mode layer tool_use 端到端)
@@ -77,7 +77,7 @@ import { describe, expect, it } from 'vitest';
 import { AnthropicClient, type ChatMessage, type ToolCall } from '@deepwhale/llm';
 import { runToolLoop, type ToolLoopStep } from '../../src/agent/tool-loop.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
-import { integrationSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
+import { anyProviderSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04) ----
 
@@ -219,7 +219,7 @@ function dumpSteps(
 // ---- 主测试: mode layer runToolLoop 端到端 跨 Anthropic 协议路径 ----
 
 describe('coding-agent mode layer — 1c-revive-2-B-3 runToolLoop 端到端 跨 Anthropic 协议路径 (1c-revive 拆分, pi-agent 4-layer)', () => {
-  const fileSkipReason = integrationSkipReason();
+  const fileSkipReason = anyProviderSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

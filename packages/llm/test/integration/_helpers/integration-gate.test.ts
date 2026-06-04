@@ -13,8 +13,10 @@ import {
   hasUsableApiKey,
   hasAnthropicKey,
   hasDeepseekKey,
-  integrationSkipReason,
   isIntegrationEnabled,
+  deepseekSkipReason,
+  deepseekAnthropicShimSkipReason,
+  anyProviderSkipReason,
 } from './integration-gate.js';
 
 describe('integration-gate helper (D-9 2026-06-04)', () => {
@@ -142,34 +144,81 @@ describe('integration-gate helper (D-9 2026-06-04)', () => {
     });
   });
 
-  describe('integrationSkipReason (D-9 字符串一致)', () => {
-    it('INTEGRATION !== 1 + 无 key → 包含 "INTEGRATION !== 1"', () => {
+  describe('integrationSkipReason (D-9 字符串一致) — D-10c 拆 3 gate', () => {
+    it('INTEGRATION !== 1 + 无 key → 3 gate 都包含 "INTEGRATION !== 1"', () => {
       process.env['INTEGRATION'] = '0';
-      const reason = integrationSkipReason();
-      expect(reason).toBeDefined();
-      expect(reason).toMatch(/INTEGRATION !== 1/);
+      for (const fn of [deepseekSkipReason, deepseekAnthropicShimSkipReason, anyProviderSkipReason]) {
+        const reason = fn();
+        expect(reason).toBeDefined();
+        expect(reason).toMatch(/INTEGRATION !== 1/);
+      }
     });
 
-    it('INTEGRATION === 1 + 无 key → 包含 "both unset or placeholder"', () => {
+    it('INTEGRATION === 1 + DEEPSEEK_API_KEY 设 + ANTHROPIC_AUTH_TOKEN unset → deepseekSkipReason undefined (可跑)', () => {
       process.env['INTEGRATION'] = '1';
-      const reason = integrationSkipReason();
-      expect(reason).toBeDefined();
-      expect(reason).toMatch(/both unset or placeholder/);
+      process.env['DEEPSEEK_API_KEY'] = 'sk-abc...i789';
+      expect(deepseekSkipReason()).toBeUndefined();
     });
 
-    it('INTEGRATION === 1 + 至少一个真 key → undefined (可跑, 走 it.runIf 自身 gate)', () => {
+    it('INTEGRATION === 1 + DEEPSEEK_API_KEY 设 + ANTHROPIC_AUTH_TOKEN unset → deepseekAnthropicShimSkipReason undefined (shim 跟 deepseek 同)', () => {
       process.env['INTEGRATION'] = '1';
-      process.env['DEEPSEEK_API_KEY'] = 'sk-abc123def456ghi789';
-      expect(integrationSkipReason()).toBeUndefined();
+      process.env['DEEPSEEK_API_KEY'] = 'sk-abc...i789';
+      expect(deepseekAnthropicShimSkipReason()).toBeUndefined();
     });
 
-    it('INTEGRATION === 1 + 全部占位符 → "both unset or placeholder"', () => {
+    it('INTEGRATION === 1 + DEEPSEEK_API_KEY 设 + ANTHROPIC_AUTH_TOKEN unset → anyProviderSkipReason undefined (任一 key 即跑)', () => {
+      process.env['INTEGRATION'] = '1';
+      process.env['DEEPSEEK_API_KEY'] = 'sk-abc...i789';
+      expect(anyProviderSkipReason()).toBeUndefined();
+    });
+
+    it('INTEGRATION === 1 + 全部占位符 → 3 gate 都 "DEEPSEEK_API_KEY is unset or placeholder" (shim/any 略有差异但都非 undefined)', () => {
       process.env['INTEGRATION'] = '1';
       process.env['ANTHROPIC_AUTH_TOKEN'] = '***你的 key***';
       process.env['DEEPSEEK_API_KEY'] = 'placeholder';
-      const reason = integrationSkipReason();
+      // deepseek / shim 都要求 DEEPSEEK_API_KEY, 全部占位符 → 都 skip
+      expect(deepseekSkipReason()).toMatch(/DEEPSEEK_API_KEY is unset or placeholder/);
+      expect(deepseekAnthropicShimSkipReason()).toMatch(/DEEPSEEK_API_KEY is unset or placeholder/);
+      // anyProvider 任一即可, 全部占位符也 skip
+      expect(anyProviderSkipReason()).toMatch(/both unset or placeholder/);
+    });
+  });
+
+  describe('D-10c gate semantic (2026-06-04) — 严要求, 显式 OR 行为', () => {
+    it('only ANTHROPIC_AUTH_TOKEN + DeepSeek-only 测试 → skip (不因 ANTHROPIC key 误跑)', () => {
+      // 拍板: DeepSeek-only 测试用 deepseekSkipReason, 严格要求 DEEPSEEK_API_KEY.
+      // 即使用户只配 ANTHROPIC_AUTH_TOKEN, 也不能跑 deepseek-only 测试 — 否则撞 401.
+      process.env['INTEGRATION'] = '1';
+      process.env['ANTHROPIC_AUTH_TOKEN'] = 'sk-ant...i789';
+      delete process.env['DEEPSEEK_API_KEY'];
+      const reason = deepseekSkipReason();
       expect(reason).toBeDefined();
-      expect(reason).toMatch(/both unset or placeholder/);
+      expect(reason).toMatch(/DEEPSEEK_API_KEY is unset or placeholder/);
+    });
+
+    it('only ANTHROPIC_AUTH_TOKEN + DeepSeek shim 测试 → skip (跟 deepseek-only 同)', () => {
+      // 拍板: DeepSeek shim (AnthropicClient 打 DEEPSEEK_ANTHROPIC_BASE_URL) 认证用 DEEPSEEK_API_KEY.
+      // 即使用户只配 ANTHROPIC_AUTH_TOKEN, 也不能跑 — 否则撞 401.
+      process.env['INTEGRATION'] = '1';
+      process.env['ANTHROPIC_AUTH_TOKEN'] = 'sk-ant...i789';
+      delete process.env['DEEPSEEK_API_KEY'];
+      const reason = deepseekAnthropicShimSkipReason();
+      expect(reason).toBeDefined();
+      expect(reason).toMatch(/DEEPSEEK_API_KEY is unset or placeholder/);
+    });
+
+    it('only DEEPSEEK_API_KEY + DeepSeek-only 测试 → run (undefined = 可跑, 走 it.runIf(hasDeepseekKey) 自身 gate)', () => {
+      process.env['INTEGRATION'] = '1';
+      delete process.env['ANTHROPIC_AUTH_TOKEN'];
+      process.env['DEEPSEEK_API_KEY'] = 'sk-abc...i789';
+      expect(deepseekSkipReason()).toBeUndefined();
+    });
+
+    it('only DEEPSEEK_API_KEY + DeepSeek shim 测试 → run (跟 deepseek-only 同)', () => {
+      process.env['INTEGRATION'] = '1';
+      delete process.env['ANTHROPIC_AUTH_TOKEN'];
+      process.env['DEEPSEEK_API_KEY'] = 'sk-abc...i789';
+      expect(deepseekAnthropicShimSkipReason()).toBeUndefined();
     });
   });
 
