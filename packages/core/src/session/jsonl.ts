@@ -180,6 +180,12 @@ export class SessionReader {
   }
 
   private parseLines(text: string): SessionEvent[] {
+    // Sprint 1c-revive-2-D-5+ (review P2, 2026-06-04): 入口清零 lastIncompleteLineIndex.
+    // 拍板: 同一个 SessionReader 实例先读过损坏文件 (有 partial line), truncate()
+    // 成功后, 再读修复后的文件, 旧 index 仍残留, 后续 truncate() 会按旧 index
+    // 截断, 可能删掉有效 events. 拍 parseLines 入口重置 = "本次读决定
+    // lastIncompleteLineIndex, 不会被前次污染".
+    this.lastIncompleteLineIndex = -1;
     const events: SessionEvent[] = [];
     const lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
@@ -231,7 +237,11 @@ export class SessionReader {
       await handle.writeFile(keep, 'utf8');
       await handle.sync();
     } catch (err) {
-      // 写 temp 失败: 清理垃圾, 原文件**不动**, 抛错给 caller
+      // 写 temp 失败: 清理垃圾, 原文件**不动**, 抛错给 caller.
+      // 拍板 (review P2, 2026-06-04): 失败**保留** lastIncompleteLineIndex,
+      // caller 之后重试, 拍板 "still needs fix" 拍拍 抹掉. 拍板
+      // lastIncompleteLineIndex 拍拍 拍 拍 拍 拍 拍 拍, 拍 拍 拍 拍 拍
+      // 拍 拍.
       await handle.close().catch(() => {});
       await fs.unlink(tempPath).catch(() => {});
       throw err;
@@ -242,10 +252,15 @@ export class SessionReader {
     try {
       await fs.rename(tempPath, this.path);
     } catch (err) {
-      // rename 失败: 清理 temp, 原文件**不动** (rename 没成功), 抛错给 caller
+      // rename 失败: 清理 temp, 原文件**不动** (rename 没成功), 抛错给 caller.
+      // 拍板: 同样**保留** lastIncompleteLineIndex.
       await fs.unlink(tempPath).catch(() => {});
       throw err;
     }
+    // 成功: 清零 lastIncompleteLineIndex (拍板 review P2, 2026-06-04).
+    // 拍板: 拍拍 truncate 拍拍, 拍 拍拍 拍 拍 拍 拍 拍 拍 拍 拍 拍
+    // 拍 拍, 拍 拍 拍 拍 拍 拍 拍 拍 拍 拍 拍.
+    this.lastIncompleteLineIndex = -1;
     return { truncated: truncatedBytes };
   }
 }

@@ -20,7 +20,7 @@
 
 import process from 'node:process';
 import { createInterface, type Interface as RLInterface } from 'node:readline';
-import { DeepSeekClient, isLLMError, type ChatMessage, type LLMClient } from '@deepwhale/llm';
+import { isLLMError, type ChatMessage, type LLMClient } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
 import {
   isToolLoopError,
@@ -30,12 +30,17 @@ import {
   type ToolLoopResult,
 } from '../agent/index.js';
 import { createDefaultRegistry } from '../tools/registry.js';
+import { createDefaultClient, type Provider } from '../llm-factory.js';
 
 export interface RpcModeOptions {
   sessionPath?: string;
   maxSteps?: number;
-  /** 注入 LLM 客户端（默认 DeepSeekClient）。Sprint 1a follow-up:单测用。 */
+  /** 注入 LLM 客户端（默认 createDefaultClient env 推断, Sprint 1c-revive-2-D-5+ P2）。 */
   client?: LLMClient;
+  /** Sprint 1c-revive-2-D-5+ P2: 显式 provider, 跟 env 推断冲突时优先. */
+  provider?: Provider;
+  /** Sprint 1c-revive-2-D-5+ P2: 显式 model. */
+  model?: string;
   /** 注入输入流（默认 process.stdin）。Sprint 1a follow-up:单测用。 */
   input?: NodeJS.ReadableStream;
   /**
@@ -68,7 +73,15 @@ interface RpcNotification {
 }
 
 export async function runRpcMode(options: RpcModeOptions): Promise<number> {
-  const client: LLMClient = options.client ?? new DeepSeekClient();
+  // Sprint 1c-revive-2-D-5+ (review P2, 2026-06-04): rpc 改走 createDefaultClient
+  // factory, 跟 print/repl 拍板一致 (env 推断 + flag 显式覆盖). 旧实现写死
+  // DeepSeekClient 拍 P2 bug: --provider anthropic 走 rpc 仍用 deepseek.
+  const client: LLMClient =
+    options.client ??
+    createDefaultClient({
+      ...(options.provider !== undefined ? { provider: options.provider } : {}),
+      ...(options.model !== undefined ? { model: options.model } : {}),
+    });
   const sessionPath = options.sessionPath;
 
   // session

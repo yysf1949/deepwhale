@@ -11,6 +11,10 @@
  *
  * 通用参数：
  *   --session <path>    JSONL 持久化路径
+ *   --provider <name>   显式 provider (deepseek | anthropic); 走 createDefaultClient
+ *                       的 env 推断会被覆盖. 拍板 2026-06-04 review P2: 之前
+ *                       解析没接, --provider 走 'unknown flag' 分支当 print prompt.
+ *   --model <id>        显式 model id. 跟 createDefaultClient 的 model 字段对接.
  *   --no-tool-loop      退化到 Sprint 0.3 单轮 chat（不调工具）
  *   --max-steps <n>     工具循环上限（默认 5）
  *   --version | -v      输出版本
@@ -28,6 +32,8 @@ import { runRpcMode } from '../dist/modes/rpc.js';
  * @property {'interactive'|'print'|'rpc'} mode
  * @property {string|undefined} prompt
  * @property {string|undefined} sessionPath
+ * @property {string|undefined} provider
+ * @property {string|undefined} model
  * @property {boolean} enableToolLoop
  * @property {number} maxSteps
  */
@@ -41,6 +47,8 @@ function parseArgs(argv) {
     mode: 'interactive',
     prompt: undefined,
     sessionPath: undefined,
+    provider: undefined,
+    model: undefined,
     enableToolLoop: true,
     maxSteps: 5,
   };
@@ -69,6 +77,25 @@ function parseArgs(argv) {
     }
     if (a === '--session') {
       args.sessionPath = pathResolve(argv[i + 1] ?? '');
+      i += 2;
+      continue;
+    }
+    if (a === '--provider') {
+      // 拍板 2026-06-04 review P2: 之前未接, --provider X 被当 prompt 进入 print 模式.
+      // 校验: deepseek | anthropic (跟 llm-factory.ts 的 Provider 拍板一致).
+      const v = argv[i + 1] ?? '';
+      if (v !== 'deepseek' && v !== 'anthropic') {
+        process.stderr.write(
+          `Error: --provider must be 'deepseek' or 'anthropic', got '${v}'\n`,
+        );
+        process.exit(2);
+      }
+      args.provider = v;
+      i += 2;
+      continue;
+    }
+    if (a === '--model') {
+      args.model = argv[i + 1] ?? '';
       i += 2;
       continue;
     }
@@ -102,14 +129,18 @@ Usage:
 
 Options:
   --session <path>    Persist session to JSONL file
+  --provider <name>   LLM provider: deepseek | anthropic (overrides env detection)
+  --model <id>        LLM model id (e.g. deepseek-v4-flash, claude-sonnet-4-5)
   --no-tool-loop      Disable tool calling (single-turn chat only)
   --max-steps <n>     Max tool-loop steps (default 5)
   --version, -v       Print version and exit
   --help, -h          Print this help
 
 Environment:
-  DEEPSEEK_API_KEY    Required. Set in ~/.deepwhale/config.toml or env.
-  DEEPWHALE_LANG      Optional. 'en' (default) or 'zh-CN'.
+  DEEPSEEK_API_KEY        Required for deepseek (or --provider).
+  ANTHROPIC_AUTH_TOKEN    Required for anthropic (or --provider). May also be
+                          DEEPWHALE_SESSION_KEY for session-at-rest encryption.
+  DEEPWHALE_LANG          Optional. 'en' (default) or 'zh-CN'.
 
 Built-in REPL commands:
   /help, /exit, exit, quit
@@ -118,6 +149,8 @@ Built-in REPL commands:
 /**
  * 路由到 3 种模式之一。
  * Sprint 1a:interactive/print 接 tool loop + session;rpc 是 NDJSON 框架 stub。
+ * Sprint 1c-revive-2-D-5+ (review P2, 2026-06-04): --provider/--model 透传
+ * 3 mode, 跟 createDefaultClient factory 对接.
  *
  * @returns {Promise<number>}
  */
@@ -127,6 +160,8 @@ async function main() {
     case 'interactive':
       return startRepl({
         ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
+        ...(args.provider !== undefined ? { provider: args.provider } : {}),
+        ...(args.model !== undefined ? { model: args.model } : {}),
         enableToolLoop: args.enableToolLoop,
       });
     case 'print':
@@ -137,12 +172,16 @@ async function main() {
       return runPrintMode({
         prompt: args.prompt,
         ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
+        ...(args.provider !== undefined ? { provider: args.provider } : {}),
+        ...(args.model !== undefined ? { model: args.model } : {}),
         enableToolLoop: args.enableToolLoop,
         maxSteps: args.maxSteps,
       });
     case 'rpc':
       return runRpcMode({
         ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
+        ...(args.provider !== undefined ? { provider: args.provider } : {}),
+        ...(args.model !== undefined ? { model: args.model } : {}),
         maxSteps: args.maxSteps,
       });
   }
