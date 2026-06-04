@@ -258,6 +258,19 @@ function toAnthropicMessages(
 ): { system: string | undefined; messages: AnthropicMessageParam[]; tools?: Anthropic.Tool[] } {
   const out: AnthropicMessageParam[] = [];
   let system: string | undefined;
+  // Sprint 1c-revive-2-D-4-1 (P38, 2026-06-04): 合并连续 tool 消息到 1 个 user 消息
+  // (Anthropic 协议要求 N 个 tool_use 紧跟 1 个 user 消息含 N 个 tool_result blocks).
+  // 1c.5 拍板时 1-tool-call 路径碰巧合法 (N=1 时独立 user 消息仍可), 多 tool_calls 揭示.
+  let pendingToolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> | undefined;
+  const flushToolResults = (): void => {
+    if (pendingToolResults !== undefined && pendingToolResults.length > 0) {
+      out.push({
+        role: 'user',
+        content: pendingToolResults as unknown as Array<Anthropic.ContentBlockParam>,
+      });
+    }
+    pendingToolResults = undefined;
+  };
   for (const m of messages) {
     if (m.role === 'system') {
       // 多条 system 合并 (Anthropic system 是单 string, 重复 system 罕见)
@@ -265,20 +278,20 @@ function toAnthropicMessages(
       continue;
     }
     if (m.role === 'tool') {
-      // Sprint 1c.5 (1c-revive-2-B-1): tool 消息 → Anthropic tool_result content block
-      // Anthropic 协议: { type: 'tool_result', tool_use_id, content }  (tool_use_id = OAI tool_call_id)
-      out.push({
-        role: 'user',
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: m.tool_call_id ?? '',
-            content: m.content,
-          },
-        ],
+      // 拍板 (D-4-1): 累积 tool_result 进 pendingToolResults (跟下一个 tool 消息合并).
+      // flush 时机: 1) 遇到非 tool 角色, 2) loop 结束.
+      if (pendingToolResults === undefined) {
+        pendingToolResults = [];
+      }
+      pendingToolResults.push({
+        type: 'tool_result',
+        tool_use_id: m.tool_call_id ?? '',
+        content: m.content,
       });
       continue;
     }
+    // 非 tool 角色: 先 flush pending tool_results (如果有)
+    flushToolResults();
     if (m.role === 'user') {
       out.push({ role: 'user', content: m.content });
       continue;
@@ -304,6 +317,8 @@ function toAnthropicMessages(
       continue;
     }
   }
+  // loop 结束: flush 最后一批 tool_results (避免末尾独立 tool 消息丢失)
+  flushToolResults();
   // tool schema: OAI {name, description, parameters} → Anthropic {name, description, input_schema}
   // 1c.5 拍板: 走 Tool 类型 (跟 SDK 对齐), 不拆 ToolUnion (Bash20250124 等 built-in 工具暂不用).
   let anthropicTools: Anthropic.Tool[] | undefined;
