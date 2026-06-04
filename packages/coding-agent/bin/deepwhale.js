@@ -23,6 +23,11 @@
 
 import { resolve as pathResolve } from 'node:path';
 import process from 'node:process';
+// Sprint 1c-revive-2-D-7 (review, 2026-06-04): 启动时加载项目根 .env (补缺不覆盖,
+// CI / shell export 优先级最高). 必须在 import dist 之前调, 让 createDefaultClient
+// factory 看到 process.env['DEEPSEEK_API_KEY'] / ['ANTHROPIC_AUTH_TOKEN'] 已就位.
+import { loadProjectEnv } from '../dist/env/load-project-env.js';
+loadProjectEnv();
 import { startRepl } from '../dist/index.js';
 import { runPrintMode } from '../dist/modes/print.js';
 import { runRpcMode } from '../dist/modes/rpc.js';
