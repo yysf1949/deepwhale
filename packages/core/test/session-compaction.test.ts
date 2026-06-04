@@ -18,6 +18,7 @@ import {
   shouldCompact,
   compact,
   resolveCompactionConfig,
+  resolveTail,
   COMPACTION_DEFAULTS,
   CompactionState,
   runCompactionWithLatch,
@@ -95,20 +96,22 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
       expect(shouldCompact(msgs, { contextWindow: 1000 })).toBe(true);
     });
 
-    it('messages <= tailKeep → false (没东西可总结)', () => {
+    it('messages 数 <= tailKeep → false (没东西可总结, D-5-1 拍板 message_count 模式)', () => {
       const big = 'x'.repeat(3200);
       const msgs: ChatMessage[] = [
         { role: 'user', content: big },
         { role: 'assistant', content: big },
       ];
-      // 2 消息, default tailKeep=4 → messages <= tailKeep
-      expect(shouldCompact(msgs, { contextWindow: 1000 })).toBe(false);
+      // D-5-3 拍板: tailMode='message_count' 显式拍 (默认 token_budget)
+      expect(shouldCompact(msgs, { contextWindow: 1000, tailMode: 'message_count', tailKeepMessages: 4 })).toBe(false);
     });
 
-    it('resolveCompactionConfig 用 defaults', () => {
+    it('resolveCompactionConfig 用 defaults (D-5-3 token_budget 默认)', () => {
       const r = resolveCompactionConfig({ contextWindow: 1000 });
       expect(r.compactRatio).toBe(COMPACTION_DEFAULTS.compactRatio);
+      expect(r.tailMode).toBe('token_budget'); // D-5-3 拍板
       expect(r.tailKeepMessages).toBe(COMPACTION_DEFAULTS.tailKeepMessages);
+      expect(r.tailKeepTokens).toBe(COMPACTION_DEFAULTS.tailKeepTokens); // D-5-3
       expect(r.threshold).toBe(800); // 1000 * 0.8
     });
   });
@@ -126,9 +129,10 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
       ];
 
       // tailKeep=2, head = 5 条, tail = 2 条, summary 替 5 条
+      // D-5-3 拍板: tailMode='message_count' 显式 (默认 token_budget 不适用此测)
       const result = await compact(
         msgs,
-        { contextWindow: 100000, tailKeepMessages: 2 },
+        { contextWindow: 100000, tailMode: 'message_count', tailKeepMessages: 2 },
         async (toSummarize) => `summarized ${toSummarize.length} messages`,
         { now: () => 1234567890 },
       );
@@ -160,13 +164,13 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
       expect(result.stats.replacedRange).toEqual([0, 5]);
     });
 
-    it('messages <= tailKeep 抛错 (caller 该先 shouldCompact 拍)', async () => {
+    it('messages <= tailKeep 抛错 (caller 该先 shouldCompact 拍, D-5-1 message_count 模式)', async () => {
       const msgs: ChatMessage[] = [
         { role: 'user', content: 'a' },
         { role: 'assistant', content: 'b' },
       ];
       await expect(
-        compact(msgs, { contextWindow: 100000, tailKeepMessages: 4 }, async () => 'x'),
+        compact(msgs, { contextWindow: 100000, tailMode: 'message_count', tailKeepMessages: 4 }, async () => 'x'),
       ).rejects.toThrow(/nothing to compact/);
     });
   });
@@ -321,6 +325,116 @@ describe('Sprint 1c-revive-2-D-5-1: Session Compaction (基础 trigger + replace
       expect(r2.pausedEvent.reason).toMatch(/auto-paused/);
       expect(r2.pausedEvent.last_error).toBe('API timeout again');
       expect(state.paused).toBe(true);
+    });
+  });
+
+  /**
+   * Sprint 1c-revive-2-D-5-3: tail token budget (Reasonix compact.go:271-289 拍板一致).
+   *
+   * 拍板: tail 边界按 token 而非 message count, 解耦 tail 大小跟消息数.
+   * 拍板默认 tailMode='token_budget' (D-5-3), D-5-1 模式 'message_count' 保留兼容.
+   *
+   * P28 拍板 (继承): 跨协议路径随机, 走软断言; 走 token 算术边界时走硬 assert.
+   */
+  describe('resolveTail + D-5-3 token_budget (拍板替代 message_count)', () => {
+    it('空 messages → tail 空, head 空, tailStart=0', () => {
+      const r = resolveTail([], { contextWindow: 1000 });
+      expect(r.tailStart).toBe(0);
+      expect(r.head).toEqual([]);
+      expect(r.tail).toEqual([]);
+    });
+
+    it("tailMode='message_count' 走 tailKeepMessages (D-5-1 拍板兼容)", () => {
+      const msgs: ChatMessage[] = Array(10).fill({ role: 'user', content: 'x' });
+      const r = resolveTail(msgs, { contextWindow: 1000, tailMode: 'message_count', tailKeepMessages: 3 });
+      expect(r.tailStart).toBe(7);
+      expect(r.head).toHaveLength(7);
+      expect(r.tail).toHaveLength(3);
+    });
+
+    it("tailMode='token_budget' (默认): tail 累计 token >= budget, 至少保 1 条", () => {
+      // 5 条消息, 每条约 5 token (短内容)
+      // budget=12 → 从末尾往前: m4 (5) + m3 (5) + m2 (5)=15 > 12 且 i<4 → break
+      // tail = m2, m3, m4 (15 tokens), head = m0, m1
+      const msgs: ChatMessage[] = [
+        { role: 'user', content: 'aaaaa' }, // m0
+        { role: 'user', content: 'bbbbb' }, // m1
+        { role: 'user', content: 'ccccc' }, // m2
+        { role: 'user', content: 'ddddd' }, // m3
+        { role: 'user', content: 'eeeee' }, // m4
+      ];
+      const r = resolveTail(msgs, { contextWindow: 1000, tailKeepTokens: 12 });
+      // tail = m2..m4 (3 条, ~15 tokens), head = m0..m1
+      expect(r.tailStart).toBe(2);
+      expect(r.head).toHaveLength(2);
+      expect(r.tail).toHaveLength(3);
+    });
+
+    it("tailMode='token_budget': 1 条超 budget → tail=1 (保底)", () => {
+      // 1 条 1000 token 消息, budget=12 → m0 1000 > 12 且 i==0(=len-1, 不 break) → tail=1
+      const huge = 'x'.repeat(4000); // 4000 chars → ~1000 tokens
+      const msgs: ChatMessage[] = [{ role: 'user', content: huge }];
+      const r = resolveTail(msgs, { contextWindow: 1000, tailKeepTokens: 12 });
+      expect(r.tailStart).toBe(0);
+      expect(r.tail).toHaveLength(1); // 保 1 条
+      expect(r.head).toEqual([]);
+    });
+
+    it("tailMode='token_budget': 所有都加进 budget 内 → tail=全部, head=空", () => {
+      const msgs: ChatMessage[] = Array(5).fill({ role: 'user', content: 'a' });
+      const r = resolveTail(msgs, { contextWindow: 1000, tailKeepTokens: 1000 });
+      expect(r.tailStart).toBe(0);
+      expect(r.head).toEqual([]);
+      expect(r.tail).toHaveLength(5);
+    });
+
+    it('shouldCompact: 默认 token_budget, 超 threshold → true (head 非空保底)', () => {
+      // 5 条 ~800 token 消息, 5*800=4000 >> threshold=800
+      // token_budget default 500, m4 800 > 500 但 i=4=len-1 保底 → tail=1 条, head=4 条 → true
+      const big = 'x'.repeat(3200); // ~800 tokens
+      const msgs: ChatMessage[] = [big, big, big, big, big].map((c) => ({ role: 'user', content: c }));
+      expect(shouldCompact(msgs, { contextWindow: 1000 })).toBe(true);
+    });
+
+    it('shouldCompact: messages 数 0 → false (没东西可 compact)', () => {
+      expect(shouldCompact([], { contextWindow: 1000 })).toBe(false);
+    });
+
+    it('shouldCompact: 5 短消息 + budget 大 → head 空 → false (新拍板, D-5-3)', () => {
+      // 5 短消息 5 tokens < threshold=800 → 已经 false
+      // 测"head 空但超 threshold": 让 budget=1000 远超 5 token 总和, head 空
+      // tokens=5 < 800 → false (threshold 拍板)
+      expect(shouldCompact(
+        Array(5).fill({ role: 'user', content: 'a' }),
+        { contextWindow: 1000, tailKeepTokens: 1000 },
+      )).toBe(false);
+    });
+
+    it('compact: token_budget 模式, 写 1 条 system summary, meta 拍 tail 拍板', async () => {
+      const big = 'x'.repeat(3200); // ~800 tokens
+      const msgs: ChatMessage[] = [big, big, big, big, big].map((c) => ({ role: 'user', content: c }));
+      // contextWindow=1000, threshold=800, 5 消息 * 800 = 4000 tokens
+      // token_budget default 500, big 800 > 500 → tail=1 条保底, head=4 条
+      const result = await compact(
+        msgs,
+        { contextWindow: 1000 }, // 默认 tailMode='token_budget', tailKeepTokens=500
+        async (toSummarize) => `summarized ${toSummarize.length} msgs`,
+        { now: () => 9999 },
+      );
+      // 4 head + 1 summary + 1 tail = 6
+      expect(result.messages).toHaveLength(6);
+      expect(result.messages[0]).toEqual(msgs[0]);
+      expect(result.messages[4].role).toBe('system');
+      expect(result.messages[5]).toEqual(msgs[4]); // tail 末条保持
+      // event
+      expect(result.event.kind).toBe('compaction');
+      if (result.event.kind !== 'compaction') throw new Error('unreachable');
+      expect(result.event.replaced_range).toEqual([0, 4]);
+      // meta 拍 tail 拍板 (D-5-3)
+      const meta = result.event.meta as Record<string, unknown>;
+      expect(meta.tail_mode).toBe('token_budget');
+      expect(meta.tail_keep_tokens).toBe(COMPACTION_DEFAULTS.tailKeepTokens);
+      expect(meta.tail_start).toBe(4);
     });
   });
 });
