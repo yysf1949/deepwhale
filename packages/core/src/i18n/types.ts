@@ -22,4 +22,6 @@ export type TranslationKey =
   | 'cli.session_load_warning'
   | 'cli.session_write_warning'
   | 'cli.tool_loop_limit'
+  | 'cli.repl_force_exit_timeout'
+  | 'cli.turn_in_flight_deny'
   | 'error.api_key_missing';

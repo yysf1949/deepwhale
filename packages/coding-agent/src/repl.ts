@@ -278,6 +278,11 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     const finish = async (code: number): Promise<void> => {
       if (exiting) return;
       exiting = true;
+      // === Sprint 1c-revive-3-D-19.6 (2026-06-05): 清 exitTimer 防止 P1 兜底 timer 泄漏 ===
+      if (exitTimer) {
+        clearTimeout(exitTimer);
+        exitTimer = null;
+      }
       process.off('SIGINT', onSigint);
       rl.close();
       if (writer) {
@@ -305,6 +310,14 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     //     时撞 V8 10000 帧限制)
     let turnInFlight = false;
     let pendingExit = false;
+    // === Sprint 1c-revive-3-D-19.6 (2026-06-05): P1 close-during-turn 30s 兜底 timer ===
+    // 拍板 (D-19.6, user review 2026-06-05 P1): close handler 走 pendingExit + finally
+    // 兜底 finish() 后, 若 in-flight turn 永远不收束 (e.g. 网络卡死/无限 retry), REPL
+    // 永远不退出. exitTimer 启动 30s 硬 timeout, 触发时 stderr warning (i18n) +
+    // 强制 finish. 变量与 pendingExit 同 scope (Q2=方案 2): REPL 单次生命周期状态,
+    // 模块级会让嵌入式/并行多 REPL 实例互相污染. 仅 turnInFlight=true 启动 (Q3=b):
+    // 没有 in-flight turn 时直接 finish, 不需要兜底.
+    let exitTimer: NodeJS.Timeout | null = null;
     const lineQueue: string[] = [];
 
     // === Sprint 1c-revive-3-D-19 (2026-06-05): P2-Ctrl+C 修法 — turn AbortController ===
@@ -501,13 +514,36 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       // 修法: close 时先 dismiss pending confirm (resolve null → tool 走 user_denied 落审计),
       // 再 abort turnAbortController 让 runAgentTurn 走 finally 收束. 顺序: dismiss 先于
       // abort, 因为 confirm resolve 后 runToolLoop 才检查 signal, 调换会丢 audit 路径.
+      // === Sprint 1c-revive-3-D-19.6 (2026-06-05): P1 close-during-turn 收束 — 不再直接 finish() ===
+      // 拍板 (D-19.6, user review 2026-06-05 P1): dismiss + abort 之后, 老 finish() 立即
+      // 关 writer, 后续 turn 内部 writer.append (user_denied / 其它 audit event) 撞
+      // 'file closed' (stderr "Unexpected error: Error: file closed").
+      // 修复: 设 pendingExit=true 让 finally 块 (L490 附近) 兜底调 finish. 如果 in-flight
+      // turn 30s 内没 finally, exitTimer 触发 stderr warning (i18n) + 强制 finish.
+      // 红线: dismiss 先于 abort (D-19.5 P2-dismiss); finally 块 if/else if/else 链
+      // pendingExit 优先 (D-19.5 P1); exitTimer 仅 turnInFlight 时启动 (Q3=b).
       if (confirmController.hasPending()) {
         confirmController.dismiss();
       }
       if (turnInFlight && !turnAbortController.signal.aborted) {
         turnAbortController.abort();
       }
-      void finish(0);
+      pendingExit = true;
+      if (turnInFlight) {
+        if (exitTimer) clearTimeout(exitTimer);
+        exitTimer = setTimeout(() => {
+          // 30s 兜底: turn 卡死时强制 finish, stderr warning 走 i18n (Q1=A).
+          // 注: t() 是位置参数, 模板用 {0}, 不是 {ms}.
+          if (exiting) return;
+          err.write(`${t('cli.repl_force_exit_timeout', 30000)}\n`);
+          void finish(0);
+        }, 30_000);
+        // unref: 不让 timer 阻止进程退出 (finish 自己会调 process.exit / resolve).
+        exitTimer.unref?.();
+      } else {
+        // turn 没在跑, 直接 finish (Q3=b 的 else 分支).
+        void finish(0);
+      }
     });
 
     const prompt = (): void => {

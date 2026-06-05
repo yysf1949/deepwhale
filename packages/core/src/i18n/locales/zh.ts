@@ -18,5 +18,7 @@ export const zh: Record<TranslationKey, string> = {
   'cli.session_load_warning': '加载会话失败：{0}',
   'cli.session_write_warning': '写入会话失败：{0}',
   'cli.tool_loop_limit': '工具循环达到最大步数（{0}）。请尝试更短的任务。',
+  'cli.repl_force_exit_timeout': 'warning: 当前 turn 未在 {0}ms 内收束, 强制退出 REPL (审计可能不完整)',
+  'cli.turn_in_flight_deny': 'turn 正在运行, 请等待完成 (内建命令已拒绝)',
   'error.api_key_missing': '未设置 DEEPSEEK_API_KEY，请在 ~/.deepwhale/config.toml 配置',
 };

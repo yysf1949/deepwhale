@@ -18,5 +18,7 @@ export const en: Record<TranslationKey, string> = {
   'cli.session_load_warning': 'Could not load session: {0}',
   'cli.session_write_warning': 'Could not write session event: {0}',
   'cli.tool_loop_limit': 'Tool loop hit max steps ({0}). Try a shorter task.',
+  'cli.repl_force_exit_timeout': 'warning: in-flight turn did not finish within {0}ms, forcing REPL exit (audit may be incomplete)',
+  'cli.turn_in_flight_deny': 'turn running, wait for finish (built-in command deferred)',
   'error.api_key_missing': 'DEEPSEEK_API_KEY is not set. Please set it in ~/.deepwhale/config.toml',
 };
