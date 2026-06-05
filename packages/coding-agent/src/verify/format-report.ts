@@ -25,6 +25,9 @@ const STATUS_ICON: Readonly<Record<VerifyCheckStatus, string>> = {
   failed: '✗',
   'timed-out': '⏱',
   'spawn-error': '⚠',
+  // Sprint 1c-revive-2-D-11-4 review P2 修复: 新增 'aborted' 状态. 跟 spawn-error
+  // 视觉区分 (⚠ vs ⛔) 让 reviewer 一眼看到"被外部 signal 干掉" vs "spawn 失败".
+  aborted: '⛔',
 };
 
 /**

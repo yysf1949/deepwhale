@@ -63,7 +63,7 @@
 import { describe, expect, it } from 'vitest';
 import { AnthropicClient, type ChatChunk, type ChatMessage } from '@deepwhale/llm';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
-import { anyProviderSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
+import { deepseekAnthropicShimSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04): 占位符过滤 + 走 it.runIf + 统一 skip reason ----
 
@@ -143,7 +143,12 @@ function dumpSnapshot(label: string, snap: StreamSnapshot): void {
 // ---- 主测试: stream path 端到端 跨 Anthropic 协议 ----
 
 describe('coding-agent client — 1c-revive-2-D-1 AnthropicClient stream path 真接 + 跨 Anthropic 协议 (1c-revive 拆分)', () => {
-  const fileSkipReason = anyProviderSkipReason();
+  // D-11-4 review P1 修复 (2026-06-04): 改 helper deepseekAnthropicShimSkipReason()
+  // 模式. 之前 anyProviderSkipReason() 允许 ANTHROPIC_AUTH_TOKEN 存在就跑, 但
+  // AnthropicClient 默认 baseURL = DEEPSEEK_ANTHROPIC_BASE_URL, 走的是 DeepSeek 提供的
+  // /anthropic 端点, 认证用 DEEPSEEK_API_KEY. 用户只有 ANTHROPIC_AUTH_TOKEN 时会撞 401.
+  // 跟 multi-tool-calls-2d4 / schema-validation-2d3 模式一致.
+  const fileSkipReason = deepseekAnthropicShimSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

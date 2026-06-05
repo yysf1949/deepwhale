@@ -87,7 +87,7 @@ import { describe, expect, it } from 'vitest';
 import { AnthropicClient, type ChatMessage } from '@deepwhale/llm';
 import { runToolLoop, ToolLoopLimitError, type ToolLoopStep } from '../../src/agent/tool-loop.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
-import { anyProviderSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
+import { deepseekAnthropicShimSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04) ----
 
@@ -119,7 +119,9 @@ function dumpErrorPath(label: string, steps: ReadonlyArray<ToolLoopStep>): void 
 // ---- 主测试: error path 3 子场景 + 跨 Anthropic 协议 ----
 
 describe('coding-agent mode layer — 1c-revive-2-D-2 错误恢复 3 子场景 + 跨 Anthropic 协议 (Sprint 1+ 扩展第 2 步)', () => {
-  const fileSkipReason = anyProviderSkipReason();
+  // D-11-4 review P1 修复 (2026-06-04): 改 helper deepseekAnthropicShimSkipReason()
+  // 模式. 跟 anthropic-stream-2d1 一致, 详 D-10c 拍板文档.
+  const fileSkipReason = deepseekAnthropicShimSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop

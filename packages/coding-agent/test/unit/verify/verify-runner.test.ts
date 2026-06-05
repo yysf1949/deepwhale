@@ -208,14 +208,18 @@ describe('verify-runner (D-11 2026-06-04)', () => {
   });
 
   describe('外部 AbortSignal', () => {
-    it('signal 触发前跑完的 step 不受影响, 后续 step 标 spawn-error aborted', async () => {
+    // D-11-4 review P2 修复: signal 触发时 kill 当前 child (SIGTERM → 1s grace →
+    // SIGKILL), 返回 status='aborted'. 旧测试只断言 "s3 没跑 + 标 spawn-error",
+    // 那是"signal 只影响下一 step" 的旧拍板. 修复后 s2 自己被 kill, s2 status = 'aborted',
+    // fail-fast break, s3 不会 push 进 results.
+    it('signal 触发时 kill 当前 child, status=aborted, fail-fast break 后 s3 不进 results', async () => {
       const ac = new AbortController();
       const reportPromise = runVerify({
         cwd: workDir,
         signal: ac.signal,
         checks: [
           nodeCheck('s1', '', { stdout: 'ok' }),
-          nodeCheck('s2', '', { delayMs: 200 }), // 这个 200ms, 中途 abort
+          nodeCheck('s2', '', { delayMs: 200 }), // 200ms delay, 50ms 时 abort → 应被 kill
           nodeCheck('s3', '', { stdout: 'should-not-run' }),
         ],
       });
@@ -226,13 +230,14 @@ describe('verify-runner (D-11 2026-06-04)', () => {
       expect(report.overallStatus).toBe('failed');
       // s1 跑完 (50ms 内, delay 0)
       expect(report.checks[0]!.status).toBe('passed');
-      // s2 还在跑, 被 signal 触发的内部逻辑也只影响**下**一 step
-      // 实际: s2 自己跑完 (200ms 后), 跟 abort 关系是 race condition
-      // 拍板: 我们只断言 s3 没跑 (status='spawn-error', errorMessage 含 'aborted')
+      // s2 还在跑被 signal 干掉: status='aborted', errorMessage 含 'aborted'
+      const s2 = report.checks.find((c) => c.name === 's2');
+      expect(s2).toBeDefined();
+      expect(s2!.status).toBe('aborted');
+      expect(s2!.errorMessage).toMatch(/aborted/);
+      // s3 fail-fast break 后**不**进 results
       const s3 = report.checks.find((c) => c.name === 's3');
-      expect(s3).toBeDefined();
-      expect(s3!.status).toBe('spawn-error');
-      expect(s3!.errorMessage).toMatch(/aborted/);
+      expect(s3).toBeUndefined();
     });
   });
 

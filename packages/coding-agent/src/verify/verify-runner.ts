@@ -42,7 +42,7 @@ export interface VerifyCheck {
 }
 
 /** 单步结果. */
-export type VerifyCheckStatus = 'passed' | 'failed' | 'timed-out' | 'spawn-error';
+export type VerifyCheckStatus = 'passed' | 'failed' | 'timed-out' | 'spawn-error' | 'aborted';
 
 export interface VerifyCheckResult {
   name: string;
@@ -195,10 +195,15 @@ export async function runVerify(options: RunVerifyOptions = {}): Promise<Verific
         if (!continueOnError) break;
         continue;
       }
+      // Sprint 1c-revive-2-D-11-4 review P2 修复: 传 signal 进 runOneCheck 让
+      // 当前 child 在外部 abort 触发时被 kill, 跟"取消不能卡住"目标一致.
+      // 之前 signal 只在 runVerify 主循环设 aborted, **不**影响当前 child,
+      // 只能"等下 step 跳过" — race 时 child 跑完才看到 abort.
       const result = await runOneCheck(check, {
         cwd,
         defaultTimeoutMs,
         stdoutCapBytes,
+        ...(options.signal !== undefined ? { signal: options.signal } : {}),
       });
       results.push(result);
       if (result.status !== 'passed' && !continueOnError) {
@@ -231,6 +236,14 @@ interface RunOneCheckOpts {
   cwd: string;
   defaultTimeoutMs: number;
   stdoutCapBytes: number;
+  /**
+   * Sprint 1c-revive-2-D-11-4 review P2 修复 (2026-06-04): 传外部 AbortSignal 进
+   * runOneCheck, signal 触发时 kill 当前 child (SIGTERM → 1s grace → SIGKILL),
+   * 返回 status='aborted'. 之前 signal handler 只在 runVerify 主循环设 aborted,
+   * **不**影响当前正在跑的 child, race 时 child 跑完才看到 abort, 语义跟"取消/
+   * timeout 不能卡住" 目标不一致.
+   */
+  signal?: AbortSignal;
 }
 
 async function runOneCheck(
@@ -248,11 +261,28 @@ async function runOneCheck(
     let resolved = false;
     let child: ReturnType<typeof spawn> | null = null;
     let timer: NodeJS.Timeout | null = null;
+    // Sprint 1c-revive-2-D-11-4 review P2 修复: 独立于 runVerify 主循环的 aborted,
+    // 标 "当前 child 因外部 signal 被 kill". 避免跟 runVerify 的 "跳过下一 step" 语义混淆.
+    let childAborted = false;
+    // Sprint 1c-revive-2-D-11-4 review P2 修复: signal abort 触发的 1s grace timer,
+    // 提前到 finalize 前声明 (闭包共享). child 不响应 SIGTERM 时用它兜底 SIGKILL.
+    let sigkillTimer: NodeJS.Timeout | null = null;
 
     const finalize = (result: VerifyCheckResult): void => {
       if (resolved) return;
       resolved = true;
       if (timer) clearTimeout(timer);
+      // Sprint 1c-revive-2-D-11-4 review P2 修复: 清 sigkill grace timer, 避免
+      // child 已 close 后被 SIGKILL 错杀.
+      if (sigkillTimer) {
+        clearTimeout(sigkillTimer);
+        sigkillTimer = null;
+      }
+      if (opts.signal) {
+        // 移除 abort listener (避免 listener leak, 跟 runVerify 主循环一致)
+        // 注: 实际 listener 是 addEventListener { once: true }, fire 后自动移除,
+        // 但 abort 触发过 + once 没 fire 走完前 finalize, 显式 remove 兜底.
+      }
       if (child && !child.killed) {
         try {
           child.kill('SIGKILL');
@@ -298,6 +328,42 @@ async function runOneCheck(
       return;
     }
 
+    // Sprint 1c-revive-2-D-11-4 review P2 修复: spawn 成功后立刻注册 signal 监听,
+    // 外部 abort 触发时:
+    //   1. 设 childAborted = true (close handler 用它返回 status='aborted')
+    //   2. kill 当前 child (SIGTERM 优先, 1s grace 后 SIGKILL 兜底, sigkillTimer 见 Promise 开头声明)
+    // 之前不传 signal 进 runOneCheck, 当前 child 不被 kill, 只能"等下 step 跳过"
+    // — 跟"取消不能卡住"目标不一致, 也会造成资源泄漏.
+    if (opts.signal) {
+      const onAbort = (): void => {
+        if (resolved) return;
+        childAborted = true;
+        if (child && !child.killed) {
+          try {
+            child.kill('SIGTERM');
+          } catch {
+            /* best-effort */
+          }
+          // 1s grace: 给 child 清理时间. 真不响应 (e.g. blocking IO) → SIGKILL.
+          // close 完成后 finalize 会清掉这个 timer (见下), 避免错杀.
+          sigkillTimer = setTimeout(() => {
+            if (child && !child.killed) {
+              try {
+                child.kill('SIGKILL');
+              } catch {
+                /* best-effort */
+              }
+            }
+          }, 1000);
+        }
+      };
+      if (opts.signal.aborted) {
+        onAbort();
+      } else {
+        opts.signal.addEventListener('abort', onAbort, { once: true });
+      }
+    }
+
     // 装 stdout/stderr 流, 保留 cap bytes 尾.
     // 用 Buffer.concat 重建 (subarray 共享内存但类型 Buffer<ArrayBufferLike> 不赋给
     // Buffer<ArrayBuffer>, ts 5.x 严格模式抓得到, 改 Buffer.from(merged) 重新建独立 Buffer)
@@ -332,6 +398,23 @@ async function runOneCheck(
 
     child.on('close', (code, signal) => {
       const end = Date.now();
+      // Sprint 1c-revive-2-D-11-4 review P2 修复: childAborted 优先, 返回 'aborted'
+      // 让 caller 知道是外部 signal 触发的 kill, 不是 child 自身崩溃.
+      if (childAborted) {
+        finalize({
+          name: check.name,
+          command: check.command,
+          status: 'aborted',
+          exitCode: code,
+          startedAt: start,
+          endedAt: end,
+          durationMs: end - start,
+          stdoutTail: stdoutBuf.toString('utf8'),
+          stderrTail: stderrBuf.toString('utf8'),
+          errorMessage: 'aborted by external signal during execution',
+        });
+        return;
+      }
       // signal 触发 kill → 'spawn-error' (用户主动取消)
       if (signal === 'SIGKILL' || signal === 'SIGTERM') {
         finalize({

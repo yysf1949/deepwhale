@@ -90,7 +90,7 @@ import {
   persistToolLoopSteps,
 } from '../../src/agent/session-adapter.js';
 import { SessionReader, SessionWriter } from '@deepwhale/core';
-import { anyProviderSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
+import { deepseekAnthropicShimSkipReason } from '../../../llm/test/integration/_helpers/integration-gate.js';
 
 // ---- 红线门 (helper 化, D-9 2026-06-04) ----
 
@@ -239,7 +239,10 @@ function dumpSteps(
 // ---- 主测试: 跨包 session module 集成 + 跨 Anthropic 协议 ----
 
 describe('coding-agent mode layer — 1c-revive-2-C+3 跨包 session module 集成 + 跨 Anthropic 协议 (1c-revive 拆分完毕, 1 commit)', () => {
-  const fileSkipReason = anyProviderSkipReason();
+  // D-11-4 review P1 修复 (2026-06-04): 改 helper deepseekAnthropicShimSkipReason()
+  // 模式. 跟 anthropic-stream-2d1 / error-recovery-2d2 / runToolLoop-2turn-anthropic
+  // 一致, 详 D-10c 拍板文档.
+  const fileSkipReason = deepseekAnthropicShimSkipReason();
   if (fileSkipReason !== undefined) {
     it.skip(`SKIPPED: ${fileSkipReason}`, () => {
       // noop
