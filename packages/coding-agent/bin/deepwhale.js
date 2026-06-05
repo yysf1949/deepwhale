@@ -33,6 +33,7 @@ loadProjectEnv();
 import { startRepl } from '../dist/index.js';
 import { runPrintMode } from '../dist/modes/print.js';
 import { runRpcMode } from '../dist/modes/rpc.js';
+import { runTuiMode } from '../dist/modes/tui.js';
 import { runVerify } from '../dist/verify/index.js';
 import { buildSummaryAndNext, formatReport } from '../dist/verify/index.js';
 // Sprint 1c-revive-4-D-20.1 (2026-06-05): 友好错误处理.
@@ -82,6 +83,14 @@ function parseArgs(argv) {
     }
     if (a === '--rpc') {
       args.mode = 'rpc';
+      i += 1;
+      continue;
+    }
+    // Sprint 1c-revive-4-D-20.3 (2026-06-05): TUI mode (D-20.3 P0-B)
+    // `deepwhale tui` 启动 minimal ANSI TUI. 必须出现在 -p/--prompt 检查之前,
+    // 否则 'tui' 会被当 print mode 的 prompt (D-15 拍板: 非 '-' 开头的 argv 走 print).
+    if (a === 'tui') {
+      args.mode = 'tui';
       i += 1;
       continue;
     }
@@ -230,6 +239,15 @@ async function main() {
         ...(args.provider !== undefined ? { provider: args.provider } : {}),
         ...(args.model !== undefined ? { model: args.model } : {}),
         ...(args.yes ? { yes: true } : {}),
+        maxSteps: args.maxSteps,
+      });
+    case 'tui':
+      return runTuiMode({
+        ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
+        ...(args.provider !== undefined ? { provider: args.provider } : {}),
+        ...(args.model !== undefined ? { model: args.model } : {}),
+        ...(args.yes ? { yes: true } : {}),
+        enableToolLoop: args.enableToolLoop,
         maxSteps: args.maxSteps,
       });
     case 'verify': // Sprint 1c-revive-2-D-11-4: 走 runVerify (4 步 default), formatReport 印到 stdout.

@@ -11,3 +11,4 @@
 
 export { runPrintMode } from './print.js';
 export { runRpcMode } from './rpc.js';
+export { runTuiMode } from './tui.js';
