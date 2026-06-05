@@ -53,11 +53,22 @@ export function resolveSandboxRunnerFromEnv(
       );
     }
     const network: 'none' | 'bridge' = networkEnv === 'bridge' ? 'bridge' : 'none';
+    // Sprint 1c-revive-4-D-20.1 P0-F (2026-06-05): 容器资源限制 (拍板: memory=512m /
+    // cpus=1.0 / pids-limit=256). 防止 Docker 容器 fork 炸弹 / OOM 把宿主打挂.
+    // env 解析走跟 NETWORK 同形态, 空字符串 = unset (走 DockerSandboxRunner 内部 default).
+    // 格式校验: docker CLI 接受 '512m'/'1g' 等字符串, 解析失败 docker 自己会 stderr
+    // 出来, 走 result.warning. 0 强校验降低复杂度, 接受"用户传错格式 → docker 报错"风险.
+    const memoryEnv = env['DEEPWHALE_DOCKER_MEMORY'];
+    const cpusEnv = env['DEEPWHALE_DOCKER_CPUS'];
+    const pidsLimitEnv = env['DEEPWHALE_DOCKER_PIDS_LIMIT'];
     return new DockerSandboxRunner({
       sandboxRoot: config.sandboxRoot,
       image,
       network,
       defaultTimeoutMs: DOCKER_DEFAULT_TIMEOUT_MS,
+      ...(memoryEnv !== undefined && memoryEnv !== '' ? { memory: memoryEnv } : {}),
+      ...(cpusEnv !== undefined && cpusEnv !== '' ? { cpus: cpusEnv } : {}),
+      ...(pidsLimitEnv !== undefined && pidsLimitEnv !== '' ? { pidsLimit: pidsLimitEnv } : {}),
     });
   }
   // 未知值 — fail-closed. 抛出的 message 拼齐提示, 入口能直接 stderr 打印给用户.

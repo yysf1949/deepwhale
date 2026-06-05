@@ -31,6 +31,7 @@ import {
   DockerSandboxRunner,
   DOCKER_DEFAULT_TIMEOUT_MS,
 } from '../../src/sandbox/docker-runner.js';
+import { resolveSandboxRunnerFromEnv } from '../../src/sandbox/env-gate.js';
 
 
 // 共享 mock child 引用
@@ -99,11 +100,22 @@ vi.mock('node:child_process', async (importOriginal) => {
 
 const SANDBOX_ROOT = '/tmp/sbx-test';
 
-function makeRunner(overrides: Partial<{ image: string; network: 'none' | 'bridge' }> = {}) {
+function makeRunner(
+  overrides: Partial<{
+    image: string;
+    network: 'none' | 'bridge';
+    memory: string;
+    cpus: string;
+    pidsLimit: string;
+  }> = {},
+) {
   return new DockerSandboxRunner({
     sandboxRoot: SANDBOX_ROOT,
     ...(overrides.image !== undefined ? { image: overrides.image } : {}),
     ...(overrides.network !== undefined ? { network: overrides.network } : {}),
+    ...(overrides.memory !== undefined ? { memory: overrides.memory } : {}),
+    ...(overrides.cpus !== undefined ? { cpus: overrides.cpus } : {}),
+    ...(overrides.pidsLimit !== undefined ? { pidsLimit: overrides.pidsLimit } : {}),
   });
 }
 
@@ -290,6 +302,130 @@ describe('DockerSandboxRunner', () => {
       expect(tail[1]).toBe('node');
       expect(tail[2]).toBe('-e');
       expect(tail[3]).toBe('process.stdout.write("hi")');
+    });
+  });
+
+  describe('D-20.1 P0-F: 资源限制', () => {
+    // 拍板默认值: memory=512m / cpus=1.0 / pids-limit=256.
+    // 跟 Docker CLI 标准格式: --memory / --cpus / --pids-limit 字符串.
+    it('默认: --memory=512m / --cpus=1.0 / --pids-limit=256', () => {
+      const runner = makeRunner();
+      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+        command: 'ls',
+        args: [],
+        cwd: '/tmp/sbx-test',
+        timeoutMs: 1_000,
+        stdoutCapBytes: 1024,
+      });
+      expect(args).toContain('--memory');
+      expect(args[args.indexOf('--memory') + 1]).toBe('512m');
+      expect(args).toContain('--cpus');
+      expect(args[args.indexOf('--cpus') + 1]).toBe('1.0');
+      expect(args).toContain('--pids-limit');
+      expect(args[args.indexOf('--pids-limit') + 1]).toBe('256');
+    });
+
+    it('构造参数覆盖 memory=1g → buildDockerArgs 用 1g', () => {
+      const runner = makeRunner({ memory: '1g' });
+      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+        command: 'ls',
+        args: [],
+        cwd: '/tmp/sbx-test',
+        timeoutMs: 1_000,
+        stdoutCapBytes: 1024,
+      });
+      expect(args[args.indexOf('--memory') + 1]).toBe('1g');
+      // 其他限制保持默认
+      expect(args[args.indexOf('--cpus') + 1]).toBe('1.0');
+      expect(args[args.indexOf('--pids-limit') + 1]).toBe('256');
+    });
+
+    it('构造参数覆盖 cpus=0.5 → buildDockerArgs 用 0.5', () => {
+      const runner = makeRunner({ cpus: '0.5' });
+      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+        command: 'ls',
+        args: [],
+        cwd: '/tmp/sbx-test',
+        timeoutMs: 1_000,
+        stdoutCapBytes: 1024,
+      });
+      expect(args[args.indexOf('--cpus') + 1]).toBe('0.5');
+    });
+
+    it('构造参数覆盖 pidsLimit=1024 → buildDockerArgs 用 1024', () => {
+      const runner = makeRunner({ pidsLimit: '1024' });
+      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+        command: 'ls',
+        args: [],
+        cwd: '/tmp/sbx-test',
+        timeoutMs: 1_000,
+        stdoutCapBytes: 1024,
+      });
+      expect(args[args.indexOf('--pids-limit') + 1]).toBe('1024');
+    });
+
+    it('env override: DEEPWHALE_DOCKER_MEMORY=2g + docker 模式 → buildDockerArgs 用 2g', () => {
+      // 走 env-gate 解析, 验证 env → constructor option → buildDockerArgs 端到端
+      const r = resolveSandboxRunnerFromEnv(
+        { sandboxRoot: '/tmp/x' },
+        {
+          DEEPWHALE_SANDBOX: 'docker',
+          DEEPWHALE_DOCKER_MEMORY: '2g',
+          DEEPWHALE_DOCKER_CPUS: '2.0',
+          DEEPWHALE_DOCKER_PIDS_LIMIT: '512',
+        },
+      ) as DockerSandboxRunner;
+      const args = r.buildDockerArgs('sbx-x', '/tmp/x', {
+        command: 'ls',
+        args: [],
+        cwd: '/tmp/x',
+        timeoutMs: 1_000,
+        stdoutCapBytes: 1024,
+      });
+      expect(args[args.indexOf('--memory') + 1]).toBe('2g');
+      expect(args[args.indexOf('--cpus') + 1]).toBe('2.0');
+      expect(args[args.indexOf('--pids-limit') + 1]).toBe('512');
+    });
+
+    it('env override: 空字符串 + docker 模式 → 走 runner 默认 (512m/1.0/256)', () => {
+      // 跟 NETWORK 空字符串同形态: '' 跟 unset 等义, 走内部 default
+      const r = resolveSandboxRunnerFromEnv(
+        { sandboxRoot: '/tmp/x' },
+        {
+          DEEPWHALE_SANDBOX: 'docker',
+          DEEPWHALE_DOCKER_MEMORY: '',
+          DEEPWHALE_DOCKER_CPUS: '',
+          DEEPWHALE_DOCKER_PIDS_LIMIT: '',
+        },
+      ) as DockerSandboxRunner;
+      const args = r.buildDockerArgs('sbx-x', '/tmp/x', {
+        command: 'ls',
+        args: [],
+        cwd: '/tmp/x',
+        timeoutMs: 1_000,
+        stdoutCapBytes: 1024,
+      });
+      expect(args[args.indexOf('--memory') + 1]).toBe('512m');
+      expect(args[args.indexOf('--cpus') + 1]).toBe('1.0');
+      expect(args[args.indexOf('--pids-limit') + 1]).toBe('256');
+    });
+
+    it('红线: buildDockerArgs 不传 DEEPSEEK_API_KEY / ANTHROPIC_AUTH_TOKEN (跟 D-12 拍板一致)', () => {
+      // 资源限制是新增字段, 不能意外让 API key 漏出.
+      const runner = makeRunner();
+      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+        command: 'ls',
+        args: [],
+        cwd: '/tmp/sbx-test',
+        timeoutMs: 1_000,
+        stdoutCapBytes: 1024,
+      });
+      const joined = args.join(' ');
+      expect(joined).not.toContain('DEEPSEEK_API_KEY');
+      expect(joined).not.toContain('ANTHROPIC_AUTH_TOKEN');
+      expect(joined).not.toContain('DEEPWHALE_SESSION_KEY');
+      // 容器 args 没有 --env-file (API key 泄露通道之一)
+      expect(joined).not.toContain('--env-file');
     });
   });
 

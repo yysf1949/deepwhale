@@ -43,6 +43,12 @@ const DEFAULT_STDOUT_CAP = 4 * 1024;
 /** 10MB hard ceiling, 跟 LocalSandboxRunner 一致. */
 const _MAX_BUFFER_UNUSED = 10 * 1024 * 1024;
 
+// Sprint 1c-revive-4-D-20.1 P0-F (2026-06-05): 容器资源限制默认值 (拍板红线).
+// 防止 fork 炸弹 / OOM / CPU 100% 把宿主打挂. env override 走 env-gate.
+const DEFAULT_MEMORY = '512m';
+const DEFAULT_CPUS = '1.0';
+const DEFAULT_PIDS_LIMIT = '256';
+
 /**
  * Sprint 1c-revive-3-D-12 review 修复 (2026-06-05, 基于 9348650 review).
  *
@@ -121,6 +127,24 @@ export interface DockerSandboxOptions {
   readonly network?: 'none' | 'bridge';
   /** 默认 60_000. clamp 上限 10 分钟. */
   readonly defaultTimeoutMs?: number;
+  /**
+   * Sprint 1c-revive-4-D-20.1 P0-F (2026-06-05): 容器内存硬上限.
+   * 默认 '512m' (拍板: 防 OOM 把宿主打挂). docker CLI 接受字符串 ('512m'/'1g'/'2048m' 等).
+   * env override: DEEPWHALE_DOCKER_MEMORY. 解析失败 docker 自身会 stderr, 走 result.warning.
+   */
+  readonly memory?: string;
+  /**
+   * Sprint 1c-revive-4-D-20.1 P0-F: 容器 CPU 配额.
+   * 默认 '1.0' (1 核). docker 接受小数 ('0.5' / '2.0' / 等).
+   * env override: DEEPWHALE_DOCKER_CPUS.
+   */
+  readonly cpus?: string;
+  /**
+   * Sprint 1c-revive-4-D-20.1 P0-F: 容器进程数硬上限.
+   * 默认 '256' (防 fork 炸弹). docker 接受整数字符串.
+   * env override: DEEPWHALE_DOCKER_PIDS_LIMIT.
+   */
+  readonly pidsLimit?: string;
 }
 
 /**
@@ -143,6 +167,10 @@ export class DockerSandboxRunner implements SandboxRunner {
   private readonly sandboxRoot: string;
   private readonly network: 'none' | 'bridge';
   private readonly defaultTimeoutMs: number;
+  /** Sprint 1c-revive-4-D-20.1 P0-F: 资源限制字段. env override 走 env-gate. */
+  private readonly memory: string;
+  private readonly cpus: string;
+  private readonly pidsLimit: string;
   /**
    * Sprint 1c-revive-3-D-12 review P2 修复 (2026-06-05): 每个 runner 实例
    * 唯一 runId. 容器打两个 label: `deepwhale.sandbox=true` (粗筛) +
@@ -156,6 +184,9 @@ export class DockerSandboxRunner implements SandboxRunner {
     this.sandboxRoot = opts.sandboxRoot;
     this.network = opts.network ?? 'none';
     this.defaultTimeoutMs = opts.defaultTimeoutMs ?? DOCKER_DEFAULT_TIMEOUT_MS;
+    this.memory = opts.memory ?? DEFAULT_MEMORY;
+    this.cpus = opts.cpus ?? DEFAULT_CPUS;
+    this.pidsLimit = opts.pidsLimit ?? DEFAULT_PIDS_LIMIT;
     this.runId = randomUUID().slice(0, 8);
   }
 
@@ -325,6 +356,14 @@ export class DockerSandboxRunner implements SandboxRunner {
       'no-new-privileges', // 防 setuid 提权
       '--network',
       this.network, // 默认 none 禁网
+      // Sprint 1c-revive-4-D-20.1 P0-F: 资源限制, 防 fork 炸弹 / OOM / CPU 100%
+      // 拍板默认值: memory=512m / cpus=1.0 / pids-limit=256, env override 走 env-gate.
+      '--memory',
+      this.memory,
+      '--cpus',
+      this.cpus,
+      '--pids-limit',
+      this.pidsLimit,
       '-v',
       `${workspaceAbs}:${CONTAINER_WORKDIR}:rw`, // 显式 workspace bind mount
       '-w',
