@@ -43,7 +43,15 @@ export function resolveSandboxRunnerFromEnv(
   }
   if (raw === 'docker') {
     const image = env['DEEPWHALE_DOCKER_IMAGE'] ?? 'node:22-alpine';
-    const networkEnv = env['DEEPWHALE_DOCKER_NETWORK'] ?? 'none';
+    // Sprint 1c-revive-4-D-20.1 (2026-06-05) review-fix: 跟 DEEPWHALE_SANDBOX 一致
+    // fail-closed, 不静默 fallback. 之前 raw !== 'bridge' 静默 → 'none', 拼错
+    // 'bridgee' 之类会"以防网跑" (跟用户本意"放行"相反, 安全红线).
+    const networkEnv = env['DEEPWHALE_DOCKER_NETWORK'];
+    if (networkEnv !== undefined && networkEnv !== '' && networkEnv !== 'none' && networkEnv !== 'bridge') {
+      throw new Error(
+        `invalid DEEPWHALE_DOCKER_NETWORK=${JSON.stringify(networkEnv)}, expected unset|none|bridge`,
+      );
+    }
     const network: 'none' | 'bridge' = networkEnv === 'bridge' ? 'bridge' : 'none';
     return new DockerSandboxRunner({
       sandboxRoot: config.sandboxRoot,

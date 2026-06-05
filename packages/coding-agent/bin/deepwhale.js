@@ -35,6 +35,11 @@ import { runPrintMode } from '../dist/modes/print.js';
 import { runRpcMode } from '../dist/modes/rpc.js';
 import { runVerify } from '../dist/verify/index.js';
 import { buildSummaryAndNext, formatReport } from '../dist/verify/index.js';
+// Sprint 1c-revive-4-D-20.1 (2026-06-05): 友好错误处理.
+//  - APIKeyMissingError: REPL/print/rpc/tui 缺 key 时 → 印 setup hint + exit 2.
+//  - "invalid DEEPWHALE_SANDBOX=..." / "invalid DEEPWHALE_DOCKER_NETWORK=...":
+//    env-gate throw, CLI 入口接住转 stderr + exit 2.
+import { APIKeyMissingError } from '@deepwhale/llm';
 
 /**
  * @typedef {Object} CliArgs
@@ -153,6 +158,7 @@ Usage:
   deepwhale -p "<prompt>"           Print mode: single-shot chat + tool loop
   deepwhale --verify                Verify mode: run build/lint/typecheck/test, no LLM
   deepwhale --rpc                   RPC mode: NDJSON over stdio (Sprint 1a stub)
+  deepwhale tui                     TUI mode: minimal ANSI TUI (D-20.3, ships in v1.0)
 
 Options:
   --session <path>    Persist session to JSONL file
@@ -170,9 +176,19 @@ Environment:
   ANTHROPIC_AUTH_TOKEN    Required for anthropic (or --provider). May also be
                           DEEPWHALE_SESSION_KEY for session-at-rest encryption.
   DEEPWHALE_LANG          Optional. 'en' (default) or 'zh-CN'.
+  DEEPWHALE_SANDBOX       Optional. 'local' (default) or 'docker'.
+  DEEPWHALE_DOCKER_IMAGE  Optional. default 'node:22-alpine'.
+  DEEPWHALE_DOCKER_NETWORK  Optional. unset|'none' (default) or 'bridge'.
+                            D-20.1: invalid value → fail-closed (exit 2).
 
 Built-in REPL commands:
   /help, /verify, /exit, exit, quit
+
+Setup hint:
+  If you see "API key not set" on first run:
+    1. Set DEEPSEEK_API_KEY=<your-key>  (or ANTHROPIC_AUTH_TOKEN=...)
+    2. Or place it in ./.env (project root, see .env.example)
+    3. --verify does not require any key (build/lint/typecheck/test only)
 `;
 
 /**
@@ -238,6 +254,27 @@ async function main() {
 main().then(
   (code) => process.exit(code),
   (err) => {
+    // Sprint 1c-revive-4-D-20.1 (2026-06-05) review-fix: 友好错误处理, 退出码 2 (跟参数错一致).
+    //  - APIKeyMissingError: REPL/print/rpc/tui 缺 key → 印 setup hint
+    //  - env-gate 抛 'invalid DEEPWHALE_SANDBOX=...' / 'invalid DEEPWHALE_DOCKER_NETWORK=...'
+    //    → 直接 stderr 打印 (message 拼齐了 hint), exit 2
+    if (err instanceof APIKeyMissingError) {
+      process.stderr.write(
+        'Error: API key not set. deepwhale needs DEEPSEEK_API_KEY (or ANTHROPIC_AUTH_TOKEN),\n' +
+          '       or pass --provider. See --help for full setup.\n' +
+          '       Hint: --verify runs build/lint/typecheck/test and does NOT need a key.\n' +
+          `       Underlying: ${err.message}\n`,
+      );
+      process.exit(2);
+    }
+    if (err instanceof Error && /^invalid DEEPWHALE_SANDBOX=/.test(err.message)) {
+      process.stderr.write(`Error: ${err.message}\n`);
+      process.exit(2);
+    }
+    if (err instanceof Error && /^invalid DEEPWHALE_DOCKER_NETWORK=/.test(err.message)) {
+      process.stderr.write(`Error: ${err.message}\n`);
+      process.exit(2);
+    }
     process.stderr.write(`FATAL: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);
   },

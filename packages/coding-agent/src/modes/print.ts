@@ -18,7 +18,7 @@
  */
 
 import process from 'node:process';
-import { type ChatMessage, type LLMClient } from '@deepwhale/llm';
+import { type ChatMessage, type LLMClient, APIKeyMissingError } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent, type SummarizeFn } from '@deepwhale/core';
 import {
   isToolLoopError,
@@ -202,6 +202,16 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
     } catch (e) {
       if (isToolLoopError(e)) {
         process.stderr.write(`\nerror: tool loop hit max steps (${e.steps})\n`);
+      } else if (e instanceof APIKeyMissingError) {
+        // Sprint 1c-revive-4-D-20.1 (2026-06-05) review-fix: print mode 缺 key
+        // 给 setup hint + 退出码 2 (跟参数错一致), 跟 CLI main().catch 拍板一致.
+        process.stderr.write(
+          'Error: API key not set. deepwhale needs DEEPSEEK_API_KEY (or ANTHROPIC_AUTH_TOKEN),\n' +
+            '       or pass --provider. See --help for full setup.\n' +
+            '       Hint: --verify runs build/lint/typecheck/test and does NOT need a key.\n' +
+            `       Underlying: ${e.message}\n`,
+        );
+        return 2;
       } else {
         process.stderr.write(`\nerror: ${e instanceof Error ? e.message : String(e)}\n`);
       }

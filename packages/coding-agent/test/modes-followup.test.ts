@@ -235,6 +235,42 @@ describe('runPrintMode — Sprint 1a follow-up', () => {
       stdoutSpy.mockRestore();
     }
   });
+
+  it('D-20.1: APIKeyMissingError → 印 setup hint + exit 2 (跟参数错一致)', async () => {
+    // Sprint 1c-revive-4-D-20.1 (2026-06-05) review-fix: print mode 缺 key 不再走
+    // 通用 "error: ...", 给 setup hint + 退出码 2. 跟 bin/deepwhale.js main().catch
+    // 拍板一致 (caller 在 2 个地方看到的错都同源).
+    // mock client: chat() 抛 APIKeyMissingError (跟 createDefaultClient 真实失败同形态)
+    const { APIKeyMissingError } = await import('@deepwhale/llm');
+    const failClient: LLMClient = {
+      model: 'mock' as ModelId,
+      chat: vi.fn(async (): Promise<ChatResult> => {
+        throw new APIKeyMissingError('mock: no key');
+      }),
+      stream: vi.fn(async (): Promise<ChatResult> => {
+        throw new APIKeyMissingError('mock: no key');
+      }),
+    };
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
+      stderrChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+      return true;
+    });
+    try {
+      const code = await runPrintMode({ prompt: 'hello', client: failClient, enableToolLoop: true });
+      // 退出码必须是 2 (跟参数错一致), 不是 1
+      expect(code).toBe(2);
+      const all = stderrChunks.join('');
+      // 必须给 setup hint (不能只是 echo 原始 err.message)
+      expect(all).toMatch(/API key not set/);
+      expect(all).toMatch(/DEEPSEEK_API_KEY.*ANTHROPIC_AUTH_TOKEN/);
+      expect(all).toMatch(/--verify.*does NOT need a key/);
+      // 原始 err.message 必须保留 (caller 排错用)
+      expect(all).toMatch(/Underlying: mock: no key/);
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
 });
 
 // =====================================================================

@@ -76,4 +76,46 @@ describe('resolveSandboxRunnerFromEnv', () => {
     });
     expect(args[args.indexOf('--network') + 1]).toBe('bridge');
   });
+
+  it('DEEPWHALE_DOCKER_NETWORK=unset + docker 模式 → none (默认禁网)', () => {
+    // Sprint 1c-revive-4-D-20.1 (2026-06-05): 跟 DEEPWHALE_SANDBOX 一致, unset = 'none'.
+    const r = resolveSandboxRunnerFromEnv(
+      { sandboxRoot: '/tmp/x' },
+      { DEEPWHALE_SANDBOX: 'docker' },
+    ) as DockerSandboxRunner;
+    const args = r.buildDockerArgs('sbx-test', '/tmp/x', {
+      command: 'ls',
+      args: [],
+      cwd: '/tmp/x',
+      timeoutMs: 1_000,
+      stdoutCapBytes: 1024,
+    });
+    expect(args[args.indexOf('--network') + 1]).toBe('none');
+  });
+
+  it('DEEPWHALE_DOCKER_NETWORK=空字符串 + docker 模式 → none (跟 unset 同义)', () => {
+    const r = resolveSandboxRunnerFromEnv(
+      { sandboxRoot: '/tmp/x' },
+      { DEEPWHALE_SANDBOX: 'docker', DEEPWHALE_DOCKER_NETWORK: '' },
+    ) as DockerSandboxRunner;
+    const args = r.buildDockerArgs('sbx-test', '/tmp/x', {
+      command: 'ls',
+      args: [],
+      cwd: '/tmp/x',
+      timeoutMs: 1_000,
+      stdoutCapBytes: 1024,
+    });
+    expect(args[args.indexOf('--network') + 1]).toBe('none');
+  });
+
+  it('DEEPWHALE_DOCKER_NETWORK=其他值 → throw fail-closed (跟 DEEPWHALE_SANDBOX 一致)', () => {
+    // Sprint 1c-revive-4-D-20.1: 之前 fail-open 静默 → 'none', 拼错 'bridgee' 会"以防网跑"
+    // (跟用户本意"放行"相反). 修法: throw, 入口 stderr + exit 2.
+    expect(() =>
+      resolveSandboxRunnerFromEnv(
+        { sandboxRoot: '/tmp/x' },
+        { DEEPWHALE_SANDBOX: 'docker', DEEPWHALE_DOCKER_NETWORK: 'bridgee' },
+      ),
+    ).toThrow(/invalid DEEPWHALE_DOCKER_NETWORK=.*expected unset\|none\|bridge/);
+  });
 });
