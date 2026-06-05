@@ -353,15 +353,40 @@ describe('D-12 review P2 修复: makeDockerCliEnv 黑名单 + 白名单', () => 
     expect(DOCKER_CLI_DENY_KEYS.has('DEEPWHALE_SESSION_KEY')).toBe(true);
   });
 
-  it('白名单只含 docker CLI 必需的 7 个 key (PATH/HOME/USERPROFILE/DOCKER_*)', () => {
+  it('白名单只含 docker CLI 必需的 8 个 key (PATH + Windows Path + HOME + USERPROFILE + 4×DOCKER_*)', () => {
+    // Sprint 1c-revive-3-D-12 review chain 关单: 实际 8 个 (含 Windows 'Path' 兼容).
+    // 拍板: 不做 case-insensitive 归一化 (会引入"同 key 不同大小写同时存在被覆盖" 副作用),
+    // 直接列两个大小写 — 跟其他 DOCKER_* key 风格一致.
     expect(DOCKER_CLI_ALLOW_KEYS.has('PATH')).toBe(true);
+    expect(DOCKER_CLI_ALLOW_KEYS.has('Path')).toBe(true);
     expect(DOCKER_CLI_ALLOW_KEYS.has('HOME')).toBe(true);
     expect(DOCKER_CLI_ALLOW_KEYS.has('USERPROFILE')).toBe(true);
     expect(DOCKER_CLI_ALLOW_KEYS.has('DOCKER_HOST')).toBe(true);
     expect(DOCKER_CLI_ALLOW_KEYS.has('DOCKER_CONFIG')).toBe(true);
     expect(DOCKER_CLI_ALLOW_KEYS.has('DOCKER_TLS_VERIFY')).toBe(true);
     expect(DOCKER_CLI_ALLOW_KEYS.has('DOCKER_TLS_CERTPATH')).toBe(true);
-    expect(DOCKER_CLI_ALLOW_KEYS.size).toBe(7);
+    expect(DOCKER_CLI_ALLOW_KEYS.size).toBe(8);
+  });
+
+  it('Windows process.env 只有 Path (无 PATH) → docker CLI 子进程仍拿到 Path', () => {
+    // Sprint 1c-revive-3-D-12 review chain 关单: Windows / PowerShell 用户
+    // 常见 process.env 只含 'Path' (cmd.exe / PowerShell 习惯大小写), 旧白名单
+    // 漏这个会 spawn docker CLI 时 PATH 缺失, docker 找不到 (docker binary 在
+    // C:\Program Files\Docker\Docker\resources\bin\ 等非默认路径时更明显).
+    const windowsEnv: NodeJS.ProcessEnv = {
+      // 注意: **没有** 'PATH', 只有 'Path' — 模拟 Windows PowerShell 启动的 Node.
+      Path: 'C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Windows\\System32',
+      USERPROFILE: 'C:\\Users\\test',
+      DOCKER_HOST: 'tcp://127.0.0.1:2375',
+    };
+    const result = makeDockerCliEnv(windowsEnv);
+    expect(result['Path']).toBe(
+      'C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Windows\\System32',
+    );
+    expect(result['USERPROFILE']).toBe('C:\\Users\\test');
+    expect(result['DOCKER_HOST']).toBe('tcp://127.0.0.1:2375');
+    // 不反向 (旧实现会漏 Path, 这里 verify 修后保留)
+    expect(Object.keys(result).sort()).toEqual(['DOCKER_HOST', 'Path', 'USERPROFILE']);
   });
 
   it('makeDockerCliEnv: 注入 DEEPSEEK_API_KEY 不进 docker CLI env', () => {

@@ -82,6 +82,12 @@ export const DOCKER_CLI_DENY_KEYS: ReadonlySet<string> = new Set([
  */
 export const DOCKER_CLI_ALLOW_KEYS: ReadonlySet<string> = new Set([
   'PATH',
+  // Sprint 1c-revive-3-D-12 review chain 关单 (2026-06-05, 基于 dfe9d9a review):
+  // Windows / PowerShell 用户的 process.env 习惯用 'Path' (跟 cmd.exe / PowerShell
+  // 一致), Unix 用 'PATH'. Node 透传时**不**归一化大小写, 只 allow 单一大小写会
+  // 漏 Windows. 两个都列, 跟其他 DOCKER_* key 风格一致; case-insensitive 归一化
+  // 跨平台有"同 key 不同大小写同时存在被覆盖" 的不可见副作用, 不引入.
+  'Path',
   'HOME',
   'USERPROFILE',
   'DOCKER_HOST',
