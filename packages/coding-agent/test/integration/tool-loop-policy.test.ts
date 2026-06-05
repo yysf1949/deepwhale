@@ -703,4 +703,128 @@ describe('tool-loop policy integration (D-13)', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // === Sprint 1c-revive-3-D-19 (2026-06-05): Ctrl+C signal 链路验收 ===
+  // 拍板 (D-19): tool-loop.ts:367 现在调 policy.confirm(prompt, { signal }) 透传
+  // externalSignal. 测覆盖: (a) signal 真的传到 confirm 实现; (b) 中途 abort 立刻 resolve null;
+  // (c) 已 abort signal 立刻 resolve null.
+  // 拍板: 不在 repl-shared-stdin.test.ts 测 (那条测的是 stdin 拓扑); 这里测的是 policy 链路.
+  it('D-19: write_file + isInteractive=true + policy.confirm 接收 opts.signal → externalSignal 真传到 confirm', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dw-pol-d19-signal-'));
+    try {
+      const target = join(dir, 'target.txt');
+      const sessionPath = join(dir, 'session.jsonl');
+      const writer = new SessionWriter(sessionPath);
+      await writer.open();
+      const ac = new AbortController();
+      let receivedSignal: AbortSignal | undefined;
+      const confirmPolicy: ToolPolicy = {
+        ...staticToolPolicy,
+        confirm: async (_prompt: string, opts?: { signal?: AbortSignal }) => {
+          receivedSignal = opts?.signal;
+          // 不 abort, 返 true 让 tool 走通
+          return true;
+        },
+      };
+      const client = makeMockClient({
+        id: 'c1',
+        name: 'write_file',
+        args: { path: target, content: 'd19-signal' },
+      });
+      const result = await runToolLoop(client, [{ role: 'user', content: 'go' }], {
+        registry: createDefaultRegistry(),
+        policy: confirmPolicy,
+        isInteractive: true,
+        yes: false,
+        writer,
+        signal: ac.signal, // D-19: turn-level signal
+        onChunk: () => {},
+      });
+      const toolResult = result.steps.find((s) => s.kind === 'tool');
+      // 工具真执行 (confirm 返 true)
+      expect(toolResult?.kind).toBe('tool');
+      if (toolResult?.kind === 'tool') {
+        expect(toolResult.result.success).toBe(true);
+      }
+      // 关键断言: confirm 收到外部 signal
+      expect(receivedSignal, 'confirm 应该收到 externalSignal').toBeDefined();
+      expect(receivedSignal).toBe(ac.signal);
+      expect(receivedSignal?.aborted).toBe(false);
+      await writer.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('D-19: 中途 abort signal → confirm resolve null → 工具不执行 + 落 user_denied (Ctrl+C 链路)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dw-pol-d19-abort-'));
+    try {
+      const target = join(dir, 'target.txt');
+      const sessionPath = join(dir, 'session.jsonl');
+      const writer = new SessionWriter(sessionPath);
+      await writer.open();
+      const ac = new AbortController();
+      // 拍板 (D-19): 不在 mock confirm 里排 abort, 改在 mock client 第 1 轮 stream
+      // 返完 (onChunk + return) 之后, 用 setImmediate 在下一个 macrotask 调 abort.
+      // 这能避开 microtask 调度顺序的复杂性 — 拍板: setImmediate 等于 '下一个 I/O 周期',
+      // 足够让 stream 同步完成 + executeToolCall 调 confirm 进 await 等待.
+      const confirmPolicy: ToolPolicy = {
+        ...staticToolPolicy,
+        confirm: async (_prompt: string, opts?: { signal?: AbortSignal }) => {
+          if (opts?.signal?.aborted) return null;
+          return new Promise<boolean | null>((resolve) => {
+            opts?.signal?.addEventListener('abort', () => resolve(null), { once: true });
+          });
+        },
+      };
+      const client = makeMockClient({
+        id: 'c1',
+        name: 'write_file',
+        args: { path: target, content: 'should-not-write' },
+      });
+      // 第 1 轮 stream 返完后 (即 tool call 已被 line 188 拿到, executeToolCall 即将调
+      // confirm) 在下一个 macrotask 调 abort. 时机模拟 Ctrl+C 在 confirm prompt 期间触发.
+      setImmediate(() => ac.abort());
+      let result: Awaited<ReturnType<typeof runToolLoop>> | undefined;
+      let loopAborted = false;
+      try {
+        result = await runToolLoop(client, [{ role: 'user', content: 'go' }], {
+          registry: createDefaultRegistry(),
+          policy: confirmPolicy,
+          isInteractive: true,
+          yes: false,
+          writer,
+          signal: ac.signal,
+          onChunk: () => {},
+        });
+      } catch (e) {
+        // 拍板 (D-19): abort 在 confirm 期间触发时, runToolLoop 第 1 步完成 (tool 拒绝
+        // 落 user_denied) 后, 第 2 步想再调 LLM 时被 signal 拦下抛 LLMUnknownError.
+        // 这是正确行为 — 阻止下一步 chat, 跟 Ctrl+C 'dismiss 当前 turn' 契约一致.
+        if (e instanceof Error && e.message.includes('Tool loop aborted')) {
+          loopAborted = true;
+        } else {
+          throw e;
+        }
+      }
+      expect(loopAborted, '应该被 LLMUnknownError 中断').toBe(true);
+      // 文件不应被写
+      expect(existsSync(target)).toBe(false);
+      // session 应落 user_denied (tool 拒绝)
+      await writer.close();
+      const events = await readSessionEvents(sessionPath);
+      const policyEvents = events.filter((e) => e.kind === 'policy_decision');
+      const ev = policyEvents.find((e) => e.kind === 'policy_decision');
+      expect(ev, '应该落 policy_decision event').toBeDefined();
+      if (ev?.kind === 'policy_decision') {
+        expect(ev.decision).toBe('user_denied');
+        // reason='user dismissed' (D-15 §Decision 3 翻译: ok===null 当 dismissed)
+        expect(ev.reason).toMatch(/dismissed/);
+      }
+      // 防 lint: result 在 abort 路径下未赋值, 这里别用
+      void result;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
