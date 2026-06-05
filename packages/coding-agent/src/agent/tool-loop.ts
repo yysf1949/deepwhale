@@ -364,7 +364,12 @@ async function executeToolCall(
         };
       } else if (typeof policy.confirm === 'function') {
         // 3) 交互模式 + 注入 confirm: 走 y/N (D-15 注入 readline; D-13 MVP 没人调这条).
-        const ok = await policy.confirm(`Allow ${tc.name}? (${sanitizeReason(decision.reason)})`);
+        // Sprint 1c-revive-3-D-19 (2026-06-05): 透传 externalSignal 给 confirm (Ctrl+C / turn 取消).
+        // 拍板 (D-19): repl-confirm.ts 拿到 signal 后, abort 时立即 resolve null (dismissed).
+        // 老 confirm() 实现 (单参 prompt) 继续合法 (opts 默认 undefined).
+        const ok = await policy.confirm(`Allow ${tc.name}? (${sanitizeReason(decision.reason)})`, {
+          ...(externalSignal !== undefined ? { signal: externalSignal } : {}),
+        });
         const userDecision: 'user_approved' | 'user_denied' =
           ok === true ? 'user_approved' : 'user_denied';
         if (options.writer) {

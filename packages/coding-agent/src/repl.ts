@@ -197,18 +197,18 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
   // Sprint 1c-revive-3-D-13: REPL = 交互模式 (isInteractive=true), --yes 标志透传.
   const policyYes = options.yes ?? false;
-  // Sprint 1c-revive-3-D-15: REPL 注入真 confirm 实现 (y/N readline prompt).
-  // 拍板 (D-15, 2026-06-05): 工厂 createReplConfirm 接受 options.input/output 便于单测,
-  // REPL 端用 startRepl 闭包内的 input/output 注入 (跟 main readline 共享同一流; child
-  // rl.question 短窗口 + close 立刻释放, 不抢主 rl — D-15 plan §Risk R-1).
+  // Sprint 1c-revive-3-D-19 (2026-06-05): P1 修法 — 不再开第二个 readline 抢同一 input.
+  // createReplConfirm 现在返回 controller (confirm + offerLine + hasPending + dismiss),
+  // 主 rl.on('line') 是 stdin 唯一消费者, 确认期间用 offerLine() 串行化.
+  // 拍板 (D-19): 单 readline 路径, 删 D-15 R-1 "子 rl 短窗口" 妥协.
   // 拍板红线: --yes 永远先于 confirm (D-13.5 P1 重排), replPolicy.confirm 只在 yes=false
   // 才被 tool-loop 调. runAgentTurn 加可选 policy 参数透传 (默认 staticToolPolicy 向后兼容).
+  const confirmController = createReplConfirm({
+    output: options.output ?? stdout,
+  });
   const replPolicy: ToolPolicy = {
     ...staticToolPolicy,
-    confirm: createReplConfirm({
-      input: options.input ?? stdin,
-      output: options.output ?? stdout,
-    }),
+    confirm: confirmController.confirm,
   };
 
   // greeting — Sprint 1c-revive-2-D-11-4 review P1 修复: 不依赖 client.model (lazy 化后
@@ -283,8 +283,44 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       resolve(code);
     };
 
+    // === Sprint 1c-revive-3-D-19 (2026-06-05): P2-Ctrl+C 修法 — turn AbortController ===
+    // 拍板 (D-19): turnAbortController 闭包共享, 让 SIGINT handler 能 abort 它,
+    // 透传到 runToolLoop → executeToolCall → policy.confirm 的 signal 参数.
+    // 注意: plan R-1 实测 — terminal:false rl 不自动派发 SIGINT 事件, 必须挂 process.
+    // 单测用 mock 的 process, 通过 rl.input (PassThrough) 触发不了 SIGINT; 测 Ctrl+C
+    // 行为走 turnAbortController.abort() 直接调 (见 repl-shared-stdin / tool-loop-policy test).
+    //
+    // turn 生命周期: 每次 chat 入口 new 一个新 controller, 旧的引用还在闭包里
+    // (供 SIGINT handler 用). 拍板 (D-19): AbortController 单次 abort 语义, 一次
+    // turn SIGINT 之后, 下一个 turn 用新 controller + 重新挂 SIGINT (drain old handler).
+    let turnAbortController = new AbortController();
+    const onSigint = (): void => {
+      // Ctrl+C: dismiss in-flight confirm first (落 user_denied), 然后 abort turn.
+      // 拍板 (D-19): 进程不退出, 用户可继续. finish() 仍由 /exit 或 EOF 触发.
+      if (confirmController.hasPending()) {
+        confirmController.dismiss();
+      }
+      if (!turnAbortController.signal.aborted) {
+        turnAbortController.abort();
+      }
+    };
+    process.on('SIGINT', onSigint);
+
     rl.on('line', async (rawLine: string) => {
       const line = rawLine.trim();
+
+      // === Sprint 1c-revive-3-D-19 (2026-06-05): P1 修法 — 串行化 confirm 期间 line 消费 ===
+      // 拍板 (D-19): 主 rl 是 stdin 唯一消费者. 确认期间收到的 line 必须喂给 confirm
+      // resolver, 不能入 chat. 修 D-15 P1 (同流双 readline 抢同一行 → y 被当新 chat turn).
+      if (confirmController.hasPending()) {
+        const consumed = confirmController.offerLine(line);
+        if (consumed) {
+          // confirm resolver 已 settle, 等待 promise 走完; 调 prompt() 让用户看见下一轮.
+          // 注意: confirmController 内部在 offerLine 同步 settle, 但 await 仍在 tool-loop 端.
+          // 拍板 (D-19): 不在这里 await confirm 本身, 避免阻塞 rl 内部 line queue.
+          return;
+        }
+      }
 
       // 内建命令
       if (line === '') {
@@ -347,7 +383,11 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       // chat — Sprint 1c-revive-2-D-11-4 review P1 修复: client lazy 化后, chat
       // 路径首次调 tryCreateClient() 真创. 创失败 (无 key) → i18n stderr 提示 + 跳
       // 过本次 turn (不退出 REPL, 用户可继续 /verify 或 /exit).
-      const ac = new AbortController();
+      // Sprint 1c-revive-3-D-19 (2026-06-05): 续命 turnAbortController. 上一个 turn 已被
+      // SIGINT abort, 复用同一个 controller 第二次 abort 无效, new 一个新的. onSigint
+      // 闭包持有的是变量名 (let), 新 controller 一被赋值, 下次 SIGINT 自动 abort 新的,
+      // 不需要重建 handler. 红线: 不要 add 多份 SIGINT listener 重复触发.
+      turnAbortController = new AbortController();
       const c = clientFromOptions ? { client: clientFromOptions, error: null } : tryCreateClient();
       if (c.client === null) {
         err.write(`${t('error.api_key_missing')}\n\n`);
@@ -364,14 +404,14 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
             writer,
             out,
             err,
-            ac.signal,
+            turnAbortController.signal,
             compactionConfig,
             sandboxRunner,
             policyYes,
             replPolicy, // D-15: 注入 y/N confirm; 默认 staticToolPolicy 向后兼容
           );
         } else {
-          const turn = await runOneTurn(liveClient, line, [], { signal: ac.signal });
+          const turn = await runOneTurn(liveClient, line, [], { signal: turnAbortController.signal });
           if (turn.kind === 'error') {
             err.write(`${turn.error}\n\n`);
           } else if (turn.kind === 'chat') {

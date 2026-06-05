@@ -1,30 +1,39 @@
 /**
- * REPL y/N confirmation prompt — Sprint 1c-revive-3-D-15 (2026-06-05).
+ * REPL y/N confirmation prompt — Sprint 1c-revive-3-D-19 (2026-06-05).
  *
- * 拍板 (D-15, 2026-06-05):
- *   - 工厂函数, 接受 mock input/output + abort signal, 便于单测 (R-4 拍板)
- *   - prompt 格式: "Allow <tool_name>? (<reason>) [y/N]: "  (D-15 plan §Decision 2)
- *   - 输入识别: y/yes/Y/YES → true; n/no/N/NO/空/other → false; EOF/abort → null (D-15 plan §Decision 3)
- *   - 不读原始 args, prompt 字符串只含 tool name + reason (红线)
- *   - abort signal 触发立即 resolve null (dismissed)
+ * 历史:
+ *   D-15 (2026-06-05): 工厂函数 + 内部 createInterface, 用 rl.question 收 y/N.
+ *     留 P1 (review blocker): 同流上主 rl + 子 rl 抢同一行, 用户输 y 时主 rl
+ *     会把 y 当新 chat turn 启动 (实测 Node repro 确认).
+ *   D-19 (2026-06-05): 拆掉自创 readline, 改成 "caller 喂 line" 的纯 resolver.
+ *     主 REPL 的 rl.on('line') 是唯一 stdin 消费者, 确认期间把 line 喂给
+ *     pending resolver, 解析完才放行, P1 串行化彻底.
  *
- * 拍板 (D-15 plan §Risk R-1): child readline + terminal:false (跟主 rl 一致, pipe 友好),
- * rl.question 拿到 answer 后立刻 rl.close() 释放 stdin 监听, 让主 rl (REPL) 继续.
- * 单测用 PassThrough mock, 不依赖真 stdin.
+ * 拍板 (D-19, 2026-06-05):
+ *   - API 形状: createReplConfirm(opts) 返回的 confirm() 不再内部读 stdin,
+ *     而是用 offerLine(rawLine) + 内部 Promise<boolean | null> 状态机.
+ *   - prompt 格式: caller 拼好 "Allow <tool_name>? (<reason>) [y/N]: ",
+ *     confirm() 内部只负责 "收一行 → 解析 → resolve".
+ *   - 输入识别: y/yes/Y/YES → true; n/no/N/NO/空/other → false; abort → null.
+ *   - abort signal 触发立即 resolve null (dismissed).
+ *   - 同时只能有一个 pending 确认 (REPL 串行 chat-turn 拓扑保证).
+ *   - offerLine 二次调用 = 抛错 (caller bug, 不能丢 silent).
  *
- * 拍板 (D-15 plan §NOT in scope): 不接 RPC confirmedTools (D-17), 不接 user policy
- * config (D-16), 不做 TUI (D-18). D-15 0 改 tool-loop.ts / chain.ts / static-rules.ts /
- * core (D-13 已 ship 接口 + 异步分支).
+ * 拍板 (D-19 §out of scope): 不接 RPC confirmedTools (D-17), 不接 user policy
+ * config (D-16), 不做 TUI (D-18).
  */
 
-import { createInterface, type Interface as RLInterface } from 'node:readline';
-
 export interface ReplConfirmOptions {
-  input: NodeJS.ReadableStream;
+  /**
+   * REPL 的 out (拿 prompt 字符出口). 用 NodeJS.WritableStream 是为了兼容
+   * startRepl 传进来的 NodeJS.WritableStream 类型 (vs node:stream Writable).
+   * D-19 内部只写 prompt, 不读.
+   */
   output: NodeJS.WritableStream;
 }
 
 export interface ReplConfirmCallOptions {
+  /** AbortSignal — 触发时 confirm 立即 resolve null (dismissed). D-19 修 Ctrl+C 链路. */
   signal?: AbortSignal;
 }
 
@@ -33,27 +42,57 @@ export type ReplConfirm = (
   options?: ReplConfirmCallOptions,
 ) => Promise<boolean | null>;
 
-export function createReplConfirm(opts: ReplConfirmOptions): ReplConfirm {
-  return async (prompt, callOpts) => {
+interface PendingConfirm {
+  prompt: string;
+  resolve: (v: boolean | null) => void;
+  abortHandler: (() => void) | null;
+}
+
+export interface ReplConfirmController {
+  /** 提示用户 (写到 output, 加 [y/N]: 后缀). 内部 start 一个 pending. */
+  confirm: ReplConfirm;
+  /** REPL 主 line handler 拿到 line 后调: 若有 pending → 喂给 confirm; 若无 → false (caller 走 chat). */
+  offerLine: (rawLine: string) => boolean;
+  /** 当前是否有 in-flight 确认 (caller 用此守卫主 rl.line). */
+  hasPending: () => boolean;
+  /** 强制取消 (caller 进程退出/EOF/cleanup). */
+  dismiss: () => void;
+}
+
+export function createReplConfirm(opts: ReplConfirmOptions): ReplConfirmController {
+  let pending: PendingConfirm | null = null;
+
+  const settle = (v: boolean | null): void => {
+    if (!pending) return;
+    const p = pending;
+    pending = null;
+    if (p.abortHandler && p.abortHandler !== null) {
+      // no-op: signal listener 已被 offerLine / abortHandler 清理
+    }
+    p.resolve(v);
+  };
+
+  const confirm: ReplConfirm = (prompt, callOpts) => {
+    if (pending) {
+      // 拍板 (D-19): 同时只能有一个 pending, 二次 confirm 抛错 (caller bug).
+      return Promise.reject(
+        new Error(
+          'repl-confirm: confirm() called while another confirmation is in flight. ' +
+            'Caller must serialize via hasPending() guard.',
+        ),
+      );
+    }
+    // 拍板 (D-19): caller 拼好 prompt, 我们只追加 [y/N]: 后缀.
+    const fullPrompt = `${prompt} [y/N]: `;
+    opts.output.write(fullPrompt);
+
     return new Promise<boolean | null>((resolve) => {
-      // 拍板 (D-15 plan §Risk R-1): terminal:false 跟主 rl 一致, pipe 友好.
-      const rl: RLInterface = createInterface({
-        input: opts.input,
-        terminal: false,
-        output: opts.output,
-      });
-      let settled = false;
-      const settle = (v: boolean | null): void => {
-        if (settled) return;
-        settled = true;
-        // 关键: rl.close() 释放 stdin 监听, 让主 rl (REPL) 继续
-        try {
-          rl.close();
-        } catch {
-          /* close 失败 best-effort */
-        }
-        resolve(v);
+      const p: PendingConfirm = {
+        prompt: fullPrompt,
+        resolve,
+        abortHandler: null,
       };
+      pending = p;
 
       // abort signal — 立即 resolve null (dismissed)
       if (callOpts?.signal) {
@@ -61,31 +100,32 @@ export function createReplConfirm(opts: ReplConfirmOptions): ReplConfirm {
           settle(null);
           return;
         }
-        callOpts.signal.addEventListener('abort', () => settle(null), { once: true });
+        const handler = (): void => settle(null);
+        callOpts.signal.addEventListener('abort', handler, { once: true });
+        p.abortHandler = handler;
       }
-
-      // prompt 格式 (D-15 plan §Decision 2): "<prompt> [y/N]: "
-      // tool-loop 注入的 prompt 是 "Allow <tool_name>? (<sanitized_reason>)",
-      // 我们在末尾追加 [y/N] 提示默认值 (跟 git/npm 风格一致, 空输入默认 N fail-closed).
-      const fullPrompt = `${prompt} [y/N]: `;
-      rl.question(fullPrompt, (answer) => {
-        const a = answer.trim().toLowerCase();
-        if (a === 'y' || a === 'yes') {
-          settle(true);
-        } else if (a === 'n' || a === 'no' || a === '') {
-          settle(false);
-        } else {
-          // 拍板 (D-15 plan §Decision 3): other 当 N 处理 (不打扰)
-          settle(false);
-        }
-      });
-
-      // EOF (e.g. Ctrl+D / input.end 无 write) → null (dismissed)
-      // 拍板: rl.question 已 resolve 时这个 listener 也会触发, 但 settle 内部
-      // settled 守卫会拦下 (避免重复 resolve).
-      rl.on('close', () => {
-        settle(null);
-      });
     });
   };
+
+  const offerLine = (rawLine: string): boolean => {
+    if (!pending) return false;
+    const answer = rawLine.trim().toLowerCase();
+    if (answer === 'y' || answer === 'yes') {
+      settle(true);
+    } else if (answer === 'n' || answer === 'no' || answer === '') {
+      settle(false);
+    } else {
+      // 拍板 (D-15 §Decision 3, D-19 沿用): other 当 N 处理 (不打扰)
+      settle(false);
+    }
+    return true;
+  };
+
+  const hasPending = (): boolean => pending !== null;
+
+  const dismiss = (): void => {
+    if (pending) settle(null);
+  };
+
+  return { confirm, offerLine, hasPending, dismiss };
 }

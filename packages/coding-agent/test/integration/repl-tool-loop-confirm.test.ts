@@ -90,15 +90,28 @@ function buildPolicyWithInput(): {
   pushAnswer: (line: string) => void;
   endInput: () => void;
 } {
+  // Sprint 1c-revive-3-D-19 (2026-06-05): createReplConfirm 现在返 controller, 不再读 input.
+  // test 用 controller.offerLine 喂答案 (跟 REPL 主 rl.on('line') 行为一致). 保留 input
+  // PassThrough 给 pushAnswer / endInput (向后兼容 caller 写法) — 实际 D-19 controller
+  // 不读 input, 写进去也不消费.
   const input = new PassThrough();
   const output = new PassThrough(); // 吃掉 prompt 字符串避免污染 test output
   output.on('data', () => {});
-  const confirm = createReplConfirm({ input, output });
-  const policy: ToolPolicy = { ...staticToolPolicy, confirm };
+  const controller = createReplConfirm({ output });
+  const policy: ToolPolicy = { ...staticToolPolicy, confirm: controller.confirm };
   return {
     policy,
-    pushAnswer: (line: string) => input.write(`${line}\n`),
-    endInput: () => input.end(),
+    pushAnswer: (line: string) => {
+      // 拍板 (D-19): 跟 REPL 主 rl 行为一致, offerLine 喂给 controller.
+      // 红线: 必须在 confirm 之后调 offerLine (异步时序), 见 setImmediate 包装.
+      setImmediate(() => controller.offerLine(line));
+    },
+    endInput: () => {
+      // 拍板 (D-19): 端到端不再依赖 EOF, dismiss 强制 resolve null (D-15 测了 EOF 分支,
+      // D-19 controller 没 readline, input.end() 不触发 dismiss — 改用 controller.dismiss).
+      controller.dismiss();
+      input.end();
+    },
   };
 }
 

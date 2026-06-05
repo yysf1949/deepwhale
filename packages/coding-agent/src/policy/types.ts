@@ -45,6 +45,10 @@ export interface ToolPolicy {
    * 拍板: 用户确认回调. REPL 走 readline, RPC 走 NDJSON "confirm" 通知 (D-15).
    * 拍板: undefined = "未实现" 兜底, caller 走 fail-closed deny.
    * 拍板: return true = 用户同意, false = 拒绝, null = dismiss (也走 deny).
+   *
+   * Sprint 1c-revive-3-D-19 (2026-06-05): opts.signal 可选 — REPL SIGINT/turn
+   * 取消时, 注入 turn-level AbortSignal, confirm 收到 abort 立刻 resolve null.
+   * 老实现 (单参) 继续合法 (opts 默认 undefined).
    */
-  confirm?(prompt: string): Promise<boolean | null>;
+  confirm?(prompt: string, opts?: { signal?: AbortSignal }): Promise<boolean | null>;
 }
