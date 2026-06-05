@@ -364,7 +364,7 @@ DOCKER_INTEGRATION=1 pnpm test -- docker-sandbox
 | `read_file` / `find` / `grep` | `allow`                                                                                                          |
 | `write_file` / `edit_file`    | `require_confirmation` (`writes to filesystem`)                                                                  |
 | `bash` (工具层静态)           | `allow`（bash 工具层用 allowlist + dangerous pattern 双重防御; 第二道防线是 tool-loop 调 `evaluateBashCommand`） |
-| bash 危险模式                 | `require_confirmation` (`rm -rf /`, `rm -rf ~`, `mkfs`, `dd if=`, `shutdown`, `> /dev/sda`)                      |
+| bash 危险模式                 | `require_confirmation` (D-13 review P1 拍板 2026-06-05, 12 pattern 详见 `src/policy/static-rules.ts`: `rm -rf /` / `rm -rf ~` / `mv *` / `cp *` / `chown` / `chmod` / `mkfs` / `dd if=` / `shutdown`+`reboot`+`halt`+`poweroff` / `> /dev/sda\|nvme*` / `curl\|sh\|bash\|python` / `curl -o /tmp/`) |
 
 ### 注入自定义 ToolPolicy
 
@@ -429,12 +429,12 @@ await runToolLoop(client, messages, {
 ### 单测覆盖
 
 - `policy/types.test.ts` — PolicyDecision union + PolicyContext 形状
-- `policy/static-rules.test.ts` — 6 工具名分支 + bash 危险 regex (10 个模式命中 + 6 个安全命令 allow)
-- `policy/chain.test.ts` — `yes=true` bypass require_confirmation, **不** bypass deny (5 tests)
+- `policy/static-rules.test.ts` — 6 工具名分支 + bash 危险 regex (14 it: 12 模式命中 + 安全命令 allow 等)
+- `policy/chain.test.ts` — chain 透传 raw decision (不做 yes bypass, P1 b 修复后 bypass 移到 tool-loop.ts) + deny 永远透传 (5 tests)
 - `policy/args-digest.test.ts` — 稳定 JSON (key 排序) + sha256 12 hex + secret 不暴露 (7 tests)
 - `policy/sanitize-reason.test.ts` — 长度 200 cap + 换行折叠 + NUL 去 (8 tests)
 - `core/test/session/policy-decision.test.ts` — round-trip + 不进 LLM context + 旧 session reload 不崩 (4 tests)
-- `integration/tool-loop-policy.test.ts` — 端到端 8 例覆盖验收红线
+- `integration/tool-loop-policy.test.ts` — 端到端 13 例覆盖验收红线 (D-13 11 例 + D-13.5 重排补 2 例: print/rpc + --yes 走 ctx.yes first 行为差异真证据)
 
 ## 4 包 Monorepo 结构（对齐 pi）
 
