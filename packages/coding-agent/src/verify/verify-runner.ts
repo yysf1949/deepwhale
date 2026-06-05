@@ -246,10 +246,7 @@ interface RunOneCheckOpts {
   signal?: AbortSignal;
 }
 
-async function runOneCheck(
-  check: VerifyCheck,
-  opts: RunOneCheckOpts,
-): Promise<VerifyCheckResult> {
+async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<VerifyCheckResult> {
   const start = Date.now();
   const timeoutMs = check.timeoutMs ?? opts.defaultTimeoutMs;
   const cwd = check.cwd ?? opts.cwd;
@@ -267,6 +264,11 @@ async function runOneCheck(
     // Sprint 1c-revive-2-D-11-4 review P2 修复: signal abort 触发的 1s grace timer,
     // 提前到 finalize 前声明 (闭包共享). child 不响应 SIGTERM 时用它兜底 SIGKILL.
     let sigkillTimer: NodeJS.Timeout | null = null;
+    // Sprint 1c-revive-2-D-11+4 review P2 修复 (2026-06-05): 闭包持有的 "child 已
+    // 退出" 标记. child.on('close', ...) 里设 true. 用这个代替 Node 内置 child.killed,
+    // 因为 child.killed 表示"信号已发送" 不是"进程已退出" — 后者才是 grace timer
+    // 判断要不要发 SIGKILL 兜底的依据.
+    let childClosed = false;
 
     const finalize = (result: VerifyCheckResult): void => {
       if (resolved) return;
@@ -283,7 +285,7 @@ async function runOneCheck(
         // 注: 实际 listener 是 addEventListener { once: true }, fire 后自动移除,
         // 但 abort 触发过 + once 没 fire 走完前 finalize, 显式 remove 兜底.
       }
-      if (child && !child.killed) {
+      if (child && !childClosed) {
         try {
           child.kill('SIGKILL');
         } catch {
@@ -301,7 +303,9 @@ async function runOneCheck(
       // runner 字符串, Windows 上 'corepack' → 'corepack.cmd'.
       const rawRunner = check.args[0];
       if (typeof rawRunner !== 'string' || rawRunner.length === 0) {
-        throw new Error(`VerifyCheck '${check.name}' args[0] must be a non-empty string (the runner binary)`);
+        throw new Error(
+          `VerifyCheck '${check.name}' args[0] must be a non-empty string (the runner binary)`,
+        );
       }
       const runner = resolveRunner(rawRunner);
       const subArgs = check.args.slice(1);
@@ -334,11 +338,17 @@ async function runOneCheck(
     //   2. kill 当前 child (SIGTERM 优先, 1s grace 后 SIGKILL 兜底, sigkillTimer 见 Promise 开头声明)
     // 之前不传 signal 进 runOneCheck, 当前 child 不被 kill, 只能"等下 step 跳过"
     // — 跟"取消不能卡住"目标不一致, 也会造成资源泄漏.
+    //
+    // Sprint 1c-revive-2-D-11+4 review P2 修复 (2026-06-05): 改用 childClosed 闭包
+    // 变量判断"child 真的退出了", 不再用 child.killed (Node 标记"信号已发", 跟
+    // "进程已退出" 语义不同). 否则 child 忽略 SIGTERM (e.g. 阻塞 IO / 自定义
+    // handler trap) 时, 1s 后 grace timer 判 !child.killed = false 跳过 SIGKILL,
+    // 子进程仍卡到 timeout 之前的所有步骤.
     if (opts.signal) {
       const onAbort = (): void => {
         if (resolved) return;
         childAborted = true;
-        if (child && !child.killed) {
+        if (child && !childClosed) {
           try {
             child.kill('SIGTERM');
           } catch {
@@ -347,7 +357,7 @@ async function runOneCheck(
           // 1s grace: 给 child 清理时间. 真不响应 (e.g. blocking IO) → SIGKILL.
           // close 完成后 finalize 会清掉这个 timer (见下), 避免错杀.
           sigkillTimer = setTimeout(() => {
-            if (child && !child.killed) {
+            if (child && !childClosed) {
               try {
                 child.kill('SIGKILL');
               } catch {
@@ -397,6 +407,9 @@ async function runOneCheck(
     }, timeoutMs);
 
     child.on('close', (code, signal) => {
+      // Sprint 1c-revive-2-D-11+4 review P2 修复 (2026-06-05): close 触发 = child 真退出.
+      // sigkillTimer 内部据此判断, 不再依赖 child.killed (Node 标记语义不对).
+      childClosed = true;
       const end = Date.now();
       // Sprint 1c-revive-2-D-11-4 review P2 修复: childAborted 优先, 返回 'aborted'
       // 让 caller 知道是外部 signal 触发的 kill, 不是 child 自身崩溃.
