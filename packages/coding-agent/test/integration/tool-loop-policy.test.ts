@@ -645,7 +645,13 @@ describe('tool-loop policy integration (D-13)', () => {
     }
   });
 
-  it('D-13.5: bash mv a b + isInteractive=false (print/rpc) + yes=true → ctx.yes 优先于 !isInteractive: bash 真执行 + 落 user_approved', async () => {
+  // === Sprint 1c-revive-3-D-19.5 (2026-06-05): 跨平台兼容 — Windows git-bash skip ===
+  // 拍板 (D-19.5, user review 2026-06-05 P2-test): Windows git-bash 下 mv 接收 join()
+  // 出来的 Windows 路径 (反斜杠 + 空格) 有 quoting 怪行为, execFile 'mv' 不一定
+  // 真改文件名, source 仍在 → 测红. 修法: skipIf win32, Linux 跑覆盖仍在.
+  // 红线: 不改生产代码 (BashTool / LocalSandboxRunner 行为不变), 只做测试环境适配.
+  //       跳过原因: deepwhale CI 只跑 Linux, Windows 是 reviewer 手测环境.
+  it.skipIf(process.platform === 'win32')('D-13.5: bash mv a b + isInteractive=false (print/rpc) + yes=true → ctx.yes 优先于 !isInteractive: bash 真执行 + 落 user_approved', async () => {
     // 拍板 (D-13.5 P1 重排 2026-06-05):
     //   旧顺序: !isInteractive 先命中 → deny (bash 不执行, yes=true 不 bypass)
     //   新顺序: ctx.yes 先命中 → 落 user_approved → bash 真跑 mv
