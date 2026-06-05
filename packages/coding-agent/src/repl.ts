@@ -357,7 +357,14 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         }
       }
 
-      // 内建命令 — 全部 fast-path, 不走 turnInFlight (内建不等 chat turn)
+      // 内建命令 — /exit 走 fast-path (复用 D-19.5 pendingExit 兜底); 其它 builtin
+      // (/help /verify /unknown) 推到 turn guard 之后, turnInFlight 时入队不入 builtin.
+      // 拍板 (D-19.5p, user review 2026-06-05 P2): D-19.5 注释 "全部 fast-path" 把所有 builtin
+      // 提前 return, 但这违反 "turn running 时下一行不进入 builtin/chat" 语义 — y\n/verify\n
+      // 紧贴会让 /verify 跑 runVerify + 写 verification event, 输出/session 交错. 修法:
+      // /help /verify /unknown 跟 chat 路径一样在 turnInFlight 时入 lineQueue, finally drain.
+      // 红线: /exit 例外, 走 fast-path + pendingExit (用户 /exit 语义是"立刻走", 不该 drain
+      // 排队行, 跟 D-19.5 拍板一致). confirm 期间 /exit 仍走 confirm-dismiss 分支 (D-19.5 修法).
       if (line === '') {
         prompt();
         return;
@@ -371,19 +378,38 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         await finish(0);
         return;
       }
-      if (line === '/help') {
-        out.write(`${t('cli.builtin_help')}\n`);
-        prompt();
+
+      // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard — 排队 turnInFlight 期间 line ===
+      // 拍板 (D-19.5, user review 2026-06-05 P1): 旧逻辑紧跟 chat turn 的下一行 (紧贴
+      // y\n 或 turn 还没跑完时 stdin 排队的行) 立刻进 chat 分支, 用旧 workingMessages
+      // 并发跑第二轮, /exit 提前 close writer. 修法: 派发前检查 turnInFlight, true
+      // → 入队不入 chat. finally 块跑完 turn, 检查 pendingExit (走 finish) → 否则
+      // drain lineQueue 下一条 (setImmediate 避免爆栈). 红线: pendingExit 优先级高于
+      // drain, 因为 /exit 应该是"不处理后续, 立刻走"语义, 不应该 drain 排队行.
+      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): P2 builtin guard — /help /verify /unknown 同样入队 ===
+      // 拍板 (D-19.5p, user review 2026-06-05 P2): D-19.5 turn guard 只 guard chat 路径,
+      // /help /verify /unknown 走 fast-path, 紧贴 chat turn 时照样跑 (e.g. /verify 写
+      // verification event). 修法: 这 3 个 builtin 跟 chat 路径一起被 turn guard 拦截,
+      // turnInFlight 时入 lineQueue, finally drain. /exit 例外, 仍走 fast-path + pendingExit
+      // (D-19.5 拍板不变 — 用户 /exit 语义是"立刻走", 不该 drain 后续).
+      if (turnInFlight) {
+        lineQueue.push(line);
         return;
       }
+      turnInFlight = true;
+
+      // === Sprint 1c-revive-2-D-11-4 (2026-06-04): REPL `/verify` 内建命令 ===
+      // 跟 CLI `deepwhale --verify` 走同一 runVerify() — 不走 LLM / tool loop.
+      // 拍板 (D-11-4 review, 2026-06-04): REPL 里 /verify 走**异步** runVerify,
+      // 跑完打 formatReport 到 out (跟其它内建命令风格一致), 然后**写 verification
+      // event 到 session JSONL** (因为用户在 REPL 里跑了 verify, session 走 audit
+      // 轨迹, 跟 CLI 不写 session 形成差异).
+      // 退出: REPL 不退, 跑完回到 prompt 继续.
+      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): 移到 turn guard 之后, turnInFlight 期间 /verify 入队 ===
+      // 拍板 (D-19.5p, user review 2026-06-05 P2): 旧位置 (turn guard 之前) 让 y\n/verify\n
+      // 紧贴时 /verify 跑 runVerify + 写 verification event, 跟 turn 输出/session 交错.
+      // 红线: turnInFlight=true 时已经在上面 lineQueue.push + return, 不会跑到这里.
       if (line === '/verify') {
-        // Sprint 1c-revive-2-D-11-4 (2026-06-04): REPL `/verify` 内建命令.
-        // 跟 CLI `deepwhale --verify` 走同一 runVerify() — 不走 LLM / tool loop.
-        // 拍板 (D-11-4 review, 2026-06-04): REPL 里 /verify 走**异步** runVerify,
-        // 跑完打 formatReport 到 out (跟其它内建命令风格一致), 然后**写 verification
-        // event 到 session JSONL** (因为用户在 REPL 里跑了 verify, session 走 audit
-        // 轨迹, 跟 CLI 不写 session 形成差异).
-        // 退出: REPL 不退, 跑完回到 prompt 继续.
         try {
           const report = await runVerify(
             options.verifyChecks !== undefined ? { checks: options.verifyChecks } : {},
@@ -411,27 +437,24 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
             `error: verify failed to start: ${e instanceof Error ? e.message : String(e)}\n\n`,
           );
         }
+        // 拍板 (D-19.5p): /verify 走的是 try/await runVerify, 不进 runAgentTurn try 块,
+        // finally 不会跑, 必须手动 turnInFlight=false + prompt (跟 /help /unknown 一致).
+        turnInFlight = false;
+        prompt();
+        return;
+      }
+      if (line === '/help') {
+        out.write(`${t('cli.builtin_help')}\n`);
+        turnInFlight = false;
         prompt();
         return;
       }
       if (line.startsWith('/')) {
         out.write(`${t('cli.builtin_unknown', line)}\n`);
+        turnInFlight = false;
         prompt();
         return;
       }
-
-      // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard — 排队 turnInFlight 期间 line ===
-      // 拍板 (D-19.5, user review 2026-06-05 P1): 旧逻辑紧跟 chat turn 的下一行 (紧贴
-      // y\n 或 turn 还没跑完时 stdin 排队的行) 立刻进 chat 分支, 用旧 workingMessages
-      // 并发跑第二轮, /exit 提前 close writer. 修法: 派发前检查 turnInFlight, true
-      // → 入队不入 chat. finally 块跑完 turn, 检查 pendingExit (走 finish) → 否则
-      // drain lineQueue 下一条 (setImmediate 避免爆栈). 红线: pendingExit 优先级高于
-      // drain, 因为 /exit 应该是"不处理后续, 立刻走"语义, 不应该 drain 排队行.
-      if (turnInFlight) {
-        lineQueue.push(line);
-        return;
-      }
-      turnInFlight = true;
 
       // chat — Sprint 1c-revive-2-D-11-4 review P1 修复: client lazy 化后, chat
       // 路径首次调 tryCreateClient() 真创. 创失败 (无 key) → i18n stderr 提示 + 跳
@@ -501,11 +524,25 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       // 修法: close 时先 dismiss pending confirm (resolve null → tool 走 user_denied 落审计),
       // 再 abort turnAbortController 让 runAgentTurn 走 finally 收束. 顺序: dismiss 先于
       // abort, 因为 confirm resolve 后 runToolLoop 才检查 signal, 调换会丢 audit 路径.
+      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): P1 close drain — 复用 pendingExit 兜底 finish ===
+      // 拍板 (D-19.5p, user review 2026-06-05 P1): D-19.5 close handler 仍直接 `void finish(0)`,
+      // finish() 内部顺序仍是 process.off + rl.close + await writer.close. 如果 turn 还在
+      // 跑 (e.g. 用户在 confirm 后输入 EOF, turn 已被 abort 但 finally 还没走完 audit 落盘),
+      // writer 在 turn 写 `user_denied` / steps 之前就被关, 撞 `Error: file closed` 实测
+      // stderr 明确出现. 修法: 复用 D-19.5 已有的 pendingExit 机制 — turn 在跑时只标
+      // pendingExit=true + abort, finally 块跑完 drain 时检测到 pendingExit 走 finish,
+      // 此时 turn 已落完所有 audit 事件, writer.close() 安全. 红线: 不在 close 路径
+      // 新增 turnDrain Promise, 避免和 D-19.5 SIGINT dismiss/abort 顺序冲突.
       if (confirmController.hasPending()) {
         confirmController.dismiss();
       }
-      if (turnInFlight && !turnAbortController.signal.aborted) {
-        turnAbortController.abort();
+      if (turnInFlight) {
+        if (!turnAbortController.signal.aborted) {
+          turnAbortController.abort();
+        }
+        // 复用 pendingExit 兜底, finally 跑完 turn 审计落盘后再 finish.
+        pendingExit = true;
+        return;
       }
       void finish(0);
     });
