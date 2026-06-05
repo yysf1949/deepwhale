@@ -188,6 +188,132 @@ deepwhale> /exit                    # 退
 
 跟 `compaction_paused` 同语义：metadata, reload session 时 `sessionEventsToMessages` 跳过, 不污染 LLM 看到的 messages。**旧 session reload 不崩**（strict union 兜底, D-11-3 拍板红线）。
 
+## Sandbox (D-12, MVP)
+
+> **Sprint 1c-revive-3-D-12**（2026-06-05）：BashTool 接入 Docker sandbox。默认仍走本地 exec，可通过 `DEEPWHALE_SANDBOX=docker` 切换到 Docker 隔离。**MVP，**不**等于完整安全审计**（看下面威胁模型 + 已知风险）。
+
+### 快速启用
+
+```bash
+# 默认 (本地 exec, 现状行为)
+pnpm dev
+
+# 切到 Docker 隔离
+DEEPWHALE_SANDBOX=docker pnpm dev
+
+# 自定义镜像 + 允许网络
+DEEPWHALE_SANDBOX=docker \
+  DEEPWHALE_DOCKER_IMAGE=alpine:3.20 \
+  DEEPWHALE_DOCKER_NETWORK=bridge \
+  pnpm dev
+```
+
+| Env | 缺省 | 说明 |
+|---|---|---|
+| `DEEPWHALE_SANDBOX` | `local` | `local` = 进程级本地 exec（v1.0 行为）；`docker` = 容器级隔离 |
+| `DEEPWHALE_DOCKER_IMAGE` | `node:22-alpine` | 容器镜像 |
+| `DEEPWHALE_DOCKER_NETWORK` | `none` | `none` = 禁网（推荐 MVP）；`bridge` = 走 docker 默认 bridge |
+
+### 架构
+
+```
+BashTool (allowlist + dangerous pattern + cwd 校验)
+  ↓
+SandboxRunner (interface)
+  ├─ LocalSandboxRunner  (默认, 现状 execFile 行为)
+  └─ DockerSandboxRunner (opt-in, docker run --rm 隔离)
+```
+
+`BashTool` 入口的 allowlist / dangerous pattern / cwd 校验**不**依赖 runner —— runner 只跑过白名单的命令。两者解耦，**默认行为不变**（20 个 `tools.test.ts` 全过）。
+
+### Local vs Docker 行为差异
+
+| 维度 | Local (默认) | Docker (opt-in) |
+|---|---|---|
+| 文件系统 | 看到宿主（限制 cwd 内） | 容器独立 fs + workspace bind mount |
+| 网络 | 走宿主网络 | `--network=none` 缺省下无网 |
+| 环境变量 | `process.env` 全传 | 只透传 host env，**不**注入 `.env` / API key |
+| 性能 | ~直接 exec | 容器启动 ~200-500ms 额外开销 |
+| 隔离强度 | 弱（进程级） | 中（容器级，**不是** VM 级） |
+| 失败模式 | execFile 错 / timeout | docker 不存在 / 镜像未拉 / container start fail |
+
+### Docker command shape
+
+```bash
+docker run --rm -i \
+  --label deepwhale.sandbox=true \
+  --name deepwhale-sbx-${randomUUID8} \
+  --user 1000:1000 \
+  --read-only \
+  --cap-drop=ALL \
+  --security-opt no-new-privileges \
+  --network none \
+  -v ${workspaceAbs}:/workspace:rw \
+  -w /workspace \
+  --tmpfs /tmp:size=64m,noexec,nosuid \
+  node:22-alpine \
+  ${command} ${args[@]}
+```
+
+**安全红线**（grep 自查覆盖）：
+- **不** 加 `--privileged`
+- **不** 传 `--env-file` / `DEEPSEEK_API_KEY` / `ANTHROPIC_AUTH_TOKEN`
+- **不** 挂宿主根目录（`--volume /:/host` 之类）
+- 容器名加 `randomUUID().slice(0, 8)` 后缀避免冲突
+- timeout 走 `docker stop` (5s grace) → `docker kill` (SIGKILL) 兜底
+- cleanup 失败进 `console.warn`，不静默假成功
+
+### 威胁模型
+
+D-12 是 MVP，**不**是完整 sandbox：
+
+| 威胁 | Local 现状 | Docker 修复 |
+|---|---|---|
+| 跳出 cwd | `pathResolve` 防 `cd ../../..` | workspace bind mount + DockerRunner 入口 sandboxRoot 校验 |
+| 读 `/etc/passwd` 等系统文件 | ❌ 未防 | ✅ 容器默认只读 fs |
+| 网络下载 + 任意执行 | `curl\|sh` 模式黑名单挡一部分 | `--network=none` 缺省下无网 |
+| 提权 / 写 device | `sudo` / `dd if=` 模式黑名单 | `--cap-drop=ALL` + `no-new-privileges` |
+| privileged 容器逃逸 | N/A | **禁** `--privileged` |
+| workspace 内破坏 | 仍可能 | 仍可能（靠 allowlist + dangerous pattern 兜底） |
+| timeout 不杀进程 | 60s timeout（`execFile` 内置） | 容器 `timeout` 后 `--rm` 触发；cleanup 兜底 |
+
+### 已知风险 / 边界
+
+1. **本机无 Docker** — `DOCKER_INTEGRATION=1` 时 `integration/docker-sandbox.test.ts` SKIPPED，**不**假绿
+2. **容器启动开销** — 不适合 hot loop（数十次/秒），README 标注
+3. **workspace mount 是 rw** — 与 Sprint 0.2 行为一致，未来可分 read-only mounts
+4. **没有 seccomp profile** — 容器级隔离（Docker default），**不**等于完整 sandbox（gVisor/firecracker）
+5. **mount escape** — BashTool 入口已校验 cwd 不出 `SANDBOX_ROOT`，但 Docker mount 内 `/workspace` 仍可被 `rm -rf /workspace`（容器视角）破坏 —— 靠 allowlist + dangerous pattern 兜底
+6. **跨平台** — Linux 本机是真容器；Docker Desktop on Windows/Mac 用 VM，**不**在 D-12 验证范围
+7. **cleanup 失败** — best-effort `docker rm -f` 兜底，stderr 警告
+
+### 测试
+
+```bash
+# 单测 (默认, mock docker 不依赖本机 docker)
+pnpm test
+
+# Integration (真 docker, 默认 SKIPPED)
+DOCKER_INTEGRATION=1 pnpm test -- docker-sandbox
+```
+
+单测覆盖：
+- `sandbox/types.test.ts` — interface 形状 + default timeout/cap
+- `sandbox/local-runner.test.ts` — 真跑 `node -e` 验证 stdout/stderr/cap/timeout/env
+- `sandbox/docker-runner.test.ts` — mock `child_process`，断言禁 privileged / 禁宿主 mount / 禁 env-file / 容器名随机 / cleanup 失败进 warning
+- `sandbox/bash-injection.test.ts` — BashTool 接受 runner 注入，默认 Local，注入 mock 不调真 exec
+- `sandbox/env-gate.test.ts` — `resolveSandboxRunnerFromEnv` env 解析
+
+### MVP 边界（不是）
+
+- **不** 做完整 policy language（Sprint D-15）
+- **不** 做 per-tool permission UI
+- **不** 做 TUI / MCP / 远程容器
+- **不** 做 rootless Docker 自动安装
+- **不** 改 edit_file/hashline
+- **不** 一次性把所有工具迁入 Docker（先 BashTool）
+
+
 ## 4 包 Monorepo 结构（对齐 pi）
 
 ```
