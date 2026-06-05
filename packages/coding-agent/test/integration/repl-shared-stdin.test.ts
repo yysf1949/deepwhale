@@ -282,7 +282,21 @@ describe('REPL turn-guard + shutdown cleanup (D-19.5)', () => {
       expect(readFileSync(target, 'utf8')).toBe('d19.5-p1-tight-exit');
 
       // 验证 2: session 落 user_approved (confirm y 走通)
-      p.catch(() => {});
+      // === Sprint 1c-revive-3-D-19.6 (2026-06-05): P3 /exit 测试必须 await p resolve ===
+      // 拍板 (D-19.6, user review 2026-06-05 P3): 老逻辑 p.catch(() => {}) 只 swallow
+      // 错误, 不断言 p 真 resolve. fast-path finish 失败时测试仍可能假绿. 修复: 用
+      // Promise.race 加硬 timeout 兜底. 5s margin 推导: Windows focused suite 实测
+      // 200ms 完成 /exit fast-path, 5s = 25x 安全边际. P1 commit (21c889a) 把 close
+      // 路径改 pendingExit + finally 兜底, p 必然 resolve (不再 sync finish + hang).
+      await Promise.race([
+        p,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('REPL did not exit within 5s (P3 fix)')),
+            5000,
+          ),
+        ),
+      ]);
       const events = await readSessionEvents(harness.sessionPath);
       const policyEvents = events.filter((e) => e.kind === 'policy_decision');
       const approved = policyEvents.find((e) => e.kind === 'policy_decision' && e.decision === 'user_approved');
