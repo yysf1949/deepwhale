@@ -370,6 +370,34 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         }
       }
 
+      // === Sprint 1c-revive-3-D-19.6 (2026-06-05): P2 turn guard deny 非 /exit builtin ===
+      // 拍板 (D-19.6, user review 2026-06-05 P2): 老逻辑 L373 注释"内建命令全部
+      // fast-path, 不走 turnInFlight"在 turn 正在跑时仍然跑 builtin, e.g. /verify
+      // 调 runVerify + 写 verification event, /help 写 out + prompt, /unknown
+      // 写 out + prompt, 都跟 in-flight chat turn 输出/session 交错, 违背
+      // "turn running 时下一行不进入 builtin/chat" 的 review 语义.
+      // 修复: turnInFlight 时, 除 /exit /quit /exit /quit /'' 之外的 builtin 走
+      // deny, 输出 i18n 提示 (cli.turn_in_flight_deny) + prompt + return, 不入
+      // lineQueue. 选择 deny 而非 defer, 因为 lineQueue 在 D-19.5 已有红线 (L407):
+      // "lineQueue 只排 chat line", defer 会让 finally drain 还要判 builtin vs chat.
+      //
+      // 位置红线: 必须 confirm 守卫 (L341-358) 之后, 内建命令 dispatcher (L373 起始)
+      // 之前. confirm 期间 /exit 走 dismiss+pendingExit (D-19.5 P1), 不应被本守卫拦.
+      // /exit /quit /exit /quit 走 fast-path (L378), 也不应被拦. 空行 L374 调
+      // prompt() 也不应被拦 (空行 ≠ 内建命令).
+      if (
+        turnInFlight &&
+        line !== '' &&
+        line !== 'exit' &&
+        line !== 'quit' &&
+        line !== '/exit' &&
+        line !== '/quit'
+      ) {
+        out.write(`${t('cli.turn_in_flight_deny')}\n\n`);
+        prompt();
+        return;
+      }
+
       // 内建命令 — 全部 fast-path, 不走 turnInFlight (内建不等 chat turn)
       if (line === '') {
         prompt();
