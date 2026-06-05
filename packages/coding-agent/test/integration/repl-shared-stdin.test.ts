@@ -77,6 +77,11 @@ interface ReplHarness {
   exit: () => void;
   outChunks: string;
   sessionPath: string;
+  /**
+   * Sprint 1c-revive-3-D-19.5 (2026-06-05): 暴露 input PassThrough, 让测能调
+   * input.end() 模拟 EOF (P2-dismiss 测需要). 之前只暴露 write/exit, 没法真 EOF.
+   */
+  endInput: () => void;
 }
 
 function buildReplHarness(toolCall: {
@@ -135,6 +140,11 @@ function buildReplHarness(toolCall: {
       return Buffer.concat(outChunks).toString();
     },
     sessionPath,
+    endInput: () => {
+      // Sprint 1c-revive-3-D-19.5 (2026-06-05): 模拟 stdin EOF, 触发 rl 'close'
+      // handler (dismiss pending confirm + abort turn + finish 链路).
+      input.end();
+    },
   };
 }
 
@@ -228,5 +238,165 @@ describe('REPL shared-stdin (D-19)', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('REPL turn-guard + shutdown cleanup (D-19.5)', () => {
+  // === Sprint 1c-revive-3-D-19.5 (2026-06-05): 3 个 review finding 补测 ===
+  // 拍板 (D-19.5, user review 2026-06-05): D-19 baseline 测用 setTimeout(100) 模拟
+  // turn 跑完, 没覆盖"input 还在 stdin 排队 + turn 没完" 的真 race. 这里 3 个测
+  // 精确触发 3 个 finding, 用最小 mock 让 turn 真在跑 + input 紧贴派发.
+  //
+  // 测 1 (P1 修法): y\n/exit\n 紧贴 — 期望 /exit 走 fast-path (标 pendingExit),
+  // turn 跑完 finally 兜底 finish, /exit 不 leak 到 chat 分支 (不入 user events).
+  //
+  // 测 2 (P2-dismiss): EOF during confirm — confirm 还在 pending 时 input.end(),
+  // 期望 confirm dismiss (resolve null) + 落 user_denied + finish 正常 + 不 hang.
+  //
+  // 测 3 (P2-SIGINT): 多次 startRepl/finish 后 SIGINT listener delta = 0.
+
+  it('P1: confirm 后 /exit 紧贴输入不入 chat, finish 走 fast-path (review finding 2026-06-05)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dw-repl-d195-p1-'));
+    const target = join(dir, 'target.txt');
+    const harness = buildReplHarness({
+      id: 'c1',
+      name: 'write_file',
+      args: { path: target, content: 'd19.5-p1-tight-exit' },
+    });
+
+    try {
+      const p = harness.start();
+      await new Promise((r) => setImmediate(r));
+      // 触发 confirm prompt
+      harness.write('please write to file');
+      await new Promise((r) => setTimeout(r, 100));
+      // y + /exit 紧贴 — 模拟用户一次性输入
+      harness.write('y');
+      // 不等 100ms, 立刻 /exit (race: 旧版本 /exit 会 leak 到 chat)
+      harness.write('/exit');
+      // 给 startRepl 足够时间 drain + finish
+      await new Promise((r) => setTimeout(r, 200));
+
+      // 验证 1: 工具真落盘 (y 走通)
+      expect(existsSync(target)).toBe(true);
+      expect(readFileSync(target, 'utf8')).toBe('d19.5-p1-tight-exit');
+
+      // 验证 2: session 落 user_approved (confirm y 走通)
+      p.catch(() => {});
+      const events = await readSessionEvents(harness.sessionPath);
+      const policyEvents = events.filter((e) => e.kind === 'policy_decision');
+      const approved = policyEvents.find((e) => e.kind === 'policy_decision' && e.decision === 'user_approved');
+      expect(approved, 'confirm y 应该落 user_approved').toBeDefined();
+
+      // 验证 3: /exit 不入 user events (D-19.5 P1 修法: turnInFlight 守卫排队后
+      // turn 跑完 finally 走 finish, /exit 不 leak 到 chat 分支)
+      const userEvents = events.filter((e) => e.kind === 'user');
+      const userContents = userEvents.map((e) => (e.kind === 'user' ? e.content : ''));
+      expect(userContents).toContain('please write to file');
+      expect(userContents, '/exit 不应入 user events (D-19.5 P1 修法)').not.toContain('/exit');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('P2-dismiss: confirm pending 时 input.end() → confirm resolve null + 工具不执行 + finish 不 hang (review finding 2026-06-05)', async () => {
+    // 拍板 (D-19.5): 这测核心验证 rl.close handler 不会让 confirm Promise 永远悬空.
+    // 旧版本: rl 'close' → finish(0) 直接走, confirm 还在 pending → policy.confirm
+    // 永远不 resolve → turn finally 不跑 → REPL 进程表面退出但内部 promise 链悬空.
+    // 修后: close → dismiss + abort + finish 链路完整, startRepl 能在 1s 内 resolve.
+    //
+    // 红线: 不强求 user_denied event 一定落 — turn 跑到 policy.confirm 才写 audit,
+    // dismiss 落 audit 还要求 turn 走完 finally, 时序复杂. 这里只验证:
+    //   1) startRepl 1s 内 finish (旧版本会 hang)
+    //   2) 工具没真执行 (confirm dismiss 后 tool step 走 user_denied return success=false)
+    const dir = mkdtempSync(join(tmpdir(), 'dw-repl-d195-eof-'));
+    const target = join(dir, 'target.txt');
+    const harness = buildReplHarness({
+      id: 'c1',
+      name: 'write_file',
+      args: { path: target, content: 'd19.5-eof-during-confirm' },
+    });
+
+    try {
+      let resolved = false;
+      const p = harness.start().then((code) => {
+        resolved = true;
+        return code;
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      // 触发 confirm prompt
+      harness.write('please write to file');
+      await new Promise((r) => setTimeout(r, 100));
+      // 工具没真执行 (target 还没在), confirm 还在 pending — EOF
+      // 期望: rl 'close' handler dismiss confirm + abort turn + finish(0)
+      harness.endInput();
+      // 给 finish 时间 (race: 旧版本 confirm Promise 悬空, p 永远不 resolve)
+      const code = await Promise.race([
+        p,
+        new Promise<number>((_, reject) => setTimeout(() => reject(new Error('startRepl finish 超时 (dismiss 失败)')),
+          2000)),
+      ]);
+      expect(resolved, 'startRepl 应该 resolve (旧版本会 hang)').toBe(true);
+      expect(code).toBe(0);
+
+      // 验证: 工具**没**执行 (confirm dismissed, 走 user_denied return)
+      expect(existsSync(target), '工具不应在 dismiss 后真落盘').toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('P2-SIGINT: 多次 startRepl/finish 后 process SIGINT listener delta = 0 (review finding 2026-06-05)', async () => {
+    // 拍板 (D-19.5): 测 3 不依赖 REPL turn 行为, 只断言 listener 计数.
+    // 用 buildReplHarness + /exit 走完完整 startRepl → finish 流程, 验证 listener
+    // 不累积. 红线: 不能用绝对值断言 (vitest 内部可能挂 SIGINT), 用 startRepl
+    // 之前 / 之后 delta = 0.
+    const harness = buildReplHarness({
+      id: 'c1',
+      name: 'write_file',
+      args: { path: join(mkdtempSync(join(tmpdir(), 'dw-repl-d195-sigint-')), 't.txt') },
+    });
+
+    // baseline 计数 (在 startRepl 之前)
+    const before = process.listenerCount('SIGINT');
+    const p = harness.start();
+    // 等 startRepl 内部 await writer.open() + createInterface + process.on('SIGINT')
+    // 走完. setImmediate 不够 — startRepl 内部有 await, 需要给点时间.
+    await new Promise((r) => setTimeout(r, 50));
+    // startRepl 内部 process.on('SIGINT', onSigint) — 应该 +1
+    const during = process.listenerCount('SIGINT');
+    expect(during, 'startRepl 应该挂 1 个 SIGINT listener').toBe(before + 1);
+
+    // /exit 触发 finish → process.off('SIGINT', onSigint) 应该 -1, 回到 baseline
+    harness.exit();
+    const code = await Promise.race([
+      p,
+      new Promise<number>((_, reject) => setTimeout(() => reject(new Error('startRepl finish 超时')), 1000)),
+    ]);
+    expect(code).toBe(0);
+
+    // 等 microtask 队列消化 (finish 内部 await writer.close())
+    await new Promise((r) => setImmediate(r));
+    const after = process.listenerCount('SIGINT');
+    expect(after, `D-19.5 P2-SIGINT 修法: finish 后 listener delta 应 = 0, 实际 before=${before} after=${after}`).toBe(before);
+
+    // 第二次 startRepl → finish, 验证也不增长
+    const harness2 = buildReplHarness({
+      id: 'c1',
+      name: 'write_file',
+      args: { path: join(mkdtempSync(join(tmpdir(), 'dw-repl-d195-sigint-')), 't.txt') },
+    });
+    const p2 = harness2.start();
+    await new Promise((r) => setTimeout(r, 50));
+    const during2 = process.listenerCount('SIGINT');
+    expect(during2, '第二次 startRepl 仍只挂 1 个').toBe(after + 1);
+    harness2.exit();
+    await Promise.race([
+      p2,
+      new Promise<number>((_, reject) => setTimeout(() => reject(new Error('startRepl finish 超时')), 1000)),
+    ]);
+    await new Promise((r) => setImmediate(r));
+    const after2 = process.listenerCount('SIGINT');
+    expect(after2, '第二次 finish 后 listener 回到 after (不累积)').toBe(after);
   });
 });

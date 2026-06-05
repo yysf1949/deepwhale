@@ -268,9 +268,17 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   return new Promise<number>((resolve) => {
     let exiting = false;
 
+    // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P2-SIGINT 修法 — finish 移除全局 listener ===
+    // 拍板 (D-19.5, user review 2026-06-05 P2): repl.ts:307 每次 startRepl() 挂全局
+    // process.on('SIGINT'), finish() 没 process.off, 嵌入式/测试多次启动 REPL → 累积
+    // listener. 后 Ctrl+C 触发已退出 REPL 的闭包. 修法: finish() 入口先 .off 一次.
+    // 顺序: .off 必须在 rl.close() 之前, 否则 close 派发 'close' event 期间 Ctrl+C 还能
+    // 触达 onSigint 闭包. 红线: 跟 D-19 P2-Ctrl+C 拍板不冲突 — finish 才清理, SIGINT
+    // 触发的 dismiss + abort 仍由 onSigint 兜底 (D-19 行为不变).
     const finish = async (code: number): Promise<void> => {
       if (exiting) return;
       exiting = true;
+      process.off('SIGINT', onSigint);
       rl.close();
       if (writer) {
         try {
@@ -282,6 +290,22 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       out.write(`${t('cli.goodbye')}\n`);
       resolve(code);
     };
+
+    // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard + 排队 + SIGINT/dismiss 链路 ===
+    // 拍板 (D-19.5, user review 2026-06-05 P1): 旧 line handler 在 confirm settle 之后, 紧
+    // 跟的下一行 (e.g. /exit\n) 立刻 leak 到 main chat/builtin 分支, /exit 提前 close
+    // writer, 第二轮 chat 用旧 workingMessages 并发跑. 修法: turnInFlight 闭包标志 +
+    // lineQueue 排队, 关键时序:
+    //   - 派发前检查 turnInFlight, true → 入队不入 chat
+    //   - turn 跑完在 finally 块: 检查 pendingExit (走 finish) → 否则 drain 下一条
+    //   - /exit fast-path: turn 在跑时只标 pendingExit, finally 兜底; turn 不在跑时直接
+    //     finish (exiting 守卫幂等)
+    //   - confirm 期间: 旧 D-19 offerLine 派发仍走, 但 line 不能 leak 到 chat 分支
+    //   - drain 用 setImmediate 避免同步递归爆栈 (P-verify-4 实测, 同步 emit 在大量排队
+    //     时撞 V8 10000 帧限制)
+    let turnInFlight = false;
+    let pendingExit = false;
+    const lineQueue: string[] = [];
 
     // === Sprint 1c-revive-3-D-19 (2026-06-05): P2-Ctrl+C 修法 — turn AbortController ===
     // 拍板 (D-19): turnAbortController 闭包共享, 让 SIGINT handler 能 abort 它,
@@ -312,7 +336,18 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       // === Sprint 1c-revive-3-D-19 (2026-06-05): P1 修法 — 串行化 confirm 期间 line 消费 ===
       // 拍板 (D-19): 主 rl 是 stdin 唯一消费者. 确认期间收到的 line 必须喂给 confirm
       // resolver, 不能入 chat. 修 D-15 P1 (同流双 readline 抢同一行 → y 被当新 chat turn).
+      // === Sprint 1c-revive-3-D-19.5 (2026-06-05): 补 — confirm 期间 /exit 不入 chat, dismiss 兜底 ===
+      // 拍板 (D-19.5, user review 2026-06-05 P1): 旧逻辑 confirm 期间 /exit 走到下面
+      // /exit 分支直接 await finish(0), 但 confirm 还在 pending → finish 里 rl.close
+      // 后 confirm Promise 永远悬空 (跟 P2-dismiss 同源). 修法: confirm 期间 /exit 先
+      // dismiss confirm 再标记 pendingExit, finally 兜底 finish. 顺序: dismiss 先
+      // (让 runToolLoop 走 user_denied 审计), 再标 pendingExit.
       if (confirmController.hasPending()) {
+        if (line === 'exit' || line === 'quit' || line === '/exit' || line === '/quit') {
+          confirmController.dismiss();
+          pendingExit = true;
+          return;
+        }
         const consumed = confirmController.offerLine(line);
         if (consumed) {
           // confirm resolver 已 settle, 等待 promise 走完; 调 prompt() 让用户看见下一轮.
@@ -322,12 +357,17 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         }
       }
 
-      // 内建命令
+      // 内建命令 — 全部 fast-path, 不走 turnInFlight (内建不等 chat turn)
       if (line === '') {
         prompt();
         return;
       }
       if (line === 'exit' || line === 'quit' || line === '/exit' || line === '/quit') {
+        // 拍板 (D-19.5): turn 不在跑直接 finish; 在跑标 pendingExit, finally 兜底.
+        if (turnInFlight) {
+          pendingExit = true;
+          return;
+        }
         await finish(0);
         return;
       }
@@ -380,6 +420,19 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         return;
       }
 
+      // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard — 排队 turnInFlight 期间 line ===
+      // 拍板 (D-19.5, user review 2026-06-05 P1): 旧逻辑紧跟 chat turn 的下一行 (紧贴
+      // y\n 或 turn 还没跑完时 stdin 排队的行) 立刻进 chat 分支, 用旧 workingMessages
+      // 并发跑第二轮, /exit 提前 close writer. 修法: 派发前检查 turnInFlight, true
+      // → 入队不入 chat. finally 块跑完 turn, 检查 pendingExit (走 finish) → 否则
+      // drain lineQueue 下一条 (setImmediate 避免爆栈). 红线: pendingExit 优先级高于
+      // drain, 因为 /exit 应该是"不处理后续, 立刻走"语义, 不应该 drain 排队行.
+      if (turnInFlight) {
+        lineQueue.push(line);
+        return;
+      }
+      turnInFlight = true;
+
       // chat — Sprint 1c-revive-2-D-11-4 review P1 修复: client lazy 化后, chat
       // 路径首次调 tryCreateClient() 真创. 创失败 (无 key) → i18n stderr 提示 + 跳
       // 过本次 turn (不退出 REPL, 用户可继续 /verify 或 /exit).
@@ -391,6 +444,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       const c = clientFromOptions ? { client: clientFromOptions, error: null } : tryCreateClient();
       if (c.client === null) {
         err.write(`${t('error.api_key_missing')}\n\n`);
+        turnInFlight = false;
         prompt();
         return;
       }
@@ -419,12 +473,40 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
           }
         }
       } finally {
-        prompt();
+        // === Sprint 1c-revive-3-D-19.5 (2026-06-05): drain lineQueue / 走 pendingExit ===
+        // 拍板 (D-19.5): turn 跑完 → 1) pendingExit=true 走 finish (丢弃排队);
+        // 2) 否则 drain 下一条 line (setImmediate 避免同步递归爆栈);
+        // 3) 都 false → prompt 继续. 顺序: pendingExit 优先, 不然用户 /exit 后还跑排队行.
+        // 红线: finally 不能 return (no-unsafe-finally), 用 if/else if/else 链.
+        turnInFlight = false;
+        if (pendingExit) {
+          pendingExit = false;
+          void finish(0);
+        } else if (lineQueue.length > 0 && !exiting) {
+          const next = lineQueue.shift()!;
+          setImmediate(() => rl.emit('line', next));
+        } else {
+          prompt();
+        }
       }
     });
 
     rl.on('close', () => {
       // stdin EOF（管道/Ctrl-D）→ 优雅退出
+      // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P2-dismiss 修法 — close 期间清理 pending confirm + abort turn ===
+      // 拍板 (D-19.5, user review 2026-06-05 P2): 旧逻辑只调 finish(0), 忽略两种悬空:
+      //   1) confirm 还在 pending → policy.confirm() Promise 永远不 resolve, turn 不会
+      //      走 finally, session 不会落 user_denied 审计.
+      //   2) turn 还在跑 → LLM stream / tool exec 还在 await, 进程表面已关但内部链未断.
+      // 修法: close 时先 dismiss pending confirm (resolve null → tool 走 user_denied 落审计),
+      // 再 abort turnAbortController 让 runAgentTurn 走 finally 收束. 顺序: dismiss 先于
+      // abort, 因为 confirm resolve 后 runToolLoop 才检查 signal, 调换会丢 audit 路径.
+      if (confirmController.hasPending()) {
+        confirmController.dismiss();
+      }
+      if (turnInFlight && !turnAbortController.signal.aborted) {
+        turnAbortController.abort();
+      }
       void finish(0);
     });
 
