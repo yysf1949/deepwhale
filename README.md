@@ -315,6 +315,104 @@ DOCKER_INTEGRATION=1 pnpm test -- docker-sandbox
 - **不** 改 edit_file/hashline
 - **不** 一次性把所有工具迁入 Docker（先 BashTool）
 
+## Permission / Policy (D-13, MVP)
+
+> **Sprint 1c-revive-3-D-13**（2026-06-05）：默认静态规则 + 可注入 `ToolPolicy`。
+> bash/write/edit 在 destructive 路径上 require_confirmation;非交互模式默认 deny;
+> `--yes` 只 bypass `require_confirmation`,不 bypass `deny`;session 记录 `policy_decision`（只
+> deny/require_confirmation/user_approved/user_denied 写,`allow` 不写避免 JSONL 刷爆）。
+
+### 3 mode × isInteractive 矩阵
+
+| 模式           | isInteractive | write/edit 默认                            | 危险 bash 默认         |
+| -------------- | ------------- | ------------------------------------------ | ---------------------- |
+| REPL (default) | `true`        | `require_confirmation` (REPL 注入 confirm) | `require_confirmation` |
+| print (`-p`)   | `false`       | deny（**非交互默认 deny**）                | deny                   |
+| rpc (`--rpc`)  | `false`       | deny（D-15 扩 confirmedTools 协议）        | deny                   |
+
+### `--yes` 标志
+
+`deepwhale -p ... --yes` / `deepwhale --rpc --yes` / REPL 启动时 `--yes`:
+
+- ✅ **bypass** `require_confirmation`（写文件/edit/危险 bash 自动 allow）
+- ❌ **不** bypass `deny`（拍板红线, audit 不能被 yes 抹平）
+- session 每次 `policy_decision` 事件都落 (除 `allow` 外)
+
+### 默认静态规则 (src/policy/static-rules.ts)
+
+| 工具                          | 决策                                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `read_file` / `find` / `grep` | `allow`                                                                                                          |
+| `write_file` / `edit_file`    | `require_confirmation` (`writes to filesystem`)                                                                  |
+| `bash` (工具层静态)           | `allow`（bash 工具层用 allowlist + dangerous pattern 双重防御; 第二道防线是 tool-loop 调 `evaluateBashCommand`） |
+| bash 危险模式                 | `require_confirmation` (`rm -rf /`, `rm -rf ~`, `mkfs`, `dd if=`, `shutdown`, `> /dev/sda`)                      |
+
+### 注入自定义 ToolPolicy
+
+```ts
+import { createDefaultRegistry, type ToolPolicy } from '@deepwhale/coding-agent';
+
+const myPolicy: ToolPolicy = {
+  evaluate(toolCall, ctx) {
+    if (toolCall.name === 'bash' && /prod-db/.test(String(toolCall.argsDigest))) {
+      return { decision: 'deny', reason: 'prod-db hash detected' };
+    }
+    return { decision: 'allow' };
+  },
+};
+
+const registry = createDefaultRegistry({ sandboxRunner });
+await runToolLoop(client, messages, {
+  registry,
+  policy: myPolicy,
+  isInteractive: false,
+  yes: false,
+  writer, // 可选, 落 policy_decision 到 session
+});
+```
+
+### SessionEvent policy_decision
+
+拍板 (用户 2026-06-05):
+
+- `'allow'` **不** 落盘 (避免 JSONL 刷爆)
+- `'deny' | 'require_confirmation' | 'user_approved' | 'user_denied'` 落 `'policy_decision'` event
+- 字段: `tool_call_id` (跟后续 `tool` event 配对) + `name` + `decision` + `argsDigest` (sha256:12hex) + `reason` (sanitize 后 ≤ 200 字符, 换行折叠, 去 NUL)
+- `argsDigest` 拍板: 不存原始 args, 用稳定 JSON (key 排序) + sha256 前 12 位
+- 跟 `'compaction'` / `'compaction_paused'` / `'verification'` 同语义: metadata, `sessionEventsToMessages` 跳过, 不进 LLM context
+
+```jsonl
+{"kind":"assistant","ts":2,"content":"","tool_calls":[{"id":"c1","name":"write_file","args":{"path":"/etc/hosts","content":"..."}}]}
+{"kind":"policy_decision","ts":3,"tool_call_id":"c1","name":"write_file","decision":"deny","argsDigest":"sha256:abcdef012345","reason":"non-interactive mode: writes to filesystem","meta":{"isInteractive":false}}
+{"kind":"tool","ts":4,"tool_call_id":"c1","name":"write_file","result":{"success":false,"content":"","error":"policy_blocked: non-interactive mode: writes to filesystem"},"duration_ms":0,"meta":{"argsDigest":"sha256:abcdef012345","policy":"require_confirmation","isInteractive":false}}
+```
+
+### 验收红线 (D-13 拍板)
+
+1. ✅ 默认情况下 agent 不能无确认执行 destructive write/bash (`policy_blocked`)
+2. ✅ 非交互模式不能假装确认 (`isInteractive=false` + `require_confirmation` → `deny`)
+3. ✅ `--yes` 明确可追踪 (bypass `require_confirmation` 不 bypass `deny`, session 每次 bypass 落 `user_approved` event)
+
+### MVP 边界（不是）
+
+- ❌ User config file 注入 ToolPolicy (D-15)
+- ❌ Per-tool 详细权限 UI (D-15)
+- ❌ RPC 协议扩 `confirm` 通知 / `confirmedTools` (D-15)
+- ❌ Cross-process file lock / race 真防 (D-15+ inotify)
+- ❌ Secret 强检测 (redact API key in reason) (D-15)
+- ❌ 路径白名单/黑名单 (D-15)
+- ❌ Bash argv deep parse (e.g. shlex) (D-15)
+
+### 单测覆盖
+
+- `policy/types.test.ts` — PolicyDecision union + PolicyContext 形状
+- `policy/static-rules.test.ts` — 6 工具名分支 + bash 危险 regex (10 个模式命中 + 6 个安全命令 allow)
+- `policy/chain.test.ts` — `yes=true` bypass require_confirmation, **不** bypass deny (5 tests)
+- `policy/args-digest.test.ts` — 稳定 JSON (key 排序) + sha256 12 hex + secret 不暴露 (7 tests)
+- `policy/sanitize-reason.test.ts` — 长度 200 cap + 换行折叠 + NUL 去 (8 tests)
+- `core/test/session/policy-decision.test.ts` — round-trip + 不进 LLM context + 旧 session reload 不崩 (4 tests)
+- `integration/tool-loop-policy.test.ts` — 端到端 8 例覆盖验收红线
+
 ## 4 包 Monorepo 结构（对齐 pi）
 
 ```
