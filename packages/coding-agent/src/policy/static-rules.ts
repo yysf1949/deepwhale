@@ -61,8 +61,11 @@ function evaluateByToolName(name: ToolName, _argsDigest: string): PolicyDecision
       // 保守返 allow (bash tool 会自己再过一遍 evaluateBashCommand).
       return { decision: 'allow' };
     default: {
-      // 兜底: 未注册 tool 走 deny. name cast never 让 TS 拍板 exhaustive.
-      return { decision: 'deny', reason: `unknown tool: ${String(name as never)}` };
+      // 兜底: "未在白名单" 的 tool (含 caller 自注册 tool, e.g. test 'hanger') 走 allow.
+      // 拍板 (D-13): 'tool-not-found' 已经在 executeToolCall 上层 (registry.get 拍)
+      // 拦了, policy 这层不需要再判 unknown. 给 caller 自定义 tool 留口 (D-15 user config 接入
+      // 也会用 default 分支).
+      return { decision: 'allow' };
     }
   }
 }

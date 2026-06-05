@@ -28,8 +28,16 @@
 
 import type { ChatMessage, ChatResult, LLMClient, LLMToolSchema, ToolCall } from '@deepwhale/llm';
 import { canonicalizeSchema, LLMStreamError, LLMUnknownError } from '@deepwhale/llm';
+import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolResult } from '../types.js';
 import type { ToolRegistry } from '../tools/registry.js';
+import type { ToolPolicy } from '../policy/types.js';
+import { evaluatePolicy } from '../policy/chain.js';
+import { staticToolPolicy, evaluateBashCommand } from '../policy/static-rules.js';
+import { computeArgsDigest } from '../policy/args-digest.js';
+import { sanitizeReason } from '../policy/sanitize-reason.js';
+import { appendPolicyDecisionEvent } from './session-adapter.js';
+import type { SessionWriter } from '@deepwhale/core';
 
 /** Sprint 1a 默认：跟 LLM 来回 5 轮（够用 coding agent 短任务，长任务 caller 调高）。 */
 export const TOOL_LOOP_DEFAULT_MAX_STEPS = 5;
@@ -45,6 +53,18 @@ export interface ToolLoopOptions {
   onChunk?: (chunk: { content?: string; tool_calls?: ReadonlyArray<ToolCall> }) => void;
   /** 外部 abort signal（Ctrl-C / session 结束）。 */
   signal?: AbortSignal;
+  /**
+   * Sprint 1c-revive-3-D-13 (2026-06-05): tool call policy.
+   * 默认 staticToolPolicy. 显式传 null = 不检查 (单测用).
+   * 拍板: 'allow' 不写 session, 只有 deny / require_confirmation 落 policy_decision.
+   */
+  policy?: ToolPolicy | null;
+  /** Sprint 1c-revive-3-D-13: 模式是否可交互 (REPL = true, print/rpc 默认 = false). */
+  isInteractive?: boolean;
+  /** Sprint 1c-revive-3-D-13: --yes 标志. yes=true bypass require_confirmation, 不 bypass deny. */
+  yes?: boolean;
+  /** Sprint 1c-revive-3-D-13: session writer 注入 (写 policy_decision event 用). */
+  writer?: SessionWriter | null;
 }
 
 export type ToolLoopStep =
@@ -169,7 +189,12 @@ export async function runToolLoop(
       if (options.signal?.aborted) {
         throw new LLMUnknownError('Tool loop aborted by caller', { cause: options.signal.reason });
       }
-      const toolResult = await executeToolCall(registry, tc, toolTimeoutMs, options.signal);
+      const toolResult = await executeToolCall(registry, tc, toolTimeoutMs, options.signal, {
+        ...(options.policy !== undefined ? { policy: options.policy } : {}),
+        ...(options.isInteractive !== undefined ? { isInteractive: options.isInteractive } : {}),
+        ...(options.yes !== undefined ? { yes: options.yes } : {}),
+        ...(options.writer !== undefined ? { writer: options.writer } : {}),
+      });
       const toolMsg: ChatMessage = {
         role: 'tool',
         content: formatToolResult(toolResult),
@@ -216,12 +241,21 @@ function buildLlmTools(tools: ReadonlyArray<Tool>): ReadonlyArray<LLMToolSchema>
  * 调单个 tool。
  * Sprint 1a：直接 execute()，不做 schema 校验(LLM 错了包成 tool 错误继续)。
  * Sprint 1a 超时策略：toolTimeoutMs 由外层 setTimeout + AbortController 统一包。
+ * Sprint 1c-revive-3-D-13 (2026-06-05): policy gate 在 execute 之前.
+ *   拍板: deny / require_confirmation 都返 success=false, LLM 续聊看到 tool 错误.
+ *   bash 工具自身用 evaluateBashCommand 拍 cmd 危险模式, 双重防线 (tool-loop 一层 + bash 工具一层).
  */
 async function executeToolCall(
   registry: ToolRegistry,
   tc: ToolCall,
   toolTimeoutMs: number | undefined,
   externalSignal: AbortSignal | undefined,
+  options: {
+    policy?: ToolPolicy | null;
+    isInteractive?: boolean;
+    yes?: boolean;
+    writer?: SessionWriter | null;
+  } = {},
 ): Promise<ToolResult> {
   const tool = registry.get(tc.name);
   if (!tool) {
@@ -233,6 +267,121 @@ async function executeToolCall(
         .map((t) => t.name)
         .join(', ')}`,
     };
+  }
+
+  // Sprint 1c-revive-3-D-13: policy check (在 execute 之前, 拍板红线 deny 默认走 fail-closed)
+  // 拍板 (用户 2026-06-05):
+  //   - 'allow' 不写 session, 也不在 tool result 里加 meta
+  //   - 'deny' / 'require_confirmation' 走 fail-closed: tool 不执行, 返 success=false
+  //   - 非交互模式 + require_confirmation → policy_blocked (no interactive confirmation)
+  //   - session 写 fail → 抛 (audit 红线, 写不进就拒绝继续)
+  if (options.policy !== null) {
+    const policy = options.policy ?? staticToolPolicy;
+    const argsDigest = computeArgsDigest(tc.args);
+    const ctx = {
+      isInteractive: options.isInteractive ?? false,
+      yes: options.yes ?? false,
+      argsDigest,
+    };
+    let decision = evaluatePolicy({ name: tc.name as ToolName, argsDigest }, ctx, policy);
+
+    // bash 工具自身层用 evaluateBashCommand 拍 cmd 危险模式 (双重防线).
+    // tool-loop 这层 staticToolPolicy 走 allow, 不会 deny; 改走 bash 自身层.
+    if (tc.name === 'bash' && decision.decision !== 'deny' && decision.decision === 'allow') {
+      const cmd = (tc.args['command'] as string | undefined) ?? '';
+      const args = (tc.args['args'] as ReadonlyArray<string> | undefined) ?? [];
+      const bashDecision = evaluateBashCommand(cmd, args);
+      if (bashDecision.decision === 'require_confirmation') {
+        decision = evaluatePolicy({ name: tc.name as ToolName, argsDigest }, ctx, {
+          evaluate: () => bashDecision,
+        });
+      }
+    }
+
+    if (decision.decision === 'deny') {
+      const reason = sanitizeReason(decision.reason);
+      // 落 session (拍板: 'deny' 写 policy_decision)
+      if (options.writer) {
+        await appendPolicyDecisionEvent(options.writer, {
+          tool_call_id: tc.id,
+          name: tc.name,
+          decision: 'deny',
+          argsDigest,
+          reason,
+        });
+      }
+      return {
+        success: false,
+        content: '',
+        error: `policy_blocked: ${reason}`,
+        meta: { argsDigest, policy: 'deny' },
+      };
+    }
+    if (decision.decision === 'require_confirmation') {
+      // 非交互模式: 默认 deny (print/rpc 无用户确认)
+      if (!ctx.isInteractive) {
+        const reason = sanitizeReason(`non-interactive mode: ${decision.reason}`);
+        if (options.writer) {
+          await appendPolicyDecisionEvent(options.writer, {
+            tool_call_id: tc.id,
+            name: tc.name,
+            decision: 'deny',
+            argsDigest,
+            reason,
+            meta: { isInteractive: false },
+          });
+        }
+        return {
+          success: false,
+          content: '',
+          error: `policy_blocked: ${reason}`,
+          meta: { argsDigest, policy: 'require_confirmation', isInteractive: false },
+        };
+      }
+      // 交互模式: 调 policy.confirm (REPL 注入; D-13 MVP 留 undefined 兜底 deny)
+      if (typeof policy.confirm === 'function') {
+        const ok = await policy.confirm(`Allow ${tc.name}? (${sanitizeReason(decision.reason)})`);
+        const userDecision: 'user_approved' | 'user_denied' =
+          ok === true ? 'user_approved' : 'user_denied';
+        if (options.writer) {
+          await appendPolicyDecisionEvent(options.writer, {
+            tool_call_id: tc.id,
+            name: tc.name,
+            decision: userDecision,
+            argsDigest,
+            reason: ok === true ? 'user approved' : `user ${ok === false ? 'denied' : 'dismissed'}`,
+          });
+        }
+        if (ok !== true) {
+          return {
+            success: false,
+            content: '',
+            error: `policy_blocked: user ${ok === false ? 'denied' : 'dismissed'} confirmation`,
+            meta: { argsDigest, policy: 'require_confirmation', userDecision: ok },
+          };
+        }
+      } else {
+        // 没 confirm 实现: 兜底 deny (fail-closed, R-3 拍板)
+        const reason = sanitizeReason(`no confirm impl: ${decision.reason}`);
+        if (options.writer) {
+          await appendPolicyDecisionEvent(options.writer, {
+            tool_call_id: tc.id,
+            name: tc.name,
+            decision: 'deny',
+            argsDigest,
+            reason,
+            meta: { reason: 'no-confirm-impl' },
+          });
+        }
+        return {
+          success: false,
+          content: '',
+          error: `policy_blocked: ${reason}`,
+          meta: { argsDigest, policy: 'require_confirmation', reason: 'no-confirm-impl' },
+        };
+      }
+    }
+    // 'allow' 走默认, 不落 session, 不返特殊 meta
   }
 
   // Sprint 1a 修 P2-B:tool 自带 timeout 不支持,通过外层 setTimeout + Promise.race 包一层强制中断。
@@ -277,7 +426,8 @@ async function executeToolCall(
     };
   } catch (err) {
     // 区分是 tool 自身抛错,还是 timeout/abort 包出来的错
-    const isSynthetic = err === timeoutReason || (err instanceof Error && /^(aborted:)/.test(err.message));
+    const isSynthetic =
+      err === timeoutReason || (err instanceof Error && /^(aborted:)/.test(err.message));
     return {
       success: false,
       content: '',
