@@ -322,13 +322,29 @@ DOCKER_INTEGRATION=1 pnpm test -- docker-sandbox
 > `--yes` 只 bypass `require_confirmation`,不 bypass `deny`;session 记录 `policy_decision`（只
 > deny/require_confirmation/user_approved/user_denied 写,`allow` 不写避免 JSONL 刷爆）。
 
-### 3 mode × isInteractive 矩阵
+### 3 mode × isInteractive × bypass 矩阵
 
-| 模式           | isInteractive | write/edit 默认                            | 危险 bash 默认         |
-| -------------- | ------------- | ------------------------------------------ | ---------------------- |
-| REPL (default) | `true`        | `require_confirmation` (REPL 注入 confirm) | `require_confirmation` |
-| print (`-p`)   | `false`       | deny（**非交互默认 deny**）                | deny                   |
-| rpc (`--rpc`)  | `false`       | deny（D-15 扩 confirmedTools 协议）        | deny                   |
+> **Sprint 1c-revive-3-D-13 review P2 修复 (2026-06-05)**: 拍板 (用户 review) "REPL 现状是
+> isInteractive=true **但** 静态 tool-loop 走 no confirm impl deny, 跟 print/rpc 行为几乎
+> 相同. 文档必须拍准."
+
+| 模式           | isInteractive | write/edit 默认                        | 危险 bash 默认       | --yes 加 yes    | confirm 实现                                                   |
+| -------------- | ------------- | -------------------------------------- | -------------------- | --------------- | -------------------------------------------------------------- |
+| REPL (default) | `true`        | **fail-closed deny** (无 confirm impl) | **fail-closed deny** | bypass → 真执行 | **D-15 拍板**（现状: readline prompt 留 D-15, MVP 用 `--yes`） |
+| print (`-p`)   | `false`       | deny（**非交互默认 deny**）            | deny                 | bypass → 真执行 | D-15 协议扩                                                    |
+| rpc (`--rpc`)  | `false`       | deny（D-15 扩 confirmedTools 协议）    | deny                 | bypass → 真执行 | D-15 协议扩                                                    |
+
+**P2 修复后的拍板**:
+
+- REPL **现状** (D-13 ship 时): `isInteractive=true` 但 `staticToolPolicy.confirm = undefined` → 走
+  `no confirm impl` 分支 → fail-closed deny (跟 print/rpc 一致). **不是** y/N prompt 拍板.
+- REPL **bypass**: 加 `--yes` (启动时) → `ctx.yes=true` → `require_confirmation` bypassed →
+  落 `user_approved` 审计 → 工具真执行.
+- REPL **未来** (D-15): 注入 `staticToolPolicy.confirm = readlinePrompt` 实现, 那时
+  `isInteractive=true` 才有意义. **D-13 MVP 不实现, 拍板红线就是 fail-closed 不让破坏**.
+
+⚠️ **REPL 现状 D-13 = fail-closed deny** (跟 print/rpc 一致). 如果你需要"REPL y/N 拍板"
+行为, 当前 ship 版本下请用 `--yes` (D-13 拍板) 或等 D-15 拍板.
 
 ### `--yes` 标志
 
@@ -337,6 +353,9 @@ DOCKER_INTEGRATION=1 pnpm test -- docker-sandbox
 - ✅ **bypass** `require_confirmation`（写文件/edit/危险 bash 自动 allow）
 - ❌ **不** bypass `deny`（拍板红线, audit 不能被 yes 抹平）
 - session 每次 `policy_decision` 事件都落 (除 `allow` 外)
+- **拍板红线 (D-13 P1(b) 修复 2026-06-05)**: 每次 `--yes` bypass 都落 `user_approved` 事件
+  (含 `meta.bypassedByYes: true`). audit 链不能被 yes 抹平. **拍板 (用户 review)**:
+  "保持 PolicyDecision 简洁, 在 tool-loop.ts 里保留 raw decision, chain 不做 yes bypass".
 
 ### 默认静态规则 (src/policy/static-rules.ts)
 
@@ -392,6 +411,10 @@ await runToolLoop(client, messages, {
 1. ✅ 默认情况下 agent 不能无确认执行 destructive write/bash (`policy_blocked`)
 2. ✅ 非交互模式不能假装确认 (`isInteractive=false` + `require_confirmation` → `deny`)
 3. ✅ `--yes` 明确可追踪 (bypass `require_confirmation` 不 bypass `deny`, session 每次 bypass 落 `user_approved` event)
+4. ✅ **bash 危险模式覆盖完整** (D-13 review P1 修复 2026-06-05): `rm -rf /` / `mv` 全部 / `cp` 全部 / `chown` / `chmod` / `curl|sh` / `curl -o /tmp` 等都必过 tool-loop policy 层, 不绕过
+5. ✅ **REPL 现状 fail-closed** (D-13 review P2 修复 2026-06-05): `isInteractive=true` 但
+   `staticToolPolicy.confirm = undefined` → 走 `no confirm impl` → deny. 跟 README/UX 契约一致
+   (D-15 注入真 confirm 才允许 y/N 拍板, 当前 D-13 MVP 必须 `--yes`)
 
 ### MVP 边界（不是）
 

@@ -1206,6 +1206,7 @@ executeToolCall policy check 后立刻 await persistPolicyDecision; 如果 write
 
 - ❌ **User config file 注入 ToolPolicy** (D-15 — user 拍板)
 - ❌ **Per-tool 详细权限 UI / interactive prompt 优化** (D-15)
+- ❌ **REPL 真实 readline y/N confirm prompt 注入** (D-15 — MVP 拍板 `confirm = undefined` 兜底 deny)
 - ❌ **RPC 协议扩 `confirm` 通知 / `confirmedTools` 字段** (D-15)
 - ❌ **Cross-process file lock / race 真防** (D-15+ inotify)
 - ❌ **Secret 强检测 (redact API key / token in reason)** (D-15 — secret detection)
@@ -1213,3 +1214,36 @@ executeToolCall policy check 后立刻 await persistPolicyDecision; 如果 write
 - ❌ **Bash argv deep parse (e.g. shlex)** (D-15 — 拍板用 python shlex 类似物)
 
 Each excluded item has "why deferred" → D-15 user config 拍板一批, MVP 拍板只做 "默认静态 + 可注入 + session audit" 拍板红线.
+
+## Review P1 修复 (2026-06-05)
+
+> D-13 ship 后 review 拍板 2 个 P1 + 1 个 P2 修复, 全收.
+
+### P1 (a) bash 合并 cmd + args + 加 mv/cp/chown/chmod/curl|sh
+
+**拍板 (用户 review 2026-06-05)**:
+
+- "v1.0 红线是'未经确认不 mv', 不只是 /etc/系统路径; cp 一起收, 宁可多弹确认"
+- 合并 `command + " " + args.join(" ")` 一条字符串再 regex match (轻量, 不引 shlex)
+- 加 mv / cp 全部 / chown / chmod / curl|sh / wget|bash / curl -o /tmp 等 6+ pattern
+- 测覆盖 mv 普通移动 (a b), cp 普通复制, chmod 777, curl|sh, curl -o /tmp dropper
+
+### P1 (b) --yes bypass 落 user_approved 审计
+
+**拍板 (用户 review 2026-06-05)**:
+
+- "保持 PolicyDecision 简洁, 在 tool-loop.ts 里保留 raw decision, chain 不做 yes bypass"
+- 实现: chain.ts **不**做 yes bypass, 透传 raw decision; tool-loop 在
+  `require_confirmation + ctx.yes=true` 分支里落 `user_approved` 事件 (meta.bypassedByYes=true)
+  再继续执行工具
+- audit 红线: 每次 --yes bypass 都留 trace, 不被 yes 抹平
+
+### P2 REPL 现状 fail-closed (文档拍准)
+
+**拍板 (用户 review 2026-06-05)**:
+
+- "REPL confirm 留 D-15, README 必须改成现状: REPL 无 --yes 是 fail-closed deny, 不是 y/N prompt"
+- README 3-mode 矩阵改: REPL 行标 "fail-closed deny (无 confirm impl)"; 加 ⚠️ 提示
+  "REPL 现状 D-13 = fail-closed deny"; 加 bypass 路径说明 (--yes 才放行)
+- 不修改代码: REPL 行为 (isInteractive=true + confirm=undefined → no confirm impl → deny)
+  跟 print/rpc 一致, 是 fail-closed 红线正确体现
