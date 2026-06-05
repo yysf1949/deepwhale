@@ -271,10 +271,15 @@ async function executeToolCall(
 
   // Sprint 1c-revive-3-D-13: policy check (在 execute 之前, 拍板红线 deny 默认走 fail-closed)
   // 拍板 (用户 2026-06-05):
-  //   - 'allow' 不写 session, 也不在 tool result 里加 meta
+  //   - 'allow' 不写 session, 也不在 tool result 里加 meta (除 yes bypass 走 user_approved 拍板)
   //   - 'deny' / 'require_confirmation' 走 fail-closed: tool 不执行, 返 success=false
   //   - 非交互模式 + require_confirmation → policy_blocked (no interactive confirmation)
   //   - session 写 fail → 抛 (audit 红线, 写不进就拒绝继续)
+  //
+  // Sprint 1c-revive-3-D-13 review P1(b) 修复 (2026-06-05): --yes bypass 落 user_approved 审计
+  //   拍板 (用户 2026-06-05): "保持 PolicyDecision 简洁, 在 tool-loop.ts 里保留 raw decision".
+  //   实现: 在 require_confirmation 分支里, 如果 ctx.yes=true, 落 user_approved 事件再
+  //   继续执行 (绕过交互确认), tool result 仍返 success (不返 policy_blocked).
   if (options.policy !== null) {
     const policy = options.policy ?? staticToolPolicy;
     const argsDigest = computeArgsDigest(tc.args);
@@ -360,8 +365,26 @@ async function executeToolCall(
             meta: { argsDigest, policy: 'require_confirmation', userDecision: ok },
           };
         }
+      } else if (ctx.yes) {
+        // === Sprint 1c-revive-3-D-13 review P1(b) 修复 (2026-06-05) ===
+        // --yes bypass 拍板: 落 user_approved 审计事件 + 继续执行工具.
+        // 拍板 (用户 2026-06-05):
+        //   - "保持 PolicyDecision 简洁, 在 tool-loop.ts 里保留 raw decision"
+        //   - "如果 raw 是 require_confirmation 且 ctx.yes=true, 先落 user_approved, 再执行工具"
+        // 拍板红线: audit 不能被 yes 抹平. 即便 yes=true, 也要留 user_approved 记录.
+        if (options.writer) {
+          await appendPolicyDecisionEvent(options.writer, {
+            tool_call_id: tc.id,
+            name: tc.name,
+            decision: 'user_approved',
+            argsDigest,
+            reason: sanitizeReason(`--yes bypass: ${decision.reason}`),
+            meta: { bypassedByYes: true },
+          });
+        }
+        // 不返, 继续往下走 (执行工具)
       } else {
-        // 没 confirm 实现: 兜底 deny (fail-closed, R-3 拍板)
+        // 没 confirm 实现 + 无 --yes: 兜底 deny (fail-closed, R-3 拍板)
         const reason = sanitizeReason(`no confirm impl: ${decision.reason}`);
         if (options.writer) {
           await appendPolicyDecisionEvent(options.writer, {
