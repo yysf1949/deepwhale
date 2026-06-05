@@ -34,6 +34,8 @@ import {
 import { CompactionState } from '@deepwhale/core';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { createDefaultClient, type Provider } from '../llm-factory.js';
+import { resolveSandboxRunnerFromEnv } from '../sandbox/env-gate.js';
+import type { SandboxRunner } from '../sandbox/types.js';
 
 export interface RpcModeOptions {
   sessionPath?: string;
@@ -93,6 +95,10 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
     });
   const sessionPath = options.sessionPath;
 
+  // Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 入口解析 sandbox env.
+  // 未知值 throw (fail-closed), 由 CLI `main().catch` 写到 stderr + exit 1.
+  const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
+
   // session
   let workingMessages: Awaited<ReturnType<typeof loadSession>>['messages'] = [];
   const writer = sessionPath ? new SessionWriter(sessionPath) : null;
@@ -128,7 +134,10 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
   process.stderr.write('  methods: chat { prompt, stream? }\n');
   process.stderr.write('  notifications: stderr only\n');
 
-  const rl: RLInterface = createInterface({ input: options.input ?? process.stdin, terminal: false });
+  const rl: RLInterface = createInterface({
+    input: options.input ?? process.stdin,
+    terminal: false,
+  });
   let exiting = false;
   // Sprint 1a follow-up:readline line event 不会 await handler,并发 dispatch 会让 workingMessages race。
   // 维护一个 in-flight chain,保证 request 串行处理,workingMessages 累积语义稳定。
@@ -183,7 +192,15 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
       }
 
       try {
-        const result = await dispatch(client, req, workingMessages, writer, options, compactionConfig);
+        const result = await dispatch(
+          client,
+          req,
+          workingMessages,
+          writer,
+          options,
+          compactionConfig,
+          sandboxRunner,
+        );
         sendOk(req.id, result);
       } catch (e) {
         if (isToolLoopError(e)) {
@@ -241,6 +258,9 @@ async function dispatch(
   writer: SessionWriter | null,
   options: RpcModeOptions,
   compactionConfig: AgentCompactionConfig | null,
+  // Sprint 1c-revive-3-D-12 review P1 修复: 透传 sandboxRunner 进 dispatch,
+  // 让 chat request 内的 tool loop 跟 env 配置一致.
+  sandboxRunner: SandboxRunner,
 ): Promise<unknown> {
   switch (req.method) {
     case 'chat': {
@@ -254,10 +274,7 @@ async function dispatch(
         await writer.append(userEvent);
       }
       // 构造 turn 消息:历史 + 本轮 user。Sprint 1a 修 P1 — user 必须进 LLM。
-      const turnMessages: ChatMessage[] = [
-        ...workingMessages,
-        { role: 'user', content: prompt },
-      ];
+      const turnMessages: ChatMessage[] = [...workingMessages, { role: 'user', content: prompt }];
       // Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): compactionConfig 存在
       // 走 runToolLoopWithCompaction, 跨 chat request 复用 CompactionState (paused
       // / failures 跨 request 持续, 跟 test 1c-revive-2-D-5-2 拍板).
@@ -270,7 +287,7 @@ async function dispatch(
             client,
             turnMessages,
             {
-              registry: createDefaultRegistry(),
+              registry: createDefaultRegistry({ sandboxRunner }),
               ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
               ...(stream
                 ? {
@@ -291,7 +308,7 @@ async function dispatch(
           );
         }
         return runToolLoop(client, turnMessages, {
-          registry: createDefaultRegistry(),
+          registry: createDefaultRegistry({ sandboxRunner }),
           ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
           ...(stream
             ? {
@@ -354,10 +371,7 @@ function sendError(code: string, message: string, id: string): void {
  * 跟 startRepl / runPrintMode 同形态 helper 拍板一致. 跨 openai/anthropic
  * 同形态 (走 LLMClient 统一契约).
  */
-function makeLlmSummarizeFn(
-  client: LLMClient,
-  _protocol: 'openai' | 'anthropic',
-): SummarizeFn {
+function makeLlmSummarizeFn(client: LLMClient, _protocol: 'openai' | 'anthropic'): SummarizeFn {
   return async (toSummarize: ReadonlyArray<ChatMessage>): Promise<string> => {
     const summaryMessages: ChatMessage[] = [
       {

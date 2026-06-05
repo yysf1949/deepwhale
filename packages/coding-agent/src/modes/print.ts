@@ -34,6 +34,7 @@ import { CompactionState } from '@deepwhale/core';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { formatUsageStatus } from '../repl.js';
 import { createDefaultClient, type Provider } from '../llm-factory.js';
+import { resolveSandboxRunnerFromEnv } from '../sandbox/env-gate.js';
 
 export interface PrintModeOptions {
   prompt: string;
@@ -71,6 +72,11 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
   // schema 转换, --provider anthropic 选了就该跑 tool loop.
   const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
+
+  // Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 入口解析 sandbox env.
+  // 未知值 throw (fail-closed), 由 CLI `main().catch` 写到 stderr + exit 1.
+  // 解析成功则把 runner 显式注入 registry, 跟 BashTool 对齐.
+  const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
 
   // session 加载
   let workingMessages: Awaited<ReturnType<typeof loadSession>>['messages'] = [];
@@ -130,7 +136,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
             client,
             turnMessages,
             {
-              registry: createDefaultRegistry(),
+              registry: createDefaultRegistry({ sandboxRunner }),
               onChunk: (chunk) => {
                 if (chunk.content) process.stdout.write(chunk.content);
               },
@@ -141,7 +147,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
           );
         } else {
           result = await runToolLoop(client, turnMessages, {
-            registry: createDefaultRegistry(),
+            registry: createDefaultRegistry({ sandboxRunner }),
             onChunk: (chunk) => {
               if (chunk.content) process.stdout.write(chunk.content);
             },
@@ -162,10 +168,7 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
         });
         // 包装成 ToolLoopResult 形态,让 caller 持久化逻辑无感
         result = {
-          messages: [
-            ...turnMessages,
-            { role: 'assistant', content: streamResult.content },
-          ],
+          messages: [...turnMessages, { role: 'assistant', content: streamResult.content }],
           final: streamResult,
           steps: [
             {
@@ -230,10 +233,7 @@ function printStepSummary(steps: ReadonlyArray<ToolLoopStep>): void {
  * + startRepl 同形态 helper 拍板一致. 跨 openai/anthropic 同形态 (走
  * LLMClient 统一契约).
  */
-function makeLlmSummarizeFn(
-  client: LLMClient,
-  _protocol: 'openai' | 'anthropic',
-): SummarizeFn {
+function makeLlmSummarizeFn(client: LLMClient, _protocol: 'openai' | 'anthropic'): SummarizeFn {
   return async (toSummarize: ReadonlyArray<ChatMessage>): Promise<string> => {
     const summaryMessages: ChatMessage[] = [
       {

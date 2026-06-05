@@ -125,7 +125,10 @@ export class BashTool implements Tool {
    */
   constructor(
     private readonly sandboxRunner: SandboxRunner = new LocalSandboxRunner(),
-    private readonly sandboxDefaults: { defaultTimeoutMs: number; defaultStdoutCapBytes: number } = {
+    private readonly sandboxDefaults: {
+      defaultTimeoutMs: number;
+      defaultStdoutCapBytes: number;
+    } = {
       defaultTimeoutMs: 60_000,
       defaultStdoutCapBytes: 4 * 1024,
     },
@@ -173,17 +176,24 @@ export class BashTool implements Tool {
       };
     }
 
-    // Sprint 0.2 跨平台兜底：少数命令在 Windows 上是 shell builtin（无独立可执行文件），
-    // `execFile` 会 ENOENT。这些命令用 Node 内置等价实现，不走 spawn。
-    // 后续 Sprint 1+ 沙箱化时整套换掉（arch §2.3）。
+    // Sprint 0.2 跨平台兜底:少数命令在 Windows 上是 shell builtin(无独立可执行文件),
+    // `execFile` 会 ENOENT。这些命令用 Node 内置等价实现,不走 spawn。
+    // 后续 Sprint 1+ 沙箱化时整套换掉(arch §2.3)。
     // Sprint 1c-revive-3-D-12: 仍保留 builtin 兜底, 不进 sandbox.
-    const builtinResult = tryBuiltin(command, argList);
-    if (builtinResult !== null) {
-      return {
-        success: true,
-        content: builtinResult,
-        meta: { command, args: argList, builtin: true },
-      };
+    // Sprint 1c-revive-3-D-12 review P2 修复 (2026-06-05): docker 模式下 builtin
+    // 会**绕过**容器 — 跟 sandbox 隔离语义冲突, 也让 integration 假绿 (`echo`
+    // 不进容器但仍返 stdout). 修法: docker runner 时跳过 builtin, 交给容器执行.
+    // 注意: 只有 `echo` 一个 builtin, 影响面窄; local 模式继续走 builtin 兜底.
+    const skipBuiltin = this.sandboxRunner.kind === 'docker';
+    if (!skipBuiltin) {
+      const builtinResult = tryBuiltin(command, argList);
+      if (builtinResult !== null) {
+        return {
+          success: true,
+          content: builtinResult,
+          meta: { command, args: argList, builtin: true },
+        };
+      }
     }
 
     // Sprint 1c-revive-3-D-12: 走 sandboxRunner 而不是直接 execFile.

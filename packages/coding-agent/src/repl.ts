@@ -50,6 +50,8 @@ import { CompactionState, type SummarizeFn } from '@deepwhale/core';
 import { createDefaultRegistry } from './tools/registry.js';
 import { createDefaultClient, type Provider } from './llm-factory.js';
 import { buildSummaryAndNext, formatReport, runVerify } from './verify/index.js';
+import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
+import type { SandboxRunner } from './sandbox/types.js';
 
 const VERSION = '0.1.0';
 
@@ -181,12 +183,18 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
 
+  // Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 入口解析 sandbox env.
+  // 未知值 throw (fail-closed), 由 CLI `main().catch` 写到 stderr + exit 1.
+  const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
+
   // greeting — Sprint 1c-revive-2-D-11-4 review P1 修复: 不依赖 client.model (lazy 化后
   // client 可能未创). 真创只在 chat 首次发生; 创失败 i18n 错误到 stderr. 这里 greeting
   // 只显示 ready + 版本号, 跟 1b.5 时代 'model 在 greeting 显示' 比, 牺牲一点 UX
   // (用户得 chat 一次才能看到 model 名) 换 REPL 可在无 key 状态启动.
   const initialClientState = tryCreateClient();
-  out.write(`${t('cli.greeting', VERSION, initialClientState.client?.model ?? 'not-configured')}\n`);
+  out.write(
+    `${t('cli.greeting', VERSION, initialClientState.client?.model ?? 'not-configured')}\n`,
+  );
   if (initialClientState.error) {
     // 无 key 提示沿用 1b.5 时代 163-166 行的 stderr 警告语义, 但挪到 lazy create 之后
     err.write(`${t('error.api_key_missing')}\n`);
@@ -278,9 +286,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         // 退出: REPL 不退, 跑完回到 prompt 继续.
         try {
           const report = await runVerify(
-            options.verifyChecks !== undefined
-              ? { checks: options.verifyChecks }
-              : {},
+            options.verifyChecks !== undefined ? { checks: options.verifyChecks } : {},
           );
           const filled = buildSummaryAndNext(report);
           const text = formatReport({
@@ -301,7 +307,9 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
             });
           }
         } catch (e) {
-          err.write(`error: verify failed to start: ${e instanceof Error ? e.message : String(e)}\n\n`);
+          err.write(
+            `error: verify failed to start: ${e instanceof Error ? e.message : String(e)}\n\n`,
+          );
         }
         prompt();
         return;
@@ -325,7 +333,17 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       const liveClient = c.client;
       try {
         if (enableToolLoop) {
-          await runAgentTurn(liveClient, line, workingMessages, writer, out, err, ac.signal, compactionConfig);
+          await runAgentTurn(
+            liveClient,
+            line,
+            workingMessages,
+            writer,
+            out,
+            err,
+            ac.signal,
+            compactionConfig,
+            sandboxRunner,
+          );
         } else {
           const turn = await runOneTurn(liveClient, line, [], { signal: ac.signal });
           if (turn.kind === 'error') {
@@ -375,6 +393,9 @@ export async function runAgentTurn(
   err: NodeJS.WritableStream,
   signal: AbortSignal,
   compactionConfig: AgentCompactionConfig | null = null,
+  // Sprint 1c-revive-3-D-12 review P1 修复: startRepl 把 env 解析的 runner
+  // 传进来, 工具注册表跟 env 状态对齐. 不传 = 用 LocalSandboxRunner (向后兼容).
+  sandboxRunner?: SandboxRunner,
 ): Promise<void> {
   // 1) 持久化 user 输入
   if (writer) {
@@ -402,7 +423,9 @@ export async function runAgentTurn(
         client,
         turnMessages,
         {
-          registry: createDefaultRegistry(),
+          registry: createDefaultRegistry({
+            ...(sandboxRunner !== undefined ? { sandboxRunner } : {}),
+          }),
           onChunk: (chunk) => {
             if (chunk.content) out.write(chunk.content);
           },
@@ -413,7 +436,9 @@ export async function runAgentTurn(
       );
     } else {
       result = await runToolLoop(client, turnMessages, {
-        registry: createDefaultRegistry(),
+        registry: createDefaultRegistry({
+          ...(sandboxRunner !== undefined ? { sandboxRunner } : {}),
+        }),
         onChunk: (chunk) => {
           if (chunk.content) out.write(chunk.content);
         },
@@ -571,10 +596,7 @@ function formatError(e: unknown): string {
  * 字段对齐). 1c-revive-2-D-6 拍板: protocol 字段保留供未来 system
  * prompt 模板差异化用, 当前 D-6 默认用同 system prompt 模板 (跨协议一致).
  */
-function makeLlmSummarizeFn(
-  client: LLMClient,
-  _protocol: 'openai' | 'anthropic',
-): SummarizeFn {
+function makeLlmSummarizeFn(client: LLMClient, _protocol: 'openai' | 'anthropic'): SummarizeFn {
   return async (toSummarize: ReadonlyArray<ChatMessage>): Promise<string> => {
     const summaryMessages: ChatMessage[] = [
       {

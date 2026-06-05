@@ -12,12 +12,14 @@
  */
 
 import type { Tool, ToolName } from '../types.js';
+import type { SandboxRunner } from '../sandbox/types.js';
 import { ReadFileTool } from './read-file.js';
 import { WriteFileTool } from './write-file.js';
 import { EditFileTool } from './edit-file.js';
 import { BashTool } from './bash.js';
 import { FindTool } from './find.js';
 import { GrepTool } from './grep.js';
+import { LocalSandboxRunner } from '../sandbox/local-runner.js';
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -55,13 +57,27 @@ export class ToolRegistry {
   }
 }
 
-/** 默认 6 工具的 registry 工厂 */
-export function createDefaultRegistry(): ToolRegistry {
+/** Sprint 1c-revive-3-D-12 review P1 修复: 显式注入 sandboxRunner. */
+export interface CreateDefaultRegistryOptions {
+  /** 注入 BashTool 的 SandboxRunner. 不传 = LocalSandboxRunner (v1.0 行为). */
+  readonly sandboxRunner?: SandboxRunner;
+}
+
+/**
+ * 默认 6 工具的 registry 工厂
+ *
+ * Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 加 `sandboxRunner` 显式参数.
+ * 之前 `new BashTool()` 走默认 LocalSandboxRunner, `DEEPWHALE_SANDBOX=docker` 解析
+ * 出的 DockerSandboxRunner 不会进 tool loop. 修法: mode 调用点从 env 解析 runner 后
+ * 显式传入, 工具注册表跟 env 状态对齐.
+ */
+export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}): ToolRegistry {
   const reg = new ToolRegistry();
+  const runner = options.sandboxRunner ?? new LocalSandboxRunner();
   reg.register(new ReadFileTool());
   reg.register(new WriteFileTool());
   reg.register(new EditFileTool());
-  reg.register(new BashTool());
+  reg.register(new BashTool(runner));
   reg.register(new FindTool());
   reg.register(new GrepTool());
   return reg;

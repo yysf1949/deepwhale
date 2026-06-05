@@ -17,18 +17,32 @@ describe('resolveSandboxRunnerFromEnv', () => {
   });
 
   it('DEEPWHALE_SANDBOX=local → LocalSandboxRunner', () => {
-    const r = resolveSandboxRunnerFromEnv({ sandboxRoot: '/tmp/x' }, { DEEPWHALE_SANDBOX: 'local' });
+    const r = resolveSandboxRunnerFromEnv(
+      { sandboxRoot: '/tmp/x' },
+      { DEEPWHALE_SANDBOX: 'local' },
+    );
     expect(r.kind).toBe('local');
   });
 
   it('DEEPWHALE_SANDBOX=docker → DockerSandboxRunner', () => {
-    const r = resolveSandboxRunnerFromEnv({ sandboxRoot: '/tmp/x' }, { DEEPWHALE_SANDBOX: 'docker' });
+    const r = resolveSandboxRunnerFromEnv(
+      { sandboxRoot: '/tmp/x' },
+      { DEEPWHALE_SANDBOX: 'docker' },
+    );
     expect(r).toBeInstanceOf(DockerSandboxRunner);
     expect(r.kind).toBe('docker');
   });
 
-  it('DEEPWHALE_SANDBOX=其他值 → fallback LocalSandboxRunner (不抛)', () => {
-    const r = resolveSandboxRunnerFromEnv({ sandboxRoot: '/tmp/x' }, { DEEPWHALE_SANDBOX: 'wasm' });
+  it('DEEPWHALE_SANDBOX=其他值 → throw fail-closed', () => {
+    // Sprint 1c-revive-3-D-12 review P1 修复: 之前 fail-open 静默 fallback local,
+    // 拼错 `dokcer` 之类会本地执行 — 安全红线. 修法: throw, 入口 stderr + exit 1.
+    expect(() =>
+      resolveSandboxRunnerFromEnv({ sandboxRoot: '/tmp/x' }, { DEEPWHALE_SANDBOX: 'wasm' }),
+    ).toThrow(/invalid DEEPWHALE_SANDBOX=.*expected unset\|local\|docker/);
+  });
+
+  it('DEEPWHALE_SANDBOX=空字符串 → LocalSandboxRunner (跟 unset 同义)', () => {
+    const r = resolveSandboxRunnerFromEnv({ sandboxRoot: '/tmp/x' }, { DEEPWHALE_SANDBOX: '' });
     expect(r.kind).toBe('local');
   });
 

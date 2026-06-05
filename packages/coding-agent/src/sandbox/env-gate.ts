@@ -23,13 +23,25 @@ export interface SandboxEnvConfig {
 /**
  * 解析 env → 选 sandbox runner. 缺省 = LocalSandboxRunner (BashTool 现状).
  * env DEEPWHALE_SANDBOX=docker 时返 DockerSandboxRunner, 镜像/网络用对应 env.
+ *
+ * Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 严格 enum, 未知值 throw.
+ * 之前 `mode !== 'docker'` 全部 fallback local, 拼错 `dokcer` 之类会静默本地执行
+ * — fail-open, 安全红线. 修法: 只接受 unset / `local` / `docker`, 其他值抛错.
+ * 入口 (CLI / REPL 启动) 应当把 throw 转到 stderr + exit 1, 不静默.
  */
 export function resolveSandboxRunnerFromEnv(
   config: SandboxEnvConfig,
   env: NodeJS.ProcessEnv = process.env,
 ): SandboxRunner {
-  const mode = env['DEEPWHALE_SANDBOX'] ?? 'local';
-  if (mode === 'docker') {
+  const raw = env['DEEPWHALE_SANDBOX'];
+  // unset / 空字符串 = 默认 local (跟 README 一致)
+  if (raw === undefined || raw === '') {
+    return new LocalSandboxRunner();
+  }
+  if (raw === 'local') {
+    return new LocalSandboxRunner();
+  }
+  if (raw === 'docker') {
     const image = env['DEEPWHALE_DOCKER_IMAGE'] ?? 'node:22-alpine';
     const networkEnv = env['DEEPWHALE_DOCKER_NETWORK'] ?? 'none';
     const network: 'none' | 'bridge' = networkEnv === 'bridge' ? 'bridge' : 'none';
@@ -40,6 +52,6 @@ export function resolveSandboxRunnerFromEnv(
       defaultTimeoutMs: DOCKER_DEFAULT_TIMEOUT_MS,
     });
   }
-  // 显式非 docker → local
-  return new LocalSandboxRunner();
+  // 未知值 — fail-closed. 抛出的 message 拼齐提示, 入口能直接 stderr 打印给用户.
+  throw new Error(`invalid DEEPWHALE_SANDBOX=${JSON.stringify(raw)}, expected unset|local|docker`);
 }
