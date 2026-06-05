@@ -179,7 +179,7 @@ D-19.6 三 commit 推到 origin 后, reviewer (Windows 端) 复跑 focused suite
 
 - typecheck 0 errors
 - lint 0 errors / 0 warnings
-- 完整测试 **495 passed / 20 skipped** (D-19.5 baseline 493 + D-19.6 新增 2 = 495, 持平, 无回归)
+- 完整测试 **495 passed / 20 skipped** (D-19.5 baseline 493 + D-19.6 新增 2 = 495; vs D-19.6 持平 495, 无回归)
 - REPL 切片 66 passed / 9 skipped (D-19.5 + D-19.6 全部绿)
 - D-19.5 时代预存 verify-runner flaky **也消失了** (可能跟 D-19.6 P1 修法 + D-19.6.1 Q3 abort-aware 分支有关, race 减少)
 
@@ -214,8 +214,8 @@ D-19.6 三 commit 推到 origin 后, reviewer (Windows 端) 复跑 focused suite
 
 **对比 reviewer 关注** (本机 Ubuntu 跑 `pnpm test` 实测, reviewer Windows 端跑 `vitest.CMD run` focused 6-file):
 - D-19.5 ship baseline: 493 passed / 20 skipped
-- D-19.6 ship baseline: 493 passed / 20 skipped (P1 + P2 新增 2 个新 test 文件, P3 改既有 1 文件, 0 it 数变化)
-- D-19.6.1 ship baseline: **495 passed / 20 skipped** (D-19.6 baseline 493 + 2 新增 it = 495, D-19.6.1 0 改 0 删 it, 持平; 新增 1 docs commit `3b7d3c2` 不改 it 数)
+- D-19.6 ship baseline: **495 passed / 20 skipped** (P1 + P2 新增 2 个新 test 文件 / +2 it, P3 改既有 1 文件 0 it 变化; D-19.5 → D-19.6 净 it 数 +2)
+- D-19.6.1 ship baseline: **495 passed / 20 skipped** (D-19.6 baseline 495, D-19.6.1 0 改 0 删 it, 持平; 新增 1 docs commit `3b7d3c2` 不改 it 数)
 - Reviewer 复跑 D-19.6.1 (focused 6-file, Windows 端): **42 passed / 1 skipped**
 
 ---
