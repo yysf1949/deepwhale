@@ -61,10 +61,8 @@ function evaluateByToolName(name: ToolName, _argsDigest: string): PolicyDecision
       // 保守返 allow (bash tool 会自己再过一遍 evaluateBashCommand).
       return { decision: 'allow' };
     default: {
-      // 兜底: 未注册 tool 走 deny
-      const _exhaustive: never = name;
-      void _exhaustive;
-      return { decision: 'deny', reason: `unknown tool: ${String(name)}` };
+      // 兜底: 未注册 tool 走 deny. name cast never 让 TS 拍板 exhaustive.
+      return { decision: 'deny', reason: `unknown tool: ${String(name as never)}` };
     }
   }
 }

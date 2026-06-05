@@ -184,11 +184,14 @@ export function sessionEventsToMessages(events: ReadonlyArray<SessionEvent>): Ch
         content: `[Session compaction summary]\n${ev.summary}`,
       });
     }
-    // 'system' / 'compaction_paused' / 'verification' 跳过 — 三种都是 metadata, 不进 LLM context:
+    // 'system' / 'compaction_paused' / 'verification' / 'policy_decision' 跳过 — 4 种都是 metadata, 不进 LLM context:
     //   - 'system' caller 决定要不要用
     //   - 'compaction_paused' UI/footer 显式读
     //   - 'verification' (Sprint 1c-revive-2-D-11-3, 2026-06-04) audit log / viewer 显式读
     //     reload session 时验证历史不污染 LLM 看到的 messages 列表
+    //   - 'policy_decision' (Sprint 1c-revive-3-D-13, 2026-06-05) tool policy 决策审计, 同 verification
+    //     不进 LLM context. 'allow' 不写 (避免 JSONL 刷爆), 只 deny / require_confirmation /
+    //     user_approved / user_denied 4 个终态落盘, 跟 verification 同 metadata 拍板.
   }
   // EOF: 调 flushBuffer 而非硬清空.
   // 修复: 旧实现 `buffer = []` 把"assistant(tool_calls) → tool 已配对完成但
@@ -347,6 +350,41 @@ export async function appendVerificationEvent(
     command_count: args.commandCount,
     failed_count: args.failedCount,
     summary: args.summary,
+    ...(args.meta !== undefined ? { meta: args.meta } : {}),
+  });
+}
+
+/**
+ * 写一条 'policy_decision' event (Sprint 1c-revive-3-D-13, 2026-06-05).
+ * 拍板 (用户 2026-06-05): 'allow' 不调本函数 (避免 JSONL 刷爆). 只对
+ *   'deny' / 'require_confirmation' / 'user_approved' / 'user_denied' 4 个
+ *   终态落盘.
+ *
+ * 字段拍板:
+ *   - tool_call_id: 跟后续 'tool' event 配对 (reload 时 audit trace 完整)
+ *   - argsDigest: sha256:<12hex>, 不存原始 args
+ *   - reason: 已过 sanitize (长度 / 换行 / NUL, 拍板红线: 不存 secret)
+ */
+export async function appendPolicyDecisionEvent(
+  writer: SessionWriter,
+  args: {
+    tool_call_id: string;
+    name: string;
+    decision: 'deny' | 'require_confirmation' | 'user_approved' | 'user_denied';
+    argsDigest: string;
+    reason?: string;
+    meta?: Record<string, unknown>;
+    ts?: number;
+  },
+): Promise<void> {
+  await writer.append({
+    kind: 'policy_decision',
+    ts: args.ts ?? Date.now(),
+    tool_call_id: args.tool_call_id,
+    name: args.name,
+    decision: args.decision,
+    argsDigest: args.argsDigest,
+    ...(args.reason !== undefined ? { reason: args.reason } : {}),
     ...(args.meta !== undefined ? { meta: args.meta } : {}),
   });
 }

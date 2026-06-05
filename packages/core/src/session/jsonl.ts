@@ -143,6 +143,31 @@ export type SessionEvent =
       failed_count: number;
       summary: string;
       meta?: Record<string, unknown>;
+    }
+  | {
+      /**
+       * Policy decision event (Sprint 1c-revive-3-D-13, 2026-06-05).
+       * tool 实际 execute 之前, policy layer (src/policy/) 的决策落盘.
+       * 拍板 (用户 2026-06-05): 'allow' 不写 (避免 JSONL 被读工具刷爆), 只有
+       *   'deny' / 'require_confirmation' / 用户确认结果 ('user_approved' / 'user_denied')
+       *   写. 跟 'compaction' / 'compaction_paused' / 'verification' 同语义:
+       *   metadata, sessionEventsToMessages 跳过, 不进 LLM context.
+       *
+       * 字段拍板:
+       *   - tool_call_id: 跟后续 'tool' event 配对 (reload 时 audit trace 完整)
+       *   - decision: 'deny' | 'require_confirmation' | 'user_approved' | 'user_denied'
+       *     (拍板: 不写 'allow' — 噪音)
+       *   - argsDigest: sha256:<12hex>, 不存原始 args (拍板: 防 secret leak)
+       *   - reason: 自然语言, 已经过 sanitize (长度 / 换行 / NUL)
+       */
+      kind: 'policy_decision';
+      ts: number;
+      tool_call_id: string;
+      name: string;
+      decision: 'deny' | 'require_confirmation' | 'user_approved' | 'user_denied';
+      argsDigest: string;
+      reason?: string;
+      meta?: Record<string, unknown>;
     };
 
 /**
