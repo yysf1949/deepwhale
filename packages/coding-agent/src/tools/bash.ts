@@ -7,16 +7,17 @@
  * - 危险 token 黑名单（rm -rf /、sudo、curl、wget）
  *
  * Sprint 1+ 增强：Docker sandbox 统一（arch §2.3 ROADMAP 红线）
+ * Sprint 1c-revive-3-D-12 (2026-06-05): BashTool 接入 SandboxRunner 抽象.
+ * 默认 sandboxRunner = LocalSandboxRunner (现状行为). 可注入 DockerSandboxRunner
+ * 跑容器化命令. BashTool 入口的 allowlist + dangerous pattern + cwd 校验不变.
  */
 
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { resolve as pathResolve, sep as pathSep } from 'node:path';
 import process from 'node:process';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
-
-const execFileP = promisify(execFile);
+import type { SandboxRunner, SandboxRunRequest } from '../sandbox/types.js';
+import { LocalSandboxRunner } from '../sandbox/local-runner.js';
 
 const ALLOWED_COMMANDS = new Set([
   'ls',
@@ -83,10 +84,11 @@ const DANGEROUS_PATTERNS: ReadonlyArray<{ re: RegExp; reason: string }> = [
 const SANDBOX_ROOT = pathResolve(process.cwd());
 
 /**
- * 跨平台 builtin 兜底：返回 string 表示命中（stdout），null 表示走 execFile。
+ * 跨平台 builtin 兜底：返回 string 表示命中（stdout），null 表示走 sandbox。
  *
  * 触发原因：Windows 的 `echo` / `cd` / `dir` 等是 cmd builtin，没有独立 exe，
  * `execFile` 会 spawn ENOENT。Sprint 0.2 简化版只实现 `echo`（最常用 + 测试覆盖）。
+ * Sprint 1c-revive-3-D-12: 仍由 BashTool 自身处理, 不进 sandbox (sandbox 是真 exec).
  */
 function tryBuiltin(command: string, args: string[]): string | null {
   if (command === 'echo') {
@@ -115,6 +117,19 @@ export class BashTool implements Tool {
     },
     required: ['command'],
   };
+
+  /**
+   * Sprint 1c-revive-3-D-12 (2026-06-05): sandbox runner 注入点. 默认 = LocalSandboxRunner
+   * (BashTool 现状行为). 测试 / 外部可传 DockerSandboxRunner. BashTool 入口的 allowlist
+   * + dangerous pattern + cwd 校验 **不** 依赖 runner — runner 只跑过白名单的命令.
+   */
+  constructor(
+    private readonly sandboxRunner: SandboxRunner = new LocalSandboxRunner(),
+    private readonly sandboxDefaults: { defaultTimeoutMs: number; defaultStdoutCapBytes: number } = {
+      defaultTimeoutMs: 60_000,
+      defaultStdoutCapBytes: 4 * 1024,
+    },
+  ) {}
 
   async execute(input: Record<string, unknown>): Promise<ToolResult> {
     const command = input['command'];
@@ -161,6 +176,7 @@ export class BashTool implements Tool {
     // Sprint 0.2 跨平台兜底：少数命令在 Windows 上是 shell builtin（无独立可执行文件），
     // `execFile` 会 ENOENT。这些命令用 Node 内置等价实现，不走 spawn。
     // 后续 Sprint 1+ 沙箱化时整套换掉（arch §2.3）。
+    // Sprint 1c-revive-3-D-12: 仍保留 builtin 兜底, 不进 sandbox.
     const builtinResult = tryBuiltin(command, argList);
     if (builtinResult !== null) {
       return {
@@ -170,27 +186,58 @@ export class BashTool implements Tool {
       };
     }
 
+    // Sprint 1c-revive-3-D-12: 走 sandboxRunner 而不是直接 execFile.
+    // BashTool 入口已完成 allowlist / dangerous pattern / cwd 校验, 这里直接调.
+    const req: SandboxRunRequest = {
+      command,
+      args: argList,
+      cwd: resolvedCwd,
+      timeoutMs: this.sandboxDefaults.defaultTimeoutMs,
+      stdoutCapBytes: this.sandboxDefaults.defaultStdoutCapBytes,
+    };
     try {
-      const { stdout, stderr } = await execFileP(command, argList, {
-        cwd: resolvedCwd,
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-        timeout: 60_000, // 60s
-      });
-      return {
-        success: true,
-        content: stdout + (stderr ? `\n[stderr]\n${stderr}` : ''),
-        meta: { command, args: argList, stderr: !!stderr },
-      };
-    } catch (err) {
-      const e = err as Error & { code?: string; stderr?: string; stdout?: string } & {
-        stderr?: string;
-        stdout?: string;
-      };
+      const result = await this.sandboxRunner.run(req);
+      if (result.ok) {
+        return {
+          success: true,
+          content:
+            result.stdoutTail + (result.stderrTail ? `\n[stderr]\n${result.stderrTail}` : ''),
+          meta: {
+            command,
+            args: argList,
+            sandboxKind: this.sandboxRunner.kind,
+            stderr: !!result.stderrTail,
+            durationMs: result.durationMs,
+          },
+        };
+      }
+      // 失败 / timeout / spawn fail — 跟 BashTool 现状 execFile catch 行为对齐
+      const failureMsg =
+        result.signal !== undefined
+          ? `execution-failed: killed by ${result.signal} after ${result.durationMs}ms`
+          : `execution-failed: exit ${result.exitCode ?? 'unknown'}`;
       return {
         success: false,
-        content: e.stdout ?? '',
-        error: `execution-failed: ${e.message}${e.stderr ? `\nstderr: ${e.stderr}` : ''}`,
-        meta: { command, exitCode: e.code },
+        content: result.stdoutTail,
+        error:
+          failureMsg +
+          (result.stderrTail ? `\nstderr: ${result.stderrTail}` : '') +
+          (result.warning ? `\nwarning: ${result.warning}` : ''),
+        meta: {
+          command,
+          sandboxKind: this.sandboxRunner.kind,
+          exitCode: result.exitCode,
+          signal: result.signal,
+          durationMs: result.durationMs,
+        },
+      };
+    } catch (err) {
+      // sandboxRunner 自身抛 (e.g. 构造错误) — 兜底 catch
+      return {
+        success: false,
+        content: '',
+        error: `execution-failed: ${err instanceof Error ? err.message : String(err)}`,
+        meta: { command, sandboxKind: this.sandboxRunner.kind },
       };
     }
   }
