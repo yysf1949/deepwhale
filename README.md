@@ -330,21 +330,15 @@ DOCKER_INTEGRATION=1 pnpm test -- docker-sandbox
 
 | 模式           | isInteractive | write/edit 默认                        | 危险 bash 默认       | --yes 加 yes    | confirm 实现                                                   |
 | -------------- | ------------- | -------------------------------------- | -------------------- | --------------- | -------------------------------------------------------------- |
-| REPL (default) | `true`        | **fail-closed deny** (无 confirm impl) | **fail-closed deny** | bypass → 真执行 | **D-15 拍板**（现状: readline prompt 留 D-15, MVP 用 `--yes`） |
+| REPL (default) | `true`        | y/N prompt (REPL 注入 `replConfirm`)   | y/N prompt          | bypass → 真执行 | **D-15 ship** (2026-06-05): REPL 走 y/N readline prompt, `Allow <tool>? (<reason>) [y/N]:`, 空输入默认 N (fail-closed), Ctrl+D/EOF → dismissed (user_denied); `--yes` 仍先于 prompt bypass 落 user_approved |
 | print (`-p`)   | `false`       | deny（**非交互默认 deny**）            | deny                 | bypass → 真执行 | D-15 协议扩                                                    |
 | rpc (`--rpc`)  | `false`       | deny（D-15 扩 confirmedTools 协议）    | deny                 | bypass → 真执行 | D-15 协议扩                                                    |
 
-**P2 修复后的拍板**:
+**D-15 ship 后的拍板 (2026-06-05)**:
 
-- REPL **现状** (D-13 ship 时): `isInteractive=true` 但 `staticToolPolicy.confirm = undefined` → 走
-  `no confirm impl` 分支 → fail-closed deny (跟 print/rpc 一致). **不是** y/N prompt 拍板.
-- REPL **bypass**: 加 `--yes` (启动时) → `ctx.yes=true` → `require_confirmation` bypassed →
-  落 `user_approved` 审计 → 工具真执行.
-- REPL **未来** (D-15): 注入 `staticToolPolicy.confirm = readlinePrompt` 实现, 那时
-  `isInteractive=true` 才有意义. **D-13 MVP 不实现, 拍板红线就是 fail-closed 不让破坏**.
-
-⚠️ **REPL 现状 D-13 = fail-closed deny** (跟 print/rpc 一致). 如果你需要"REPL y/N 拍板"
-行为, 当前 ship 版本下请用 `--yes` (D-13 拍板) 或等 D-15 拍板.
+- REPL **D-15 ship 现状**: 启动时构造 `replPolicy = {...staticToolPolicy, confirm: createReplConfirm({input, output})}` 注入 runToolLoop. 遇 `require_confirmation` 时打印 `Allow <tool>? (<reason>) [y/N]: `, 用户输 `y` / `yes` → 落 `user_approved` 放行, 输 `n` / `no` / 空 / Ctrl+C / EOF → 落 `user_denied` 拒绝. prompt 字符串**不**含原始 args / secret / argsDigest, 只暴露 tool name + sanitized reason. 见 `src/repl/repl-confirm.ts` + `test/repl/repl-confirm.test.ts` (11 it) + `test/integration/repl-tool-loop-confirm.test.ts` (3 it).
+- REPL **D-13 历史** (D-15 之前, 2026-06-05 早): `isInteractive=true` 但 `staticToolPolicy.confirm = undefined` → 走 `no confirm impl` 分支 → fail-closed deny (跟 print/rpc 一致). **不是** y/N prompt 拍板. D-15 注入真 confirm 后废弃 (但静态契约保留 — 未注入 confirm 的 ToolPolicy 仍走 fail-closed, 见 `tool-loop-policy.test.ts` D-13 兼容测).
+- REPL **bypass**: 加 `--yes` (启动时) → `ctx.yes=true` → `require_confirmation` bypassed → 落 `user_approved` 放行. **拍板红线**: `--yes` 优先于 confirm 提示 (D-13.5 P1 重排), 即便注入 confirm 函数, `--yes=true` 时 confirm **0** 调用, 仍落 `user_approved` 审计 (bypassedByYes:true, isInteractive: ctx.isInteractive).
 
 ### `--yes` 标志
 
@@ -412,9 +406,8 @@ await runToolLoop(client, messages, {
 2. ✅ 非交互模式不能假装确认 (`isInteractive=false` + `require_confirmation` → `deny`)
 3. ✅ `--yes` 明确可追踪 (bypass `require_confirmation` 不 bypass `deny`, session 每次 bypass 落 `user_approved` event, `meta={bypassedByYes:true, isInteractive: ctx.isInteractive}`; D-13.5 review P1 重排 2026-06-05 把 `ctx.yes` 提到最前, 优先级: `--yes` > 非交互 deny > confirm > 兜底 deny)
 4. ✅ **bash 危险模式覆盖完整** (D-13 review P1 修复 2026-06-05): `rm -rf /` / `rm -rf ~` / `mv` 全部 / `cp` 全部 / `chown` / `chmod` / `mkfs` / `dd if=` / `shutdown`+`reboot`+`halt`+`poweroff` / `> /dev/sda\|nvme*` / `curl|sh` / `wget|sh` / `curl -o /tmp` / `wget -O /tmp` 等 14 pattern 都必过 tool-loop policy 层, 不绕过
-5. ✅ **REPL 现状 fail-closed** (D-13 review P2 修复 2026-06-05): `isInteractive=true` 但
-   `staticToolPolicy.confirm = undefined` → 走 `no confirm impl` → deny. 跟 README/UX 契约一致
-   (D-15 注入真 confirm 才允许 y/N 拍板, 当前 D-13 MVP 必须 `--yes`)
+5. ✅ **REPL 注入真 confirm** (D-15 ship 2026-06-05): REPL 启动时构造 `replPolicy = {...staticToolPolicy, confirm: createReplConfirm({input, output})}`, 走 `Allow <tool>? (<reason>) [y/N]: ` prompt, y/yes → 落 `user_approved` 放行, n/no/空/EOF → 落 `user_denied` 拒绝, `--yes` 永远先于 confirm bypass (D-13.5 P1 重排, confirm 0 调用, 仍落 user_approved). 见 `src/repl/repl-confirm.ts` (新文件) + `test/repl/repl-confirm.test.ts` (11 it) + `test/integration/repl-tool-loop-confirm.test.ts` (3 it)
+6. ✅ **D-13 fail-closed 历史保留** (D-13 review P2 修复 2026-06-05, D-15 兼容): D-15 之前 REPL 现状是 `isInteractive=true` 但 `staticToolPolicy.confirm = undefined` → 走 `no confirm impl` → deny. D-15 注入 confirm 后静态契约保留: 显式不传 `policy.confirm` 的 ToolPolicy 仍走 fail-closed, 不破坏 D-13 兼容 (见 `tool-loop-policy.test.ts` "D-13 兼容测" — `policy: { evaluate: staticToolPolicy.evaluate }` → `policy_blocked: no confirm impl`).
 
 ### MVP 边界（不是）
 
@@ -434,7 +427,7 @@ await runToolLoop(client, messages, {
 - `policy/args-digest.test.ts` — 稳定 JSON (key 排序) + sha256 12 hex + secret 不暴露 (7 tests)
 - `policy/sanitize-reason.test.ts` — 长度 200 cap + 换行折叠 + NUL 去 (8 tests)
 - `core/test/session/policy-decision.test.ts` — round-trip + 不进 LLM context + 旧 session reload 不崩 (4 tests)
-- `integration/tool-loop-policy.test.ts` — 端到端 13 例覆盖验收红线 (D-13 11 例 + D-13.5 重排补 2 例: print/rpc + --yes 走 ctx.yes first 行为差异真证据)
+- `integration/tool-loop-policy.test.ts` — 端到端 16 例覆盖验收红线 (D-13 11 例 + D-13.5 重排补 2 例 + D-15 confirm 注入补 3 例: y/yes → user_approved, n/no → user_denied, --yes 优先 confirm 0 调用)
 
 ## 4 包 Monorepo 结构（对齐 pi）
 

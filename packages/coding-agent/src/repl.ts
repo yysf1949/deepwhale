@@ -52,6 +52,8 @@ import { createDefaultClient, type Provider } from './llm-factory.js';
 import { buildSummaryAndNext, formatReport, runVerify } from './verify/index.js';
 import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
 import { staticToolPolicy } from './policy/static-rules.js';
+import { createReplConfirm } from './repl/repl-confirm.js'; // D-15: REPL y/N confirm 工厂
+import type { ToolPolicy } from './policy/types.js';
 import type { SandboxRunner } from './sandbox/types.js';
 
 const VERSION = '0.1.0';
@@ -195,6 +197,19 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
   // Sprint 1c-revive-3-D-13: REPL = 交互模式 (isInteractive=true), --yes 标志透传.
   const policyYes = options.yes ?? false;
+  // Sprint 1c-revive-3-D-15: REPL 注入真 confirm 实现 (y/N readline prompt).
+  // 拍板 (D-15, 2026-06-05): 工厂 createReplConfirm 接受 options.input/output 便于单测,
+  // REPL 端用 startRepl 闭包内的 input/output 注入 (跟 main readline 共享同一流; child
+  // rl.question 短窗口 + close 立刻释放, 不抢主 rl — D-15 plan §Risk R-1).
+  // 拍板红线: --yes 永远先于 confirm (D-13.5 P1 重排), replPolicy.confirm 只在 yes=false
+  // 才被 tool-loop 调. runAgentTurn 加可选 policy 参数透传 (默认 staticToolPolicy 向后兼容).
+  const replPolicy: ToolPolicy = {
+    ...staticToolPolicy,
+    confirm: createReplConfirm({
+      input: options.input ?? stdin,
+      output: options.output ?? stdout,
+    }),
+  };
 
   // greeting — Sprint 1c-revive-2-D-11-4 review P1 修复: 不依赖 client.model (lazy 化后
   // client 可能未创). 真创只在 chat 首次发生; 创失败 i18n 错误到 stderr. 这里 greeting
@@ -353,6 +368,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
             compactionConfig,
             sandboxRunner,
             policyYes,
+            replPolicy, // D-15: 注入 y/N confirm; 默认 staticToolPolicy 向后兼容
           );
         } else {
           const turn = await runOneTurn(liveClient, line, [], { signal: ac.signal });
@@ -408,6 +424,9 @@ export async function runAgentTurn(
   sandboxRunner?: SandboxRunner,
   // Sprint 1c-revive-3-D-13: 透传 yes 进 turn.
   yes?: boolean,
+  // Sprint 1c-revive-3-D-15: 透传 policy 进 turn (REPL 注入 replPolicy; 单测传
+  // staticToolPolicy 走 baseline). undefined = 默认 staticToolPolicy (向后兼容).
+  policy?: ToolPolicy,
 ): Promise<void> {
   // 1) 持久化 user 输入
   if (writer) {
@@ -428,6 +447,9 @@ export async function runAgentTurn(
   const summaryFn: SummarizeFn | null = compactionConfig
     ? makeLlmSummarizeFn(client, compactionConfig.protocol)
     : null;
+  // 拍板 (D-15, 2026-06-05): REPL 注入 replPolicy; 显式传 policy 也用, 默认 staticToolPolicy.
+  // 拍板红线 (D-13.5 P1 重排): --yes 永远先于 confirm, replPolicy.confirm 只在 yes=false 才被调.
+  const resolvedPolicy: ToolPolicy = policy ?? staticToolPolicy;
   let result: ToolLoopResult;
   try {
     if (compactionConfig !== null && summaryFn !== null) {
@@ -442,7 +464,7 @@ export async function runAgentTurn(
             if (chunk.content) out.write(chunk.content);
           },
           signal,
-          policy: staticToolPolicy,
+          policy: resolvedPolicy,
           isInteractive: true, // REPL = 交互模式 (D-13 拍板)
           yes: yes ?? false,
           ...(writer ? { writer } : {}),
@@ -459,7 +481,7 @@ export async function runAgentTurn(
           if (chunk.content) out.write(chunk.content);
         },
         signal,
-        policy: staticToolPolicy,
+        policy: resolvedPolicy,
         isInteractive: true, // REPL = 交互模式 (D-13 拍板)
         yes: yes ?? false,
         ...(writer ? { writer } : {}),

@@ -294,26 +294,198 @@ describe('tool-loop policy integration (D-13)', () => {
     }
   });
 
-  it('bash mv a b + isInteractive=true + yes=false (REPL 无 --yes 默认): policy 走 no confirm impl → deny (R-3 拍板)', async () => {
-    // 拍板 (D-13 P2 review 修复 2026-06-05): REPL 现状 isInteractive=true 但 staticToolPolicy.confirm
-    // 是 undefined, 走 no confirm impl → deny (fail-closed). 这跟 P2 修复 README 一致:
-    // "REPL 默认 deny (fail-closed, 拍板无 confirm), --yes 才 bypass. REPL confirm 留 D-15."
+  it('bash mv a b + isInteractive=true + yes=false + policy.confirm 显式 undefined: 走 no confirm impl → deny (D-13 兼容测, 保留 D-13 P2 拍板)', async () => {
+    // 拍板 (D-15, 2026-06-05): D-13 P2 review 修复拍板 "REPL 现状 isInteractive=true 但
+    // staticToolPolicy.confirm 是 undefined → 走 no confirm impl → deny (fail-closed)".
+    // D-15 注入真 confirm 后这条测的"原意"变成 "未注入 confirm 实现 → 兜底 deny" —
+    // D-13 兼容测, 留作 D-15 后人可验证未注入 confirm 的 ToolPolicy 仍走 fail-closed,
+    // 不破坏 D-13 静态契约.
     const client = makeMockClient({
       id: 'c1',
       name: 'bash',
       args: { command: 'mv', args: ['a', 'b'] },
     });
+    const policyNoConfirm: ToolPolicy = {
+      evaluate: staticToolPolicy.evaluate,
+      // 显式不传 confirm — 走 no confirm impl 分支
+    };
     const result = await runToolLoop(client, [{ role: 'user', content: 'go' }], {
       registry: createDefaultRegistry(),
-      policy: staticToolPolicy,
+      policy: policyNoConfirm,
       isInteractive: true, // REPL
       yes: false, // 无 --yes
       onChunk: () => {},
     });
     const toolResult = getToolStepResult(result);
     expect(toolResult!.success).toBe(false);
-    // fail-closed deny, 拍板 跟 print/rpc 行为一致 (P2 修复)
+    // fail-closed deny, 拍板 跟 print/rpc 行为一致 (D-13 P2 修复)
     expect(toolResult!.error).toMatch(/policy_blocked: no confirm impl/);
+  });
+
+  // === Sprint 1c-revive-3-D-15 (2026-06-05): REPL confirm 注入补测 ===
+  // 拍板 (D-15, 2026-06-05): REPL 注入真 confirm 实现后, 走 confirm 分支. 这 3 条测是
+  // D-15 的端到端契约: y → 落 user_approved, n → 落 user_denied, --yes 优先 confirm 0 调用.
+
+  it('D-15: write_file + isInteractive=true + yes=false + policy.confirm 注入 mock 返 true → 走 confirm 分支, 工具真执行 + 落 user_approved', async () => {
+    // 拍板 (D-15, 2026-06-05): REPL 注入真 confirm 后, 不再走 no confirm impl → deny,
+    // 而是调 confirm 函数. 这里用 mock confirm = () => true 模拟用户输 y.
+    const dir = mkdtempSync(join(tmpdir(), 'dw-pol-d15-'));
+    try {
+      const target = join(dir, 'target.txt');
+      const sessionPath = join(dir, 'session.jsonl');
+      const writer = new SessionWriter(sessionPath);
+      await writer.open();
+      let confirmCalls = 0;
+      const confirmPolicy: ToolPolicy = {
+        ...staticToolPolicy,
+        confirm: async (_prompt: string) => {
+          confirmCalls += 1;
+          return true; // 模拟用户输 y
+        },
+      };
+      const client = makeMockClient({
+        id: 'c1',
+        name: 'write_file',
+        args: { path: target, content: 'repl-confirmed' },
+      });
+      const result = await runToolLoop(client, [{ role: 'user', content: 'go' }], {
+        registry: createDefaultRegistry(),
+        policy: confirmPolicy,
+        isInteractive: true, // REPL
+        yes: false, // 无 --yes
+        writer,
+        onChunk: () => {},
+      });
+      const toolResult = getToolStepResult(result);
+      // (1) 工具真执行, 文件真落盘
+      expect(toolResult!.success).toBe(true);
+      expect(readFileSync(target, 'utf8')).toBe('repl-confirmed');
+      // (2) confirm 函数被调了 1 次
+      expect(confirmCalls).toBe(1);
+      // (3) session 落 user_approved event
+      await writer.close();
+      const events = await readSessionEvents(sessionPath);
+      const policyEvents = events.filter((e) => e.kind === 'policy_decision');
+      expect(policyEvents).toHaveLength(1);
+      const ev = policyEvents[0]!;
+      if (ev.kind === 'policy_decision') {
+        expect(ev.decision).toBe('user_approved');
+        expect(ev.tool_call_id).toBe('c1');
+        expect(ev.name).toBe('write_file');
+        expect(ev.argsDigest).toMatch(/^sha256:[a-f0-9]{12}$/);
+        expect(ev.reason).toBe('user approved');
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('D-15: write_file + isInteractive=true + yes=false + policy.confirm 注入 mock 返 false → 走 confirm 分支, 工具不执行 + 落 user_denied', async () => {
+    // 拍板 (D-15, 2026-06-05): REPL confirm 注入后, 用户输 n → 工具不执行 + 落 user_denied.
+    const dir = mkdtempSync(join(tmpdir(), 'dw-pol-d15-'));
+    try {
+      const target = join(dir, 'target.txt');
+      writeFileSync(target, 'original');
+      const sessionPath = join(dir, 'session.jsonl');
+      const writer = new SessionWriter(sessionPath);
+      await writer.open();
+      let confirmCalls = 0;
+      const confirmPolicy: ToolPolicy = {
+        ...staticToolPolicy,
+        confirm: async (_prompt: string) => {
+          confirmCalls += 1;
+          return false; // 模拟用户输 n
+        },
+      };
+      const client = makeMockClient({
+        id: 'c1',
+        name: 'write_file',
+        args: { path: target, content: 'n-no' },
+      });
+      const result = await runToolLoop(client, [{ role: 'user', content: 'go' }], {
+        registry: createDefaultRegistry(),
+        policy: confirmPolicy,
+        isInteractive: true, // REPL
+        yes: false, // 无 --yes
+        writer,
+        onChunk: () => {},
+      });
+      const toolResult = getToolStepResult(result);
+      // (1) 工具不执行, 文件未覆盖
+      expect(toolResult!.success).toBe(false);
+      expect(toolResult!.error).toMatch(/policy_blocked: user denied confirmation/);
+      expect(readFileSync(target, 'utf8')).toBe('original');
+      // (2) confirm 函数被调了 1 次
+      expect(confirmCalls).toBe(1);
+      // (3) session 落 user_denied event
+      await writer.close();
+      const events = await readSessionEvents(sessionPath);
+      const policyEvents = events.filter((e) => e.kind === 'policy_decision');
+      expect(policyEvents).toHaveLength(1);
+      const ev = policyEvents[0]!;
+      if (ev.kind === 'policy_decision') {
+        expect(ev.decision).toBe('user_denied');
+        expect(ev.tool_call_id).toBe('c1');
+        expect(ev.name).toBe('write_file');
+        expect(ev.reason).toBe('user denied'); // tool-loop.ts:376 reason="user denied" (无 "confirmation" 后缀, 跟 error msg 不同)
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('D-15: write_file + isInteractive=true + yes=true + policy.confirm 注入 mock → ctx.yes 优先, confirm 函数 0 调用, 落 user_approved (bypassedByYes:true)', async () => {
+    // 拍板 (D-15, 2026-06-05 + D-13.5 P1 重排红线): --yes 永远先于 confirm, 注入 confirm 后
+    // 也要验证 --yes 走 ctx.yes 分支, confirm 0 调用, 落 user_approved (bypassedByYes:true).
+    const dir = mkdtempSync(join(tmpdir(), 'dw-pol-d15-'));
+    try {
+      const target = join(dir, 'target.txt');
+      const sessionPath = join(dir, 'session.jsonl');
+      const writer = new SessionWriter(sessionPath);
+      await writer.open();
+      let confirmCalls = 0;
+      const confirmPolicy: ToolPolicy = {
+        ...staticToolPolicy,
+        confirm: async (_prompt: string) => {
+          confirmCalls += 1;
+          return true;
+        },
+      };
+      const client = makeMockClient({
+        id: 'c1',
+        name: 'write_file',
+        args: { path: target, content: 'yes-priority' },
+      });
+      const result = await runToolLoop(client, [{ role: 'user', content: 'go' }], {
+        registry: createDefaultRegistry(),
+        policy: confirmPolicy,
+        isInteractive: true, // REPL
+        yes: true, // --yes 拍板
+        writer,
+        onChunk: () => {},
+      });
+      const toolResult = getToolStepResult(result);
+      // (1) 工具真执行
+      expect(toolResult!.success).toBe(true);
+      expect(readFileSync(target, 'utf8')).toBe('yes-priority');
+      // (2) confirm 函数 0 调用 (--yes 优先, D-13.5 P1 重排红线)
+      expect(confirmCalls).toBe(0);
+      // (3) session 落 user_approved (bypassedByYes:true)
+      await writer.close();
+      const events = await readSessionEvents(sessionPath);
+      const policyEvents = events.filter((e) => e.kind === 'policy_decision');
+      expect(policyEvents).toHaveLength(1);
+      const ev = policyEvents[0]!;
+      if (ev.kind === 'policy_decision') {
+        expect(ev.decision).toBe('user_approved');
+        expect(ev.reason).toMatch(/--yes bypass/);
+        const meta = (ev as { meta?: { bypassedByYes?: boolean; isInteractive?: boolean } }).meta;
+        expect(meta?.bypassedByYes).toBe(true);
+        expect(meta?.isInteractive).toBe(true); // REPL 模式
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('read_file: policy allow → 工具真跑, 不写 session (allow 不刷爆 JSONL)', async () => {
