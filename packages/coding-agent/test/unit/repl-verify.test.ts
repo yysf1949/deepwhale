@@ -5,6 +5,8 @@
  *   - REPL 收 `/verify` → 调 runVerify → formatReport 输出到 out
  *   - writer 存在 → 写 1 条 'verification' event 到 session JSONL
  *   - REPL 跑完 /verify 不退, 回到 prompt
+ *   - **D-11-4 review P1 修复**: 无 LLM key 时 REPL 仍能启动 + /verify 跑通
+ *     (lazy client 化, 不在 146 行抢创 createDefaultClient)
  *
  * 拍板 (D-11-4, 2026-06-04): 不真跑 `corepack pnpm build` (太慢).
  * 注入 mock LLMClient + 短 input 序列验证 REPL 集成点.
@@ -13,7 +15,7 @@
  *   - 不 mock runVerify, 用真 node 子进程 (通过注入 options.checks)
  *   - 不写 key, 不读 .env
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -128,4 +130,90 @@ describe('REPL /verify (D-11-4 2026-06-04)', () => {
       expect(verifyEvent.summary).toMatch(/4\/4 checks passed/);
     }
   }, 60_000); // 60s timeout, 4 个简单 check < 1s
+
+  // Sprint 1c-revive-2-D-11-4 review P1 修复 (2026-06-04): 无 LLM key 时 REPL 不
+  // 阻塞, /verify 路径不依赖 client 创成功. 之前 146 行抢创 createDefaultClient()
+  // 在无 key 时抛 APIKeyMissingError, REPL Promise 直接 reject, 用户进不去.
+  // 修复: 显式 unset 两个 key, **不**传 options.client (走 lazy 创建路径).
+  describe('REPL 无 LLM key 启动 (D-11-4 review P1 修复)', () => {
+    let origDeepseek: string | undefined;
+    let origAnthropic: string | undefined;
+
+    beforeEach(() => {
+      origDeepseek = process.env['DEEPSEEK_API_KEY'];
+      origAnthropic = process.env['ANTHROPIC_AUTH_TOKEN'];
+      delete process.env['DEEPSEEK_API_KEY'];
+      delete process.env['ANTHROPIC_AUTH_TOKEN'];
+    });
+
+    afterEach(() => {
+      if (origDeepseek !== undefined) process.env['DEEPSEEK_API_KEY'] = origDeepseek;
+      if (origAnthropic !== undefined) process.env['ANTHROPIC_AUTH_TOKEN'] = origAnthropic;
+    });
+
+    it('REPL 无 key 启动成功 + /verify 跑通 + 写 session event + chat 路径报 i18n 错', async () => {
+      const out = new CollectingWritable();
+      const err = new CollectingWritable();
+      const sessionFile = join(
+        tmpdir(),
+        `dw-repl-nokey-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jsonl`,
+      );
+
+      // 4 个简单 pass check
+      const passChecks: VerifyCheck[] = Array.from({ length: 4 }, (_, i) => {
+        const tmp = join(
+          tmpdir(),
+          `dw-repl-nokey-pass-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}.js`,
+        );
+        writeFileSync(tmp, `process.stdout.write('ok-${i + 1}'); process.exit(0);`);
+        return {
+          name: `step${i + 1}`,
+          command: `node ${tmp}`,
+          args: ['node', tmp],
+        };
+      });
+
+      // input: /verify → chat 触发 lazy create 失败 → /exit
+      async function* inputGen(): AsyncGenerator<Buffer> {
+        yield Buffer.from('/verify\n');
+        await new Promise((r) => setTimeout(r, 1000)); // 给 verify 跑完
+        yield Buffer.from('hello without key\n'); // 触发 lazy create 失败
+        await new Promise((r) => setTimeout(r, 200)); // 给 stderr 写完
+        yield Buffer.from('/exit\n');
+      }
+      const input = Readable.from(inputGen(), { objectMode: false });
+
+      const exitPromise = startRepl({
+        // 注意: **不**传 client, 让 lazy create 触发
+        input,
+        output: out,
+        errorOutput: err,
+        exit: (code) => code as never,
+        sessionPath: sessionFile,
+        verifyChecks: passChecks,
+      });
+
+      const code = await Promise.race([
+        exitPromise,
+        new Promise<number>((resolve) => setTimeout(() => resolve(-1), 30_000)),
+      ]);
+      expect(code).toBe(0);
+
+      const outText = out.text();
+      const errText = err.text();
+
+      // 1) greeting 仍输出 (即使 client 创失败, REPL 不会因模型名缺失而 reject)
+      expect(outText).toMatch(/deepwhale/);
+      // 2) /verify 跑通 (out 含 'deepwhale verify' 报告)
+      expect(outText).toMatch(/deepwhale verify/);
+      // 3) chat 触发 lazy create 失败 → i18n error 到 stderr (REPL 不退)
+      expect(errText).toMatch(/api_key_missing|API/i);
+      // 4) /exit 仍能退出 (REPL 没被无 key 状态卡死)
+      expect(outText).toMatch(/goodbye/i);
+      // 5) session JSONL 写了 verification event (REPL /verify 行为不变)
+      const events = await readSessionEvents(sessionFile);
+      const verifyEvent = events.find((e) => e.kind === 'verification');
+      expect(verifyEvent).toBeDefined();
+    }, 30_000);
+  });
 });

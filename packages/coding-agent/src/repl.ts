@@ -19,7 +19,6 @@
  */
 
 import { createInterface, type Interface as RLInterface } from 'node:readline';
-import process from 'node:process';
 import { stdin, stdout, stderr } from 'node:process';
 import { t } from '@deepwhale/core';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
@@ -143,12 +142,36 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   // - client 未给 + provider 显式给 → 走 createDefaultClient({provider})
   // - client 未给 + provider 未给 → 走 createDefaultClient() (env 推断 + 双设报错)
   // 任何抛 APIKeyMissingError 都被 catch 后写到 stderr (跟 1b 时代行为一致)
-  const client =
-    options.client ??
-    createDefaultClient({
-      ...(options.provider !== undefined ? { provider: options.provider } : {}),
-      ...(options.model !== undefined ? { model: options.model } : {}),
-    });
+  //
+  // Sprint 1c-revive-2-D-11-4 review P1 修复 (2026-06-04): **lazy** client 初始化.
+  // 之前 146 行抢创 createDefaultClient() 在无 LLM key 时抛 APIKeyMissingError,
+  // REPL 根本进不去 → 跟 README "/verify 不依赖 key" 承诺冲突. 修复:
+  //   1. options.client 显式给 → 立即 bind (单测路径不变)
+  //   2. options.client 未给 → 走 tryCreateClient, 失败存 clientError, 不抛
+  //   3. /verify 路径完全跳过 client 引用 (跟 deepwhale --verify 同语义)
+  //   4. chat 路径首次调 getClient() 时才真创, clientError 走 i18n 输出
+  const clientFromOptions = options.client;
+  let client: LLMClient | null = clientFromOptions ?? null;
+  let clientError: Error | null = clientFromOptions ? null : null;
+  const tryCreateClient = (): { client: LLMClient | null; error: Error | null } => {
+    if (clientFromOptions) return { client: clientFromOptions, error: null };
+    if (client !== null || clientError !== null) {
+      return { client, error: clientError };
+    }
+    try {
+      const c = createDefaultClient({
+        ...(options.provider !== undefined ? { provider: options.provider } : {}),
+        ...(options.model !== undefined ? { model: options.model } : {}),
+      });
+      client = c;
+      clientError = null;
+      return { client: c, error: null };
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      clientError = err;
+      return { client: null, error: err };
+    }
+  };
   // Sprint 1c-revive-2-D-6 (review P2 修复, 2026-06-04): 拿掉 anthropic × tool loop
   // 温柔降级. 拍板: D-4 (commit 80d3fd7/bbf1bf6) 已实装 AnthropicClient tool
   // schema 转换 (toAnthropicMessages 合并连续 tool 消息), --provider anthropic
@@ -158,9 +181,14 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
 
-  // greeting
-  out.write(`${t('cli.greeting', VERSION, client.model)}\n`);
-  if (!process.env['DEEPSEEK_API_KEY'] && !process.env['ANTHROPIC_AUTH_TOKEN']) {
+  // greeting — Sprint 1c-revive-2-D-11-4 review P1 修复: 不依赖 client.model (lazy 化后
+  // client 可能未创). 真创只在 chat 首次发生; 创失败 i18n 错误到 stderr. 这里 greeting
+  // 只显示 ready + 版本号, 跟 1b.5 时代 'model 在 greeting 显示' 比, 牺牲一点 UX
+  // (用户得 chat 一次才能看到 model 名) 换 REPL 可在无 key 状态启动.
+  const initialClientState = tryCreateClient();
+  out.write(`${t('cli.greeting', VERSION, initialClientState.client?.model ?? 'not-configured')}\n`);
+  if (initialClientState.error) {
+    // 无 key 提示沿用 1b.5 时代 163-166 行的 stderr 警告语义, 但挪到 lazy create 之后
     err.write(`${t('error.api_key_missing')}\n`);
   }
   out.write(`${t('cli.no_api_key_hint')}\n\n`);
@@ -284,13 +312,22 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         return;
       }
 
-      // chat
+      // chat — Sprint 1c-revive-2-D-11-4 review P1 修复: client lazy 化后, chat
+      // 路径首次调 tryCreateClient() 真创. 创失败 (无 key) → i18n stderr 提示 + 跳
+      // 过本次 turn (不退出 REPL, 用户可继续 /verify 或 /exit).
       const ac = new AbortController();
+      const c = clientFromOptions ? { client: clientFromOptions, error: null } : tryCreateClient();
+      if (c.client === null) {
+        err.write(`${t('error.api_key_missing')}\n\n`);
+        prompt();
+        return;
+      }
+      const liveClient = c.client;
       try {
         if (enableToolLoop) {
-          await runAgentTurn(client, line, workingMessages, writer, out, err, ac.signal, compactionConfig);
+          await runAgentTurn(liveClient, line, workingMessages, writer, out, err, ac.signal, compactionConfig);
         } else {
-          const turn = await runOneTurn(client, line, [], { signal: ac.signal });
+          const turn = await runOneTurn(liveClient, line, [], { signal: ac.signal });
           if (turn.kind === 'error') {
             err.write(`${turn.error}\n\n`);
           } else if (turn.kind === 'chat') {

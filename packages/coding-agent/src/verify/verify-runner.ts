@@ -98,6 +98,10 @@ const DEFAULT_CHECKS: ReadonlyArray<VerifyCheck> = [
   // 拍板: args[0] 是实际 spawn 的可执行 (e.g. 'corepack'), 后面是它的参数.
   // 4 步 default 用 corepack 跑 pnpm, 跟用户日常工作流一致
   // (corepack 自身 < 5MB, 启动 < 200ms, 不显著影响 verify 总耗时).
+  //
+  // Sprint 1c-revive-2-D-11-4 review P1 修复 (2026-06-04): args[0] 在 Windows 上
+  // 由 resolveRunner() 转成 'corepack.cmd'. 默认仍写 'corepack' (Linux/macOS 不变,
+  // 跟 1c 时代兼容性), 真 spawn 时再换. 单测可注入 platform = 'win32' 验证.
   {
     name: 'build',
     command: 'corepack pnpm build',
@@ -119,6 +123,22 @@ const DEFAULT_CHECKS: ReadonlyArray<VerifyCheck> = [
     args: ['corepack', 'pnpm', 'test'],
   },
 ];
+
+/**
+ * Sprint 1c-revive-2-D-11-4 review P1 修复: Windows 上 `corepack` 在 PATH 解析不到
+ * (Node `spawn('corepack', ...)` 在 Win32 默认走 CreateProcessW, 不接 .cmd shim).
+ * 实际 `where corepack` 只返 `corepack.cmd`. 修复: Win32 上把 'corepack' → 'corepack.cmd'.
+ *
+ * 设计: 接受 platform 参数, 默认用 process.platform, 单测可注入 'win32' 验证.
+ * 仅在 args0 严格 === 'corepack' 时转换; 其它可执行 (node / bash / .exe) 透传,
+ * 跟单测里 mock 各种 runner 的行为兼容.
+ */
+export function resolveRunner(args0: string, platform: NodeJS.Platform = process.platform): string {
+  if (args0 === 'corepack' && platform === 'win32') {
+    return 'corepack.cmd';
+  }
+  return args0;
+}
 
 /**
  * 跑 4 步验证 (默认), 返回 `VerificationReport`.
@@ -247,11 +267,14 @@ async function runOneCheck(
       // 拍板 (D-11, 2026-06-04): 透传 args[0] 给 spawn, 不写死 corepack.
       // 调用方可以传 'node' / 'bash' / 'corepack' / 任何 spawn 兼容的可执行.
       // 4 步 default 用 corepack, 跟用户日常工作流一致.
-      const runner = check.args[0];
-      const subArgs = check.args.slice(1);
-      if (typeof runner !== 'string' || runner.length === 0) {
+      // Sprint 1c-revive-2-D-11-4 review P1 修复: spawn 前用 resolveRunner 转换
+      // runner 字符串, Windows 上 'corepack' → 'corepack.cmd'.
+      const rawRunner = check.args[0];
+      if (typeof rawRunner !== 'string' || rawRunner.length === 0) {
         throw new Error(`VerifyCheck '${check.name}' args[0] must be a non-empty string (the runner binary)`);
       }
+      const runner = resolveRunner(rawRunner);
+      const subArgs = check.args.slice(1);
       child = spawn(runner, subArgs, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],

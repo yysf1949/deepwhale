@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   runVerify,
+  resolveRunner,
   type VerifyCheck,
   type VerificationReport,
 } from '../../../src/verify/verify-runner.js';
@@ -278,6 +279,28 @@ describe('verify-runner (D-11 2026-06-04)', () => {
       } finally {
         if (orig !== undefined) process.env['DEEPSEEK_API_KEY'] = orig;
       }
+    });
+  });
+
+  describe('Windows runner resolution (D-11-4 review P1 修复, 2026-06-04)', () => {
+    // 拍板: Linux/macOS 下 corepack 直走 CreateProcessW 解析得到, 不需 .cmd shim.
+    // Windows 上 Node 默认 spawn 走 CreateProcessW 不接 .cmd, 必须显式 .cmd 后缀.
+    // resolveRunner 单元验证平台分支, 不动 process.platform 避免污染其它单测.
+    it('Linux: corepack 透传不变', () => {
+      expect(resolveRunner('corepack', 'linux')).toBe('corepack');
+      expect(resolveRunner('corepack', 'darwin')).toBe('corepack');
+    });
+    it('Windows: corepack 转 corepack.cmd', () => {
+      expect(resolveRunner('corepack', 'win32')).toBe('corepack.cmd');
+    });
+    it('Windows: 其它可执行 (node/bash) 不转换, 跟单测 mock 各种 runner 兼容', () => {
+      expect(resolveRunner('node', 'win32')).toBe('node');
+      expect(resolveRunner('bash', 'win32')).toBe('bash');
+      expect(resolveRunner('my-tool.exe', 'win32')).toBe('my-tool.exe');
+    });
+    it('Linux: 任何 runner 透传, 不强制加 .cmd', () => {
+      expect(resolveRunner('my-tool.exe', 'linux')).toBe('my-tool.exe');
+      expect(resolveRunner('corepack.cmd', 'linux')).toBe('corepack.cmd');
     });
   });
 });
