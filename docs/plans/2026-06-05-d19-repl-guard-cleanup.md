@@ -7,7 +7,7 @@
 **Goal:** 修 D-19 留下的 robustness 缺陷 — P1 关闭 race (写 'file closed' 到 stderr + 漏 user_denied 审计) + P2 turn guard 漏 non-/exit builtin 路径 + P3 /exit 测试未 await p resolve, 修后跑 reviewer 6-file focused suite 全过 (42 passed / 1 skipped).
 
 **Architecture:** **零侵入 core / tool-loop / chain / static-rules / 协议** (D-19 ship 拍的 tool-loop.ts:365-386 confirm 异步分支契约保持, D-13.5 P1 重排的优先级保持). D-19.5/6/6.1 全是 `packages/coding-agent/src/repl.ts` + 新 test 文件 + vitest.config.ts 改动 + i18n 扩 3 key. **不**改:
-- `packages/coding-agent/src/agent/index.js` (tool-loop.ts 入口, 0 改)
+- `packages/coding-agent/src/agent/index.ts` (tool-loop.ts 入口, 0 改)
 - `packages/coding-agent/src/policy/*.ts` (0 改)
 - `packages/coding-agent/src/repl/repl-confirm.ts` (D-19 controller 形状 0 改)
 - `packages/coding-agent/src/repl-confirm*` (D-19 y/N controller 0 改)
@@ -43,8 +43,8 @@ D-19 (commit `0a56c68` + `d30f360` + `5119570`, 2026-06-05) 修完 P1 同流双 
 3. `test/integration/tool-loop-policy.test.ts` `bash mv` 断言改跨平台 (用 `mockShell` 而非 `/bin/mv`)
 
 **Tests (D-19.5 ship 必覆盖):**
-- `test/integration/repl-confirm.test.ts` — 验 `finish()` 后再 startRepl 不累积 SIGINT listener
-- `test/integration/tool-loop-policy.test.ts` — 验跨平台 bash mv (用 mock shell, 不再依赖 `/bin/mv`)
+- `packages/coding-agent/test/repl/repl-confirm.test.ts` — 验 `finish()` 后再 startRepl 不累积 SIGINT listener
+- `packages/coding-agent/test/integration/tool-loop-policy.test.ts` — 验跨平台 bash mv (用 mock shell, 不再依赖 `/bin/mv`)
 
 **Commit (`bacd09a`):** `fix(repl): D-19.5 guard in-flight turn and cleanup shutdown`
 
@@ -191,7 +191,9 @@ D-19.6 三 commit 推到 origin 后, reviewer (Windows 端) 复跑 focused suite
 > - `corepack pnpm lint`: 0 warnings
 > - `git status -sb`: clean
 >
-> **Findings**: No blocking findings in `5a027bb..9d948a7`. Q2 slash guard 方向正确, 普通 chat line 不再被 deny; Q3 abort-aware 分支已把 shutdown abort 从 unknown error 分流; Q4 timeout reject + exitCode 断言补上了拒假绿网.
+> **Findings** (reviewer 当时 review 范围 `5a027bb..9d948a7`, 5 commits): No blocking findings. Q2 slash guard 方向正确, 普通 chat line 不再被 deny; Q3 abort-aware 分支已把 shutdown abort 从 unknown error 分流; Q4 timeout reject + exitCode 断言补上了拒假绿网.
+>
+> **后续归档 commit `3b7d3c2`** (D-19.6.1 收尾 plan 文档) 是 docs 改动, 跟上述 review 范围不重叠 — docs 归档 commit 本身**不**在 reviewer review 范围内. 完整 D-19 review-fix 段 range = `511c459..3b7d3c2` (6 commits), 见下方"最终 6-commit cluster".
 >
 > **残余风险**: `vitest.config.ts` 的 alias 目前只覆盖 `@deepwhale/core` 根入口; 当前 import 全部命中根入口, 所以可接受. 以后如果新增 `@deepwhale/core/i18n` subpath import, 建议同步加 exact subpath alias.
 
@@ -199,9 +201,10 @@ D-19.6 三 commit 推到 origin 后, reviewer (Windows 端) 复跑 focused suite
 
 ---
 
-## 最终 5-commit cluster (D-19.5 + D-19.6 + D-19.6.1)
+## 最终 6-commit cluster (D-19.5 + D-19.6 + D-19.6.1, 含 docs 归档)
 
 ```
+3b7d3c2 docs(plans): D-19.5/6/6.1 repl guard cleanup 总集归档
 9d948a7 fix(repl): D-19.6.1 review-fix Q2/Q3/Q4 (slash guard + abort-aware + 强断言)
 31061d0 fix(test): vitest alias @deepwhale/core → src (D-19.6.1 P1.1)
 5a027bb test(repl): P1 tight /exit 测试 await p resolve (D-19.6 P3)
@@ -209,10 +212,11 @@ D-19.6 三 commit 推到 origin 后, reviewer (Windows 端) 复跑 focused suite
 21c889a fix(repl): close 路径不再 race in-flight turn (D-19.6 P1)
 ```
 
-**对比 reviewer 关注**:
+**对比 reviewer 关注** (本机 Ubuntu 跑 `pnpm test` 实测, reviewer Windows 端跑 `vitest.CMD run` focused 6-file):
 - D-19.5 ship baseline: 493 passed / 20 skipped
-- D-19.6 ship baseline: 493 passed / 20 skipped (P1 + P2 + P3 新增 2 测, 0 改 0 删, 持平)
-- D-19.6.1 ship baseline: **495 passed / 20 skipped** (D-19.6 baseline 493 + 2 新增 2 = 495, D-19.6.1 0 改 0 删, 持平)
+- D-19.6 ship baseline: 493 passed / 20 skipped (P1 + P2 新增 2 个新 test 文件, P3 改既有 1 文件, 0 it 数变化)
+- D-19.6.1 ship baseline: **495 passed / 20 skipped** (D-19.6 baseline 493 + 2 新增 it = 495, D-19.6.1 0 改 0 删 it, 持平; 新增 1 docs commit `3b7d3c2` 不改 it 数)
+- Reviewer 复跑 D-19.6.1 (focused 6-file, Windows 端): **42 passed / 1 skipped**
 
 ---
 
@@ -249,13 +253,16 @@ D-19.6 三 commit 推到 origin 后, reviewer (Windows 端) 复跑 focused suite
 | 3 | unit (新) | `test/repl/repl-close-during-turn.test.ts` | P1 close 测试: 强 reject timeout + 断言 `exitCode === 0` + 验证 stderr 无 "file closed" + session 落 `user_denied` 审计 | D-19.6 P1 + D-19.6.1 Q4 |
 | 4 | integration (regression) | `test/integration/tool-loop-policy.test.ts` | D-19.5 跨平台 bash mv (用 mock shell) | D-19.5 |
 
-**总计**: 2 个新 test 文件 (P1 + P2) + 2 个回归改 (P3 + bash mv) = **净 +4 测** (D-19.5 0 + D-19.6 +2 + D-19.6.1 0 = 2, 但 D-19.6 改 P3 + D-19.6.1 改 P1 不新增 it 计数, 实际净 +2 it).
+**总计** (按"测文件数"和"测 it 数"两种口径分写, 避免 P3 review 自相矛盾):
+- **测文件数**: D-19.5 0 新增 / D-19.6 +2 新增 (repl-close-during-turn.test.ts + repl-turn-guard-builtin.test.ts) + D-19.6.1 0 新增 = **+2 新文件**
+- **回归改文件**: D-19.5 改 tool-loop-policy.test.ts (bash mv 跨平台) / D-19.6 改 repl-shared-stdin.test.ts (P3 await p resolve) + 改 repl-close-during-turn.test.ts (D-19.6.1 Q4 强断言) = **3 个改**
+- **it 计数净增**: D-19.5 0 / D-19.6 +2 (P1 + P2 各 1 个 `it` 新文件) / D-19.6.1 0 (改写不增 it) = **+2 it** 净增, 跟 495 - 493 = 2 一致
 
 ---
 
 ## D-19.5/6/6.1 红线 (给未来 sprint)
 
-- **不**改 `packages/coding-agent/src/agent/index.js` (tool-loop.ts 入口, 0 改)
+- **不**改 `packages/coding-agent/src/agent/index.ts` (tool-loop.ts 入口, 0 改)
 - **不**改 `packages/coding-agent/src/policy/*.ts` (0 改)
 - **不**改 `packages/coding-agent/src/repl/repl-confirm.ts` (D-19 controller 形状 0 改)
 - **不**改 `packages/core/src/session/*` (event schema 0 改)
@@ -287,8 +294,9 @@ D-19.6 三 commit 推到 origin 后, reviewer (Windows 端) 复跑 focused suite
 | `5a027bb` | hermes | 2026-06-05 | test(repl): P1 tight /exit 测试 await p resolve (D-19.6 P3) |
 | `31061d0` | hermes | 2026-06-05 | fix(test): vitest alias @deepwhale/core → src (D-19.6.1 P1.1) |
 | `9d948a7` | hermes | 2026-06-05 | fix(repl): D-19.6.1 review-fix Q2/Q3/Q4 (slash guard + abort-aware + 强断言) |
+| `3b7d3c2` | hermes | 2026-06-05 | docs(plans): D-19.5/6/6.1 repl guard cleanup 总集归档 |
 
-**Push:** `5a027bb..9d948a7` 已推 `origin/feature/d19.5-repl-guard-cleanup`. `git status -sb` 无 ahead/behind, 远程本地完全同步.
+**Push:** `511c459..3b7d3c2` 已推 `origin/feature/d19.5-repl-guard-cleanup` (D-19.5 起点到 D-19.6.1 归档终点, 6 commits). `git status -sb` 无 ahead/behind, 远程本地完全同步.
 
 **飞书通知 (DM, 2026-06-05):** reviewer compare URL + 6-file focused suite 验收命令 + commit hash + diff stat.
 
