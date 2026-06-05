@@ -15,6 +15,7 @@ export function sanitizeReason(reason: string): string {
   // 1. 折叠换行 (\r?\n → ' / '), 单行显示
   let r = reason.replace(/\r?\n/g, ' / ');
   // 2. 去 NUL (JSON 写入安全, 防 null byte 注入)
+  // eslint-disable-next-line no-control-regex
   r = r.replace(/\u0000/g, '');
   // 3. 长度上限 + 标 truncated
   if (r.length > MAX_REASON_LEN) {

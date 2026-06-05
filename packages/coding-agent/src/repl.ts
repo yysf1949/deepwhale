@@ -51,6 +51,7 @@ import { createDefaultRegistry } from './tools/registry.js';
 import { createDefaultClient, type Provider } from './llm-factory.js';
 import { buildSummaryAndNext, formatReport, runVerify } from './verify/index.js';
 import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
+import { staticToolPolicy } from './policy/static-rules.js';
 import type { SandboxRunner } from './sandbox/types.js';
 
 const VERSION = '0.1.0';
@@ -58,6 +59,12 @@ const VERSION = '0.1.0';
 export interface ReplOptions {
   /** 注入 LLM 客户端（默认 createDefaultClient env 推断, Sprint 1b.5 Step 2 C3 拍板）。单测用。 */
   client?: LLMClient;
+  /**
+   * Sprint 1c-revive-3-D-13 (2026-06-05): --yes 标志.
+   * yes=true bypass require_confirmation (write_file / edit_file / 危险 bash),
+   * 不 bypass deny. 拍板: REPL = 交互模式 (isInteractive=true), policy=staticToolPolicy.
+   */
+  yes?: boolean;
   /**
    * Sprint 1b.5 Step 2 (2.5 拍板, C3 拍板 2026-06-03): 显式 provider. 跟 env 推断冲突时优先.
    * 跟 options.client 互斥 — 传 client 时 provider 忽略 (单测路径).
@@ -186,6 +193,8 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   // Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 入口解析 sandbox env.
   // 未知值 throw (fail-closed), 由 CLI `main().catch` 写到 stderr + exit 1.
   const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
+  // Sprint 1c-revive-3-D-13: REPL = 交互模式 (isInteractive=true), --yes 标志透传.
+  const policyYes = options.yes ?? false;
 
   // greeting — Sprint 1c-revive-2-D-11-4 review P1 修复: 不依赖 client.model (lazy 化后
   // client 可能未创). 真创只在 chat 首次发生; 创失败 i18n 错误到 stderr. 这里 greeting
@@ -343,6 +352,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
             ac.signal,
             compactionConfig,
             sandboxRunner,
+            policyYes,
           );
         } else {
           const turn = await runOneTurn(liveClient, line, [], { signal: ac.signal });
@@ -396,6 +406,8 @@ export async function runAgentTurn(
   // Sprint 1c-revive-3-D-12 review P1 修复: startRepl 把 env 解析的 runner
   // 传进来, 工具注册表跟 env 状态对齐. 不传 = 用 LocalSandboxRunner (向后兼容).
   sandboxRunner?: SandboxRunner,
+  // Sprint 1c-revive-3-D-13: 透传 yes 进 turn.
+  yes?: boolean,
 ): Promise<void> {
   // 1) 持久化 user 输入
   if (writer) {
@@ -430,6 +442,10 @@ export async function runAgentTurn(
             if (chunk.content) out.write(chunk.content);
           },
           signal,
+          policy: staticToolPolicy,
+          isInteractive: true, // REPL = 交互模式 (D-13 拍板)
+          yes: yes ?? false,
+          ...(writer ? { writer } : {}),
         },
         compactionConfig,
         summaryFn,
@@ -443,6 +459,10 @@ export async function runAgentTurn(
           if (chunk.content) out.write(chunk.content);
         },
         signal,
+        policy: staticToolPolicy,
+        isInteractive: true, // REPL = 交互模式 (D-13 拍板)
+        yes: yes ?? false,
+        ...(writer ? { writer } : {}),
       });
     }
   } catch (e) {

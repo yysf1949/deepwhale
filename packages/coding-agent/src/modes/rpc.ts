@@ -35,6 +35,7 @@ import { CompactionState } from '@deepwhale/core';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { createDefaultClient, type Provider } from '../llm-factory.js';
 import { resolveSandboxRunnerFromEnv } from '../sandbox/env-gate.js';
+import { staticToolPolicy } from '../policy/static-rules.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 
 export interface RpcModeOptions {
@@ -60,6 +61,10 @@ export interface RpcModeOptions {
    * (CompactionState 闭包持有, writer 复用 sessionPath writer).
    */
   compactionConfig?: Omit<AgentCompactionConfig, 'writer' | 'state'> | null;
+  /**
+   * Sprint 1c-revive-3-D-13 (2026-06-05): --yes 标志. rpc 拍板 isInteractive=false.
+   */
+  yes?: boolean;
 }
 
 interface RpcRequest {
@@ -98,6 +103,8 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
   // Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 入口解析 sandbox env.
   // 未知值 throw (fail-closed), 由 CLI `main().catch` 写到 stderr + exit 1.
   const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
+  // Sprint 1c-revive-3-D-13: rpc 拍板 isInteractive=false (D-15 扩 confirmedTools 协议).
+  const policyYes = options.yes ?? false;
 
   // session
   let workingMessages: Awaited<ReturnType<typeof loadSession>>['messages'] = [];
@@ -200,6 +207,7 @@ export async function runRpcMode(options: RpcModeOptions): Promise<number> {
           options,
           compactionConfig,
           sandboxRunner,
+          policyYes,
         );
         sendOk(req.id, result);
       } catch (e) {
@@ -261,6 +269,8 @@ async function dispatch(
   // Sprint 1c-revive-3-D-12 review P1 修复: 透传 sandboxRunner 进 dispatch,
   // 让 chat request 内的 tool loop 跟 env 配置一致.
   sandboxRunner: SandboxRunner,
+  // Sprint 1c-revive-3-D-13: 透传 yes 进 dispatch.
+  yes: boolean,
 ): Promise<unknown> {
   switch (req.method) {
     case 'chat': {
@@ -291,7 +301,7 @@ async function dispatch(
               ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
               ...(stream
                 ? {
-                    onChunk: (chunk) => {
+                    onChunk: (chunk: { content?: string }) => {
                       if (chunk.content) {
                         const notif: RpcNotification = {
                           method: 'chat.delta',
@@ -302,6 +312,10 @@ async function dispatch(
                     },
                   }
                 : {}),
+              policy: staticToolPolicy,
+              isInteractive: false, // rpc 拍板非交互 (D-13)
+              yes,
+              ...(writer ? { writer } : {}),
             },
             compactionConfig,
             summaryFn,
@@ -323,6 +337,10 @@ async function dispatch(
                 },
               }
             : {}),
+          policy: staticToolPolicy,
+          isInteractive: false, // rpc 拍板非交互 (D-13)
+          yes,
+          ...(writer ? { writer } : {}),
         });
       })();
       if (writer) {

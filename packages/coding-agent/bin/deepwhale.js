@@ -17,6 +17,8 @@
  *   --model <id>        显式 model id. 跟 createDefaultClient 的 model 字段对接.
  *   --no-tool-loop      退化到 Sprint 0.3 单轮 chat（不调工具）
  *   --max-steps <n>     工具循环上限（默认 5）
+ *   --yes               Sprint 1c-revive-3-D-13 (2026-06-05): bypass require_confirmation
+ *                       (write_file / edit_file / 危险 bash), 不 bypass deny.
  *   --version | -v      输出版本
  *   --help | -h         输出帮助
  */
@@ -43,6 +45,7 @@ import { buildSummaryAndNext, formatReport } from '../dist/verify/index.js';
  * @property {string|undefined} model
  * @property {boolean} enableToolLoop
  * @property {number} maxSteps
+ * @property {boolean} [yes]    Sprint 1c-revive-3-D-13: --yes flag, 透传 3 mode.
  */
 
 /**
@@ -58,6 +61,7 @@ function parseArgs(argv) {
     model: undefined,
     enableToolLoop: true,
     maxSteps: 5,
+    yes: undefined,
   };
 
   let i = 0;
@@ -101,13 +105,19 @@ function parseArgs(argv) {
       // 校验: deepseek | anthropic (跟 llm-factory.ts 的 Provider 拍板一致).
       const v = argv[i + 1] ?? '';
       if (v !== 'deepseek' && v !== 'anthropic') {
-        process.stderr.write(
-          `Error: --provider must be 'deepseek' or 'anthropic', got '${v}'\n`,
-        );
+        process.stderr.write(`Error: --provider must be 'deepseek' or 'anthropic', got '${v}'\n`);
         process.exit(2);
       }
       args.provider = v;
       i += 2;
+      continue;
+    }
+    if (a === '--yes') {
+      // Sprint 1c-revive-3-D-13 (2026-06-05): --yes 透传 3 mode.
+      // 拍板: bypass require_confirmation (write_file/edit_file/bash 危险模式),
+      //       不 bypass deny. 跟 R-3 拍板一致.
+      args.yes = true;
+      i += 1;
       continue;
     }
     if (a === '--model') {
@@ -150,6 +160,8 @@ Options:
   --model <id>        LLM model id (e.g. deepseek-v4-flash, claude-sonnet-4-5)
   --no-tool-loop      Disable tool calling (single-turn chat only)
   --max-steps <n>     Max tool-loop steps (default 5)
+  --yes               Bypass require_confirmation (write/edit/dangerous bash).
+                      Does NOT bypass deny. Sprint 1c-revive-3-D-13.
   --version, -v       Print version and exit
   --help, -h          Print this help
 
@@ -179,6 +191,7 @@ async function main() {
         ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
         ...(args.provider !== undefined ? { provider: args.provider } : {}),
         ...(args.model !== undefined ? { model: args.model } : {}),
+        ...(args.yes ? { yes: true } : {}),
         enableToolLoop: args.enableToolLoop,
       });
     case 'print':
@@ -191,6 +204,7 @@ async function main() {
         ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
         ...(args.provider !== undefined ? { provider: args.provider } : {}),
         ...(args.model !== undefined ? { model: args.model } : {}),
+        ...(args.yes ? { yes: true } : {}),
         enableToolLoop: args.enableToolLoop,
         maxSteps: args.maxSteps,
       });
@@ -199,21 +213,25 @@ async function main() {
         ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
         ...(args.provider !== undefined ? { provider: args.provider } : {}),
         ...(args.model !== undefined ? { model: args.model } : {}),
+        ...(args.yes ? { yes: true } : {}),
         maxSteps: args.maxSteps,
       });
-    case 'verify':
-      // Sprint 1c-revive-2-D-11-4: 走 runVerify (4 步 default), formatReport 印到 stdout.
-      // 退出码: passed=0, failed=1 (跟 runVerify overallStatus 对应). 跟 Unix
-      // 惯例一致 (CI 脚本 \`if deepwhale --verify; then ...\`).
-      // 注: 不写 session event (verify 不是 chat 行为, session JSONL 是 chat 持久化,
-      //     verify 跑完不污染 session). 后续 sprint 如要 audit log, 留 --verify-log 选项.
-      {
-        const report = await runVerify();
-        const filled = buildSummaryAndNext(report);
-        const text = formatReport({ ...report, summary: filled.summary, nextSuggestedAction: filled.nextSuggestedAction });
-        process.stdout.write(text + '\n');
-        return report.overallStatus === 'passed' ? 0 : 1;
-      }
+    case 'verify': // Sprint 1c-revive-2-D-11-4: 走 runVerify (4 步 default), formatReport 印到 stdout.
+    // 退出码: passed=0, failed=1 (跟 runVerify overallStatus 对应). 跟 Unix
+    // 惯例一致 (CI 脚本 \`if deepwhale --verify; then ...\`).
+    // 注: 不写 session event (verify 不是 chat 行为, session JSONL 是 chat 持久化,
+    //     verify 跑完不污染 session). 后续 sprint 如要 audit log, 留 --verify-log 选项.
+    {
+      const report = await runVerify();
+      const filled = buildSummaryAndNext(report);
+      const text = formatReport({
+        ...report,
+        summary: filled.summary,
+        nextSuggestedAction: filled.nextSuggestedAction,
+      });
+      process.stdout.write(text + '\n');
+      return report.overallStatus === 'passed' ? 0 : 1;
+    }
   }
 }
 

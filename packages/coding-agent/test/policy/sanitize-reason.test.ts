@@ -29,8 +29,9 @@ describe('policy/sanitize-reason.sanitizeReason', () => {
   });
 
   it('去 NUL 防 JSON 注入', () => {
-    const r = sanitizeReason('hello\u0000world');
+    const r = sanitizeReason('hello' + String.fromCharCode(0) + 'world');
     expect(r).toBe('helloworld');
+    // eslint-disable-next-line no-control-regex
     expect(r).not.toMatch(/\u0000/);
   });
 

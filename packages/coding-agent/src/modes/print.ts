@@ -35,6 +35,7 @@ import { createDefaultRegistry } from '../tools/registry.js';
 import { formatUsageStatus } from '../repl.js';
 import { createDefaultClient, type Provider } from '../llm-factory.js';
 import { resolveSandboxRunnerFromEnv } from '../sandbox/env-gate.js';
+import { staticToolPolicy } from '../policy/static-rules.js';
 
 export interface PrintModeOptions {
   prompt: string;
@@ -56,6 +57,12 @@ export interface PrintModeOptions {
    * 拍板: writer 字段 print mode 内部构造 (跟 sessionPath 同 instance).
    */
   compactionConfig?: Omit<AgentCompactionConfig, 'writer' | 'state'> | null;
+  /**
+   * Sprint 1c-revive-3-D-13 (2026-06-05): --yes 标志.
+   * yes=true bypass require_confirmation (write_file / edit_file / 危险 bash).
+   * 不 bypass deny. 拍板: print mode 默认 isInteractive=false + policy=staticToolPolicy.
+   */
+  yes?: boolean;
 }
 
 export async function runPrintMode(options: PrintModeOptions): Promise<number> {
@@ -77,6 +84,10 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
   // 未知值 throw (fail-closed), 由 CLI `main().catch` 写到 stderr + exit 1.
   // 解析成功则把 runner 显式注入 registry, 跟 BashTool 对齐.
   const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
+  // Sprint 1c-revive-3-D-13 (2026-06-05): print mode 拍板 isInteractive=false
+  // (非交互, 无用户确认). default policy = staticToolPolicy. --yes 透传 bypass
+  // require_confirmation, 不 bypass deny.
+  const policyYes = options.yes ?? false;
 
   // session 加载
   let workingMessages: Awaited<ReturnType<typeof loadSession>>['messages'] = [];
@@ -141,6 +152,10 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
                 if (chunk.content) process.stdout.write(chunk.content);
               },
               ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
+              policy: staticToolPolicy,
+              isInteractive: false, // print mode = 非交互 (D-13 拍板)
+              yes: policyYes,
+              ...(writer ? { writer } : {}),
             },
             compactionConfig,
             summaryFn,
@@ -152,6 +167,10 @@ export async function runPrintMode(options: PrintModeOptions): Promise<number> {
               if (chunk.content) process.stdout.write(chunk.content);
             },
             ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
+            policy: staticToolPolicy,
+            isInteractive: false, // print mode = 非交互 (D-13 拍板)
+            yes: policyYes,
+            ...(writer ? { writer } : {}),
           });
         }
         printStepSummary(result.steps);
