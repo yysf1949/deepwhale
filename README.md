@@ -410,7 +410,7 @@ await runToolLoop(client, messages, {
 
 1. ✅ 默认情况下 agent 不能无确认执行 destructive write/bash (`policy_blocked`)
 2. ✅ 非交互模式不能假装确认 (`isInteractive=false` + `require_confirmation` → `deny`)
-3. ✅ `--yes` 明确可追踪 (bypass `require_confirmation` 不 bypass `deny`, session 每次 bypass 落 `user_approved` event)
+3. ✅ `--yes` 明确可追踪 (bypass `require_confirmation` 不 bypass `deny`, session 每次 bypass 落 `user_approved` event, `meta={bypassedByYes:true, isInteractive: ctx.isInteractive}`; D-13.5 review P1 重排 2026-06-05 把 `ctx.yes` 提到最前, 优先级: `--yes` > 非交互 deny > confirm > 兜底 deny)
 4. ✅ **bash 危险模式覆盖完整** (D-13 review P1 修复 2026-06-05): `rm -rf /` / `mv` 全部 / `cp` 全部 / `chown` / `chmod` / `curl|sh` / `curl -o /tmp` 等都必过 tool-loop policy 层, 不绕过
 5. ✅ **REPL 现状 fail-closed** (D-13 review P2 修复 2026-06-05): `isInteractive=true` 但
    `staticToolPolicy.confirm = undefined` → 走 `no confirm impl` → deny. 跟 README/UX 契约一致

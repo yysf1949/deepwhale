@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { LLMClient, ChatResult, ChatChunk, ModelId } from '@deepwhale/llm';
@@ -407,6 +407,126 @@ describe('tool-loop policy integration (D-13)', () => {
       });
       const toolResult = getToolStepResult(result);
       expect(toolResult!.success).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // === Sprint 1c-revive-3-D-13.5 review P1 重排补测 (2026-06-05) ===
+  // 拍板 (用户 2026-06-05): 整段重排后, 旧顺序是 `!isInteractive` 先 deny, 根本没机会走 `ctx.yes`.
+  // 新顺序 `ctx.yes` first → print/rpc (`isInteractive=false`) + `yes=true` 也能放行, 落 user_approved.
+  // 这 2 条测是 D-13.5 重排的**行为差异真证据**, 缺一不可.
+
+  it('D-13.5: write_file + isInteractive=false (print/rpc) + yes=true → ctx.yes 优先于 !isInteractive: 工具真执行 + 落 user_approved', async () => {
+    // 拍板 (D-13.5 P1 重排 2026-06-05):
+    //   旧顺序: !isInteractive 先命中 → deny (工具不执行, 即便 yes=true 也不 bypass)
+    //   新顺序: ctx.yes 先命中 → 落 user_approved → 继续执行 → write_file 真落盘
+    // 验证点:
+    //   (1) tool result success=true (没被 policy_blocked, 文件真落盘)
+    //   (2) session 落 1 个 policy_decision event, decision=user_approved
+    //   (3) meta.bypassedByYes=true AND meta.isInteractive=false (print/rpc 模式触发 yes bypass)
+    const dir = mkdtempSync(join(tmpdir(), 'dw-pol-d135-'));
+    try {
+      const target = join(dir, 'target.txt');
+      const sessionPath = join(dir, 'session.jsonl');
+      const writer = new SessionWriter(sessionPath);
+      await writer.open();
+
+      const client = makeMockClient({
+        id: 'c1',
+        name: 'write_file',
+        args: { path: target, content: 'yes-bypass-print' },
+      });
+      const result = await runToolLoop(client, [{ role: 'user', content: 'go' }], {
+        registry: createDefaultRegistry(),
+        policy: staticToolPolicy,
+        isInteractive: false, // print/rpc 模式 (跟 REPL isInteractive=true 区分)
+        yes: true, // --yes 拍板
+        writer, // 拍板红线: audit 不能被 yes 抹平
+        onChunk: () => {},
+      });
+      const toolResult = getToolStepResult(result);
+      // (1) 工具真执行, 文件真落盘
+      expect(toolResult!.success).toBe(true);
+      expect(toolResult!.error ?? '').not.toMatch(/policy_blocked/);
+      expect(readFileSync(target, 'utf8')).toBe('yes-bypass-print');
+
+      await writer.close();
+      const events = await readSessionEvents(sessionPath);
+      const policyEvents = events.filter((e) => e.kind === 'policy_decision');
+      // (2) 1 个 user_approved event
+      expect(policyEvents).toHaveLength(1);
+      const ev = policyEvents[0]!;
+      if (ev.kind === 'policy_decision') {
+        expect(ev.decision).toBe('user_approved');
+        expect(ev.tool_call_id).toBe('c1');
+        expect(ev.name).toBe('write_file');
+        expect(ev.argsDigest).toMatch(/^sha256:[a-f0-9]{12}$/);
+        expect(ev.reason).toMatch(/--yes bypass/);
+        // (3) meta 含 bypassedByYes=true (audit 红线) + isInteractive=false (D-13.5 新加, 区分触发模式)
+        const meta = (ev as { meta?: { bypassedByYes?: boolean; isInteractive?: boolean } }).meta;
+        expect(meta?.bypassedByYes).toBe(true);
+        expect(meta?.isInteractive).toBe(false);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('D-13.5: bash mv a b + isInteractive=false (print/rpc) + yes=true → ctx.yes 优先于 !isInteractive: bash 真执行 + 落 user_approved', async () => {
+    // 拍板 (D-13.5 P1 重排 2026-06-05):
+    //   旧顺序: !isInteractive 先命中 → deny (bash 不执行, yes=true 不 bypass)
+    //   新顺序: ctx.yes 先命中 → 落 user_approved → bash 真跑 mv
+    // 验证点:
+    //   (1) tool result 没 policy_blocked error, bash 真跑 (mv 成功, source 没了 dest 在)
+    //   (2) session 落 1 个 policy_decision event, decision=user_approved
+    //   (3) meta.bypassedByYes=true AND meta.isInteractive=false
+    const dir = mkdtempSync(join(tmpdir(), 'dw-pol-d135-'));
+    try {
+      const source = join(dir, 'source.txt');
+      const dest = join(dir, 'dest.txt');
+      writeFileSync(source, 'src-content');
+      const sessionPath = join(dir, 'session.jsonl');
+      const writer = new SessionWriter(sessionPath);
+      await writer.open();
+
+      const client = makeMockClient({
+        id: 'c1',
+        name: 'bash',
+        args: { command: 'mv', args: [source, dest] },
+      });
+      const result = await runToolLoop(client, [{ role: 'user', content: 'go' }], {
+        registry: createDefaultRegistry(),
+        policy: staticToolPolicy,
+        isInteractive: false, // print/rpc 模式
+        yes: true, // --yes 拍板
+        writer,
+        onChunk: () => {},
+      });
+      const toolResult = getToolStepResult(result);
+      // (1) bash 真跑 mv (没被 policy_blocked)
+      expect(toolResult!.error ?? '').not.toMatch(/policy_blocked/);
+      // mv 真执行: source 没了, dest 在
+      expect(existsSync(source)).toBe(false);
+      expect(existsSync(dest)).toBe(true);
+      expect(readFileSync(dest, 'utf8')).toBe('src-content');
+
+      await writer.close();
+      const events = await readSessionEvents(sessionPath);
+      const policyEvents = events.filter((e) => e.kind === 'policy_decision');
+      // (2) 1 个 user_approved event
+      expect(policyEvents).toHaveLength(1);
+      const ev = policyEvents[0]!;
+      if (ev.kind === 'policy_decision') {
+        expect(ev.decision).toBe('user_approved');
+        expect(ev.tool_call_id).toBe('c1');
+        expect(ev.name).toBe('bash');
+        expect(ev.reason).toMatch(/--yes bypass/);
+        // (3) meta
+        const meta = (ev as { meta?: { bypassedByYes?: boolean; isInteractive?: boolean } }).meta;
+        expect(meta?.bypassedByYes).toBe(true);
+        expect(meta?.isInteractive).toBe(false);
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

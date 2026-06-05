@@ -323,8 +323,28 @@ async function executeToolCall(
       };
     }
     if (decision.decision === 'require_confirmation') {
-      // 非交互模式: 默认 deny (print/rpc 无用户确认)
-      if (!ctx.isInteractive) {
+      // === Sprint 1c-revive-3-D-13.5 review P1 重排 (2026-06-05) ===
+      // 顺序拍板 (用户 2026-06-05): ctx.yes first → !isInteractive → policy.confirm.
+      // 理由: --yes 是显式用户拍板, 必须最先处理 (audit 红线不丢);
+      //       非交互模式是机器模式 (print/rpc), 没用户就 deny (fail-closed);
+      //       最后才走 policy.confirm (REPL D-15 才会注入, D-13 MVP 落 no-confirm-impl deny).
+      // 不要最小插入留阅读陷阱: 整段重排成下面 4 个分支, 一段一段看完就懂优先级.
+
+      // 1) ctx.yes first: --yes 显式拍板, 落 user_approved 后放行 (audit 红线).
+      if (ctx.yes) {
+        if (options.writer) {
+          await appendPolicyDecisionEvent(options.writer, {
+            tool_call_id: tc.id,
+            name: tc.name,
+            decision: 'user_approved',
+            argsDigest,
+            reason: sanitizeReason(`--yes bypass: ${decision.reason}`),
+            meta: { bypassedByYes: true, isInteractive: ctx.isInteractive },
+          });
+        }
+        // 不返, 继续往下走 (执行工具)
+      } else if (!ctx.isInteractive) {
+        // 2) 非交互模式: print/rpc 没有用户, 默认 deny (R-3 拍板: fail-closed).
         const reason = sanitizeReason(`non-interactive mode: ${decision.reason}`);
         if (options.writer) {
           await appendPolicyDecisionEvent(options.writer, {
@@ -342,9 +362,8 @@ async function executeToolCall(
           error: `policy_blocked: ${reason}`,
           meta: { argsDigest, policy: 'require_confirmation', isInteractive: false },
         };
-      }
-      // 交互模式: 调 policy.confirm (REPL 注入; D-13 MVP 留 undefined 兜底 deny)
-      if (typeof policy.confirm === 'function') {
+      } else if (typeof policy.confirm === 'function') {
+        // 3) 交互模式 + 注入 confirm: 走 y/N (D-15 注入 readline; D-13 MVP 没人调这条).
         const ok = await policy.confirm(`Allow ${tc.name}? (${sanitizeReason(decision.reason)})`);
         const userDecision: 'user_approved' | 'user_denied' =
           ok === true ? 'user_approved' : 'user_denied';
@@ -365,26 +384,8 @@ async function executeToolCall(
             meta: { argsDigest, policy: 'require_confirmation', userDecision: ok },
           };
         }
-      } else if (ctx.yes) {
-        // === Sprint 1c-revive-3-D-13 review P1(b) 修复 (2026-06-05) ===
-        // --yes bypass 拍板: 落 user_approved 审计事件 + 继续执行工具.
-        // 拍板 (用户 2026-06-05):
-        //   - "保持 PolicyDecision 简洁, 在 tool-loop.ts 里保留 raw decision"
-        //   - "如果 raw 是 require_confirmation 且 ctx.yes=true, 先落 user_approved, 再执行工具"
-        // 拍板红线: audit 不能被 yes 抹平. 即便 yes=true, 也要留 user_approved 记录.
-        if (options.writer) {
-          await appendPolicyDecisionEvent(options.writer, {
-            tool_call_id: tc.id,
-            name: tc.name,
-            decision: 'user_approved',
-            argsDigest,
-            reason: sanitizeReason(`--yes bypass: ${decision.reason}`),
-            meta: { bypassedByYes: true },
-          });
-        }
-        // 不返, 继续往下走 (执行工具)
       } else {
-        // 没 confirm 实现 + 无 --yes: 兜底 deny (fail-closed, R-3 拍板)
+        // 4) 交互模式 + 没 confirm 实现: 兜底 deny (fail-closed, D-13 MVP 现状).
         const reason = sanitizeReason(`no confirm impl: ${decision.reason}`);
         if (options.writer) {
           await appendPolicyDecisionEvent(options.writer, {
