@@ -371,14 +371,23 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       }
 
       // === Sprint 1c-revive-3-D-19.6 (2026-06-05): P2 turn guard deny 非 /exit builtin ===
+      // === Sprint 1c-revive-3-D-19.6.1 (2026-06-05): 加 line.startsWith('/') 限制, 不拦普通 chat line ===
       // 拍板 (D-19.6, user review 2026-06-05 P2): 老逻辑 L373 注释"内建命令全部
       // fast-path, 不走 turnInFlight"在 turn 正在跑时仍然跑 builtin, e.g. /verify
       // 调 runVerify + 写 verification event, /help 写 out + prompt, /unknown
       // 写 out + prompt, 都跟 in-flight chat turn 输出/session 交错, 违背
       // "turn running 时下一行不进入 builtin/chat" 的 review 语义.
-      // 修复: turnInFlight 时, 除 /exit /quit /exit /quit /'' 之外的 builtin 走
-      // deny, 输出 i18n 提示 (cli.turn_in_flight_deny) + prompt + return, 不入
-      // lineQueue. 选择 deny 而非 defer, 因为 lineQueue 在 D-19.5 已有红线 (L407):
+      // === Sprint 1c-revive-3-D-19.6.1 (2026-06-05): Q2 修法 — 加 line.startsWith('/') 限制 ===
+      // 拍板 (D-19.6.1, user review 2026-06-05 P1.2): D-19.6 守卫条件缺 slash
+      // 限制, 普通 chat line 也会被 deny, 跟 D-19.5 lineQueue "只排 chat line"
+      // 红线冲突, 永远到不了 lineQueue. 修法: 加 `line.startsWith('/')` 限制, 只
+      // deny slash builtin. 普通 chat line 继续走 L408 lineQueue 排队 (D-19.5 拍板
+      // 不变). 守卫名改成"slash builtin guard"以反映新语义.
+      //
+      // 修复: turnInFlight 时, 除 /exit /quit /exit /quit /'' 之外的 **slash builtin**
+      // (/verify /help /unknown slash) 走 deny, 输出 i18n 提示
+      // (cli.turn_in_flight_deny) + prompt + return, 不入 lineQueue.
+      // 选择 deny 而非 defer, 因为 lineQueue 在 D-19.5 已有红线 (L407):
       // "lineQueue 只排 chat line", defer 会让 finally drain 还要判 builtin vs chat.
       //
       // 位置红线: 必须 confirm 守卫 (L341-358) 之后, 内建命令 dispatcher (L373 起始)
@@ -387,9 +396,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       // prompt() 也不应被拦 (空行 ≠ 内建命令).
       if (
         turnInFlight &&
-        line !== '' &&
-        line !== 'exit' &&
-        line !== 'quit' &&
+        line.startsWith('/') &&
         line !== '/exit' &&
         line !== '/quit'
       ) {
@@ -674,7 +681,22 @@ export async function runAgentTurn(
       });
     }
   } catch (e) {
-    if (isToolLoopError(e)) {
+    // === Sprint 1c-revive-3-D-19.6.1 (2026-06-05): Q3 修法 — abort-aware 分支 ===
+    // 拍板 (D-19.6.1, user review 2026-06-05 P2.1): D-19.6 P1 修法让 close 路径 abort
+    // in-flight turn, runToolLoop 内部 throw "Tool loop aborted by caller", 老 catch
+    // 走 cli.error.unknown ("Unexpected error: {0}") 污染 stderr 为 unexpected error.
+    // 修法: 检测 signal.aborted 优先于 isToolLoopError/isLLMError, 走专门 i18n key
+    // (cli.turn_aborted_shutdown). 文案 "no audit gap" 强调 user_denied 该落的都
+    // 落了 (D-19.6 P1 dismiss+abort+pendingExit 链路已保审计). 不走 unexpected
+    // 路径, stderr 不再被 intentional shutdown 污染.
+    //
+    // 顺序红线: signal.aborted 检查必须在 isToolLoopError 之前 — runToolLoop 内部
+    // abort 时 throw Error('Tool loop aborted by caller'), 这 Error 满足 isToolLoopError
+    // 的某些宽松判定 (e.g. 有 .message 但无 .steps) 是不稳的. signal.aborted 是
+    // 最直接的真相, 优先.
+    if (signal.aborted) {
+      err.write(`${t('cli.turn_aborted_shutdown')}\n\n`);
+    } else if (isToolLoopError(e)) {
       err.write(`${t('cli.tool_loop_limit', e.steps)}\n\n`);
     } else if (isLLMError(e)) {
       err.write(`${formatError(e)}\n\n`);

@@ -138,8 +138,25 @@ describe('REPL close-during-turn race (D-19.6 P1)', () => {
         `dismiss 路径必须落 user_denied 审计, 实际 events: ${JSON.stringify(events.map((e) => e.kind))}`,
       ).toBeGreaterThanOrEqual(1);
 
-      // 让 p 收束 (finally 走完后 startRepl 的 promise resolve)
-      await Promise.race([p, new Promise<void>((r) => setTimeout(r, 1000))]);
+      // 让 p 收束 (finally 走完后 startRepl 的 promise resolve).
+      // === Sprint 1c-revive-3-D-19.6.1 (2026-06-05): Q4 修法 — timeout reject + 断言 p resolve ===
+      // 拍板 (D-19.6.1, user review 2026-06-05 P2.2): D-19.6 P1 close 测试用
+      // `Promise.race([p, new Promise(r => setTimeout(r, 1000))])`, timeout 也让
+      // 测试继续通过, 不断言 p 真 resolve, fast-path finish 失败时假绿. 修法:
+      // 跟 D-19.6 P3 (repl-shared-stdin.test.ts L278) 一样 — timeout reject
+      // 显式失败, 然后断言 exitCode === 0 证明 p 真 resolve. 1s margin 推导:
+      // P1 测试 main flow 500ms drain + finally 收束, 1s = 2x 安全边际.
+      await Promise.race([
+        p,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('startRepl did not exit within 1s (D-19.6.1 Q4 修法)')),
+            1000,
+          ),
+        ),
+      ]);
+      // 强断言: p 真 resolve 且 exit code = 0 (P3 同风格, 拒假绿).
+      expect(exitCode, 'startRepl 必须 resolve 且 exit code = 0 (D-19.6.1 Q4)').toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

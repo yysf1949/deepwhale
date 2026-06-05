@@ -20,5 +20,6 @@ export const en: Record<TranslationKey, string> = {
   'cli.tool_loop_limit': 'Tool loop hit max steps ({0}). Try a shorter task.',
   'cli.repl_force_exit_timeout': 'warning: in-flight turn did not finish within {0}ms, forcing REPL exit (audit may be incomplete)',
   'cli.turn_in_flight_deny': 'turn running, wait for finish (built-in command deferred)',
+  'cli.turn_aborted_shutdown': 'turn aborted during shutdown (no audit gap)',
   'error.api_key_missing': 'DEEPSEEK_API_KEY is not set. Please set it in ~/.deepwhale/config.toml',
 };

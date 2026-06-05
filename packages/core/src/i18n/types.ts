@@ -24,4 +24,5 @@ export type TranslationKey =
   | 'cli.tool_loop_limit'
   | 'cli.repl_force_exit_timeout'
   | 'cli.turn_in_flight_deny'
+  | 'cli.turn_aborted_shutdown'
   | 'error.api_key_missing';
