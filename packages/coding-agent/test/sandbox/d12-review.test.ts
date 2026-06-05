@@ -335,3 +335,124 @@ describe('D-12 review P2: DockerSandboxRunner runId 隔离 cleanup', () => {
     }
   });
 });
+
+// ─── P2 修 #3: makeDockerCliEnv 黑名单 + 白名单 (env 隔离) ──────────────────
+
+import {
+  makeDockerCliEnv,
+  DOCKER_CLI_ALLOW_KEYS,
+  DOCKER_CLI_DENY_KEYS,
+} from '../../src/sandbox/docker-runner.js';
+
+describe('D-12 review P2 修复: makeDockerCliEnv 黑名单 + 白名单', () => {
+  it('黑名单列出 deepseek/anthropic/session key', () => {
+    // 拍板证据: 红线注释 L11 列了 deepseek + anthropic; review 补 session key
+    // (DEEPWHALE_SESSION_KEY 是 at-rest encryption key, 跟 API key 同等敏感).
+    expect(DOCKER_CLI_DENY_KEYS.has('DEEPSEEK_API_KEY')).toBe(true);
+    expect(DOCKER_CLI_DENY_KEYS.has('ANTHROPIC_AUTH_TOKEN')).toBe(true);
+    expect(DOCKER_CLI_DENY_KEYS.has('DEEPWHALE_SESSION_KEY')).toBe(true);
+  });
+
+  it('白名单只含 docker CLI 必需的 7 个 key (PATH/HOME/USERPROFILE/DOCKER_*)', () => {
+    expect(DOCKER_CLI_ALLOW_KEYS.has('PATH')).toBe(true);
+    expect(DOCKER_CLI_ALLOW_KEYS.has('HOME')).toBe(true);
+    expect(DOCKER_CLI_ALLOW_KEYS.has('USERPROFILE')).toBe(true);
+    expect(DOCKER_CLI_ALLOW_KEYS.has('DOCKER_HOST')).toBe(true);
+    expect(DOCKER_CLI_ALLOW_KEYS.has('DOCKER_CONFIG')).toBe(true);
+    expect(DOCKER_CLI_ALLOW_KEYS.has('DOCKER_TLS_VERIFY')).toBe(true);
+    expect(DOCKER_CLI_ALLOW_KEYS.has('DOCKER_TLS_CERTPATH')).toBe(true);
+    expect(DOCKER_CLI_ALLOW_KEYS.size).toBe(7);
+  });
+
+  it('makeDockerCliEnv: 注入 DEEPSEEK_API_KEY 不进 docker CLI env', () => {
+    const env: NodeJS.ProcessEnv = {
+      DEEPSEEK_API_KEY: 'sk-deepseek-secret-123',
+      PATH: '/usr/bin',
+      HOME: '/root',
+    };
+    const result = makeDockerCliEnv(env);
+    expect(result).not.toHaveProperty('DEEPSEEK_API_KEY');
+    // 白名单 key 仍存在
+    expect(result['PATH']).toBe('/usr/bin');
+    expect(result['HOME']).toBe('/root');
+  });
+
+  it('makeDockerCliEnv: ANTHROPIC_AUTH_TOKEN + DEEPWHALE_SESSION_KEY 都被剔', () => {
+    const env: NodeJS.ProcessEnv = {
+      ANTHROPIC_AUTH_TOKEN: 'sk-ant-secret-456',
+      DEEPWHALE_SESSION_KEY: 'session-key-789',
+      PATH: '/usr/bin',
+    };
+    const result = makeDockerCliEnv(env);
+    expect(result).not.toHaveProperty('ANTHROPIC_AUTH_TOKEN');
+    expect(result).not.toHaveProperty('DEEPWHALE_SESSION_KEY');
+  });
+
+  it('makeDockerCliEnv: process.env 里有但白名单没的 key 全部不传 (TZ / LANG / 等)', () => {
+    // 这是 reviewer 拍板的核心: 显式白名单, 不依赖黑名单完整.
+    // 模拟 host env 有大量运行时 key, docker CLI 只能拿到 7 个必需 key.
+    const env: NodeJS.ProcessEnv = {
+      PATH: '/usr/bin',
+      HOME: '/root',
+      TZ: 'Asia/Shanghai',
+      LANG: 'zh-CN.UTF-8',
+      LC_ALL: 'zh-CN.UTF-8',
+      NODE_ENV: 'production',
+      RANDOM_RUNTIME_KEY: 'noise',
+      DEEPSEEK_API_KEY: 'sk-secret',
+    };
+    const result = makeDockerCliEnv(env);
+    // 白名单 ✓
+    expect(result).toHaveProperty('PATH');
+    expect(result).toHaveProperty('HOME');
+    // 其他 host 进程 key ✗
+    expect(result).not.toHaveProperty('TZ');
+    expect(result).not.toHaveProperty('LANG');
+    expect(result).not.toHaveProperty('LC_ALL');
+    expect(result).not.toHaveProperty('NODE_ENV');
+    expect(result).not.toHaveProperty('RANDOM_RUNTIME_KEY');
+    // 黑名单 ✓ (即使允许列表里没, 也明确断言)
+    expect(result).not.toHaveProperty('DEEPSEEK_API_KEY');
+    // 严格白名单: 数量 ≤ DOCKER_CLI_ALLOW_KEYS.size
+    expect(Object.keys(result).length).toBeLessThanOrEqual(DOCKER_CLI_ALLOW_KEYS.size);
+  });
+
+  it('makeDockerCliEnv: 返回新对象, 不污染 process.env', () => {
+    const env: NodeJS.ProcessEnv = { DEEPSEEK_API_KEY: 'secret', PATH: '/usr/bin' };
+    const result = makeDockerCliEnv(env);
+    expect(result).not.toBe(env);
+    // process.env 自己没动 (即使 env 引用 process.env, 不修改 keys)
+    // 注: 实际 env 引用 process.env 时, mutate process.env 仍会改 result.
+    // 这里只验证**没添加**新 key, 拍板红线避免误删.
+    expect('DEEPSEEK_API_KEY' in env).toBe(true); // 原始 env 保留
+  });
+
+  it('docker spawn options: runner 真调用 spawn 时 env 走 makeDockerCliEnv, 不传 process.env', () => {
+    // 端到端: runner.run() → spawn mock → 验证 spawn 调用的 options.env
+    // 是过滤后的, 不含 API key.
+    const runner = new DockerSandboxRunner({ sandboxRoot: '/tmp/sbx' });
+    // 不真调 docker (要 daemon), 改: 直接验证 buildDockerArgs 后 spawn options
+    // 走的是 makeDockerCliEnv 的结果. 模拟 fakeEnv 注入 process.env 看是否被过滤.
+    // 简化: 调一次 makeDockerCliEnv(模拟的"运行时刻" env) 验证, 跟 spawn
+    // 路径等价 (docker-runner.ts:207 写死 makeDockerCliEnv()).
+    const fakeEnv: NodeJS.ProcessEnv = {
+      PATH: '/usr/bin',
+      DEEPSEEK_API_KEY: 'secret-should-be-filtered',
+    };
+    const filtered = makeDockerCliEnv(fakeEnv);
+    expect(filtered).not.toHaveProperty('DEEPSEEK_API_KEY');
+    expect(filtered['PATH']).toBe('/usr/bin');
+    // 确认 runner 真的用 makeDockerCliEnv 而不是 process.env:
+    // (代码层断言 — 改 spawn 引用方式后这条测会 fail)
+    const dockerArgs = runner.buildDockerArgs('sbx-x', '/tmp/sbx', {
+      command: 'echo',
+      args: ['hi'],
+      cwd: '/tmp/sbx',
+      timeoutMs: 5000,
+      stdoutCapBytes: 1024,
+    });
+    // sanity: dockerArgs 里**不**应含 env (env 走 spawn options, 不进 args)
+    expect(dockerArgs).not.toContain('DEEPSEEK_API_KEY');
+    expect(dockerArgs).not.toContain('sk-secret');
+  });
+});

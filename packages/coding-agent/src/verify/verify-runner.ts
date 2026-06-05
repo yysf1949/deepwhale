@@ -269,6 +269,14 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
     // 因为 child.killed 表示"信号已发送" 不是"进程已退出" — 后者才是 grace timer
     // 判断要不要发 SIGKILL 兜底的依据.
     let childClosed = false;
+    // Sprint 1c-revive-3-D-12 review P3 修复 (2026-06-05, 基于 fea52d1 review):
+    // 提到外层, 让 finalize() 能 removeEventListener 兜底 listener leak.
+    // 之前 onAbort 是 if 块内的 const, finalize 拿不到引用; listener 在
+    // addEventListener { once: true } 时 fire 后自动移除, 但**未 fire** 走
+    // (正常 step 跑完 + finalize) 时 listener 永远挂 signal 上. 多 checks /
+    // 自定义 checks 链路下 listener 累积, 主流程影响小, 但顺手收干净.
+    // 声明 () => void 而非 Event listener 签名, 避免 onAbort() 调用 TS2554.
+    let onAbort: (() => void) | null = null;
 
     const finalize = (result: VerifyCheckResult): void => {
       if (resolved) return;
@@ -280,10 +288,15 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
         clearTimeout(sigkillTimer);
         sigkillTimer = null;
       }
-      if (opts.signal) {
-        // 移除 abort listener (避免 listener leak, 跟 runVerify 主循环一致)
-        // 注: 实际 listener 是 addEventListener { once: true }, fire 后自动移除,
-        // 但 abort 触发过 + once 没 fire 走完前 finalize, 显式 remove 兜底.
+      if (opts.signal && onAbort) {
+        // Sprint 1c-revive-3-D-12 review P3 修复 (2026-06-05, 基于 fea52d1 review):
+        // 显式 removeEventListener 兜底. onAbort 在 spawn 成功后 addEventListener
+        // { once: true }, fire 后 Node 自动移除; 但**未 fire** 走 (正常 step
+        // 跑完 + finalize, 没触发外部 abort) 时 listener 永远挂 signal 上.
+        // 主流程影响小 (resolved guard 兜住重复 fire), 但多 checks 链路下
+        // listener 累积, 顺手收干净.
+        opts.signal.removeEventListener('abort', onAbort);
+        onAbort = null;
       }
       if (child && !childClosed) {
         try {
@@ -345,7 +358,7 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
     // handler trap) 时, 1s 后 grace timer 判 !child.killed = false 跳过 SIGKILL,
     // 子进程仍卡到 timeout 之前的所有步骤.
     if (opts.signal) {
-      const onAbort = (): void => {
+      onAbort = (): void => {
         if (resolved) return;
         childAborted = true;
         if (child && !childClosed) {

@@ -43,6 +43,69 @@ const DEFAULT_STDOUT_CAP = 4 * 1024;
 /** 10MB hard ceiling, 跟 LocalSandboxRunner 一致. */
 const _MAX_BUFFER_UNUSED = 10 * 1024 * 1024;
 
+/**
+ * Sprint 1c-revive-3-D-12 review 修复 (2026-06-05, 基于 9348650 review).
+ *
+ * 黑名单: 这些 key **必须** 不传给 docker CLI 子进程. D-7 `.env` loader 会把
+ * API key 放进 `process.env`; 默认 `env: process.env` 透传给 docker CLI 时,
+ * docker CLI 自身能 `env | grep KEY` dump 出来, 也可能透传到 `docker run --env`
+ * 启动的容器 (MVP 没用 --env, 但 docker CLI 内部行为 / 错误日志 / 未来扩展都有
+ * 风险).
+ *
+ * 范围拍板: D-12 review 只列了 deepseek + anthropic + "等". 保守走 deepseek/
+ * anthropic + session key (README L159 拍板的 at-rest encryption key), 其他
+ * 第三方 API key 风险不在 D-12 范围. 后续 sprint 可扩.
+ *
+ * 模式: 黑名单 (比白名单稳 — 加新 deny 项立即生效, 不需要遍历允许列表).
+ */
+export const DOCKER_CLI_DENY_KEYS: ReadonlySet<string> = new Set([
+  'DEEPSEEK_API_KEY',
+  'ANTHROPIC_AUTH_TOKEN',
+  'DEEPWHALE_SESSION_KEY',
+]);
+
+/**
+ * Sprint 1c-revive-3-D-12 review 修复 (2026-06-05, 基于 9348650 review).
+ *
+ * 给 docker CLI 子进程构造最小 env. docker CLI 自身需要的:
+ *   - PATH (Linux/macOS 找其他 binary; 这里是子进程启动新 docker 子调用时用)
+ *   - HOME (读 ~/.docker/config.json, docker config 凭据加载)
+ *   - USERPROFILE (Windows 走这个替代 HOME)
+ *   - DOCKER_HOST (连远程 docker daemon, e.g. ssh:// / tcp://)
+ *   - DOCKER_CONFIG (config 路径, 跟 HOME/config 区分时)
+ *   - DOCKER_TLS_VERIFY (TLS 开关)
+ *   - DOCKER_TLS_CERTPATH (TLS 凭据路径)
+ *
+ * 其他 host 进程 env (TZ / LANG / 等) 通过 DOCKER_CLI_ALLOW_KEYS 白名单兜底,
+ * 默认**不**透传. 跟 process.env 的差别显式记录, 避免 review 时再撞"env 注入
+ * 未知 key" 的问题.
+ */
+export const DOCKER_CLI_ALLOW_KEYS: ReadonlySet<string> = new Set([
+  'PATH',
+  'HOME',
+  'USERPROFILE',
+  'DOCKER_HOST',
+  'DOCKER_CONFIG',
+  'DOCKER_TLS_VERIFY',
+  'DOCKER_TLS_CERTPATH',
+]);
+
+/**
+ * 构造给 docker CLI 子进程的 env: DOCKER_CLI_ALLOW_KEYS 交集 process.env
+ * + 跳过 DOCKER_CLI_DENY_KEYS (黑名单优先, 即便用户在 allow set 里也跳过).
+ * 返回**新对象**, 不影响 process.env.
+ */
+export function makeDockerCliEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = {};
+  for (const key of DOCKER_CLI_ALLOW_KEYS) {
+    const value = env[key];
+    if (value === undefined) continue;
+    if (DOCKER_CLI_DENY_KEYS.has(key)) continue; // 防御: 黑名单优先
+    result[key] = value;
+  }
+  return result;
+}
+
 export interface DockerSandboxOptions {
   /** 容器镜像. 默认 'node:22-alpine'. */
   readonly image?: string;
@@ -139,7 +202,12 @@ export class DockerSandboxRunner implements SandboxRunner {
       const child = spawn('docker', dockerArgs, {
         cwd: this.sandboxRoot,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: process.env, // 透传 host env, **不** 注入 .env / API key
+        // Sprint 1c-revive-3-D-12 review 修复 (2026-06-05, 基于 9348650 review):
+        // 之前 `env: process.env` 透传, D-7 `.env` loader 注入的 API key 会
+        // 进 docker CLI 子进程 (可能被 docker 内部 dump 到诊断日志 / 未来
+        // 扩展透传到容器). 修法: makeDockerCliEnv() 黑名单 + 白名单, 默认
+        // 只透传 docker CLI 必需的 7 个 key, 显式剔除 API key.
+        env: makeDockerCliEnv(),
         // 注: 这里不传 shell: true (默认 false), 数组 args 安全
       });
 

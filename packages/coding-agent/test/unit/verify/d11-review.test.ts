@@ -170,4 +170,63 @@ describe('D-11+4 review P2: verify-runner SIGTERM grace 实际发 SIGKILL', () =
     expect(child.killSignals).toEqual(['SIGTERM']);
     expect(child.killSignals).not.toContain('SIGKILL');
   });
+
+  it('P3: 正常 step 跑完 (无 abort) → finalize 不抛错, signal.abort() 后 listener 已失效', async () => {
+    // 这是 reviewer 拍板的核心断言: 之前 onAbort 在 if 块内, finalize 拿不到引用,
+    // 正常 step 跑完走 "未 fire 路径" 时 listener 永远挂 signal 上.
+    // 修后: 提到外层, finalize 显式 removeEventListener.
+    //
+    // 验证手法: AbortSignal 不暴露 listenerCount (是 special EventTarget, 不
+    // 公开 EventTarget 方法). 退而求其次: 跑 2 step 验证
+    //   1) finalize 不抛 (removeEventListener 引用已 remove 的 listener 静默)
+    //   2) signal.abort() 不应触发 onAbort 内副作用 (resolved=true 早返 + listener
+    //      已 remove, **没有** child kill)
+    //
+    // 强验证要 Node 内部 API, 跟 reviewer "主流程影响小" 拍板一致, 弱断言足够.
+
+    vi.useFakeTimers();
+    const check1: VerifyCheck = {
+      name: 's1',
+      command: 'node',
+      args: ['node', '-e', 'process.stdout.write("ok")'],
+      timeoutMs: 5000,
+    };
+    const check2: VerifyCheck = {
+      name: 's2',
+      command: 'node',
+      args: ['node', '-e', 'process.stdout.write("ok")'],
+      timeoutMs: 5000,
+    };
+
+    const ac = new AbortController();
+    const reportPromise = runVerify({
+      cwd: '/tmp',
+      checks: [check1, check2],
+      signal: ac.signal,
+      continueOnError: true,
+    });
+
+    // 让 check1 + check2 都跑完. fake timer 模式下, emit('close') 同步走
+    // close handler → finalize. runVerify await runOneCheck 在 microtask queue.
+    // process.nextTick 不受 fake timer 影响, 推进 microtask 用.
+    for (let i = 0; i < 10; i++) {
+      await vi.advanceTimersByTimeAsync(0);
+      mockChildren.forEach((c) => c.emit('close', 0, null));
+      await new Promise<void>((r) => process.nextTick(r));
+      await new Promise<void>((r) => process.nextTick(r));
+    }
+
+    const report = await reportPromise;
+    expect(report.checks).toHaveLength(2);
+    expect(report.checks[0]!.status).toBe('passed');
+    expect(report.checks[1]!.status).toBe('passed');
+
+    // finalize 已调 (s1, s2 各一次), removeEventListener 各一次. 再 abort 不应抛.
+    ac.abort();
+    // mock child 没新 kill (修后 listener 已 remove, onAbort 不再触发)
+    mockChildren.forEach((c) => {
+      // killSignals 仍只有 undefined 或原本的, 不会有新的 SIGTERM (那是 abort 路径)
+      expect(c.killSignals).not.toContain('SIGTERM');
+    });
+  });
 });
