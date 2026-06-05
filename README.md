@@ -364,7 +364,7 @@ DOCKER_INTEGRATION=1 pnpm test -- docker-sandbox
 | `read_file` / `find` / `grep` | `allow`                                                                                                          |
 | `write_file` / `edit_file`    | `require_confirmation` (`writes to filesystem`)                                                                  |
 | `bash` (工具层静态)           | `allow`（bash 工具层用 allowlist + dangerous pattern 双重防御; 第二道防线是 tool-loop 调 `evaluateBashCommand`） |
-| bash 危险模式                 | `require_confirmation` (D-13 review P1 拍板 2026-06-05, 12 pattern 详见 `src/policy/static-rules.ts`: `rm -rf /` / `rm -rf ~` / `mv *` / `cp *` / `chown` / `chmod` / `mkfs` / `dd if=` / `shutdown`+`reboot`+`halt`+`poweroff` / `> /dev/sda\|nvme*` / `curl\|sh\|bash\|python` / `curl -o /tmp/`) |
+| bash 危险模式                 | `require_confirmation` (D-13 review P1 拍板 2026-06-05, 14 pattern 详见 `src/policy/static-rules.ts`: `rm -rf /` / `rm -rf ~` / `mv *` / `cp *` / `chown` / `chmod` / `mkfs` / `dd if=` / `shutdown`+`reboot`+`halt`+`poweroff` / `> /dev/sda\|nvme*` / `curl\|sh\|bash\|python` / `wget\|sh\|bash\|python` / `curl -o /tmp/` / `wget -O /tmp/`) |
 
 ### 注入自定义 ToolPolicy
 
@@ -411,7 +411,7 @@ await runToolLoop(client, messages, {
 1. ✅ 默认情况下 agent 不能无确认执行 destructive write/bash (`policy_blocked`)
 2. ✅ 非交互模式不能假装确认 (`isInteractive=false` + `require_confirmation` → `deny`)
 3. ✅ `--yes` 明确可追踪 (bypass `require_confirmation` 不 bypass `deny`, session 每次 bypass 落 `user_approved` event, `meta={bypassedByYes:true, isInteractive: ctx.isInteractive}`; D-13.5 review P1 重排 2026-06-05 把 `ctx.yes` 提到最前, 优先级: `--yes` > 非交互 deny > confirm > 兜底 deny)
-4. ✅ **bash 危险模式覆盖完整** (D-13 review P1 修复 2026-06-05): `rm -rf /` / `mv` 全部 / `cp` 全部 / `chown` / `chmod` / `curl|sh` / `curl -o /tmp` 等都必过 tool-loop policy 层, 不绕过
+4. ✅ **bash 危险模式覆盖完整** (D-13 review P1 修复 2026-06-05): `rm -rf /` / `rm -rf ~` / `mv` 全部 / `cp` 全部 / `chown` / `chmod` / `mkfs` / `dd if=` / `shutdown`+`reboot`+`halt`+`poweroff` / `> /dev/sda\|nvme*` / `curl|sh` / `wget|sh` / `curl -o /tmp` / `wget -O /tmp` 等 14 pattern 都必过 tool-loop policy 层, 不绕过
 5. ✅ **REPL 现状 fail-closed** (D-13 review P2 修复 2026-06-05): `isInteractive=true` 但
    `staticToolPolicy.confirm = undefined` → 走 `no confirm impl` → deny. 跟 README/UX 契约一致
    (D-15 注入真 confirm 才允许 y/N 拍板, 当前 D-13 MVP 必须 `--yes`)
@@ -429,7 +429,7 @@ await runToolLoop(client, messages, {
 ### 单测覆盖
 
 - `policy/types.test.ts` — PolicyDecision union + PolicyContext 形状
-- `policy/static-rules.test.ts` — 6 工具名分支 + bash 危险 regex (14 it: 12 模式命中 + 安全命令 allow 等)
+- `policy/static-rules.test.ts` — 6 工具名分支 + bash 危险 regex (14 it: 14 pattern 命中 + 安全命令 allow 等)
 - `policy/chain.test.ts` — chain 透传 raw decision (不做 yes bypass, P1 b 修复后 bypass 移到 tool-loop.ts) + deny 永远透传 (5 tests)
 - `policy/args-digest.test.ts` — 稳定 JSON (key 排序) + sha256 12 hex + secret 不暴露 (7 tests)
 - `policy/sanitize-reason.test.ts` — 长度 200 cap + 换行折叠 + NUL 去 (8 tests)
