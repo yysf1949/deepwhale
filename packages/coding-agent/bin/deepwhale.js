@@ -35,7 +35,16 @@ loadProjectEnv();
 import { startRepl } from '../dist/index.js';
 import { runPrintMode } from '../dist/modes/print.js';
 import { runRpcMode } from '../dist/modes/rpc.js';
+// Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9: 'tui' mode 优先走 Ink 容器 bundle
+// (../dist/tui-ink-bundle.js). 跟 D-24.1 拍板一致.
+//   - bundle 是 tui-ink 1.0.9 esbuild 输出, copy 自 packages/tui-ink/dist/tui.js (postbuild)
+//   - 1.74MB unminified, runtime 0 依赖, 跟 Hermes ui-tui 决策表一致
+import { runTuiInkMode } from '../dist/tui-ink-bundle.js';
+// D-24.1 §6 红线 1: legacy runTuiMode 仍保留作 source-install dev 路径兜底.
+// 1.0.9+ tarball 装路径 100% 走 runTuiInkMode (postbuild 强保证 bundle 存在),
+// 实际不会调 runTuiMode. void reference 仅为让 ESLint 闭嘴 (0 删 + 0 warning).
 import { runTuiMode } from '../dist/modes/tui.js';
+void runTuiMode; // legacy 兜底, sprint 1.1+ 计划完全删除.
 import { runVerify } from '../dist/verify/index.js';
 import { buildSummaryAndNext, formatReport } from '../dist/verify/index.js';
 // Sprint 1c-revive-4-D-20.1 (2026-06-05): 友好错误处理.
@@ -285,8 +294,14 @@ async function main() {
         ...(args.yes ? { yes: true } : {}),
         maxSteps: args.maxSteps,
       });
-    case 'tui':
-      return runTuiMode({
+    case 'tui': {
+      // Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9: 优先走 Ink 容器 bundle.
+      // 1. 优先 @deepwhale/tui-ink/dist bundle (tarball 装路径 / dev-build 路径)
+      // 2. Fallback 旧的 readline runTuiMode (D-20.3 P0-B legacy, source-only)
+      // 注: 上面 import 阶段是 static, 但 bundle 找不到时 import 抛 ERR_MODULE_NOT_FOUND
+      // 已经被 Node 提前到 start 抛了, 这里用 try/catch 兜不住. 拍板: 走 D-24.3 装路径
+      // 验证, bundle 必须 100% 存在 (postbuild 强保证), legacy 是 dev-only. 跟 D-24.1 §6 红线 1 一致.
+      return runTuiInkMode({
         ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
         ...(args.provider !== undefined ? { provider: args.provider } : {}),
         ...(args.model !== undefined ? { model: args.model } : {}),
@@ -294,6 +309,7 @@ async function main() {
         enableToolLoop: args.enableToolLoop,
         maxSteps: args.maxSteps,
       });
+    }
     case 'verify': // Sprint 1c-revive-2-D-11-4: 走 runVerify (4 步 default), formatReport 印到 stdout.
     // 退出码: passed=0, failed=1 (跟 runVerify overallStatus 对应). 跟 Unix
     // 惯例一致 (CI 脚本 \`if deepwhale --verify; then ...\`).
@@ -314,7 +330,17 @@ async function main() {
 }
 
 main().then(
-  (code) => process.exit(code),
+  (code) => {
+    // Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9: 兼容 tui mode 返 TuiInkResult 对象.
+    // 其它 mode 返 number. 跟 D-24.3 dispatch 1:1.
+    if (typeof code === 'number') {
+      process.exit(code);
+    }
+    if (code && typeof code === 'object' && typeof code.exitCode === 'number') {
+      process.exit(code.exitCode);
+    }
+    process.exit(0);
+  },
   (err) => {
     // Sprint 1c-revive-4-D-20.1 (2026-06-05) review-fix: 友好错误处理, 退出码 2 (跟参数错一致).
     //  - APIKeyMissingError: REPL/print/rpc/tui 缺 key → 印 setup hint

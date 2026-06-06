@@ -51,7 +51,17 @@ const buildOptions = {
   plugins: [stubDevtools],
   // Keep banner for self-contained ESM
   banner: {
-    js: '#!/usr/bin/env node\n// @deepwhale/tui-ink — D-24 full Ink TUI container. Self-contained ESM bundle.\n// Built ' + new Date().toISOString() + '\n',
+    // Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9: 注入 createRequire 让
+    // esbuild 的 __require polyfill 在 ESM 上下文能正常 dispatch (CJS deps
+    // like signal-exit / auto-bind / wrap-ansi 仍走 require). 跟 Hermes
+    // ui-tui build.mjs 的 __require + esbuild 实践一致.
+    js: `#!/usr/bin/env node
+// @deepwhale/tui-ink — D-24 full Ink TUI container. Self-contained ESM bundle.
+// Built ${new Date().toISOString()}
+import { createRequire as __cr } from 'node:module';
+import { fileURLToPath as __fpath } from 'node:url';
+const require = __cr(__fpath(import.meta.url));
+`,
   },
   // Externalize workspace packages — they're resolved at runtime via node_modules
   // (the consumer — coding-agent — provides them via its package.json).

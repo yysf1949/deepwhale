@@ -22,6 +22,9 @@ export * from './agent/index.js';
 export * from './modes/index.js';
 export * from './verify/index.js'; // Sprint 1c-revive-2-D-11-4 (2026-06-04): verify module
 export * from './policy/index.js'; // Sprint 1c-revive-2-D-24.2 (2026-06-06): tui-ink needs ToolPolicy/staticToolPolicy
+// Sprint 1c-revive-2-D-24.3 (2026-06-06): tui-ink App needs ChatMessage / SessionReader/Writer types + loadSession
+export type { ChatMessage } from '@deepwhale/llm';
+export { SessionReader, SessionWriter } from '@deepwhale/core';
 export { startRepl, runOneTurn, formatUsageStatus, createReplConfirm } from './repl.js';
 export type { ReplConfirmController, ReplConfirmOptions, ReplConfirm } from './repl/repl-confirm.js';
 export type { ReplOptions } from './repl.js';

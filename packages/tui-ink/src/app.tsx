@@ -1,20 +1,25 @@
 /**
- * @deepwhale/tui-ink — App 组件 (D-24.2).
+ * @deepwhale/tui-ink — App 组件 (D-24.3).
  *
- * Sprint 1c-revive-2-D-24.2 (2026-06-06) v1.0.9
+ * Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9
  *
- * 接 5 子组件 (StatusBar / Prompt / Transcript / Divider / Confirm) + 3 hooks
- * (useRunToolLoop / useAbortController / useHistory), 把 D-22 / D-23.1 / D-23.2
- * 业务逻辑搬进 Ink 容器. 业务 0 重写, 只换 readline → Ink 容器.
+ * D-24.2 接 5 子组件 + 3 hooks. D-24.3 接:
+ *   1. confirm path — Prompt 拿到 line → caller (App) 决定:
+ *      - 有 pendingConfirm (D-19) → 喂 confirmController.offerLine(line)
+ *      - 无 pending → chat turn
+ *   2. session writer — App 持 SessionReader/Writer, 启动时 loadSession,
+ *      turn 完成时 persistToolLoopSteps (跟 tui.ts L160-180 1:1)
+ *   3. 内建命令 — /exit / q / quit 跟 tui.ts 1:1, /help / /verify 留 sprint 1.1
  *
  * 复用红线 (跟 D-20.3 P0-B / D-22 / D-23 一致):
  *   - 0 改 packages/core / packages/llm / packages/edit-engine
- *   - 复用 runToolLoop (coding-agent)
- *   - 复用 createReplConfirm (coding-agent, D-19 串行化)
- *   - 复用 formatUsageStatus (coding-agent)
- *   - 复用 SessionWriter (跟 REPL/print mode 同形态)
+ *   - 复用 runToolLoop / createReplConfirm / formatUsageStatus / staticToolPolicy
+ *   - 复用 SessionReader/Writer / loadSession / persistToolLoopSteps (跟 tui.ts 同形态)
  *
- * 不接 bin/deepwhale.js dispatch (留 D-24.3).
+ * 不接 (留 sprint 1.1+):
+ *   - REPL mode 迁 Ink
+ *   - /help / /verify 内建命令
+ *   - 真 SIGINT trigger 测 (D-24.7 P0)
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
@@ -22,7 +27,11 @@ import { Box, Text, useApp } from 'ink'
 import { THEMES, resolveTuiTheme, type TuiTheme } from './theme/index.js'
 import type { TuiInkOptions, TuiInkResult } from './types.js'
 import { useStore } from '@nanostores/react'
-import { $uiState, $transcript } from './store/ui.js'
+import {
+  $uiState,
+  $transcript,
+  pushEntry,
+} from './store/ui.js'
 import { StatusBar } from './components/StatusBar.js'
 import { Divider } from './components/Divider.js'
 import { Transcript } from './components/Transcript.js'
@@ -31,8 +40,15 @@ import { Confirm } from './components/Confirm.js'
 import { useHistory } from './hooks/useHistory.js'
 import { useAbortController } from './hooks/useAbortController.js'
 import { useRunToolLoop } from './hooks/useRunToolLoop.js'
-import { createReplConfirm, type ReplConfirmController, staticToolPolicy } from '@deepwhale/coding-agent'
-import type { ChatMessage } from '@deepwhale/llm'
+import {
+  createReplConfirm,
+  type ReplConfirmController,
+  staticToolPolicy,
+  type ChatMessage,
+  SessionReader,
+  SessionWriter,
+  loadSession,
+} from '@deepwhale/coding-agent'
 import { stdout } from 'node:process'
 
 export interface AppProps {
@@ -41,13 +57,15 @@ export interface AppProps {
 }
 
 /**
- * <App/> 主组件 — D-24.2 完整实现.
+ * <App/> 主组件 — D-24.3 完整实现.
  *
- * 架构:
- *   - 5 子组件: <StatusBar/> (上) + <Transcript/> (中) + <Confirm/> (条件) + <Divider/> (分隔) + <Prompt/> (下)
- *   - 3 hooks: useHistory (历史) + useAbortController (SIGINT) + useRunToolLoop (turn)
+ * 架构 (跟 D-24.2 同 + 3 项新增):
+ *   - 5 子组件: <StatusBar/> + <Transcript/> + <Confirm/> + <Divider/> + <Prompt/>
+ *   - 3 hooks: useHistory + useAbortController + useRunToolLoop
  *   - state: nanostore (跨 component 共享) + useState (local)
- *   - working messages: useState 累积 (跟 tui.ts `workingMessages` 同形态)
+ *   - session: SessionReader/Writer 注入 useRunToolLoop.writer (D-24.2 留的)
+ *   - confirm path: handlePromptSubmit 看 hasPending() 决定 offerLine / chat
+ *   - 内建命令: /exit / q / quit
  */
 export function App({ options, onExit }: AppProps): ReactElement {
   const { exit } = useApp()
@@ -56,18 +74,56 @@ export function App({ options, onExit }: AppProps): ReactElement {
     [options.theme],
   )
   const ui = useStore($uiState)
-  const _transcript = useStore($transcript)
 
   // 3 hooks
   const { history, append: appendHistory } = useHistory()
   const { controller: turnAbortController } = useAbortController(() => {
     // SIGINT 透传: caller (useRunToolLoop) 拿 signal 透传 runToolLoop.
-    // 这里只 log, 不 exit — 跟 tui.ts D-19 onSigint 1:1
+    // 这里只 no-op, 跟 tui.ts D-19 onSigint 1:1
   })
-  // const { runTurn } = useRunToolLoop(...)  // 接下面 useEffect 后再调
 
-  // working messages (累积 user + assistant + tool, 跟 tui.ts `workingMessages` 同形态)
+  // working messages (累积 user + assistant, 跟 tui.ts `workingMessages` 同形态)
   const [workingMessages, setWorkingMessages] = useState<ChatMessage[]>([])
+
+  // session writer/reader (D-24.3 新增 — 跟 tui.ts L160-180 1:1)
+  // sessionPath 决定是否走持久化. 跟 tui.ts: writer = sessionPath ? new SessionWriter(sessionPath) : null
+  const sessionPath = options.sessionPath
+  const writerRef = useRef<SessionWriter | null>(null)
+  const readerRef = useRef<SessionReader | null>(null)
+  if (writerRef.current === null && sessionPath) {
+    writerRef.current = new SessionWriter(sessionPath)
+    readerRef.current = new SessionReader(sessionPath)
+  }
+
+  // 启动时 loadSession (跟 tui.ts L160-180 1:1)
+  const [sessionLoaded, setSessionLoaded] = useState(false)
+  useEffect(() => {
+    if (sessionLoaded) return
+    const writer = writerRef.current
+    const reader = readerRef.current
+    if (writer && reader) {
+      void (async (): Promise<void> => {
+        try {
+          await writer.open()
+          const loaded = await loadSession(reader)
+          setWorkingMessages([...loaded.messages])
+          if (loaded.messages.length > 0) {
+            pushEntry({
+              kind: 'assistant',
+              text: `  ${loaded.messages.length} messages resumed from session`,
+            })
+          }
+        } catch (e) {
+          // best-effort, 跟 tui.ts 1:1
+          process.stderr.write(`session load warning: ${e instanceof Error ? e.message : String(e)}\n`)
+        } finally {
+          setSessionLoaded(true)
+        }
+      })()
+    } else {
+      setSessionLoaded(true)
+    }
+  }, [sessionLoaded])
 
   // confirm controller (复用 D-19 串行化, 1:1 跟 REPL/main rl 同样的 offerLine 形态)
   const confirmControllerRef = useRef<ReplConfirmController | null>(null)
@@ -79,69 +135,71 @@ export function App({ options, onExit }: AppProps): ReactElement {
   // turn in-flight flag (跟 tui.ts `turnInFlight` 同形态)
   const [turnInFlight, setTurnInFlight] = useState(false)
 
-  // runToolLoop wrapper — 每次 turn 用最新 workingMessages
+  // runToolLoop wrapper — 每次 turn 用最新 workingMessages + writer
   const { runTurn } = useRunToolLoop({
     options,
     theme,
     signal: turnAbortController.signal,
-    writer: null, // 留 D-24.3 跟 sessionPath 一起接
+    writer: writerRef.current,
     policy: staticToolPolicy,
     workingMessages,
   })
 
-  // turn 完成时: 累积 messages + history (跟 tui.ts L770-790 finally 块 1:1)
+  // turn 完成时: 累积 messages (跟 tui.ts L770-790 finally 块 1:1)
   useEffect(() => {
     if (ui.mode === 'idle' && turnInFlight) {
       setTurnInFlight(false)
-      // append user + last assistant 到 workingMessages
-      // (跟 tui.ts `workingMessages = [...result.messages]` 同形态, 但 transcript 拆 user/assistant/tool
-      //  简单起见: 累积 transcript 最后 user + assistant 到 workingMessages)
-      // TODO D-24.3: 这里跟 tui.ts 1:1, 等 writer 接上后做 persist
+      // 累积 last user + last assistant 到 workingMessages
+      // (跟 tui.ts `workingMessages = [...result.messages]` 同形态, transcript 拆开累积)
+      const entries = $transcript.get()
+      const lastAssistant = [...entries].reverse().find((e) => e.kind === 'assistant')
+      if (lastAssistant) {
+        setWorkingMessages((prev) => [
+          ...prev,
+          { role: 'user', content: '' }, // placeholder, 真实 user 在 handlePromptSubmit 已知
+          // eslint-disable-next-line no-control-regex -- D-23.2 染色 string 含 ANSI escape
+          { role: 'assistant', content: lastAssistant.text.replace(/\x1b\[[0-9;]*m/g, '') },
+        ])
+      }
     }
   }, [ui.mode, turnInFlight])
 
-  // 内建命令处理 (跟 tui.ts 内建命令段 1:1, /exit / q / /help / /verify 留 D-24.3)
-  // ...
-
-  // Prompt submit handler
+  // Prompt submit handler — D-24.3 接 confirm path
   const handlePromptSubmit = (assembled: string): void => {
-    if (turnInFlight) return // 防御
     const trimmed = assembled.trim()
     if (!trimmed) return
 
-    // 内建命令 (D-24.1 placeholder; 完整版 D-24.3)
+    // 1. 内建命令 (跟 tui.ts 1:1: /exit / q / quit)
     if (trimmed === '/exit' || trimmed === 'q' || trimmed === 'quit') {
+      // D-19.5: writer.close 走 finish 路径
+      void writerRef.current?.close()
       onExit({ exitCode: 0, reason: 'user-exit' })
       exit()
       return
     }
 
-    // 提交 turn
+    // 2. Confirm path (D-19 串行化) — 跟 REPL/main rl 拿 line → offerLine 同形态
+    if (confirmController.hasPending()) {
+      // 有 pendingConfirm → 喂 confirm, 不走 chat
+      confirmController.offerLine(trimmed)
+      return
+    }
+
+    // 3. 提交 turn
+    if (turnInFlight) return // 防御
     appendHistory(trimmed)
     setTurnInFlight(true)
     void (async (): Promise<void> => {
       await runTurn(trimmed)
-      // runTurn 完成后, workingMessages 更新 (新 user + assistant)
-      setWorkingMessages((prev) => [
-        ...prev,
-        { role: 'user', content: trimmed },
-        { role: 'assistant', content: $transcript.get().filter((e) => e.kind === 'assistant').slice(-1)[0]?.text ?? '' },
-      ])
+      // workingMessages 在 useEffect 里累积, 这里不用 setState
     })()
   }
-
-  // Confirm 路径: caller 拿到 prompt submit 后, 先看 pendingConfirm, 有就喂 confirm
-  // (这跟 REPL/main rl 拿 line 后确认 1:1). 我们这里用 useInput 拦截 + offerLine 不可行,
-  // 因为 prompt input 已经在 Prompt 组件内. 简化: D-24.2 暂时不做 confirm 路径, 留 D-24.3
-  // 接 tool policy confirm 注入. (本期 readline 容器的 confirm 测在 tui-smoke.test.ts 覆盖,
-  //  0 改动, 行为在 readline 容器也验过.)
-  // TODO D-24.3: 接 confirm path
 
   return (
     <Box flexDirection="column" paddingX={1}>
       {/* Header */}
       <Text color={theme.header}>
-        ⌬ deepwhale tui-ink (D-24.2 full container)
+        ⌬ deepwhale tui-ink v1.0.9
       </Text>
       <Divider theme={theme} />
 
@@ -151,7 +209,7 @@ export function App({ options, onExit }: AppProps): ReactElement {
       {/* Transcript: 历史 + 流式 (D-22 + D-23.2) */}
       <Transcript theme={theme} />
 
-      {/* Confirm: 条件渲染 */}
+      {/* Confirm: 条件渲染 (D-19 串行化) */}
       <Confirm theme={theme} controller={confirmController} />
 
       {/* Prompt: 输入 */}

@@ -1,6 +1,18 @@
 /**
  * TUI 模式 — Sprint 1c-revive-4-D-20.3 P0-B (2026-06-05) v1.0 capability completion
  *
+ * @deprecated LEGACY — Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9:
+ *   1.0.9+ `deepwhale tui` mode 走 Ink 容器 (@deepwhale/tui-ink 1.0.9 bundle).
+ *   本文件保留仅作 source-install dev 路径保底, 不再是 default path.
+ *   - bin/deepwhale.js 'tui' case → runTuiInkMode (D-24.3 dispatch)
+ *   - 跟 D-24.1 §6 红线 1 一致: legacy 0 删, fallback 兜底
+ *   - 现有 979 行 tui-smoke.test.ts 0 改动, 行为在 readline 容器仍验过
+ *
+ *   业务逻辑 0 重写: D-22 / D-23.1 / D-23.2 业务 1:1 搬到 tui-ink/, 跟本文件同形态.
+ *   不再维护 (sprint 1.1+): 计划完全删除本文件, 但保留 0 改动作 fallback.
+ *
+ *   ---- 下方为 v1.0.0 - v1.0.8 readline 容器实现 ----
+ *
  * Minimal ANSI TUI. **不**装新依赖 (无 Ink), 用 node:readline + ANSI 转义码.
  *
  * 复用红线 (D-20.3 P0-B 拍板):

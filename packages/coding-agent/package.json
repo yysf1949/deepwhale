@@ -1,6 +1,6 @@
 {
   "name": "@deepwhale/coding-agent",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "DeepWhale CLI: DeepSeek-first AI coding agent. Linear sessions, 6 tools, Docker sandbox.",
   "license": "MIT",
   "type": "module",
@@ -58,7 +58,7 @@
     "@deepwhale/llm": "^1.0.0"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b --force && node ../llm/scripts/copy-toml.mjs && node scripts/copy-tui-ink-bundle.mjs",
     "dev": "tsc -b --watch",
     "clean": "rm -rf dist .tsbuildinfo"
   }
