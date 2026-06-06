@@ -24,8 +24,50 @@
  * @module @deepwhale/coding-agent/verify-runner
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import process from 'node:process';
+
+/**
+ * Verify context. 拍板 (D-21.0, 2026-06-06): verify 模式现在支持 2 种环境:
+ *   - 'monorepo': 在 deepwhale 源码仓库根跑 (有 pnpm-workspace.yaml, 或根 package.json 含 workspaces 字段),
+ *     跑 4 步真验证 (build/lint/typecheck/test), 跟 D-11 拍板保持一致
+ *   - 'installed': 在 `npm install -g @deepwhale/coding-agent` 后的环境跑 (单包 node_modules,
+ *     没 pnpm / vitest / eslint), 跑 4 步 sanity check (node --check / import / bin / exports),
+ *     验证"装出来能跑" + "主入口能 import" + "bin 能装" + "至少 export 1 个 symbol"
+ *
+ * 判 monorepo: `cwd` 存在 `pnpm-workspace.yaml` **或** 根 `package.json` 含 `workspaces` 字段.
+ * 拍板: 这两个 marker 在生态里都表示 monorepo. deepwhale 自己用的是 pnpm-workspace.yaml
+ * 形式 (根 package.json 没有 workspaces 字段), npm/yarn workspaces 用 package.json#workspaces
+ * 形式. 任一存在即 monorepo — 兼容两家. 都不存在 → installed.
+ *
+ * 不变量: detectContext 是 **同步纯函数** (不调外部命令, 不读 .env), 给定 cwd 返固定 context.
+ */
+export type VerifyContext = 'monorepo' | 'installed';
+
+export function detectContext(cwd: string = process.cwd()): VerifyContext {
+  const hasWorkspaceYaml = existsSync(join(cwd, 'pnpm-workspace.yaml'));
+  let hasWorkspacesField = false;
+  try {
+    const rootPkgPath = join(cwd, 'package.json');
+    if (existsSync(rootPkgPath)) {
+      const rootPkg = JSON.parse(readFileSync(rootPkgPath, 'utf8')) as {
+        workspaces?: unknown;
+      };
+      hasWorkspacesField =
+        rootPkg.workspaces !== undefined &&
+        rootPkg.workspaces !== null &&
+        (Array.isArray(rootPkg.workspaces) || typeof rootPkg.workspaces === 'object');
+    }
+  } catch {
+    // package.json 读不到 / JSON 坏 → 视作 installed (保守)
+    hasWorkspacesField = false;
+  }
+  return hasWorkspaceYaml || hasWorkspacesField ? 'monorepo' : 'installed';
+}
 
 /** 单步验证配置. */
 export interface VerifyCheck {
@@ -94,7 +136,7 @@ export interface RunVerifyOptions {
   continueOnError?: boolean;
 }
 
-const DEFAULT_CHECKS: ReadonlyArray<VerifyCheck> = [
+const MONOREPO_CHECKS: ReadonlyArray<VerifyCheck> = [
   // 拍板: args[0] 是实际 spawn 的可执行 (e.g. 'corepack'), 后面是它的参数.
   // 4 步 default 用 corepack 跑 pnpm, 跟用户日常工作流一致
   // (corepack 自身 < 5MB, 启动 < 200ms, 不显著影响 verify 总耗时).
@@ -123,6 +165,148 @@ const DEFAULT_CHECKS: ReadonlyArray<VerifyCheck> = [
     args: ['corepack', 'pnpm', 'vitest', 'run', '--exclude', 'packages/*/test/integration/**'],
   },
 ];
+
+/**
+ * Installed-context checks (D-21.0, 2026-06-06).
+ *
+ * 拍板: 当 `npm install -g @deepwhale/coding-agent` 之后, 用户的 cwd 一般是
+ * "我的项目" 而非 "deepwhale 源码仓库". 此时 verify 不能再跑 pnpm build/lint/
+ * typecheck/vitest — 这些 devDep 没 ship. 改成 4 步 "装出来能跑" 的 sanity:
+ *
+ *   1. syntax-check  : `node --check <main>`              — dist JS 能 parse
+ *   2. import-check  : `node -e "import('${pkg}')"`       — 包名 (走 exports 重定向)
+ *   3. bin-check     : `ls -la <bin-path>`                 — bin 文件存在
+ *   4. exports-check : `node -e "import('${pkg}').then(m => Object.keys(m).length >= 1)"`
+ *                                                       — 至少 export 1 个 symbol
+ *
+ * 关键设计: 不调 pnpm / vitest / eslint / tsc. 只用 node 内置 + 文件系统, 单包
+ * 装出来后能跑. 拍板 (D-21.0, 2026-06-06, bugfix 2): import-check / exports-check
+ * 用**包名** (e.g. '@deepwhale/coding-agent') 不是**绝对路径**. Node 22 ESM
+ * 不支持 `import('/abs/path/to/dir')` (Directory import), 必须用包名让 Node 走
+ * node_modules 解析 + package.json#exports 重定向. 绝对路径只用于 syntax-check /
+ * bin-check (--check + ls 不解 import).
+ *
+ * 拍板 (D-21.0, 2026-06-06, bugfix 1): import-check / exports-check 的 args[2]
+ * **必须**是完整 JS 字符串, 内含 `import('${pkg}')` 调用, 渲染时只替换包路径.
+ * 不能让 `args[2]` 等于包路径 (那是 shell exec 的 bug, 不是 JS 源码).
+ *
+ * 已知局限: installed check 不验证"工具调用"/"session JSONL"等运行时行为 — 这
+ * 些靠 v1.0.1 真实跑 print / REPL 模式覆盖. verify 在 installed 模式下定位是
+ * "装出来能装能 import", 不是 "功能 100% 端到端".
+ */
+const INSTALLED_CHECKS_TEMPLATE: ReadonlyArray<Omit<VerifyCheck, 'command'> & { commandTemplate: string }> = [
+  {
+    name: 'syntax-check',
+    commandTemplate: 'node --check ${CWD}/dist/index.js',
+    args: ['node', '--check', '__CWD__/dist/index.js'],
+  },
+  {
+    name: 'import-check',
+    commandTemplate: 'node -e "import(\'${PKG}\').then(m => process.exit(0)).catch(e => { process.stderr.write(e.message); process.exit(1) })"',
+    args: [
+      'node',
+      '-e',
+      "import('__PKG__').then(m => process.exit(0)).catch(e => { process.stderr.write(e.message); process.exit(1); })",
+    ],
+  },
+  {
+    name: 'bin-check',
+    commandTemplate: 'test -f ${CWD}/bin/deepwhale.js',
+    args: ['test', '-f', '__CWD__/bin/deepwhale.js'],
+  },
+  {
+    name: 'exports-check',
+    commandTemplate: 'node -e "import(\'${PKG}\').then(m => process.exit(Object.keys(m).length >= 1 ? 0 : 1)).catch(e => { process.stderr.write(e.message); process.exit(1) })"',
+    args: [
+      'node',
+      '-e',
+      "import('__PKG__').then(m => process.exit(Object.keys(m).length >= 1 ? 0 : 1)).catch(e => { process.stderr.write(e.message); process.exit(1); })",
+    ],
+  },
+];
+
+/**
+ * 给定"装出来的 coding-agent 包的根路径" 渲染 INSTALLED_CHECKS_TEMPLATE: 替换
+ * args 里的占位符, 同时生成可读的 command 字符串. 模板 → 实例 是纯映射.
+ *
+ * 拍板: 包根 = "包含 dist/ + bin/ + package.json 的目录". 1.0.1 实测路径:
+ *   global install: `<prefix>/lib/node_modules/@deepwhale/coding-agent`
+ *   local install: `<proj>/node_modules/@deepwhale/coding-agent`
+ *
+ * 拍板 (D-21.0, 2026-06-06, bugfix 3): import-check / exports-check 必须把
+ * cwd 设到 `dirname(packageRoot)` (即 node_modules 的**父目录**), 不然 Node
+ * 在用户 cwd (/tmp 或别的项目) 跑 `import('@deepwhale/coding-agent')` 时报
+ * "Cannot find package" — Node 解析包名从 cwd 向上找 node_modules, cwd 错
+ * 就找不到. 把 cwd 设到包根**之上**, Node 解析时能找到 node_modules/@deepwhale/...
+ *
+ * 调用方 (pickChecksForContext) 用 resolveInstalledPackageRoot() 拿这个路径.
+ * 包名 (PKG) 硬编码 '@deepwhale/coding-agent' — 这是 verify 验证的唯一目标包.
+ */
+function renderInstalledChecks(packageRoot: string): ReadonlyArray<VerifyCheck> {
+  const pkgName = '@deepwhale/coding-agent';
+  // 包根的父目录 = node_modules 所在目录. global: `<prefix>/lib/node_modules`;
+  // local: `<proj>/node_modules`. Node 从这个目录起能找到包.
+  const nodeModulesDir = dirname(packageRoot);
+  return INSTALLED_CHECKS_TEMPLATE.map((t) => {
+    const renderedCommand = t.commandTemplate
+      .replace(/\$\{CWD\}/g, packageRoot)
+      .replace(/\$\{PKG\}/g, pkgName);
+    const renderedArgs = t.args.map((a) =>
+      a
+        .replace(/__CWD__/g, packageRoot)
+        .replace(/__CWD_DIST__/g, `${packageRoot}/dist/index.js`)
+        .replace(/__PKG__/g, pkgName),
+    );
+    // import-check / exports-check 需要 cwd = node_modules 所在目录才能解析包名.
+    // syntax-check / bin-check 用绝对路径, 不需要特殊 cwd.
+    const needsNodeModulesCwd = t.name === 'import-check' || t.name === 'exports-check';
+    return {
+      name: t.name,
+      command: renderedCommand,
+      args: renderedArgs,
+      ...(needsNodeModulesCwd ? { cwd: nodeModulesDir } : {}),
+    };
+  });
+}
+
+/**
+ * 解析"装出来的 @deepwhale/coding-agent 包的根目录" (绝对路径).
+ *
+ * 拍板 (D-21.0, 2026-06-06): verify 验证的目标是这个**包本身**, 不是用户
+ * cwd. 跟用户跑 `deepwhale --verify` 在哪个目录无关. resolveInstalledPackageRoot
+ * 必须**独立于 cwd** — 否则用户在 /tmp 跑, verify 就跑去 /tmp 检查, 完全错.
+ *
+ * 实现策略: ESM 里用 `import.meta.url` 不行 (verify-runner 不是 entry). 用
+ * `require.resolve('@deepwhale/coding-agent/package.json')` 找自身包的 package.json,
+ * 再 dirname 拿根. CommonJS require 在 ESM module 里走 createRequire. 兼容 tsc
+ * 输出 CommonJS 跟 ESM 两种 module 格式.
+ */
+export function resolveInstalledPackageRoot(): string {
+  // createRequire 在 ESM 文件里是合法用法 (Node 12+). 注意: 装出来的 dist/verify/
+  // verify-runner.js 跟 @deepwhale/coding-agent/package.json 在同一 node_modules
+  // 树下, require.resolve 一定能找到 (前提是这个包真被 require).
+  //
+  // 拍板 (D-21.0, 2026-06-06): 用 fileURLToPath(import.meta.url) 拿当前 ESM
+  // module 的 file:// URL, 换成本地 path, 再 createRequire 拿 req. 这是 ESM
+  // 文件里 "走 require" 的官方推荐姿势 — 直接写 `require(...)` 在 ESM 顶层
+  // ReferenceError (strict mode 报 require is not defined).
+  const req = createRequire(fileURLToPath(import.meta.url));
+  const pkgJsonPath = req.resolve('@deepwhale/coding-agent/package.json');
+  return dirname(pkgJsonPath);
+}
+
+/**
+ * 给定 cwd 选对应 context 的 check 集. 拍板 (D-21.0): 单点决策, 后续要加
+ * 'ci' (GitHub Actions) 或 'docker' (容器内) 上下文, 改这里.
+ *
+ * 重要: cwd 参数**只用于 detectContext** (判 monorepo). installed 模式的
+ * check 始终以 coding-agent 包自身根为基准, 不受 cwd 影响.
+ */
+export function pickChecksForContext(cwd: string = process.cwd()): ReadonlyArray<VerifyCheck> {
+  const ctx = detectContext(cwd);
+  if (ctx === 'monorepo') return MONOREPO_CHECKS;
+  return renderInstalledChecks(resolveInstalledPackageRoot());
+}
 
 /**
  * Sprint 1c-revive-2-D-11-4 review P1 修复: Windows 上 `corepack` 在 PATH 解析不到
@@ -187,7 +371,10 @@ export function looksLikeSpawnError(
  *     runner 不写自然语言, 保持纯函数语义 (便于单测 / roundtrip).
  */
 export async function runVerify(options: RunVerifyOptions = {}): Promise<VerificationReport> {
-  const checks = options.checks ?? DEFAULT_CHECKS;
+  // Sprint D-21.0 (2026-06-06): 默认走 pickChecksForContext(cwd) — 根据 cwd 是
+  // monorepo 还是 installed, 选对应 check 集. 调用方仍可传 options.checks 显式覆盖
+  // (单测, REPL 强制 4 步等).
+  const checks = options.checks ?? pickChecksForContext(options.cwd ?? process.cwd());
   const cwd = options.cwd ?? process.cwd();
   const defaultTimeoutMs = options.defaultTimeoutMs ?? 300_000;
   const stdoutCapBytes = options.stdoutCapBytes ?? 4096;

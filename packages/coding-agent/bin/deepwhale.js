@@ -24,6 +24,8 @@
  */
 
 import { resolve as pathResolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 // Sprint 1c-revive-2-D-7 (review, 2026-06-04): 启动时加载项目根 .env (补缺不覆盖,
 // CI / shell export 优先级最高). 必须在 import dist 之前调, 让 createDefaultClient
@@ -33,7 +35,16 @@ loadProjectEnv();
 import { startRepl } from '../dist/index.js';
 import { runPrintMode } from '../dist/modes/print.js';
 import { runRpcMode } from '../dist/modes/rpc.js';
+// Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9: 'tui' mode 优先走 Ink 容器 bundle
+// (../dist/tui-ink-bundle.js). 跟 D-24.1 拍板一致.
+//   - bundle 是 tui-ink 1.0.9 esbuild 输出, copy 自 packages/tui-ink/dist/tui.js (postbuild)
+//   - 1.74MB unminified, runtime 0 依赖, 跟 Hermes ui-tui 决策表一致
+import { runTuiInkMode } from '../dist/tui-ink-bundle.js';
+// D-24.1 §6 红线 1: legacy runTuiMode 仍保留作 source-install dev 路径兜底.
+// 1.0.9+ tarball 装路径 100% 走 runTuiInkMode (postbuild 强保证 bundle 存在),
+// 实际不会调 runTuiMode. void reference 仅为让 ESLint 闭嘴 (0 删 + 0 warning).
 import { runTuiMode } from '../dist/modes/tui.js';
+void runTuiMode; // legacy 兜底, sprint 1.1+ 计划完全删除.
 import { runVerify } from '../dist/verify/index.js';
 import { buildSummaryAndNext, formatReport } from '../dist/verify/index.js';
 // Sprint 1c-revive-4-D-20.1 (2026-06-05): 友好错误处理.
@@ -58,6 +69,40 @@ import { APIKeyMissingError } from '@deepwhale/llm';
  * @param {ReadonlyArray<string>} argv
  * @returns {CliArgs}
  */
+// Sprint D-21.0.1 (2026-06-06): --version 写死 "0.1.0 (Sprint 1a)" 跟 npm 1.0.1 /
+// GitHub v1.0.1 不一致, 用户在 Windows 装出来看到 stale string. 改读自身 package.json.
+//
+// 拍板 (D-21.0.1, 2026-06-06):
+//   - 用 createRequire(import.meta.url) 拿 `../package.json` (相对 bin 路径).
+//   - 装出来: bin 在 `<prefix>/lib/node_modules/@deepwhale/coding-agent/bin/`,
+//     `../package.json` 走 `<root>/package.json` ✅. 1.0.1 / 1.0.2 / 1.1.0 自动跟.
+//   - monorepo: bin 在 `packages/coding-agent/bin/`, `../package.json` 走
+//     `packages/coding-agent/package.json` ✅. dev workflow 也对.
+//   - 输出格式跟 `npm -v` 一致 (多行, 字段对齐). 不再带 "(Sprint X)" — sprint 名
+//     是设计历史, 写在 CHANGELOG / 注释里, 不进 user-facing version 字符串.
+//
+// 不变量: pkg 读不到 (异常路径) → fallback 旧字符串, 不让 bin 直接 crash. 跟
+// Sprint 1c-revive-2-D-7 容错语义一致 (启动期不抛, 走 best-effort).
+const req = createRequire(fileURLToPath(import.meta.url));
+function readPkgVersion() {
+  try {
+    const pkg = req('../package.json');
+    return {
+      name: typeof pkg.name === 'string' ? pkg.name : '@deepwhale/coding-agent',
+      version: typeof pkg.version === 'string' ? pkg.version : '0.0.0-unknown',
+      description:
+        typeof pkg.description === 'string' ? pkg.description : 'DeepWhale coding agent',
+    };
+  } catch {
+    return { name: '@deepwhale/coding-agent', version: '0.0.0-unknown', description: '' };
+  }
+}
+function formatVersion() {
+  const { name, version, description } = readPkgVersion();
+  // 跟 `npm -v` 一样, 一行 version, 一行 name+description. Windows 友好 (没 ANSI).
+  return `${version}\n${name}: ${description}\n`;
+}
+
 function parseArgs(argv) {
   const args = {
     mode: 'interactive',
@@ -74,7 +119,10 @@ function parseArgs(argv) {
   while (i < argv.length) {
     const a = argv[i];
     if (a === '--version' || a === '-v') {
-      process.stdout.write('deepwhale 0.1.0 (Sprint 1a)\n');
+      // Sprint D-21.0.1 (2026-06-06): 改读 package.json, 跟 npm registry / GitHub
+      // release 对齐. 旧实现写死 '0.1.0 (Sprint 1a)' → 用户在 Windows 装出 1.0.1
+      // 但 --version 显示 stale, 看着像 bug. 现在 npm 1.0.2 / 1.1.0 / 2.0.0 自动跟.
+      process.stdout.write(formatVersion());
       process.exit(0);
     }
     if (a === '--help' || a === '-h') {
@@ -165,7 +213,9 @@ const HELP_TEXT = `deepwhale — Coding Agent CLI
 Usage:
   deepwhale                         Start interactive REPL (default)
   deepwhale -p "<prompt>"           Print mode: single-shot chat + tool loop
-  deepwhale --verify                Verify mode: run build/lint/typecheck/test, no LLM
+  deepwhale --verify                Verify mode: run build/lint/typecheck/test in
+                                   monorepo, or syntax/import/bin/exports sanity
+                                   checks in npm-installed context. No LLM.
   deepwhale --rpc                   RPC mode: NDJSON over stdio (Sprint 1a stub)
   deepwhale tui                     TUI mode: minimal ANSI TUI (D-20.3, ships in v1.0)
 
@@ -197,7 +247,10 @@ Setup hint:
   If you see "API key not set" on first run:
     1. Set DEEPSEEK_API_KEY=<your-key>  (or ANTHROPIC_AUTH_TOKEN=...)
     2. Or place it in ./.env (project root, see .env.example)
-    3. --verify does not require any key (build/lint/typecheck/test only)
+    3. --verify does not require any key. It auto-detects monorepo vs npm-
+       installed context: in monorepo it runs build/lint/typecheck/test; in
+       installed context it runs syntax-check / import-check / bin-check /
+       exports-check to confirm the package is usable.
 `;
 
 /**
@@ -241,8 +294,14 @@ async function main() {
         ...(args.yes ? { yes: true } : {}),
         maxSteps: args.maxSteps,
       });
-    case 'tui':
-      return runTuiMode({
+    case 'tui': {
+      // Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9: 优先走 Ink 容器 bundle.
+      // 1. 优先 @deepwhale/tui-ink/dist bundle (tarball 装路径 / dev-build 路径)
+      // 2. Fallback 旧的 readline runTuiMode (D-20.3 P0-B legacy, source-only)
+      // 注: 上面 import 阶段是 static, 但 bundle 找不到时 import 抛 ERR_MODULE_NOT_FOUND
+      // 已经被 Node 提前到 start 抛了, 这里用 try/catch 兜不住. 拍板: 走 D-24.3 装路径
+      // 验证, bundle 必须 100% 存在 (postbuild 强保证), legacy 是 dev-only. 跟 D-24.1 §6 红线 1 一致.
+      return runTuiInkMode({
         ...(args.sessionPath !== undefined ? { sessionPath: args.sessionPath } : {}),
         ...(args.provider !== undefined ? { provider: args.provider } : {}),
         ...(args.model !== undefined ? { model: args.model } : {}),
@@ -250,6 +309,7 @@ async function main() {
         enableToolLoop: args.enableToolLoop,
         maxSteps: args.maxSteps,
       });
+    }
     case 'verify': // Sprint 1c-revive-2-D-11-4: 走 runVerify (4 步 default), formatReport 印到 stdout.
     // 退出码: passed=0, failed=1 (跟 runVerify overallStatus 对应). 跟 Unix
     // 惯例一致 (CI 脚本 \`if deepwhale --verify; then ...\`).
@@ -270,7 +330,17 @@ async function main() {
 }
 
 main().then(
-  (code) => process.exit(code),
+  (code) => {
+    // Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9: 兼容 tui mode 返 TuiInkResult 对象.
+    // 其它 mode 返 number. 跟 D-24.3 dispatch 1:1.
+    if (typeof code === 'number') {
+      process.exit(code);
+    }
+    if (code && typeof code === 'object' && typeof code.exitCode === 'number') {
+      process.exit(code.exitCode);
+    }
+    process.exit(0);
+  },
   (err) => {
     // Sprint 1c-revive-4-D-20.1 (2026-06-05) review-fix: 友好错误处理, 退出码 2 (跟参数错一致).
     //  - APIKeyMissingError: REPL/print/rpc/tui 缺 key → 印 setup hint

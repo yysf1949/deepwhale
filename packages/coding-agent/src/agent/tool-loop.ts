@@ -166,7 +166,18 @@ export async function runToolLoop(
     }
 
     // 2) 把 assistant 消息写进 working(tool_calls 必带;content 可能空)
-    const assistantMsg: ChatMessage = { role: 'assistant', content: lastResult.content };
+    // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+    // reasoning_content 也写进 working, 让下轮 LLM call 时 toWireMessage 透传.
+    // DeepSeek V4 默认开 thinking, 多轮必须回传上轮 reasoning, 否则 400.
+    // 不开 thinking 时 (V3 旧 alias / thinking 关) lastResult.reasoning_content
+    // 是 undefined, 字段 absent, 行为不变.
+    const assistantMsg: ChatMessage = {
+      role: 'assistant',
+      content: lastResult.content,
+      ...(lastResult.reasoning_content !== undefined
+        ? { reasoning_content: lastResult.reasoning_content }
+        : {}),
+    };
     if (lastResult.tool_calls && lastResult.tool_calls.length > 0) {
       assistantMsg.tool_calls = lastResult.tool_calls;
     }

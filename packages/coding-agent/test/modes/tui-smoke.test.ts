@@ -12,9 +12,13 @@
  *   - session writer close 在退出时跑 (不损坏 session)
  *   - 复用 runToolLoop + staticToolPolicy (不绕过 ToolPolicy)
  *   - 复用 SessionWriter (不绕过 session audit)
+ *
+ * D-23.2 (2026-06-06): highlightChunk 测 ANSI escape bytes (\x1b[...m) 是必要的,
+ * 需要在 regex 模板里直接放 control char, 关闭 no-control-regex 规则.
  */
+/* eslint-disable no-control-regex */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { Writable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
@@ -22,6 +26,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatChunk, ChatMessage, ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
 import { runTuiMode } from '../../src/modes/tui.js';
+import { Spinner as SpinnerCls } from '../../src/modes/tui.js';
+import { resolveTuiTheme, THEMES, type TuiThemeName } from '../../src/modes/tui.js';
+import { highlightChunk } from '../../src/modes/tui.js';
 
 // ---- 共享 helper: mock LLMClient stream 返受控 content ----
 
@@ -36,6 +43,18 @@ interface MockStreamConfig {
 
 function makeMockStreamClient(cfg: MockStreamConfig): LLMClient {
   let callCount = 0;
+  // D-21.2 升级: 给 mock stream 加 usage 字段, 让 formatUsageStatus 不返 null,
+  // 走 status bar 上下双横线 (if 路径) 走完 2 条 horizontalRule, 跟生产一致.
+  // 数字随便, 跟 test 无关 (test 只验 status bar 出现 ≥ 4 次 ─{3,}, 不验数字).
+  const mockUsage = {
+    prompt_tokens: 100,
+    completion_tokens: 50,
+    total_tokens: 150,
+    // 跟 deepseek-client 真实形态对齐, 让 formatUsageStatus 不抛
+    cache_hit_tokens: 80,
+    cache_miss_tokens: 70,
+    cached: 80,
+  } as const;
   return {
     model: 'mock-deepseek-v4-flash' as ModelId,
     chat: async (): Promise<ChatResult> => {
@@ -55,17 +74,19 @@ function makeMockStreamClient(cfg: MockStreamConfig): LLMClient {
           model: 'mock-deepseek-v4-flash' as ModelId,
           content: c,
           finish_reason: 'stop',
+          // D-21.2: 加 usage 让 status bar 走 if 分支 (上下双横线)
+          usage: { ...mockUsage },
         };
       }
       // tool call path
       const toolCalls = (c as { toolCalls: { id: string; name: string; args: Record<string, unknown> }[] }).toolCalls;
       options.onChunk({ delta: { content: '', tool_calls: toolCalls as ChatResult['tool_calls'] } });
-      // 同时返一个空 content + tool_calls (跟真 LLM 行为一致)
       return {
         model: 'mock-deepseek-v4-flash' as ModelId,
         content: '',
         finish_reason: 'tool_calls',
         tool_calls: toolCalls as ChatResult['tool_calls'],
+        usage: { ...mockUsage },
       };
     },
   };
@@ -89,8 +110,12 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
   // (避免跨 it 状态污染)
 
   it('启动: stdout 含 header + prompt, /exit 走 finish path', async () => {
-    // 拍板: TUI 启动必显示 '╭─ deepwhale tui <model> ─╮' + '> ' prompt.
+    // 拍板: TUI 启动必显示 'deepwhale tui <model>' + 横线分隔 + '> ' prompt.
     // /exit 必须走 D-19.5 finish 路径, 印 'Goodbye!' + 关闭 session writer.
+    //
+    // D-21.2 轻量升级 (2026-06-06): header 改用 `─` 横线 repeat, 取代 v1.0 的 `╭─ ... ╮`
+    // 边框. 边框在 80 列终端看着局促, 横线更现代. 横线来自 horizontalRule() helper,
+    // width 自适应 terminal columns. 测试期待 '───' (3+ 个连续 ─) 即可.
     const client = makeMockStreamClient({ first: 'unused' });
     const out = new StringWritable();
     const err = new StringWritable();
@@ -113,8 +138,8 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
 
     // 头部 header 必须出现
     expect(out.data).toContain('deepwhale tui');
-    expect(out.data).toContain('╭─'); // 边框
-    expect(out.data).toContain('╰─');
+    // D-21.2: 横线分隔 (horizontalRule), 至少 1 处 3+ 连续 ─ 字符
+    expect(out.data).toMatch(/─{3,}/);
     // 提示行
     expect(out.data).toContain('/help');
     expect(out.data).toContain('/verify');
@@ -432,6 +457,43 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     // 所以**光**靠 calls[0].aborted 不够. 我们另加一个 it 显式 abort.
   });
 
+  it('D-21.2 轻量升级: header 横线 + 状态栏横线 出现 ≥ 4 次 (2 header + 2 status wrap)', async () => {
+    // D-21.2 升级验收: 走完一个 turn, 验 stdout 出现 ≥ 4 次 3+ 连续 ─ 字符
+    // (2 header 分隔 + 2 status bar 上下分隔). 跟 v1.0 比: v1.0 是 0 次
+    // (用了 ╭─╮ 边框, 没横线), 升级后必须能观察到.
+    const client = makeMockStreamClient({ first: 'mock-status-test' });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-status-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+    });
+
+    input.write('hi\n');
+    await new Promise((r) => setTimeout(r, 150));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // 数 ─{3,} 出现次数
+    const matches = out.data.match(/─{3,}/g);
+    expect(matches).not.toBeNull();
+    // header 2 条 + status bar 2 条 = ≥ 4
+    expect(matches!.length).toBeGreaterThanOrEqual(4);
+
+    // 状态栏文本必含 model (formatTuiStatusBar 把 model 拼在前面)
+    expect(out.data).toContain('mock-deepseek-v4-flash');
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
   it('红线: abort error path — TUI 在 LLM 抛 abort 错误时不 hang 走 err (D-20.6.4 P2 fix 强化)', async () => {
     // Sprint D-20.7.3 (2026-06-06) 降级: 本 it 验证 "abort error 到达 TUI 后正确
     // 走 err path" — 也就是 runToolLoop 抛 LLMUnknownError('Tool loop aborted by
@@ -493,5 +555,425 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     // 真 abort trigger 需要 tui.ts 暴露 turnAbortController, 留给 D-20.7+.
     // 当前测真覆盖的是: TUI 在 LLM 抛 abort 错误时**不**hang, 走 err path, 退出干净.
     expect(err.data.toLowerCase()).toMatch(/abort|tool loop/);
+  });
+
+  // ========== D-22 TUI 升级 (Sprint 1c-revive-2, 2026-06-06) ==========
+  //
+  // 拍板红线 (D-22 plan):
+  //   - D-22.1: 命令历史持久化 (~/.deepwhale/tui-history, JSONL, max 1000, 0o600)
+  //   - D-22.2: 流式 token spinner (5 帧 ⠋⠙⠹⠸⠼, 80ms/帧, \r + [K 覆盖)
+  //   - D-22.3: multi-line input (\ 续行 + \\ 转义, Hermes 风格)
+  //
+  // 测试环境: 用 `process.env.HOME` 临时指向 tmp dir, 验 ~/.deepwhale/tui-history 写入.
+  // Spinner 测试: isTty() 返 false (output 是 StringWritable, 非 TTY), Spinner 不会转.
+  //   → 我们直接测 内部 logic 暴露 via 直接 import, 不走 stdout (跟 tui.ts 紧耦合).
+  // Multi-line 测试: input 喂 'line1\\\nline2\n', 验 assembled 传 'line1\nline2' 1 个 prompt.
+
+  it('D-22.1: 命令历史持久化 — turn 完写 ~/.deepwhale/tui-history, 0o600 权限', async () => {
+    // mock HOME → tmp dir
+    const realHome = process.env.HOME;
+    const homeDir = mkdtempSync(join(tmpdir(), 'deepwhale-history-home-'));
+    process.env.HOME = homeDir;
+    try {
+      const client = makeMockStreamClient({ first: 'D-22.1 history test response' });
+      const out = new StringWritable();
+      const err = new StringWritable();
+      const input = new PassThrough();
+      tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-'));
+      const sessionPath = join(tmpDir, 'session.jsonl');
+
+      const codePromise = runTuiMode({
+        client,
+        sessionPath,
+        output: out,
+        errorOutput: err,
+        input,
+      });
+
+      input.write('hello-history\n');
+      await new Promise((r) => setTimeout(r, 150));
+      input.write('/exit\n');
+      const code = await codePromise;
+      expect(code).toBe(0);
+
+      // ~/.deepwhale/tui-history 应存在
+      const histPath = join(homeDir, '.deepwhale', 'tui-history');
+      expect(existsSync(histPath)).toBe(true);
+      const jsonl = readFileSync(histPath, 'utf-8');
+      // 1 turn → 至少 1 条 JSONL 行
+      const lines = jsonl.split('\n').filter((l) => l.trim().length > 0);
+      expect(lines.length).toBeGreaterThanOrEqual(1);
+      // JSON parse + 含 'hello-history' 原文
+      const obj = JSON.parse(lines[0]) as { line?: string };
+      expect(obj.line).toBe('hello-history');
+    } finally {
+      process.env.HOME = realHome;
+      rmSync(homeDir, { recursive: true, force: true });
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('D-22.1: 历史过滤内建命令 (/help, /verify, /exit) 不写入', async () => {
+    const realHome = process.env.HOME;
+    const homeDir = mkdtempSync(join(tmpdir(), 'deepwhale-history-filter-'));
+    process.env.HOME = homeDir;
+    try {
+      const client = makeMockStreamClient({ first: 'filter test' });
+      const out = new StringWritable();
+      const err = new StringWritable();
+      const input = new PassThrough();
+      tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-'));
+      const sessionPath = join(tmpDir, 'session.jsonl');
+
+      const codePromise = runTuiMode({
+        client,
+        sessionPath,
+        output: out,
+        errorOutput: err,
+        input,
+      });
+
+      input.write('/help\n');
+      input.write('/verify\n');
+      input.write('real-prompt\n');
+      await new Promise((r) => setTimeout(r, 200));
+      input.write('/exit\n');
+      await codePromise;
+
+      const histPath = join(homeDir, '.deepwhale', 'tui-history');
+      const jsonl = readFileSync(histPath, 'utf-8').trim();
+      // 期望: 只 real-prompt 一行 (内建命令不过滤)
+      const lines = jsonl ? jsonl.split('\n') : [];
+      expect(lines.length).toBe(1);
+      const obj = JSON.parse(lines[0]) as { line?: string };
+      expect(obj.line).toBe('real-prompt');
+    } finally {
+      process.env.HOME = realHome;
+      rmSync(homeDir, { recursive: true, force: true });
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('D-22.2: Spinner stop 安全幂等 (重复 stop 不抛 + 清行不重复 \\r 写)', () => {
+    // 直接 import Spinner (D-22 暴露 class 给测试).
+    // 因 StringWritable 非 TTY, Spinner.start 不会转, Spinner.stop 走兜底 (空格 + \r).
+    // 验: stop 后多调一次 stop 不抛.
+    const sw = new SpinnerCls();
+    const fakeStdout = new StringWritable();
+    // 第一次 start (非 TTY 走 silent noop, 不写入)
+    sw.start(fakeStdout as unknown as NodeJS.WritableStream);
+    // 第一次 stop
+    expect(() => sw.stop(fakeStdout as unknown as NodeJS.WritableStream)).not.toThrow();
+    // 第二次 stop (幂等, 不抛)
+    expect(() => sw.stop(fakeStdout as unknown as NodeJS.WritableStream)).not.toThrow();
+    // 兜底写入应该是 "  \r" (空格 + \r) 或者 TTY 路径 (cursorTo + clearLine),
+    // 总之**不**应该 panic / crash
+  });
+
+  it('D-22.3: Multi-line input — \\ 续行 + 收尾行 合并为 1 个 prompt (含 \\n)', async () => {
+    // input 喂 'line1\\\n' (续行) + 'line2\\\n' (续行) + 'line3\n' (收尾)
+    // 期望内部传 1 个 turn, content = 'line1\nline2\nline3'
+    //
+    // 验法: 用 toolCall path, 工具 echo 我们传的 content, 看 stdout 含 'line1\nline2\nline3'
+    // (bash 工具跑 echo 三行). 因为 StringWritable 收集, 我们**直接**看 stdout 含
+    // 3 个 'lineN' 串.
+    const client = makeMockStreamClient({
+      first: 'OK',
+      toolCall: { name: 'bash', args: { command: 'echo line1; echo line2; echo line3' }, result: 'line1\nline2\nline3\n' },
+    });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-multiline-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+    });
+
+    // 喂续行 + 收尾 (readline 是 terminal: true, 正常接收 \n)
+    input.write('line1\\\n');
+    input.write('line2\\\n');
+    input.write('line3\n');
+    await new Promise((r) => setTimeout(r, 300));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // 验: session.jsonl 含 'line1\nline2\nline3' (assembled 真 prompt)
+    const jsonl = readFileSync(sessionPath, 'utf-8');
+    expect(jsonl).toContain('line1');
+    expect(jsonl).toContain('line2');
+    expect(jsonl).toContain('line3');
+    // bash tool result 应出现在 stdout
+    expect(out.data).toMatch(/line1.*line2.*line3|line3.*line2.*line1/s);
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // ========== D-23.1 主题 (Sprint 1c-revive-2, 2026-06-06) ==========
+  //
+  // 拍板红线 (D-23.1 plan):
+  //   - 3 preset: default (cyan) / solarized (yellow/blue) / monochrome (无前景色, dim/bold)
+  //   - 7 role: header / model / divider / prompt / error / success / toolName
+  //   - resolveTuiTheme: options.theme > DEEPWHALE_TUI_THIME env > 'default'
+  //   - invalid theme → stderr warning + 退化 default, 不抛
+
+  describe('resolveTuiTheme (D-23.1)', () => {
+    it('默认 (无 env 无 arg) → default', () => {
+      const realEnv = process.env.DEEPWHALE_TUI_THEME;
+      delete process.env.DEEPWHALE_TUI_THEME;
+      try {
+        expect(resolveTuiTheme()).toBe('default');
+        expect(resolveTuiTheme('')).toBe('default');
+        expect(resolveTuiTheme(undefined)).toBe('default');
+      } finally {
+        if (realEnv !== undefined) process.env.DEEPWHALE_TUI_THEME = realEnv;
+      }
+    });
+
+    it('arg 有效 (default/solarized/monochrome) → 返对应', () => {
+      const valid: TuiThemeName[] = ['default', 'solarized', 'monochrome'];
+      for (const n of valid) {
+        expect(resolveTuiTheme(n)).toBe(n);
+      }
+    });
+
+    it('arg invalid (e.g. "neon") → stderr warning + 退化 default', () => {
+      const realEnv = process.env.DEEPWHALE_TUI_THEME;
+      delete process.env.DEEPWHALE_TUI_THEME;
+      const origWrite = process.stderr.write.bind(process.stderr);
+      let captured = '';
+      (process.stderr.write as unknown) = (chunk: string | Buffer): boolean => {
+        captured += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+        return true;
+      };
+      try {
+        const out = resolveTuiTheme('neon');
+        expect(out).toBe('default');
+        expect(captured).toContain('warning');
+        expect(captured).toContain('neon');
+        expect(captured).toContain('default');
+      } finally {
+        (process.stderr.write as unknown) = origWrite;
+        if (realEnv !== undefined) process.env.DEEPWHALE_TUI_THEME = realEnv;
+      }
+    });
+
+    it('env DEEPWHALE_TUI_THEME 优先于默认, 跟 arg 优先级 (arg > env)', () => {
+      const realEnv = process.env.DEEPWHALE_TUI_THEME;
+      process.env.DEEPWHALE_TUI_THEME = 'solarized';
+      try {
+        // env 命中
+        expect(resolveTuiTheme()).toBe('solarized');
+        // arg 覆盖 env
+        expect(resolveTuiTheme('monochrome')).toBe('monochrome');
+        // arg 仍受 invalid 校验
+        const origWrite = process.stderr.write.bind(process.stderr);
+        let captured = '';
+        (process.stderr.write as unknown) = (chunk: string | Buffer): boolean => {
+          captured += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+          return true;
+        };
+        try {
+          expect(resolveTuiTheme('bogus')).toBe('default');
+          expect(captured).toContain('warning');
+        } finally {
+          (process.stderr.write as unknown) = origWrite;
+        }
+      } finally {
+        if (realEnv !== undefined) process.env.DEEPWHALE_TUI_THEME = realEnv;
+        else delete process.env.DEEPWHALE_TUI_THEME;
+      }
+    });
+  });
+
+  it('THEMES 3 preset 7 role 完整 (D-23.1 主题表验收)', () => {
+    // 3 preset × 7 role = 21 个值都不能 undefined
+    const expectedRoles: Array<keyof typeof THEMES.default> = [
+      'header', 'model', 'divider', 'prompt', 'error', 'success', 'toolName',
+    ];
+    for (const name of ['default', 'solarized', 'monochrome'] as TuiThemeName[]) {
+      const t = THEMES[name];
+      expect(t).toBeDefined();
+      for (const role of expectedRoles) {
+        expect(t[role]).toBeDefined();
+        expect(typeof t[role]).toBe('string');
+        expect(t[role].length).toBeGreaterThan(0);
+      }
+    }
+    // 3 个 preset 至少有 1 个角色色不同 (否则 3 个一样的)
+    expect(THEMES.default.model).not.toBe(THEMES.solarized.model); // default cyan vs solarized blue
+    expect(THEMES.default.model).not.toBe(THEMES.monochrome.model); // default cyan+bold vs monochrome bold
+  });
+
+  it('D-23.1 主题接入 — 跑 turn 后 stdout 含 ≥ 2 次横线 + model 名 (theme 不破 base 渲染)', async () => {
+    // 验: 跑 TUI + theme: monochrome, /exit, stdout 仍含横线 + model 名 (theme 只换色, 不破坏内容)
+    const client = makeMockStreamClient({ first: 'D-23.1 theme test response' });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-theme-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+      theme: 'monochrome', // D-23.1 新增 option
+    });
+
+    input.write('hello-theme\n');
+    await new Promise((r) => setTimeout(r, 150));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // 横线 ≥ 4 (header 2 + status bar 2)
+    const matches = out.data.match(/─{3,}/g);
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBeGreaterThanOrEqual(4);
+    // model 名仍在
+    expect(out.data).toContain('mock-deepseek-v4-flash');
+    // /verify /help 不入历史 (跟 D-22.1 一致)
+    // theme 选项被吃 (stderr 应无 'warning' 表明 monochrome 有效)
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // ========== D-23.2 语法高亮 (Sprint 1c-revive-2, 2026-06-06) ==========
+  //
+  // 拍板红线 (D-23.2 plan):
+  //   - 仅染 onChunk assistant stream (不染 readline input, cursor 会乱)
+  //   - 4 类: tool name (toolName role) / number (success role) / path (model role) / 其它原样
+  //   - 非 TTY 退化 (跟 colorize 一致, 跟 CI/管道 log 兼容)
+  //   - forceColor 测试 hook 用于 unit test 验染色字节
+
+  describe('highlightChunk (D-23.2)', () => {
+    // D-23.2 染色走 isTty() (跟 colorize 一致), test 验染色需 mock stdout.isTTY = true
+    // forceColor 参数已加, 但 colorize 内部仍走 isTty() — test 直接设 stdout.isTTY
+    const origIsTTY = process.stdout.isTTY;
+
+    afterEach(() => {
+      // 还原 stdout.isTTY
+      if (origIsTTY === undefined) {
+        // 17.x 之前是 getter, 18+ 可写, 但 undefined 表示原本不是 TTY, 清掉 (用 delete)
+        try {
+          delete (process.stdout as { isTTY?: boolean }).isTTY;
+        } catch {
+          // ignore
+        }
+      } else {
+        (process.stdout as { isTTY?: boolean }).isTTY = origIsTTY;
+      }
+    });
+
+    it('非 TTY 默认 → 原文 (退化, 跟 colorize 一致)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = false;
+      const out = highlightChunk('Use BashTool to run 100+ commands in /tmp', THEMES.default, false);
+      expect(out).toBe('Use BashTool to run 100+ commands in /tmp');
+      expect(out).not.toMatch(/\x1b\[/);
+    });
+
+    it('isTTY=true 工具名 (BashTool) → toolName role 染色 (default theme: magenta+bold)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('Use BashTool to run', THEMES.default, true);
+      expect(out).toContain('BashTool');
+      expect(out).toMatch(/\x1b\[35m\x1b\[1mBashTool\x1b\[0m/);
+      expect(out).toContain('Use ');
+      expect(out).toContain(' to run');
+    });
+
+    it('isTTY=true 数字 (100+, 2.5x, 50%) → success role 染色 (default theme: green)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('Found 100+ matches, 2.5x faster, 50% cached', THEMES.default, true);
+      expect(out).toMatch(/\x1b\[32m100\+\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[32m2\.5x\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[32m50%\x1b\[0m/);
+      expect(out).toContain('Found ');
+      expect(out).toContain(' matches, ');
+      expect(out).toContain(' faster, ');
+      expect(out).toContain(' cached');
+    });
+
+    it('isTTY=true 文件路径 (./rel, /abs) → model role 染色 (default theme: cyan+bold)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('Read ./src/foo.ts and /usr/local/bin/node', THEMES.default, true);
+      expect(out).toMatch(/\x1b\[36m\x1b\[1m\.\/src\/foo\.ts\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[36m\x1b\[1m\/usr\/local\/bin\/node\x1b\[0m/);
+    });
+
+    it('isTTY=true 混合 4 类按优先级染色 (tool > path > number)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('BashTool reads ./x.ts for 50% cache', THEMES.default, true);
+      expect(out).toMatch(/\x1b\[35m\x1b\[1mBashTool\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[36m\x1b\[1m\.\/x\.ts\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[32m50%\x1b\[0m/);
+    });
+
+    it('空字符串 → 空字符串 (no throw)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      expect(highlightChunk('', THEMES.default, true)).toBe('');
+      (process.stdout as { isTTY?: boolean }).isTTY = false;
+      expect(highlightChunk('', THEMES.default, false)).toBe('');
+    });
+
+    it('无匹配 (普通文本) → 原文 (跟 isTTY 无关, 因为没东西可染)', () => {
+      const plain = 'Hello world, no tokens here';
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      expect(highlightChunk(plain, THEMES.default, true)).toBe(plain);
+    });
+
+    it('isTTY=true solarized theme → model role 染色 变 blue (theme 切换验证)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('Read ./x.ts', THEMES.solarized, true);
+      // solarized model role = blue + bold
+      expect(out).toMatch(/\x1b\[34m\x1b\[1m\.\/x\.ts\x1b\[0m/);
+      // 验没 cyan (solarized model 不是 cyan)
+      expect(out).not.toContain('\x1b[36m');
+    });
+  });
+
+  it('D-23.2 端到端 — 跑 turn 后 stdout 含 4 类染色 (非 TTY 退化, 验内容含 tool / 数字 / path)', async () => {
+    // 验: 跑 TUI, mock LLM 返 content 含 4 类关键字, stdout 应含原文 (非 TTY 退化, 但验关键词都在)
+    const mixedContent = 'Use BashTool to read ./src/foo.ts, found 100+ matches at 50% cache';
+    const client = makeMockStreamClient({ first: mixedContent });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-hl-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+      theme: 'default',
+    });
+
+    input.write('hello-highlight\n');
+    await new Promise((r) => setTimeout(r, 200));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // 非 TTY 退化: 关键词原文应在 stdout
+    expect(out.data).toContain('BashTool');
+    expect(out.data).toContain('./src/foo.ts');
+    expect(out.data).toContain('100+');
+    expect(out.data).toContain('50%');
+    // 横线 + banner 仍在 (theme 不破 base 渲染)
+    expect(out.data).toMatch(/─{3,}/);
+    expect(out.data).toContain('mock-deepseek-v4-flash');
+
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 });

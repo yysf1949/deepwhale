@@ -53,6 +53,7 @@ import { buildSummaryAndNext, formatReport, runVerify } from './verify/index.js'
 import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
 import { staticToolPolicy } from './policy/static-rules.js';
 import { createReplConfirm } from './repl/repl-confirm.js'; // D-15: REPL y/N confirm 工厂
+export { createReplConfirm } from './repl/repl-confirm.js'; // Sprint 1c-revive-2-D-24.2: re-export for tui-ink
 import type { ToolPolicy } from './policy/types.js';
 import type { SandboxRunner } from './sandbox/types.js';
 
@@ -164,6 +165,12 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   const clientFromOptions = options.client;
   let client: LLMClient | null = clientFromOptions ?? null;
   let clientError: Error | null = clientFromOptions ? null : null;
+  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修默认走 Anthropic 误判 bug):
+  // tryCreateClient 之前 catch 静默存 clientError, stderr 啥都不说, 用户根本
+  // 不知道. 现在 catch 时显式 stderr 写一行 [deepwhale] init error, 跟 chat
+  // 路径 (L494 error.api_key_missing) 互补. 走 createDefaultClient → resolveProvider
+  // "Both set" 错时, 显式 message 让用户立刻看到 "改用 --provider 决断".
+  let initErrorReported = false;
   const tryCreateClient = (): { client: LLMClient | null; error: Error | null } => {
     if (clientFromOptions) return { client: clientFromOptions, error: null };
     if (client !== null || clientError !== null) {
@@ -180,6 +187,13 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
       clientError = err;
+      if (!initErrorReported) {
+        initErrorReported = true;
+        // 走 stderr, 跟 chat 路径保持一致, 避免用户看不到. 拍板: message 含
+        // 原始 err.message (有 "Both set" 关键信息), 不强行套 i18n (i18n 太泛
+        // 用户看不出是 Both set 还是 No key).
+        stderr.write(`[deepwhale] init error: ${err.message}\n`);
+      }
       return { client: null, error: err };
     }
   };
@@ -227,6 +241,11 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
 
   // session 加载
   let workingMessages: ChatMessage[] = [];
+  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 cache 96%↔85% 跳变 footer 焦虑):
+  // EMA 平滑闭包 state. appendUsageStatus 每 turn in-place 更新, formatUsageStatus
+  // 读 ema 显示 (avg NN%). 跨 turn 累积, 闭包内 mutable, 不持久化 (session reload
+  // 后 sampleCount 重置为 0, 避免误导 — user 看到 avg 段消失就知道 reload 过了).
+  const emaState: UsageEmaState = { sampleCount: 0 };
   const writer = sessionPath ? new SessionWriter(sessionPath) : null;
   const reader = sessionPath ? new SessionReader(sessionPath) : null;
   if (writer && reader) {
@@ -511,6 +530,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
             sandboxRunner,
             policyYes,
             replPolicy, // D-15: 注入 y/N confirm; 默认 staticToolPolicy 向后兼容
+            emaState, // D-21.1: EMA 平滑闭包 state 透传
           );
         } else {
           const turn = await runOneTurn(liveClient, line, [], { signal: turnAbortController.signal });
@@ -620,6 +640,10 @@ export async function runAgentTurn(
   // Sprint 1c-revive-3-D-15: 透传 policy 进 turn (REPL 注入 replPolicy; 单测传
   // staticToolPolicy 走 baseline). undefined = 默认 staticToolPolicy (向后兼容).
   policy?: ToolPolicy,
+  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 cache 96%↔85% 跳变 footer 焦虑):
+  // EMA state 透传 (闭包持有). 旧 caller 不传 = 默认 EMPTY_EMA, 行为兼容
+  // (不显示 avg 段). REPL 路径必传, 跨 turn 累积.
+  emaState?: UsageEmaState,
 ): Promise<void> {
   // 1) 持久化 user 输入
   if (writer) {
@@ -730,7 +754,10 @@ export async function runAgentTurn(
   // 7) Sprint 1b: Prefix-cache 可观测性 — 每 turn 打印一行 status 到 stderr
   // 风格: 分两行(跟 plan 拍板), 不污染 stdout 流式输出, 不打 prompt 前面
   // 字段: cache_hit_rate / cost_turn / prompt / completion, 多字段同值时去冗余(Hermes footer 教训)
-  appendUsageStatus(result.final.usage, err);
+  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 cache 96%↔85% 跳变 footer 焦虑):
+  // 加 EMA 滚动平均 5-turn 平滑, 显示 "cache: 90% (avg 85%)". per-turn 数字
+  // 仍是真实值, avg 是过去 5 turn 平滑趋势. user 不会被单 turn 抖动骗.
+  appendUsageStatus(result.final.usage, err, emaState ?? EMPTY_EMA);
 }
 
 function appendStepSummary(
@@ -758,8 +785,28 @@ function appendStepSummary(
  * - 无 usage → 完全不打印 (LLM 没返 usage 时不污染 stderr)
  *
  * Sprint 1c 抽 pricing 到 config.toml, 此函数签名不变。
+ *
+ * Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 cache 96%↔85% 跳变 footer 焦虑):
+ * 增 emaState 形参. 形参 hitRateEMA 是过去 5-turn 滚动平均 (α=0.5 平滑).
+ * 输出: `cache: 90% (avg 85%)` — per-turn 数字 + 趋势均值并列. user 视角:
+ * 1) 知道当 turn 真值, 2) 知道趋势 (avg 不会跟着单 turn 抖动).
+ * 边界:
+ *   - sampleCount < 3: 不显示 (avg) 段 (样本太少, 趋势没意义, 不污染)
+ *   - sampleCount >= 3: 显示 (avg NN%)
+ *   - ema 永远存在 (闭包外, startRepl 持有), 跨 turn 累积
+ * 行为兼容: 旧 caller 不传 emaState 用默认 { hitRateEMA: undefined, sampleCount: 0 }
+ * → 行为跟改前一致 (不显示 avg 段). 现有单测 (formatUsageStatus) 不破.
  */
-export function formatUsageStatus(usage: Usage | undefined): string | null {
+export interface UsageEmaState {
+  hitRateEMA?: number;
+  sampleCount: number;
+}
+const EMPTY_EMA: UsageEmaState = { sampleCount: 0 };
+
+export function formatUsageStatus(
+  usage: Usage | undefined,
+  emaState: UsageEmaState = EMPTY_EMA,
+): string | null {
   if (usage === undefined) return null;
   const { prompt_tokens, completion_tokens } = usage;
   // 无 cached_tokens: 简版
@@ -769,17 +816,23 @@ export function formatUsageStatus(usage: Usage | undefined): string | null {
   // 满 usage: 完整 status
   const hitRatePct = ((usage.cache_hit_rate ?? 0) * 100).toFixed(0);
   const uncached = formatTokens(usage.tokens_uncached ?? prompt_tokens);
+  // Sprint 1c-revive-2-D-21.1: EMA 平滑尾部段. sampleCount >= 3 才显示 avg
+  // (样本太少趋势不稳). 不更新 caller state, 只读 (state update 在
+  // appendUsageStatus, 这是纯函数好测).
+  const avgSegment = emaState.sampleCount >= 3 && emaState.hitRateEMA !== undefined
+    ? ` (avg ${(emaState.hitRateEMA * 100).toFixed(0)}%)`
+    : '';
   // Sprint 1b.5 Step 2.5 (F5 拍板, review 2026-06-03 找到): cost_turn/cost_currency 都 absent
   // (R7 中间路径 / F4 保守) → 安静少显示字段, **不**显示 'cost ?'. 跟 1b 拍板 "absent 安静"
   // 一致. user 视角看 'cost ?/turn' 是 'UI 不知道' 不是 '这次没算', 显示 '?' 反而误导.
   if (usage.cost_turn === undefined || usage.cost_currency === undefined) {
-    return `cache: ${hitRatePct}% | prompt ${formatTokens(prompt_tokens)} (${uncached} new)`;
+    return `cache: ${hitRatePct}%${avgSegment} | prompt ${formatTokens(prompt_tokens)} (${uncached} new)`;
   }
   // cost 字段齐: 读 cost_currency 决 symbol
   const symbol = formatCostSymbol(usage.cost_currency);
   const cost = usage.cost_turn; // narrowed by 上面 if guard (cost_turn !== undefined)
   const costStr = cost < 0.01 ? `${symbol}${cost.toFixed(4)}` : `${symbol}${cost.toFixed(3)}`;
-  return `cache: ${hitRatePct}% | ${costStr}/turn | prompt ${formatTokens(prompt_tokens)} (${uncached} new)`;
+  return `cache: ${hitRatePct}%${avgSegment} | ${costStr}/turn | prompt ${formatTokens(prompt_tokens)} (${uncached} new)`;
 }
 
 /** cost_currency → 显示 symbol. 不在 UI 层做汇率换算. */
@@ -799,8 +852,34 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-function appendUsageStatus(usage: Usage | undefined, err: NodeJS.WritableStream): void {
-  const line = formatUsageStatus(usage);
+/**
+ * Sprint 1c-revive-2-D-21.1 (2026-06-06): emaState 接受 mutable 引用 (闭包),
+ * 在 sampleCount < 5 用 cold-start EMA (直接赋值), 之后 α=0.5 平滑:
+ *   newEMA = α * current + (1 - α) * oldEMA = 0.5 * current + 0.5 * oldEMA
+ * α=0.5 是 "等权平滑" (5-turn 半衰期 ≈ 1 turn, 快速响应 + 适度平滑).
+ * 数学: sampleCount=5 时, 5 turn 前的数据权重 = 0.5^5 = 3.1% (基本忘掉),
+ * 跟 5-turn rolling window 趋势一致, 但 EMA 实现更轻.
+ *
+ * export 出来供单测 (test/unit/usage-ema.test.ts) 验证 state machine.
+ * 之前是 local function, D-21.1 改成 export — 单测需要直接调它验 in-place update.
+ */
+export function appendUsageStatus(
+  usage: Usage | undefined,
+  err: NodeJS.WritableStream,
+  emaState: UsageEmaState,
+): void {
+  // 同步更新 EMA state (in-place). 调 formatUsageStatus 之前先 update,
+  // 防止 "刚 sample 1 个, display 当 turn 仍显示 sample 0 的 ema".
+  if (usage !== undefined && usage.cached_tokens !== undefined) {
+    const current = usage.cache_hit_rate ?? 0;
+    if (emaState.hitRateEMA === undefined) {
+      emaState.hitRateEMA = current;
+    } else {
+      emaState.hitRateEMA = 0.5 * current + 0.5 * emaState.hitRateEMA;
+    }
+    emaState.sampleCount += 1;
+  }
+  const line = formatUsageStatus(usage, emaState);
   if (line !== null) {
     err.write(`  ${line}\n`);
   }

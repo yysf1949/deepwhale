@@ -1,7 +1,8 @@
 {
   "name": "@deepwhale/llm",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.9",
+  "description": "LLM client factory: DeepSeek + Anthropic providers with token pricing",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,9 +16,38 @@
     "dist",
     "src/pricing.default.toml"
   ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "deepwhale",
+    "ai-agent",
+    "llm",
+    "deepseek",
+    "anthropic",
+    "claude",
+    "sdk"
+  ],
+  "author": {
+    "name": "yysf1949",
+    "email": "butterfly443@openclaw.ai"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yysf1949/deepwhale.git",
+    "directory": "packages/llm"
+  },
+  "homepage": "https://github.com/yysf1949/deepwhale#readme",
+  "bugs": {
+    "url": "https://github.com/yysf1949/deepwhale/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.1",
-    "@deepwhale/core": "workspace:*",
+    "@deepwhale/core": "^1.0.0",
     "smol-toml": "^1.6.1"
   },
   "scripts": {

@@ -1,6 +1,18 @@
 /**
  * TUI 模式 — Sprint 1c-revive-4-D-20.3 P0-B (2026-06-05) v1.0 capability completion
  *
+ * @deprecated LEGACY — Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9:
+ *   1.0.9+ `deepwhale tui` mode 走 Ink 容器 (@deepwhale/tui-ink 1.0.9 bundle).
+ *   本文件保留仅作 source-install dev 路径保底, 不再是 default path.
+ *   - bin/deepwhale.js 'tui' case → runTuiInkMode (D-24.3 dispatch)
+ *   - 跟 D-24.1 §6 红线 1 一致: legacy 0 删, fallback 兜底
+ *   - 现有 979 行 tui-smoke.test.ts 0 改动, 行为在 readline 容器仍验过
+ *
+ *   业务逻辑 0 重写: D-22 / D-23.1 / D-23.2 业务 1:1 搬到 tui-ink/, 跟本文件同形态.
+ *   不再维护 (sprint 1.1+): 计划完全删除本文件, 但保留 0 改动作 fallback.
+ *
+ *   ---- 下方为 v1.0.0 - v1.0.8 readline 容器实现 ----
+ *
  * Minimal ANSI TUI. **不**装新依赖 (无 Ink), 用 node:readline + ANSI 转义码.
  *
  * 复用红线 (D-20.3 P0-B 拍板):
@@ -33,6 +45,9 @@
 
 import { createInterface, type Interface as RLInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
+import { homedir } from 'node:os';
+import { mkdirSync, readFileSync, appendFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import type { ChatMessage, LLMClient } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
 import {
@@ -72,9 +87,348 @@ const ANSI = {
 /** 检测 TTY (跟 REPL 一样, 非 TTY 退回无色输出, 让 test 不依赖 ANSI) */
 const isTty = (): boolean => Boolean(stdout.isTTY);
 
-/** 染色 wrapper (非 TTY 时退化到原文) */
-function colorize(text: string, color: string): string {
-  return isTty() ? `${color}${text}${ANSI.reset}` : text;
+// ---- D-23.1 主题 (2026-06-06) ----
+//
+// 用户拍板 A + B + D 全要. D-23.1 主题先行, 不动 turn 路径, 仅改 colorize 内部查找表.
+// 3 preset:
+//   - default:    现状 (cyan + dim)
+//   - solarized:  暖色 (yellow/blue/magenta 暖冷对比)
+//   - monochrome: 无前景色, 仅 dim + bold (黑/白终端, 旧 CRT 风格, 不刺眼)
+//
+// 6 role (每个 preset 都填): header / model / divider / prompt / error / success
+//
+// 选: env `DEEPWHALE_TUI_THEME` (默认 `default`), 或 CLI `--theme <name>`.
+// 启动期 resolve 一次, 后续 colorize 查表.
+
+export type TuiThemeName = 'default' | 'solarized' | 'monochrome';
+
+export interface TuiTheme {
+  header: string;
+  model: string;
+  divider: string;
+  prompt: string;
+  error: string;
+  success: string;
+  /** D-23.1 (2026-06-06): 工具名 (tool call/result 行), 跟 model 同级, 用同色变体 */
+  toolName: string;
+}
+
+export const THEMES: Record<TuiThemeName, TuiTheme> = {
+  default: {
+    header: ANSI.bold,
+    model: ANSI.cyan + ANSI.bold,
+    divider: ANSI.dim,
+    prompt: ANSI.bold,
+    error: ANSI.red,
+    success: ANSI.green,
+    toolName: ANSI.magenta + ANSI.bold,
+  },
+  solarized: {
+    // 暖冷对比: divider yellow, model blue, prompt bold, error red, success green
+    header: ANSI.yellow + ANSI.bold,
+    model: ANSI.blue + ANSI.bold,
+    divider: ANSI.yellow,
+    prompt: ANSI.bold,
+    error: ANSI.red,
+    success: ANSI.green,
+    toolName: ANSI.magenta + ANSI.bold, // solarized 仍 magenta 突出 tool
+  },
+  monochrome: {
+    // 全黑白, 区分靠 dim/bold, 不刺眼
+    header: ANSI.bold,
+    model: ANSI.bold,
+    divider: ANSI.dim,
+    prompt: ANSI.bold,
+    error: ANSI.dim + ANSI.bold, // monochrome 无红, 仍用 dim+bold 强调错误
+    success: ANSI.bold,
+    toolName: ANSI.dim + ANSI.bold, // monochrome tool name 用 dim+bold
+  },
+};
+
+const VALID_THEME_NAMES: ReadonlySet<TuiThemeName> = new Set<TuiThemeName>(['default', 'solarized', 'monochrome']);
+
+/**
+ * 解析 theme 来源 (env > 默认), 找不到或 invalid 时退化到 'default' + stderr warning.
+ * 不抛: 启动期不阻塞, 跟 env-gate 风格一致.
+ */
+export function resolveTuiTheme(themeArg?: string): TuiThemeName {
+  const fromArg = themeArg ?? process.env.DEEPWHALE_TUI_THEME;
+  if (fromArg === undefined || fromArg === '') return 'default';
+  if (VALID_THEME_NAMES.has(fromArg as TuiThemeName)) return fromArg as TuiThemeName;
+  // invalid: stderr 提醒, 退化
+  stderr.write(`warning: unknown TUI theme '${fromArg}', falling back to 'default' (valid: ${[...VALID_THEME_NAMES].join(', ')})\n`);
+  return 'default';
+}
+
+/**
+ * 染色 wrapper (D-23.1 改签名) — 用 role 查当前 theme.
+ * 非 TTY 时退化到原文, 让 CI/管道 log 不带 ANSI.
+ */
+function colorize(text: string, role: keyof TuiTheme, theme: TuiTheme = THEMES.default): string {
+  if (!isTty()) return text;
+  return `${theme[role]}${text}${ANSI.reset}`;
+}
+
+// ---- 视觉元素 (D-21.2 轻量升级, 2026-06-06) ----
+// 复用红线 (D-20.3 P0-B): 不装新依赖 (无 Ink), 仍用 readline + ANSI.
+// 新增仅 2 个 helper, 替换 header 1 处 + status bar 1 处. 不动 prompt / onChunk /
+// confirm / session 路径.
+
+/**
+ * 画一条横线分隔符, 宽度按 `width` 截 (默认终端列宽, fallback 80).
+ * 配色 dim + cyan 拼接, 非 TTY 退化到 `─` 重复, 让 CI/管道 log 也可读.
+ */
+function horizontalRule(width?: number, theme: TuiTheme = THEMES.default): string {
+  const cols = width ?? (stdout.columns && stdout.columns > 20 ? stdout.columns : 80);
+  const w = Math.max(20, Math.min(cols - 4, 100));
+  const line = '─'.repeat(w);
+  return colorize('  ' + line, 'divider', theme);
+}
+
+/**
+ * 格式化状态栏 — D-21.2 升级:
+ * - 复用 formatUsageStatus 的 4 字段 (model / in / cached / out / cost)
+ * - 加分隔线 + 颜色 (key: cyan, value: 黄色 token, 灰色 cost)
+ * - 改成 1 行, 终端窄时(< 60 列) 截断不溢出
+ * - 非 TTY 退化到纯文本 (跟现状一样, 不破坏 test)
+ *
+ * @param usage - formatUsageStatus 返回的原始行, 已是 `tokens X · cached Y · out Z · cost $W` 形态
+ * @param model - 模型名, 走 formatUsageStatus 已含, 这里再拼前面 banner 用 cyan 加粗
+ */
+function formatTuiStatusBar(usage: string | null, model: string, theme: TuiTheme = THEMES.default): string {
+  if (usage === null) {
+    return colorize(`  ${model} · (no usage)`, 'divider', theme);
+  }
+  // formatUsageStatus 输出形如 "tokens 1.2k · cached 80% · out 200 · cost $0.0012"
+  // 我们把 model 提到前面 + 加色 + 末尾补分隔线
+  const bar = `${model} · ${usage}`;
+  // 终端窄时: 简单截断, 不做折行 (readline prompt 单行假设)
+  const cols = stdout.columns && stdout.columns > 20 ? stdout.columns : 80;
+  const max = Math.max(40, cols - 4);
+  const text = bar.length > max ? bar.slice(0, max - 1) + '…' : bar;
+  // 颜色: model 走 model role (theme 决定), usage 走 divider (跟 horizontalRule 一致)
+  return colorize('  ' + text, 'divider', theme);
+}
+
+// ---- D-23.2 语法高亮 (2026-06-06) ----
+//
+// 用户拍板 B: onChunk 来的 assistant stream 染色 (不染 readline input, 染 cursor 会乱).
+// 4 类:
+//   1. 工具名 (BashTool / ReadFileTool / WriteFileTool / EditTool / GlobTool / GrepTool) → toolName role
+//   2. 数字 (整数 / 小数 / 百分号 / 倍数 / 货币) → success role
+//   3. 文件路径 (./rel / /abs / node_modules/...) → model role
+//   4. 其它 → 原样 (不染)
+//
+// 算法: 一次正则扫, 用 split-keep-separator 形式拼回原顺序. 非 TTY 退化到原 text (跟 colorize 一致).
+//
+// 风险: chunk content 是一次 fragment (e.g. "Hello, I "), 正则 match 走贪婪, 实际 chunk 长 50 chars 量级 OK.
+//       跟 Fish / Starship prompt 染色同形态. 不动 readline input 路径.
+
+/** 工具名白名单 (跟 registry.createDefaultRegistry 同步, 加新 tool 必加这里) */
+const TOOL_NAME_RE = /\b(BashTool|ReadFileTool|WriteFileTool|EditTool|GlobTool|GrepTool|ListDirectoryTool|FileReadTool|FileWriteTool)\b/g;
+/** 数字 (整数 / 小数 / 百分号 / 倍数 / 货币 / + 后缀 e.g. 100+) */
+const NUMBER_RE = /(\$?\d+(?:\.\d+)?(?:\+|%|x|ms|s|kb|mb|k|m|gb)?)/g;
+/** 文件路径 (./rel, /abs, 含 /) */
+const PATH_RE = /((?:\.{1,2}\/|\/)[^\s,;:'"`]+)/g;
+
+/**
+ * 语法高亮 chunk content. 非 TTY 退化到原 text (跟 colorize 行为一致, 跟 CI/管道 log 兼容).
+ *
+ * @param text - 单 chunk 文本 fragment
+ * @param theme - 当前 theme (从 runTuiMode 闭包传入)
+ * @param forceColor - D-23.2 测试 hook: 强制当 TTY (非默认) 用于 unit test 验证染色字节.
+ *                     生产路径 (runTuiMode) 不传, 走 isTty() 自动判断.
+ * @returns 染色后文本 (含 ANSI escape) 或原 text (非 TTY)
+ */
+export function highlightChunk(
+  text: string,
+  theme: TuiTheme = THEMES.default,
+  forceColor?: boolean,
+): string {
+  if (!forceColor && !isTty()) return text;
+  if (text.length === 0) return text;
+
+  // 用 1 个 split-keep 数组, 按出现顺序拼
+  // 简化: 用单个正则 union, 优先匹配顺序是 TOOL_NAME > PATH > NUMBER (用 capturing group).
+  // 但 4 类 union 互相覆盖 (path 含数字, 工具名可能跟 path 相邻), 改用"先标记后还原"算法:
+  //   1. 扫一遍, 收集 [start, end, role] 区间 (按优先级 tool > path > number)
+  //   2. 按顺序拼 (区间内用 theme 染色, 区间外原文)
+  // 这样避免 union 正则优先级错乱.
+
+  const ranges: Array<{ start: number; end: number; role: keyof TuiTheme }> = [];
+  // 1) tool name (优先级最高, 因为是 word boundary, 不跟 path 重叠)
+  for (const m of text.matchAll(TOOL_NAME_RE)) {
+    if (m.index === undefined) continue;
+    ranges.push({ start: m.index, end: m.index + m[0].length, role: 'toolName' });
+  }
+  // 2) path (跳过已被 tool 覆盖的区间)
+  for (const m of text.matchAll(PATH_RE)) {
+    if (m.index === undefined) continue;
+    const start = m.index;
+    const end = m.index + m[0].length;
+    if (ranges.some((r) => start >= r.start && end <= r.end)) continue; // 在 tool 内, 跳过
+    ranges.push({ start, end, role: 'model' });
+  }
+  // 3) number (跳过已被 tool/path 覆盖)
+  for (const m of text.matchAll(NUMBER_RE)) {
+    if (m.index === undefined) continue;
+    const start = m.index;
+    const end = m.index + m[0].length;
+    if (ranges.some((r) => start >= r.start && end <= r.end)) continue;
+    ranges.push({ start, end, role: 'success' });
+  }
+  if (ranges.length === 0) return text;
+
+  // 按 start 排序, 拼回
+  ranges.sort((a, b) => a.start - b.start);
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const r of ranges) {
+    if (r.start > cursor) parts.push(text.slice(cursor, r.start));
+    parts.push(colorize(text.slice(r.start, r.end), r.role, theme));
+    cursor = r.end;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts.join('');
+}
+
+// ---- D-22.1 命令历史持久化 (2026-06-06) ----
+//
+// 复用红线 (D-20.3 P0-B): TUI-only feature, 不动 REPL/print mode.
+// 复用红线 (D-19 复用 confirm controller): 历史加载在 runTuiMode 启动期, confirm 期间不动 history.
+//
+// 存储: ~/.deepwhale/tui-history (JSONL, 每行 1 条 raw prompt, 0o600 权限, max 1000 条 LRU).
+// readline history 数组语义: 最新一条在尾部 (所以 load 时反序, append 时 push 后写尾).
+
+const TUI_HISTORY_MAX = 1000;
+
+function tuiHistoryPath(): string {
+  return join(homedir(), '.deepwhale', 'tui-history');
+}
+
+function tuiHistoryLoad(): string[] {
+  const p = tuiHistoryPath();
+  try {
+    const text = readFileSync(p, 'utf-8');
+    // JSONL: 1 行 = 1 个对象 { ts, line }
+    const lines = text.split('\n').filter((l) => l.trim().length > 0);
+    const out: string[] = [];
+    for (const l of lines) {
+      try {
+        const obj = JSON.parse(l) as { line?: unknown };
+        if (typeof obj.line === 'string' && obj.line.length > 0) {
+          out.push(obj.line);
+        }
+      } catch {
+        // 跳过坏行, 不破坏整个文件
+      }
+    }
+    // 保留最新 1000 条 (LRU 截断)
+    if (out.length > TUI_HISTORY_MAX) {
+      out.splice(0, out.length - TUI_HISTORY_MAX);
+    }
+    return out;
+  } catch {
+    // 文件不存在 / 权限错 → 返空 (不抛, 不阻塞启动)
+    return [];
+  }
+}
+
+function tuiHistoryAppend(line: string): void {
+  // 过滤空行 + 内建命令 (跟其它 shell history 一样, 跟 token 浪费)
+  if (line.length === 0) return;
+  if (line.startsWith('/')) return; // /help /verify /exit 不入历史
+  if (line === 'q' || line === 'exit' || line === 'quit') return;
+
+  const p = tuiHistoryPath();
+  try {
+    // 0o700 权限父目录 + 0o600 文件 (跟 ~/.bash_history 一样, 仅用户可读)
+    mkdirSync(dirname(p), { mode: 0o700, recursive: true });
+    const entry = JSON.stringify({ ts: Date.now(), line }) + '\n';
+    appendFileSync(p, entry, { mode: 0o600 });
+  } catch {
+    // best-effort, 不阻塞 turn 完成
+  }
+}
+
+// 暴露 tuiHistoryAppend 供测试用 (D-22.1 verification)
+export { tuiHistoryAppend, tuiHistoryLoad, tuiHistoryPath, TUI_HISTORY_MAX };
+
+// ---- D-22.2 流式 token spinner (2026-06-06) ----
+//
+// 5 帧: ⠋ ⠙ ⠹ ⠸ ⠼, 80ms / 帧. 走 \r carriage return + \x1b[K clear-to-end-of-line.
+// Windows 兼容: cursorTo(0) + clearLine(1) 兜底 (Win10/11 终端对 \r 也支持).
+
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼'] as const;
+const SPINNER_INTERVAL_MS = 80;
+const SPINNER_LABEL = 'thinking…';
+
+class Spinner {
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private frame = 0;
+  private active = false;
+
+  start(stream: NodeJS.WritableStream = stdout): void {
+    if (this.active) return;
+    if (!isTty()) return; // 非 TTY 不转 (跟 colorize 一致, 避免管道/重定向被转)
+    this.active = true;
+    this.frame = 0;
+    this.render(stream);
+    this.timer = setInterval(() => {
+      this.frame = (this.frame + 1) % SPINNER_FRAMES.length;
+      this.render(stream);
+    }, SPINNER_INTERVAL_MS);
+  }
+
+  stop(stream: NodeJS.WritableStream = stdout): void {
+    if (!this.active) return;
+    this.active = false;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    // 清除当前行 (覆盖 spinner 字符)
+    // Windows 兼容: cursorTo(0) + clearLine(1) 是 TTY 行为, stdout 在 isTTY 时有这俩方法.
+    // 非 TTY 走空格 + \r 兜底.
+    const ttyStream = stream as unknown as {
+      cursorTo?: (x: number) => boolean;
+      clearLine?: (dir: number) => boolean;
+    };
+    if (typeof ttyStream.cursorTo === 'function' && typeof ttyStream.clearLine === 'function') {
+      try {
+        ttyStream.cursorTo(0);
+        ttyStream.clearLine(1);
+      } catch {
+        stream.write('\r' + ' '.repeat(SPINNER_LABEL.length + 4) + '\r');
+      }
+    } else {
+      stream.write('\r' + ' '.repeat(SPINNER_LABEL.length + 4) + '\r');
+    }
+  }
+
+  private render(stream: NodeJS.WritableStream): void {
+    const text = `${SPINNER_FRAMES[this.frame]} ${SPINNER_LABEL}`;
+    // \r 回行首, [K 清到行尾
+    stream.write(`\r${text}\x1b[K`);
+  }
+}
+
+// 暴露 Spinner 类供测试用 (D-22.2 verification)
+export { Spinner, SPINNER_FRAMES, SPINNER_INTERVAL_MS, SPINNER_LABEL };
+
+// ---- D-22.3 Multi-line input (2026-06-06) ----
+//
+// Hermes 风格: `\` 续行 + `\\` 转义. readline 维持 terminal: true 拿 ↑↓ history.
+// 续行机制: 维护 `multiLineBuffer` 状态, 收到 `\` 结尾行不喂给 turn, 下次行追加.
+// 全局单例 (TUI 单 stream), 在 runTuiMode 闭包内状态化.
+
+function isContinuationLine(line: string): boolean {
+  return line.endsWith('\\') && !line.endsWith('\\\\');
+}
+
+function joinContinuation(lines: string[]): string {
+  // ["line1\\", "line2\\", "line3"] → "line1\nline2\nline3"
+  return lines.map((l) => l.replace(/\\$/, '')).join('\n');
 }
 
 // ---- TUI options ----
@@ -93,6 +447,8 @@ export interface TuiModeOptions {
   output?: NodeJS.WritableStream;
   /** 注入错误流（默认 stderr）。单测用。 */
   errorOutput?: NodeJS.WritableStream;
+  /** D-23.1 (2026-06-06): TUI 主题. 不传或 invalid → 'default' (跟 env DEEPWHALE_TUI_THEME 协同). */
+  theme?: TuiThemeName;
   /** compaction config 跟 print mode 同形态 */
   compactionConfig?: Omit<AgentCompactionConfig, 'writer' | 'state'> | null;
 }
@@ -104,6 +460,10 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
   const err = options.errorOutput ?? stderr;
   const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
+  // D-23.1 (2026-06-06): 解析 theme. options.theme 优先 > DEEPWHALE_TUI_THEME env > 'default'.
+  // 解析里含 invalid → stderr warning + 退化, 不抛 (跟 env-gate 风格一致).
+  const themeName = resolveTuiTheme(options.theme);
+  const theme: TuiTheme = THEMES[themeName];
 
   // sandbox env 解析 (跟 print mode / REPL 一致)
   const sandboxRunner: SandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
@@ -151,7 +511,7 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
       workingMessages = [...loaded.messages];
       if (workingMessages.length > 0) {
         out.write(
-          colorize(`  ${loaded.messages.length} messages resumed from session\n`, ANSI.dim) + '\n',
+          colorize(`  ${loaded.messages.length} messages resumed from session\n`, 'divider', theme) + '\n',
         );
       }
     } catch (e) {
@@ -168,33 +528,52 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
     // 注: print mode 抛 warning (D-6 拍板), TUI 不抛 (minimal scope, 留扩展点).
   }
 
-  // 顶部 header (D-20.3 TUI 标识)
+  // 顶部 header — D-21.2 轻量升级: 横线分隔 + banner
   const initialClientState = tryCreateClient();
   const modelName = initialClientState.client?.model ?? 'not-configured';
   out.write('\n');
-  out.write(colorize('  ╭─ deepwhale tui ', ANSI.bold) + colorize(modelName, ANSI.cyan + ANSI.bold) + colorize(' ─╮', ANSI.bold) + '\n');
-  out.write(colorize('  │ type a prompt, /help, /verify, /exit (or q) │\n', ANSI.dim));
-  out.write(colorize('  ╰──────────────────────────────────────────╯\n', ANSI.bold) + '\n');
+  out.write(horizontalRule(undefined, theme) + '\n');
+  out.write(
+    colorize('  deepwhale tui ', 'header', theme) +
+      colorize(modelName, 'model', theme) +
+      colorize('  ·  type a prompt, /help, /verify, /exit (or q)\n', 'divider', theme),
+  );
+  out.write(horizontalRule(undefined, theme) + '\n\n');
   if (initialClientState.error) {
     err.write(`warning: API key not set, chat will fail until DEEPSEEK_API_KEY or ANTHROPIC_AUTH_TOKEN is set.\n`);
   }
 
-  // readline (跟 REPL 同形态, terminal:false 跟 D-19 P2-Ctrl+C 拍板一致)
+  // readline (跟 REPL 同形态)
+  // D-22 (2026-06-06) 拍板: terminal: true 拿 ↑↓ history (D-22.1) + cursor (multi-line D-22.3).
+  // 复用红线: SIGINT 仍走 process.on('SIGINT', onSigint) (D-19 P2-Ctrl+C), readline 不接管
+  // (它 terminal mode 默认会按 Ctrl+C 抛 'SIGINT' 事件, 我们的 onSigint 仍 process 级别接收).
   const rl: RLInterface = createInterface({
     input: options.input ?? stdin,
-    terminal: false,
+    terminal: true,
     output: out,
   });
+  // D-22.1: 加载历史到 readline (从老到新, 跟 readline 内部 history 数组语义一致)
+  // 注: Node 18+ readline 实例有 `.history: string[]` 字段, 但官方 .d.ts 没声明,
+  // 用 any cast 兜底.
+  const rlAny = rl as unknown as { history?: string[] };
+  rlAny.history = tuiHistoryLoad();
 
   return new Promise<number>((resolve) => {
     let exiting = false;
     let turnInFlight = false;
     let pendingExit = false;
 
+    // D-22.3: multi-line input buffer (Hermes 风格 `\ 续行 + \\ 转义)
+    const multiLineBuffer: string[] = [];
+    // D-22.2: 流式 token spinner (assistant stream 期间)
+    const spinner = new Spinner();
+
     const finish = async (code: number): Promise<void> => {
       if (exiting) return;
       exiting = true;
       process.off('SIGINT', onSigint);
+      // D-22.2: 退出前停 spinner (兜底, 避免动画卡住 shell prompt)
+      spinner.stop(out);
       rl.close();
       if (writer) {
         try {
@@ -203,7 +582,7 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
           /* best-effort */
         }
       }
-      out.write('\n' + colorize('  Goodbye!\n', ANSI.dim));
+      out.write('\n' + colorize('  Goodbye!\n', 'divider', theme));
       resolve(code);
     };
 
@@ -220,12 +599,28 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
     process.on('SIGINT', onSigint);
 
     const prompt = (): void => {
-      out.write(colorize('  > ', ANSI.cyan + ANSI.bold));
+      out.write(colorize('  > ', 'prompt', theme));
     };
     prompt();
 
     rl.on('line', async (rawLine: string) => {
-      const line = rawLine.trim();
+      // D-22.3 (2026-06-06): Hermes 风格多行输入.
+      // - 末尾 `\` 续行 (不喂给 turn, 攒入 multiLineBuffer)
+      // - 末尾 `\\` (转义) 不当续行, 当字面 `\` 处理
+      // - 空行 + 末尾 `\` → 取消续行, 提交空 prompt
+      const isCont = isContinuationLine(rawLine);
+      if (isCont) {
+        multiLineBuffer.push(rawLine);
+        // 续行提示 (跟 shell 类似 `> `)
+        out.write(colorize('  … ', 'divider', theme));
+        return;
+      }
+      // 收尾 (非续行), 把 buffer 最后一行 + 当前行合并
+      const assembled = multiLineBuffer.length > 0
+        ? joinContinuation([...multiLineBuffer, rawLine])
+        : rawLine;
+      multiLineBuffer.length = 0;
+      const line = assembled.trim();
 
       // D-19 拍板: confirm 期间 line 优先喂 confirm
       if (confirmController.hasPending()) {
@@ -258,7 +653,8 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
               '    /help            show this help\n' +
               '    /verify          run build/lint/typecheck/test (no LLM needed)\n' +
               '    /exit, /quit, q  exit TUI\n\n',
-            ANSI.dim,
+            'divider',
+            theme,
           ),
         );
         prompt();
@@ -292,7 +688,7 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
 
       // 队列守卫 (跟 REPL D-19.5 拍板)
       if (turnInFlight) {
-        out.write(colorize('  (turn in flight, please wait)\n', ANSI.dim));
+        out.write(colorize('  (turn in flight, please wait)\n', 'divider', theme));
         prompt();
         return;
       }
@@ -325,10 +721,16 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
         out.write('\n'); // user 跟 assistant 间空行
         let result: ToolLoopResult;
         if (enableToolLoop) {
+          // D-22.2 (2026-06-06): turn 启动立刻启 spinner, content 来了就停
+          spinner.start(out);
           result = await runToolLoop(liveClient, turnMessages, {
             registry: createDefaultRegistry({ sandboxRunner }),
             onChunk: (chunk) => {
-              if (chunk.content) out.write(chunk.content);
+              if (chunk.content) {
+                spinner.stop(out);
+                // D-23.2 (2026-06-06): 语法高亮 assistant stream (tool 名 / 数字 / path 染色)
+                out.write(highlightChunk(chunk.content, theme));
+              }
             },
             ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
             policy: tuiPolicy,
@@ -344,9 +746,15 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
           });
         } else {
           // --no-tool-loop 直发
+          // D-22.2 (2026-06-06): spinner 启, content 来了停
+          spinner.start(out);
           const streamResult = await liveClient.stream(turnMessages, {
             onChunk: (chunk) => {
-              if (chunk.delta.content) out.write(chunk.delta.content);
+              if (chunk.delta.content) {
+                spinner.stop(out);
+                // D-23.2 (2026-06-06): 语法高亮 --no-tool-loop 直发 stream
+                out.write(highlightChunk(chunk.delta.content, theme));
+              }
             },
           });
           result = {
@@ -366,9 +774,9 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
         // TUI 格式化: tool call / result (跟 print mode printStepSummary 同形态, 但加 ANSI)
         for (const step of result.steps) {
           if (step.kind === 'tool') {
-            const status = step.result.success ? colorize('✓', ANSI.green) : colorize('✗', ANSI.red);
+            const status = step.result.success ? colorize('✓', 'success', theme) : colorize('✗', 'error', theme);
             out.write(
-              `\n  ${status} ${colorize(step.tool_call.name, ANSI.magenta + ANSI.bold)} (${step.duration_ms}ms)\n`,
+              `\n  ${status} ${colorize(step.tool_call.name, 'toolName', theme)} (${step.duration_ms}ms)\n`,
             );
           }
         }
@@ -387,20 +795,30 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
           ...result.messages,
         ];
 
-        // 状态栏 (复用 formatUsageStatus, 4 字段)
+        // 状态栏 (复用 formatUsageStatus, 4 字段) — D-21.2 轻量升级: 上下加横线分隔
         const usageLine: string | null = formatUsageStatus(result.final.usage);
         if (usageLine !== null) {
-          out.write('\n' + colorize('  ' + usageLine + '\n', ANSI.dim));
+          out.write('\n' + horizontalRule() + '\n');
+          out.write(formatTuiStatusBar(usageLine, modelName) + '\n');
+          out.write(horizontalRule() + '\n');
         } else {
-          out.write('\n');
+          out.write('\n' + horizontalRule() + '\n');
         }
       } catch (e) {
+        // D-22.2: 异常时停 spinner (兜底)
+        spinner.stop(out);
         if (isToolLoopError(e)) {
           err.write(`\nerror: tool loop hit max steps (${e.steps})\n`);
         } else {
           err.write(`\nerror: ${e instanceof Error ? e.message : String(e)}\n`);
         }
       } finally {
+        // D-22.2: turn 完 (正常/异常/abort) 停 spinner
+        spinner.stop(out);
+        // D-22.1: turn 完 (非空, 非内建命令) append 历史
+        // 注意: 续行合并后 assembled 才是真 prompt, 但历史里只存 trimmed 单行
+        // (跟 bash history 一致, 多行 prompt 存 \n 不易)
+        tuiHistoryAppend(assembled);
         turnInFlight = false;
         if (pendingExit) {
           void finish(0);

@@ -1,14 +1,14 @@
 # 🐋 deepwhale
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
-
-[![Release v1.0.0](https://img.shields.io/badge/release-v1.0.0-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
+[![Release v1.0.9](https://img.shields.io/badge/release-v1.0.9-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
+> 🎉 **v1.0.9 已发布** (2026-06-06) — TUI 全量 Ink 迁移 (D-24, 跟 Hermes ui-tui 对齐) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
 [![Status](https://img.shields.io/badge/status-Phase%201-yellow)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)]()
 [![Node](https://img.shields.io/badge/Node-%E2%89%A522-green)]()
 
-> 🎉 **v1.0.0 已发布** (2026-06-06) — 公开分支 [`release/v1.0`](https://github.com/yysf1949/deepwhale/tree/release/v1.0) (HEAD `d8ca11b`) · [tag `v1.0.0`](https://github.com/yysf1949/deepwhale/releases/tag/v1.0.0) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
+> 🎉 **v1.0.0 已发布** (2026-06-06) — 公开分支 [`release/v1.0`](https://github.com/yysf1949/deepwhale/tree/release/v1.0) (HEAD `03e584a`) · [tag `v1.0.0`](https://github.com/yysf1949/deepwhale/releases/tag/v1.0.0) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
 >
 > 5 项 release gate 全绿：lint / typecheck / build / 456+2 测试 / `deepwhale --verify` 4/4 pass exit 0
 > 留 D-20.8 风险项 (DEP0190 shell:true warning, 不阻塞 v1.0)
@@ -75,7 +75,7 @@ pnpm dev
 | 能力 | 状态 | 代码入口 | 测覆盖 | 备注 |
 | --- | --- | --- | --- | --- |
 | **CLI 4 mode** (interactive/print/rpc/verify) | ✅ done | `packages/coding-agent/bin/deepwhale.js` | 既有 modes-followup 16 it + 新增 1 it (D-20.1 APIKeyMissingError 友好错) | 4 mode + env 透传, exit code 0/1/2 |
-| **TUI minimal** (D-20.3 P0-B) | ✅ done | `packages/coding-agent/src/modes/tui.ts` | 5 it (D-20.3 tui-smoke) | 走 `deepwhale tui`, **不**装 Ink, 用 node:readline + ANSI 转义;复用 D-19 createReplConfirm (不重建 2 套 confirm) |
+| **TUI Ink (D-24)** | ✅ done | `packages/tui-ink/` (1.74MB bundle) | 5 子组件 + 3 hooks | 跟 Hermes ui-tui 对齐, Ink 6 + React 19 + ink-text-input, esbuild bundle 打入 coding-agent tarball, runtime 0 依赖 |
 | **6 tools** (read/write/edit/grep/find/bash) | ✅ done | `packages/coding-agent/src/tools/` | 既有 tools 测 + D-19.6 P1 P-verify 测 | 走 ToolPolicy chain, deny 不 bypass, --yes 仅 bypass require_confirmation |
 | **Linear Session** (7 kind union) | ✅ done | `packages/core/src/session/jsonl.ts` | session-compaction 16 it + session-adapter 测 | JSONL append-only, reload/replay/compaction/corrupted event 全测 |
 | **Prefix-cache 4 大机制** (D-20.2 P0-E) | ✅ done (固化) | `docs/design/prefix-cache-4-mechanisms.md` | `prefix-cache-4-mechanisms-contract.test.ts` 8 it (D-20.6.5 改名) | 4 机制: cache_hit_rate 字段 / canonicalizeSchema / cost_turn 算式 / Compaction 保 prefix; 测名/文档一致标 "contract" (2026-06-06 review-fix) |

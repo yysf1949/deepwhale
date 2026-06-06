@@ -32,3 +32,6 @@ coverage/
 sessions/
 *.session.jsonl
 .cache/
+
+# npm auth token — local only, never commit
+.npmrc
