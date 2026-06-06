@@ -33,6 +33,9 @@
 
 import { createInterface, type Interface as RLInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
+import { homedir } from 'node:os';
+import { mkdirSync, readFileSync, appendFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import type { ChatMessage, LLMClient } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
 import {
@@ -116,6 +119,145 @@ function formatTuiStatusBar(usage: string | null, model: string): string {
   const text = bar.length > max ? bar.slice(0, max - 1) + '…' : bar;
   // 颜色: model 走 cyan 加粗, usage 走 dim, 整体不染色避免跟 dim 横线撞
   return colorize('  ' + text, ANSI.dim);
+}
+
+// ---- D-22.1 命令历史持久化 (2026-06-06) ----
+//
+// 复用红线 (D-20.3 P0-B): TUI-only feature, 不动 REPL/print mode.
+// 复用红线 (D-19 复用 confirm controller): 历史加载在 runTuiMode 启动期, confirm 期间不动 history.
+//
+// 存储: ~/.deepwhale/tui-history (JSONL, 每行 1 条 raw prompt, 0o600 权限, max 1000 条 LRU).
+// readline history 数组语义: 最新一条在尾部 (所以 load 时反序, append 时 push 后写尾).
+
+const TUI_HISTORY_MAX = 1000;
+
+function tuiHistoryPath(): string {
+  return join(homedir(), '.deepwhale', 'tui-history');
+}
+
+function tuiHistoryLoad(): string[] {
+  const p = tuiHistoryPath();
+  try {
+    const text = readFileSync(p, 'utf-8');
+    // JSONL: 1 行 = 1 个对象 { ts, line }
+    const lines = text.split('\n').filter((l) => l.trim().length > 0);
+    const out: string[] = [];
+    for (const l of lines) {
+      try {
+        const obj = JSON.parse(l) as { line?: unknown };
+        if (typeof obj.line === 'string' && obj.line.length > 0) {
+          out.push(obj.line);
+        }
+      } catch {
+        // 跳过坏行, 不破坏整个文件
+      }
+    }
+    // 保留最新 1000 条 (LRU 截断)
+    if (out.length > TUI_HISTORY_MAX) {
+      out.splice(0, out.length - TUI_HISTORY_MAX);
+    }
+    return out;
+  } catch {
+    // 文件不存在 / 权限错 → 返空 (不抛, 不阻塞启动)
+    return [];
+  }
+}
+
+function tuiHistoryAppend(line: string): void {
+  // 过滤空行 + 内建命令 (跟其它 shell history 一样, 跟 token 浪费)
+  if (line.length === 0) return;
+  if (line.startsWith('/')) return; // /help /verify /exit 不入历史
+  if (line === 'q' || line === 'exit' || line === 'quit') return;
+
+  const p = tuiHistoryPath();
+  try {
+    // 0o700 权限父目录 + 0o600 文件 (跟 ~/.bash_history 一样, 仅用户可读)
+    mkdirSync(dirname(p), { mode: 0o700, recursive: true });
+    const entry = JSON.stringify({ ts: Date.now(), line }) + '\n';
+    appendFileSync(p, entry, { mode: 0o600 });
+  } catch {
+    // best-effort, 不阻塞 turn 完成
+  }
+}
+
+// 暴露 tuiHistoryAppend 供测试用 (D-22.1 verification)
+export { tuiHistoryAppend, tuiHistoryLoad, tuiHistoryPath, TUI_HISTORY_MAX };
+
+// ---- D-22.2 流式 token spinner (2026-06-06) ----
+//
+// 5 帧: ⠋ ⠙ ⠹ ⠸ ⠼, 80ms / 帧. 走 \r carriage return + \x1b[K clear-to-end-of-line.
+// Windows 兼容: cursorTo(0) + clearLine(1) 兜底 (Win10/11 终端对 \r 也支持).
+
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼'] as const;
+const SPINNER_INTERVAL_MS = 80;
+const SPINNER_LABEL = 'thinking…';
+
+class Spinner {
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private frame = 0;
+  private active = false;
+
+  start(stream: NodeJS.WritableStream = stdout): void {
+    if (this.active) return;
+    if (!isTty()) return; // 非 TTY 不转 (跟 colorize 一致, 避免管道/重定向被转)
+    this.active = true;
+    this.frame = 0;
+    this.render(stream);
+    this.timer = setInterval(() => {
+      this.frame = (this.frame + 1) % SPINNER_FRAMES.length;
+      this.render(stream);
+    }, SPINNER_INTERVAL_MS);
+  }
+
+  stop(stream: NodeJS.WritableStream = stdout): void {
+    if (!this.active) return;
+    this.active = false;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    // 清除当前行 (覆盖 spinner 字符)
+    // Windows 兼容: cursorTo(0) + clearLine(1) 是 TTY 行为, stdout 在 isTTY 时有这俩方法.
+    // 非 TTY 走空格 + \r 兜底.
+    const ttyStream = stream as unknown as {
+      cursorTo?: (x: number) => boolean;
+      clearLine?: (dir: number) => boolean;
+    };
+    if (typeof ttyStream.cursorTo === 'function' && typeof ttyStream.clearLine === 'function') {
+      try {
+        ttyStream.cursorTo(0);
+        ttyStream.clearLine(1);
+      } catch {
+        stream.write('\r' + ' '.repeat(SPINNER_LABEL.length + 4) + '\r');
+      }
+    } else {
+      stream.write('\r' + ' '.repeat(SPINNER_LABEL.length + 4) + '\r');
+    }
+  }
+
+  private render(stream: NodeJS.WritableStream): void {
+    const text = `${SPINNER_FRAMES[this.frame]} ${SPINNER_LABEL}`;
+    // \r 回行首, [K 清到行尾
+    stream.write(`\r${text}\x1b[K`);
+  }
+}
+
+// 暴露 Spinner 类供测试用 (D-22.2 verification)
+export { Spinner, SPINNER_FRAMES, SPINNER_INTERVAL_MS, SPINNER_LABEL };
+
+// ---- D-22.3 Multi-line input (2026-06-06) ----
+//
+// Hermes 风格: `\` 续行 + `\\` 转义. readline 维持 terminal: true 拿 ↑↓ history.
+// 续行机制: 维护 `multiLineBuffer` 状态, 收到 `\` 结尾行不喂给 turn, 下次行追加.
+// 全局单例 (TUI 单 stream), 在 runTuiMode 闭包内状态化.
+
+function isContinuationLine(line: string): boolean {
+  return line.endsWith('\\') && !line.endsWith('\\\\');
+}
+
+function joinContinuation(lines: string[]): string {
+  // ["line1\\", "line2\\", "line3"] → "line1\nline2\nline3"
+  return lines.map((l) => l.replace(/\\$/, '')).join('\n');
 }
 
 // ---- TUI options ----
@@ -224,22 +366,37 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
     err.write(`warning: API key not set, chat will fail until DEEPSEEK_API_KEY or ANTHROPIC_AUTH_TOKEN is set.\n`);
   }
 
-  // readline (跟 REPL 同形态, terminal:false 跟 D-19 P2-Ctrl+C 拍板一致)
+  // readline (跟 REPL 同形态)
+  // D-22 (2026-06-06) 拍板: terminal: true 拿 ↑↓ history (D-22.1) + cursor (multi-line D-22.3).
+  // 复用红线: SIGINT 仍走 process.on('SIGINT', onSigint) (D-19 P2-Ctrl+C), readline 不接管
+  // (它 terminal mode 默认会按 Ctrl+C 抛 'SIGINT' 事件, 我们的 onSigint 仍 process 级别接收).
   const rl: RLInterface = createInterface({
     input: options.input ?? stdin,
-    terminal: false,
+    terminal: true,
     output: out,
   });
+  // D-22.1: 加载历史到 readline (从老到新, 跟 readline 内部 history 数组语义一致)
+  // 注: Node 18+ readline 实例有 `.history: string[]` 字段, 但官方 .d.ts 没声明,
+  // 用 any cast 兜底.
+  const rlAny = rl as unknown as { history?: string[] };
+  rlAny.history = tuiHistoryLoad();
 
   return new Promise<number>((resolve) => {
     let exiting = false;
     let turnInFlight = false;
     let pendingExit = false;
 
+    // D-22.3: multi-line input buffer (Hermes 风格 `\ 续行 + \\ 转义)
+    const multiLineBuffer: string[] = [];
+    // D-22.2: 流式 token spinner (assistant stream 期间)
+    const spinner = new Spinner();
+
     const finish = async (code: number): Promise<void> => {
       if (exiting) return;
       exiting = true;
       process.off('SIGINT', onSigint);
+      // D-22.2: 退出前停 spinner (兜底, 避免动画卡住 shell prompt)
+      spinner.stop(out);
       rl.close();
       if (writer) {
         try {
@@ -270,7 +427,23 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
     prompt();
 
     rl.on('line', async (rawLine: string) => {
-      const line = rawLine.trim();
+      // D-22.3 (2026-06-06): Hermes 风格多行输入.
+      // - 末尾 `\` 续行 (不喂给 turn, 攒入 multiLineBuffer)
+      // - 末尾 `\\` (转义) 不当续行, 当字面 `\` 处理
+      // - 空行 + 末尾 `\` → 取消续行, 提交空 prompt
+      const isCont = isContinuationLine(rawLine);
+      if (isCont) {
+        multiLineBuffer.push(rawLine);
+        // 续行提示 (跟 shell 类似 `> `)
+        out.write(colorize('  … ', ANSI.dim));
+        return;
+      }
+      // 收尾 (非续行), 把 buffer 最后一行 + 当前行合并
+      const assembled = multiLineBuffer.length > 0
+        ? joinContinuation([...multiLineBuffer, rawLine])
+        : rawLine;
+      multiLineBuffer.length = 0;
+      const line = assembled.trim();
 
       // D-19 拍板: confirm 期间 line 优先喂 confirm
       if (confirmController.hasPending()) {
@@ -370,10 +543,15 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
         out.write('\n'); // user 跟 assistant 间空行
         let result: ToolLoopResult;
         if (enableToolLoop) {
+          // D-22.2 (2026-06-06): turn 启动立刻启 spinner, content 来了就停
+          spinner.start(out);
           result = await runToolLoop(liveClient, turnMessages, {
             registry: createDefaultRegistry({ sandboxRunner }),
             onChunk: (chunk) => {
-              if (chunk.content) out.write(chunk.content);
+              if (chunk.content) {
+                spinner.stop(out);
+                out.write(chunk.content);
+              }
             },
             ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
             policy: tuiPolicy,
@@ -389,9 +567,14 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
           });
         } else {
           // --no-tool-loop 直发
+          // D-22.2 (2026-06-06): spinner 启, content 来了停
+          spinner.start(out);
           const streamResult = await liveClient.stream(turnMessages, {
             onChunk: (chunk) => {
-              if (chunk.delta.content) out.write(chunk.delta.content);
+              if (chunk.delta.content) {
+                spinner.stop(out);
+                out.write(chunk.delta.content);
+              }
             },
           });
           result = {
@@ -442,12 +625,20 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
           out.write('\n' + horizontalRule() + '\n');
         }
       } catch (e) {
+        // D-22.2: 异常时停 spinner (兜底)
+        spinner.stop(out);
         if (isToolLoopError(e)) {
           err.write(`\nerror: tool loop hit max steps (${e.steps})\n`);
         } else {
           err.write(`\nerror: ${e instanceof Error ? e.message : String(e)}\n`);
         }
       } finally {
+        // D-22.2: turn 完 (正常/异常/abort) 停 spinner
+        spinner.stop(out);
+        // D-22.1: turn 完 (非空, 非内建命令) append 历史
+        // 注意: 续行合并后 assembled 才是真 prompt, 但历史里只存 trimmed 单行
+        // (跟 bash history 一致, 多行 prompt 存 \n 不易)
+        tuiHistoryAppend(assembled);
         turnInFlight = false;
         if (pendingExit) {
           void finish(0);

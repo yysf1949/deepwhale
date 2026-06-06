@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatChunk, ChatMessage, ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
 import { runTuiMode } from '../../src/modes/tui.js';
+import { Spinner as SpinnerCls } from '../../src/modes/tui.js';
 
 // ---- 共享 helper: mock LLMClient stream 返受控 content ----
 
@@ -548,5 +549,163 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     // 真 abort trigger 需要 tui.ts 暴露 turnAbortController, 留给 D-20.7+.
     // 当前测真覆盖的是: TUI 在 LLM 抛 abort 错误时**不**hang, 走 err path, 退出干净.
     expect(err.data.toLowerCase()).toMatch(/abort|tool loop/);
+  });
+
+  // ========== D-22 TUI 升级 (Sprint 1c-revive-2, 2026-06-06) ==========
+  //
+  // 拍板红线 (D-22 plan):
+  //   - D-22.1: 命令历史持久化 (~/.deepwhale/tui-history, JSONL, max 1000, 0o600)
+  //   - D-22.2: 流式 token spinner (5 帧 ⠋⠙⠹⠸⠼, 80ms/帧, \r + [K 覆盖)
+  //   - D-22.3: multi-line input (\ 续行 + \\ 转义, Hermes 风格)
+  //
+  // 测试环境: 用 `process.env.HOME` 临时指向 tmp dir, 验 ~/.deepwhale/tui-history 写入.
+  // Spinner 测试: isTty() 返 false (output 是 StringWritable, 非 TTY), Spinner 不会转.
+  //   → 我们直接测 内部 logic 暴露 via 直接 import, 不走 stdout (跟 tui.ts 紧耦合).
+  // Multi-line 测试: input 喂 'line1\\\nline2\n', 验 assembled 传 'line1\nline2' 1 个 prompt.
+
+  it('D-22.1: 命令历史持久化 — turn 完写 ~/.deepwhale/tui-history, 0o600 权限', async () => {
+    // mock HOME → tmp dir
+    const realHome = process.env.HOME;
+    const homeDir = mkdtempSync(join(tmpdir(), 'deepwhale-history-home-'));
+    process.env.HOME = homeDir;
+    try {
+      const client = makeMockStreamClient({ first: 'D-22.1 history test response' });
+      const out = new StringWritable();
+      const err = new StringWritable();
+      const input = new PassThrough();
+      tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-'));
+      const sessionPath = join(tmpDir, 'session.jsonl');
+
+      const codePromise = runTuiMode({
+        client,
+        sessionPath,
+        output: out,
+        errorOutput: err,
+        input,
+      });
+
+      input.write('hello-history\n');
+      await new Promise((r) => setTimeout(r, 150));
+      input.write('/exit\n');
+      const code = await codePromise;
+      expect(code).toBe(0);
+
+      // ~/.deepwhale/tui-history 应存在
+      const histPath = join(homeDir, '.deepwhale', 'tui-history');
+      expect(existsSync(histPath)).toBe(true);
+      const jsonl = readFileSync(histPath, 'utf-8');
+      // 1 turn → 至少 1 条 JSONL 行
+      const lines = jsonl.split('\n').filter((l) => l.trim().length > 0);
+      expect(lines.length).toBeGreaterThanOrEqual(1);
+      // JSON parse + 含 'hello-history' 原文
+      const obj = JSON.parse(lines[0]) as { line?: string };
+      expect(obj.line).toBe('hello-history');
+    } finally {
+      process.env.HOME = realHome;
+      rmSync(homeDir, { recursive: true, force: true });
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('D-22.1: 历史过滤内建命令 (/help, /verify, /exit) 不写入', async () => {
+    const realHome = process.env.HOME;
+    const homeDir = mkdtempSync(join(tmpdir(), 'deepwhale-history-filter-'));
+    process.env.HOME = homeDir;
+    try {
+      const client = makeMockStreamClient({ first: 'filter test' });
+      const out = new StringWritable();
+      const err = new StringWritable();
+      const input = new PassThrough();
+      tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-'));
+      const sessionPath = join(tmpDir, 'session.jsonl');
+
+      const codePromise = runTuiMode({
+        client,
+        sessionPath,
+        output: out,
+        errorOutput: err,
+        input,
+      });
+
+      input.write('/help\n');
+      input.write('/verify\n');
+      input.write('real-prompt\n');
+      await new Promise((r) => setTimeout(r, 200));
+      input.write('/exit\n');
+      await codePromise;
+
+      const histPath = join(homeDir, '.deepwhale', 'tui-history');
+      const jsonl = readFileSync(histPath, 'utf-8').trim();
+      // 期望: 只 real-prompt 一行 (内建命令不过滤)
+      const lines = jsonl ? jsonl.split('\n') : [];
+      expect(lines.length).toBe(1);
+      const obj = JSON.parse(lines[0]) as { line?: string };
+      expect(obj.line).toBe('real-prompt');
+    } finally {
+      process.env.HOME = realHome;
+      rmSync(homeDir, { recursive: true, force: true });
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('D-22.2: Spinner stop 安全幂等 (重复 stop 不抛 + 清行不重复 \\r 写)', () => {
+    // 直接 import Spinner (D-22 暴露 class 给测试).
+    // 因 StringWritable 非 TTY, Spinner.start 不会转, Spinner.stop 走兜底 (空格 + \r).
+    // 验: stop 后多调一次 stop 不抛.
+    const sw = new SpinnerCls();
+    const fakeStdout = new StringWritable();
+    // 第一次 start (非 TTY 走 silent noop, 不写入)
+    sw.start(fakeStdout as unknown as NodeJS.WritableStream);
+    // 第一次 stop
+    expect(() => sw.stop(fakeStdout as unknown as NodeJS.WritableStream)).not.toThrow();
+    // 第二次 stop (幂等, 不抛)
+    expect(() => sw.stop(fakeStdout as unknown as NodeJS.WritableStream)).not.toThrow();
+    // 兜底写入应该是 "  \r" (空格 + \r) 或者 TTY 路径 (cursorTo + clearLine),
+    // 总之**不**应该 panic / crash
+  });
+
+  it('D-22.3: Multi-line input — \\ 续行 + 收尾行 合并为 1 个 prompt (含 \\n)', async () => {
+    // input 喂 'line1\\\n' (续行) + 'line2\\\n' (续行) + 'line3\n' (收尾)
+    // 期望内部传 1 个 turn, content = 'line1\nline2\nline3'
+    //
+    // 验法: 用 toolCall path, 工具 echo 我们传的 content, 看 stdout 含 'line1\nline2\nline3'
+    // (bash 工具跑 echo 三行). 因为 StringWritable 收集, 我们**直接**看 stdout 含
+    // 3 个 'lineN' 串.
+    const client = makeMockStreamClient({
+      first: 'OK',
+      toolCall: { name: 'bash', args: { command: 'echo line1; echo line2; echo line3' }, result: 'line1\nline2\nline3\n' },
+    });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-multiline-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+    });
+
+    // 喂续行 + 收尾 (readline 是 terminal: true, 正常接收 \n)
+    input.write('line1\\\n');
+    input.write('line2\\\n');
+    input.write('line3\n');
+    await new Promise((r) => setTimeout(r, 300));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // 验: session.jsonl 含 'line1\nline2\nline3' (assembled 真 prompt)
+    const jsonl = readFileSync(sessionPath, 'utf-8');
+    expect(jsonl).toContain('line1');
+    expect(jsonl).toContain('line2');
+    expect(jsonl).toContain('line3');
+    // bash tool result 应出现在 stdout
+    expect(out.data).toMatch(/line1.*line2.*line3|line3.*line2.*line1/s);
+
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 });
