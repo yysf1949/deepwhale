@@ -261,6 +261,10 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
     // Sprint 1c-revive-2-D-11-4 review P2 修复: 独立于 runVerify 主循环的 aborted,
     // 标 "当前 child 因外部 signal 被 kill". 避免跟 runVerify 的 "跳过下一 step" 语义混淆.
     let childAborted = false;
+    // Sprint D-20.7.2 (2026-06-06): 标 timer-fired 状态. 不再在 timer fired 时
+    // 立刻 finalize, 改在 child.on('close') 判定 → 避免 Windows 上 child cwd
+    // 句柄没释放时 caller rmSync(workDir) EPERM.
+    let timedOut = false;
     // Sprint 1c-revive-2-D-11-4 review P2 修复: signal abort 触发的 1s grace timer,
     // 提前到 finalize 前声明 (闭包共享). child 不响应 SIGTERM 时用它兜底 SIGKILL.
     let sigkillTimer: NodeJS.Timeout | null = null;
@@ -322,10 +326,17 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
       }
       const runner = resolveRunner(rawRunner);
       const subArgs = check.args.slice(1);
+      // Sprint D-20.7.1 (2026-06-06): Windows 上 `corepack.cmd` / 其它 .cmd shim
+      // 需要 cmd.exe 解析, 否则 CreateProcessW 直接 EINVAL. 走 shell:true 让 Node
+      // 自动 dispatch 到 cmd.exe (Win32) / /bin/sh (POSIX). POSIX 上 shell:false
+      // (默认) 不变, 跟 1c 时代完全兼容. 注: subArgs 已 slice(1), 不含 'corepack',
+      // 所以 shell 不会被误解析成命令. 命令里有空格/特殊字符时仍走 args, 不进 shell.
+      const useShell = process.platform === 'win32';
       child = spawn(runner, subArgs, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         env: process.env, // 透传 env, 不注入任何东西 (loadProjectEnv 是 caller 职责)
+        shell: useShell,
       });
     } catch (e) {
       // spawn 同步失败 (e.g. corepack 不在 PATH)
@@ -403,20 +414,44 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
       stderrBuf = capAppend(stderrBuf, chunk);
     });
 
+    // Sprint D-20.7.2 (2026-06-06): timer fired 不再立刻 finalize.
+    // 之前直接 resolve → Windows 上 child cwd 句柄还占着, 测里 rmSync(workDir)
+    // EPERM. 修法: 标 timedOut=true, 调 child.kill, 等 'close' 才 finalize.
+    // 双重保险: 5s 后 child 还没 close, 走 grace kill + 再 finalize (避免永远 hang).
     timer = setTimeout(() => {
-      const end = Date.now();
-      finalize({
-        name: check.name,
-        command: check.command,
-        status: 'timed-out',
-        exitCode: null,
-        startedAt: start,
-        endedAt: end,
-        durationMs: end - start,
-        stdoutTail: stdoutBuf.toString('utf8'),
-        stderrTail: stderrBuf.toString('utf8'),
-        errorMessage: `timeout after ${timeoutMs}ms`,
-      });
+      timedOut = true;
+      try {
+        if (child && !child.killed) {
+          // Windows 上 SIGTERM 等价 kill 进程, Node 内部走 TerminateProcess.
+          child.kill('SIGTERM');
+        }
+      } catch {
+        // best-effort; 如果 kill 失败, 走 grace timer SIGKILL 兜底
+      }
+      // grace timer: 5s 内 child 没 close → SIGKILL
+      sigkillTimer = setTimeout(() => {
+        try {
+          if (child && !childClosed) {
+            child.kill('SIGKILL');
+          }
+        } catch {
+          // best-effort
+        }
+        // grace 仍 timeout 时强制 finalize, 避免 caller 永远 hang
+        const end = Date.now();
+        finalize({
+          name: check.name,
+          command: check.command,
+          status: 'timed-out',
+          exitCode: null,
+          startedAt: start,
+          endedAt: end,
+          durationMs: end - start,
+          stdoutTail: stdoutBuf.toString('utf8'),
+          stderrTail: stderrBuf.toString('utf8'),
+          errorMessage: `timeout after ${timeoutMs}ms (grace SIGKILL fired, child still not closed)`,
+        });
+      }, 5_000);
     }, timeoutMs);
 
     child.on('close', (code, signal) => {
@@ -424,6 +459,29 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
       // sigkillTimer 内部据此判断, 不再依赖 child.killed (Node 标记语义不对).
       childClosed = true;
       const end = Date.now();
+      // Sprint D-20.7.2 (2026-06-06): timeout 路径优先于 signal 判定. 如果 timer
+      // 先 fired, 我们 kill 了 child, 那 close 触发时 timedOut=true 应当报 'timed-out',
+      // 不报 'spawn-error' (SIGTERM 误报) 或 'aborted' (跟外部 signal 混淆).
+      // 同时清 sigkillTimer, 避免 grace 错杀.
+      if (timedOut) {
+        if (sigkillTimer) {
+          clearTimeout(sigkillTimer);
+          sigkillTimer = null;
+        }
+        finalize({
+          name: check.name,
+          command: check.command,
+          status: 'timed-out',
+          exitCode: code,
+          startedAt: start,
+          endedAt: end,
+          durationMs: end - start,
+          stdoutTail: stdoutBuf.toString('utf8'),
+          stderrTail: stderrBuf.toString('utf8'),
+          errorMessage: `timeout after ${timeoutMs}ms (killed, child closed)`,
+        });
+        return;
+      }
       // Sprint 1c-revive-2-D-11-4 review P2 修复: childAborted 优先, 返回 'aborted'
       // 让 caller 知道是外部 signal 触发的 kill, 不是 child 自身崩溃.
       if (childAborted) {
