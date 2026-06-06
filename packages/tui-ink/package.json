@@ -27,8 +27,9 @@
     "node": ">=20.0.0"
   },
   "peerDependencies": {
-    "@deepwhale/core": "^1.0.0",
     "@deepwhale/coding-agent": "^1.0.0",
+    "@deepwhale/core": "^1.0.0",
+    "@deepwhale/llm": "^1.0.0",
     "ink": ">=6.0.0",
     "ink-text-input": ">=6.0.0",
     "react": ">=19.0.0"
@@ -42,6 +43,7 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.14",
     "esbuild": "~0.27.0",
+    "ink-testing-library": "^4.0.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

@@ -32,7 +32,7 @@ export interface TuiInkOptions {
   model?: string
   /** Theme name (env > arg > default) */
   theme?: 'default' | 'solarized' | 'monochrome'
-  /** --no-tool-loop 模式 (直发, 不跑 tool loop) */
+  /** --no-tool-loop 模式 (直发, 不跑 tool loop) — 留 D-24.3 接 bin dispatch 时实现 */
   noToolLoop?: boolean
   /** 工具循环最大步数 */
   maxSteps?: number
@@ -40,4 +40,6 @@ export interface TuiInkOptions {
   sessionPath?: string
   /** 沙箱类型 ('local' | 'docker' | 'none') */
   sandbox?: 'local' | 'docker' | 'none'
+  /** --yes 标志 (D-13: bypass require_confirmation, 不 bypass deny) */
+  yes?: boolean
 }

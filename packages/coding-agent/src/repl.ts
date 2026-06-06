@@ -53,6 +53,7 @@ import { buildSummaryAndNext, formatReport, runVerify } from './verify/index.js'
 import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
 import { staticToolPolicy } from './policy/static-rules.js';
 import { createReplConfirm } from './repl/repl-confirm.js'; // D-15: REPL y/N confirm 工厂
+export { createReplConfirm } from './repl/repl-confirm.js'; // Sprint 1c-revive-2-D-24.2: re-export for tui-ink
 import type { ToolPolicy } from './policy/types.js';
 import type { SandboxRunner } from './sandbox/types.js';
 
