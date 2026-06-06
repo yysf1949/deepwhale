@@ -24,6 +24,8 @@
  */
 
 import { resolve as pathResolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 // Sprint 1c-revive-2-D-7 (review, 2026-06-04): 启动时加载项目根 .env (补缺不覆盖,
 // CI / shell export 优先级最高). 必须在 import dist 之前调, 让 createDefaultClient
@@ -58,6 +60,40 @@ import { APIKeyMissingError } from '@deepwhale/llm';
  * @param {ReadonlyArray<string>} argv
  * @returns {CliArgs}
  */
+// Sprint D-21.0.1 (2026-06-06): --version 写死 "0.1.0 (Sprint 1a)" 跟 npm 1.0.1 /
+// GitHub v1.0.1 不一致, 用户在 Windows 装出来看到 stale string. 改读自身 package.json.
+//
+// 拍板 (D-21.0.1, 2026-06-06):
+//   - 用 createRequire(import.meta.url) 拿 `../package.json` (相对 bin 路径).
+//   - 装出来: bin 在 `<prefix>/lib/node_modules/@deepwhale/coding-agent/bin/`,
+//     `../package.json` 走 `<root>/package.json` ✅. 1.0.1 / 1.0.2 / 1.1.0 自动跟.
+//   - monorepo: bin 在 `packages/coding-agent/bin/`, `../package.json` 走
+//     `packages/coding-agent/package.json` ✅. dev workflow 也对.
+//   - 输出格式跟 `npm -v` 一致 (多行, 字段对齐). 不再带 "(Sprint X)" — sprint 名
+//     是设计历史, 写在 CHANGELOG / 注释里, 不进 user-facing version 字符串.
+//
+// 不变量: pkg 读不到 (异常路径) → fallback 旧字符串, 不让 bin 直接 crash. 跟
+// Sprint 1c-revive-2-D-7 容错语义一致 (启动期不抛, 走 best-effort).
+const req = createRequire(fileURLToPath(import.meta.url));
+function readPkgVersion() {
+  try {
+    const pkg = req('../package.json');
+    return {
+      name: typeof pkg.name === 'string' ? pkg.name : '@deepwhale/coding-agent',
+      version: typeof pkg.version === 'string' ? pkg.version : '0.0.0-unknown',
+      description:
+        typeof pkg.description === 'string' ? pkg.description : 'DeepWhale coding agent',
+    };
+  } catch {
+    return { name: '@deepwhale/coding-agent', version: '0.0.0-unknown', description: '' };
+  }
+}
+function formatVersion() {
+  const { name, version, description } = readPkgVersion();
+  // 跟 `npm -v` 一样, 一行 version, 一行 name+description. Windows 友好 (没 ANSI).
+  return `${version}\n${name}: ${description}\n`;
+}
+
 function parseArgs(argv) {
   const args = {
     mode: 'interactive',
@@ -74,7 +110,10 @@ function parseArgs(argv) {
   while (i < argv.length) {
     const a = argv[i];
     if (a === '--version' || a === '-v') {
-      process.stdout.write('deepwhale 0.1.0 (Sprint 1a)\n');
+      // Sprint D-21.0.1 (2026-06-06): 改读 package.json, 跟 npm registry / GitHub
+      // release 对齐. 旧实现写死 '0.1.0 (Sprint 1a)' → 用户在 Windows 装出 1.0.1
+      // 但 --version 显示 stale, 看着像 bug. 现在 npm 1.0.2 / 1.1.0 / 2.0.0 自动跟.
+      process.stdout.write(formatVersion());
       process.exit(0);
     }
     if (a === '--help' || a === '-h') {
