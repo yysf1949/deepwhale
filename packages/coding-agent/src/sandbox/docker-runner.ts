@@ -181,7 +181,14 @@ export class DockerSandboxRunner implements SandboxRunner {
 
   constructor(opts: DockerSandboxOptions) {
     this.image = opts.image ?? DEFAULT_IMAGE;
-    this.sandboxRoot = opts.sandboxRoot;
+    // Sprint 1c-revive-5-D-20.6.1 review-fix (2026-06-06): 规范化 sandboxRoot
+    // 到绝对路径, 避免 Windows 端 caller 传 '/tmp/sbx-test' (POSIX 风格)
+    // 跟 pathResolve(req.cwd) 落到 Windows 盘符 (e.g. C:\Users\xxx) 不在同空间
+    // → isInsideSandbox early return → mock child 不创建, 测试 fail.
+    // 修法: 构造时 pathResolve(opts.sandboxRoot), 绝对路径原样, 相对路径
+    // 也变成绝对 (跟 process.cwd() 解). 兼容 caller 写 '/tmp/sbx-test' /
+    // 'C:\xxx' / 'C:/xxx' / './sbx' 多种形态.
+    this.sandboxRoot = pathResolve(opts.sandboxRoot);
     this.network = opts.network ?? 'none';
     this.defaultTimeoutMs = opts.defaultTimeoutMs ?? DOCKER_DEFAULT_TIMEOUT_MS;
     this.memory = opts.memory ?? DEFAULT_MEMORY;
