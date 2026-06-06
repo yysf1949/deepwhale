@@ -400,6 +400,85 @@ describe('DeepSeekClient', () => {
       expect(body['stream']).toBe(false);
       expect(body['stream_options']).toBeUndefined();
     });
+
+    it('Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 V4 thinking 400): stream 累加 reasoning_content, final 拿到完整', async () => {
+      // 真实 DeepSeek V4 thinking 模式: stream 期间逐 chunk 给 reasoning_content
+      // 增量, content 跟在 thinking 后给. 修前: parse.ts:45-46 主动丢 (Sprint 1a
+      // "机制 3 简化"), final.reasoning_content 是 undefined. 修后: 累加后透传.
+      const events = [
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-1',
+          object: 'chat.completion.chunk',
+          model: 'deepseek-v4-flash',
+          choices: [{ index: 0, delta: { reasoning_content: 'Let me think... ', role: 'assistant' } }],
+        })}`,
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-1',
+          object: 'chat.completion.chunk',
+          model: 'deepseek-v4-flash',
+          choices: [{ index: 0, delta: { reasoning_content: 'first step is...', role: 'assistant' } }],
+        })}`,
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-1',
+          object: 'chat.completion.chunk',
+          model: 'deepseek-v4-flash',
+          choices: [{ index: 0, delta: { content: 'Final answer', role: 'assistant' } }],
+        })}`,
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-1',
+          object: 'chat.completion.chunk',
+          model: 'deepseek-v4-flash',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
+        })}`,
+        'data: [DONE]',
+      ];
+      const res = makeSseResponse(events);
+      const { fn } = makeMockFetch(() => res);
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const result = await c.stream([{ role: 'user', content: 'hi' }], { onChunk: () => {} });
+      // 关键断言: 累加的 reasoning_content 在 final result 上
+      expect(result.reasoning_content).toBe('Let me think... first step is...');
+      expect(result.content).toBe('Final answer');
+    });
+
+    it('Sprint 1c-revive-2-D-21.1: non-thinking model (V3 旧 alias) 不带 reasoning_content, final 字段 absent', async () => {
+      // 反向: V3 chat / thinking 关闭 → delta 没 reasoning_content 字段 → final
+      // 也没 reasoning_content (拍板: 空字符串省掉字段, omitempty 风格, 减少 wire 噪音).
+      const events = [
+        oaiDelta('hi', 'stop'),
+        'data: [DONE]',
+      ];
+      const res = makeSseResponse(events);
+      const { fn } = makeMockFetch(() => res);
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      const result = await c.stream([{ role: 'user', content: 'hi' }], { onChunk: () => {} });
+      expect(result.reasoning_content).toBeUndefined();
+    });
+
+    it('Sprint 1c-revive-2-D-21.1: assistant message 带 reasoning_content 时, 下次请求 wire body 必带 reasoning_content (V4 400 修复)', async () => {
+      // 真 V4 400 根因: 多轮对话 assistant 消息带 reasoning_content, 下次请求
+      // 必须在 body 透传, 不然 DeepSeek 报 400. 此 test 模拟"上轮收到 reasoning"
+      // 推 working 之后, 第二次 chat 抓 wire body 验证 reasoning_content 在.
+      const { fn, calls } = makeMockFetch(() => jsonResponse(SAMPLE_RESPONSE));
+      const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });
+      await c.chat([
+        { role: 'user', content: 'hi' },
+        {
+          role: 'assistant',
+          content: 'hello',
+          reasoning_content: 'I should greet back',
+        },
+        { role: 'user', content: 'and a joke?' },
+      ]);
+      const body = JSON.parse(calls[0]!.rawBody) as Record<string, unknown>;
+      const messages = body['messages'] as Array<Record<string, unknown>>;
+      const assistantMsg = messages.find((m) => m['role'] === 'assistant');
+      expect(assistantMsg).toBeDefined();
+      // 关键: 修前 assistantMsg 没 reasoning_content (parse.ts 主动丢), V4 报 400.
+      // 修后 reasoning_content 透传, V4 多轮 200.
+      expect(assistantMsg!['reasoning_content']).toBe('I should greet back');
+    });
   });
 
   describe('error: API key', () => {

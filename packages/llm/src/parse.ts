@@ -42,9 +42,15 @@ export function parseOaiChatCompletion(
   const message = firstObj['message'];
   if (typeof message !== 'object' || message === null) return null;
   const msg = message as Record<string, unknown>;
-  // 机制 3：reasoning_content 不暴露给 caller（session 内部如果要保留,sprint 1b 再加）
-  // 这里直接忽略 reasoning_content 字段,只取 content
+  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+  // 取消 Sprint 1a "机制 3 简化" 拍板 (当时 L117-119 注释 "sprint 1b 再加" 一直没补),
+  // 改为从 choices[0].message.reasoning_content 提取. DeepSeek V4 默认开 thinking
+  // mode, 多轮必须回传, 否则 400.
+  // 兼容: V3 旧 model / 非 thinking 模式不返 reasoning_content 字段, 走 typeof string
+  // 守卫, undefined 时 result 不带该字段, 不破坏旧 caller.
   const content = typeof msg['content'] === 'string' ? msg['content'] : '';
+  const reasoningContent =
+    typeof msg['reasoning_content'] === 'string' ? msg['reasoning_content'] : undefined;
 
   // 解析 tool_calls
   let toolCalls: ToolCall[] | undefined;
@@ -110,6 +116,7 @@ export function parseOaiChatCompletion(
 
   const result: ChatResult = { model, content };
   if (toolCalls) result.tool_calls = toolCalls;
+  if (reasoningContent !== undefined) result.reasoning_content = reasoningContent;
   if (usage) result.usage = usage;
   if (finishReason) result.finish_reason = finishReason;
   return result;
@@ -192,8 +199,13 @@ export function parseSseEvent(
   if (typeof rawDelta !== 'object' || rawDelta === null) return null;
   const deltaObj = rawDelta as Record<string, unknown>;
 
-  // 机制 3：reasoning_content 不暴露
+  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+  // delta.reasoning_content 提取. stream 期间逐 chunk 累加到 working, final
+  // ChatResult 拿到完整 reasoning_content. 跟 content 一样, 可能为空字符串
+  // (纯 tool_call 增量 + thinking 关闭). 不开 thinking 的 model 不带这字段.
   const content = typeof deltaObj['content'] === 'string' ? deltaObj['content'] : undefined;
+  const reasoningContentDelta =
+    typeof deltaObj['reasoning_content'] === 'string' ? deltaObj['reasoning_content'] : undefined;
 
   // tool_calls 增量(DeepSeek V4 stream 一次性给完整,这里当 full 处理)
   let toolCalls: ToolCall[] | undefined;
@@ -231,9 +243,15 @@ export function parseSseEvent(
       ? rawFr
       : undefined;
 
-  const delta: { content?: string; tool_calls?: readonly ToolCall[] } = {};
+  // Sprint 1c-revive-2-D-21.1 (2026-06-06): delta shape 扩到带 reasoning_content.
+  const delta: {
+    content?: string;
+    tool_calls?: readonly ToolCall[];
+    reasoning_content?: string;
+  } = {};
   if (content !== undefined) delta.content = content;
   if (toolCalls !== undefined) delta.tool_calls = toolCalls;
+  if (reasoningContentDelta !== undefined) delta.reasoning_content = reasoningContentDelta;
   const chunk: ChatChunk = { delta };
   if (finishReason) chunk.finish_reason = finishReason;
   // P1 fix (2026-06-03): 顶层 usage 在 choices 路径同样挂上,

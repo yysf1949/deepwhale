@@ -40,6 +40,14 @@ export function toolLoopStepToSessionEvent(step: ToolLoopStep): SessionEvent | n
       ts: step.ts,
       content: step.message.content,
       ...(step.message.tool_calls ? { tool_calls: [...step.message.tool_calls] } : {}),
+      // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+      // reasoning_content 透传到 session event. reload 重建 messages 时还原,
+      // 让 reload 后的下一轮 LLM call 仍能带 reasoning_content (避免 400).
+      // 不开 thinking 时 (V3 旧 alias / thinking 关) message.reasoning_content
+      // 是 undefined, 字段 absent — 跟旧 session 兼容, 不污染 JSONL.
+      ...(step.message.reasoning_content !== undefined
+        ? { reasoning_content: step.message.reasoning_content }
+        : {}),
     };
   }
   if (step.kind === 'tool') {
@@ -134,12 +142,29 @@ export function sessionEventsToMessages(events: ReadonlyArray<SessionEvent>): Ch
       if (ev.tool_calls && ev.tool_calls.length > 0) {
         // 进入延迟 push 模式
         pendingToolCalls = new Set(ev.tool_calls.map((tc) => tc.id));
-        const msg: ChatMessage = { role: 'assistant', content: ev.content };
+        // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+        // reasoning_content 透传回 ChatMessage, 跟 content / tool_calls 一起 reload.
+        // 让 reload 后下轮 LLM call wire 仍带 reasoning_content, 避免 DeepSeek V4
+        // 多轮 400. 旧 session (无 reasoning_content 字段) 走 omit 分支, 行为不变.
+        const msg: ChatMessage = {
+          role: 'assistant',
+          content: ev.content,
+          ...(ev.reasoning_content !== undefined
+            ? { reasoning_content: ev.reasoning_content }
+            : {}),
+        };
         msg.tool_calls = [...ev.tool_calls] as ToolCall[];
         buffer.push(msg);
       } else {
-        // 普通 assistant(content) 无 tool_calls, 立即 commit
-        out.push({ role: 'assistant', content: ev.content });
+        // Sprint 1c-revive-2-D-21.1 (2026-06-06): 同样 reasoning_content 透传.
+        const msg: ChatMessage = {
+          role: 'assistant',
+          content: ev.content,
+          ...(ev.reasoning_content !== undefined
+            ? { reasoning_content: ev.reasoning_content }
+            : {}),
+        };
+        out.push(msg);
       }
     } else if (ev.kind === 'tool') {
       if (pendingToolCalls.has(ev.tool_call_id)) {

@@ -178,6 +178,10 @@ export class DeepSeekClient implements LLMClient {
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let assembledContent = '';
+    // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+    // 累加 delta.reasoning_content 给 final ChatResult. DeepSeek V4 默认开
+    // thinking, 多轮必须把上轮 reasoning 回传, 否则 400.
+    let assembledReasoningContent = '';
     let assembledToolCalls: ToolCall[] = [];
     let usage: Usage | undefined;
     let finishReason: ChatResult['finish_reason'];
@@ -217,6 +221,12 @@ export class DeepSeekClient implements LLMClient {
           if (parsed.delta.content) {
             assembledContent += parsed.delta.content;
           }
+          // Sprint 1c-revive-2-D-21.1 (2026-06-06): reasoning_content 增量累加.
+          // thinking mode 期间逐 chunk 给一段 thinking, 关掉后 content 继续.
+          // 不开 thinking 的 model (V3 旧 alias) 不带这字段, 累加永远 '' 不影响.
+          if (parsed.delta.reasoning_content) {
+            assembledReasoningContent += parsed.delta.reasoning_content;
+          }
           if (parsed.delta.tool_calls) {
             // Sprint 1a 一次性返回完整,直接覆盖（DeepSeek V4 流式 tool_calls 也是完整结构）
             assembledToolCalls = [...parsed.delta.tool_calls];
@@ -241,6 +251,9 @@ export class DeepSeekClient implements LLMClient {
           if (parsed) {
             chunkCount += 1;
             if (parsed.delta.content) assembledContent += parsed.delta.content;
+            if (parsed.delta.reasoning_content) {
+              assembledReasoningContent += parsed.delta.reasoning_content;
+            }
             if (parsed.delta.tool_calls) assembledToolCalls = [...parsed.delta.tool_calls];
             if (parsed.usage) usage = parsed.usage;
             if (parsed.finish_reason) finishReason = parsed.finish_reason;
@@ -269,6 +282,11 @@ export class DeepSeekClient implements LLMClient {
       model: this.model,
       content: assembledContent,
     };
+    // Sprint 1c-revive-2-D-21.1 (2026-06-06): reasoning_content 完整累加后透传.
+    // 不开 thinking 时这里是 '', 省略字段 (避免污染 caller).
+    if (assembledReasoningContent.length > 0) {
+      result.reasoning_content = assembledReasoningContent;
+    }
     if (assembledToolCalls.length > 0) result.tool_calls = assembledToolCalls;
     if (usage) result.usage = usage;
     if (finishReason) result.finish_reason = finishReason;
@@ -444,6 +462,18 @@ function loadDefaultPricing(): PricingConfig | undefined {
  * - `content: ""` 永远序列化为 ""（不带 omitempty）
  * - reasoning_content 字段不打 wire（即使 LLM 返回了也丢掉 — Sprint 1a 简化）
  * - tool_calls 必带 type:'function' 包装
+ *
+ * Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+ * 取消 "机制 3 简化" — 现在 reasoning_content 完整透传. DeepSeek V4 默认开
+ * thinking mode, 多轮必须回传上轮 reasoning, 否则 400 "reasoning_content
+ * must be passed back to the API". 改动:
+ *   - assistant 消息 (无 tool_calls): wire 包含 reasoning_content (若有)
+ *   - assistant 消息 (有 tool_calls): wire 包含 reasoning_content (若有)
+ *     (DeepSeek 协议要求 tool_call 那个 turn 也要带 reasoning)
+ *   - 非 assistant 消息: 不带 reasoning_content 字段
+ *   - 空字符串 reasoning_content (thinking 关): 仍然序列化为 "" 字段, 跟
+ *     DeepSeek 服务端 round-trip 一致 (不依赖"字段缺失"判断). 拍板: thinking
+ *     关时省掉字段 (omitempty 风格, 减少 wire 噪音), 见下行 guard.
  */
 function toWireMessage(m: ChatMessage): Record<string, unknown> {
   if (m.role === 'tool') {
@@ -454,7 +484,7 @@ function toWireMessage(m: ChatMessage): Record<string, unknown> {
     };
   }
   if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) {
-    return {
+    const wire: Record<string, unknown> = {
       role: 'assistant',
       content: m.content ?? '', // 机制 2：永远序列化
       tool_calls: m.tool_calls.map((tc) => ({
@@ -467,6 +497,20 @@ function toWireMessage(m: ChatMessage): Record<string, unknown> {
         },
       })),
     };
+    if (m.reasoning_content !== undefined && m.reasoning_content.length > 0) {
+      wire['reasoning_content'] = m.reasoning_content;
+    }
+    return wire;
+  }
+  if (m.role === 'assistant') {
+    const wire: Record<string, unknown> = {
+      role: m.role,
+      content: m.content ?? '',
+    };
+    if (m.reasoning_content !== undefined && m.reasoning_content.length > 0) {
+      wire['reasoning_content'] = m.reasoning_content;
+    }
+    return wire;
   }
   return { role: m.role, content: m.content ?? '' };
 }

@@ -58,6 +58,14 @@ export type SessionEvent =
       ts: number;
       content: string;
       tool_calls?: ReadonlyArray<{ id: string; name: string; args: Record<string, unknown> }>;
+      /**
+       * Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+       * DeepSeek V4 thinking mode 思维链. reload 时还原回 ChatMessage 给
+       * 下次 LLM call, 保证多轮推理连续. 缺省 absent 表示 thinking 关 /
+       * 非 thinking model (V3 旧 alias). 跟 AssistantEvent 的 content 同
+       * 生命周期, 不影响旧 reader (新 union 字段向后兼容).
+       */
+      reasoning_content?: string;
       meta?: Record<string, unknown>;
     }
   | {

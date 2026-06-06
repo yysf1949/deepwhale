@@ -35,6 +35,19 @@ export interface ToolCall {
  * - tool_calls: assistant 消息携带
  * - tool_call_id: tool 消息携带,echo 上面那个 id
  * - name: tool 消息携带,工具名(OAI 协议要求,便于审计)
+ *
+ * Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 DeepSeek V4 thinking 400 bug):
+ * - reasoning_content: assistant 消息可携带 (DeepSeek V4 默认开 thinking mode,
+ *   多轮必须回传上轮 reasoning_content, 否则 400 "reasoning_content must be
+ *   passed back to the API"). 取消 Sprint 1a "机制 3 简化" 拍板 (parse.ts:45-46
+ *   当时主动丢掉, sprint 1b+ 也没补回 — 直到 D-21.1 走完才知道是 v4 默认开
+ *   thinking 才暴露).
+ *   - Optional: 不开 thinking 的 model (V3 旧 alias) 没有这个字段, 不破坏兼容.
+ *   - Only meaningful for 'assistant' role. OAI 协议 system / user / tool
+ *     都不带 reasoning_content.
+ *   - Wire: deepseek-client.toWireMessage 透传到 OAI request body.
+ *   - Session 持久化: session-adapter 写 'assistant' event 时带 reasoning_content,
+ *     reload 时还原回 ChatMessage. 跨 reload 续聊不丢 thinking.
  */
 export interface ChatMessage {
   role: Role;
@@ -42,6 +55,11 @@ export interface ChatMessage {
   tool_calls?: ReadonlyArray<ToolCall>;
   tool_call_id?: string;
   name?: string;
+  /**
+   * DeepSeek V4 thinking mode 思维链. 多轮必须回传, 否则 400.
+   * 非 thinking model 不返, 字段 absent.
+   */
+  reasoning_content?: string;
 }
 
 /**
@@ -96,11 +114,18 @@ export interface Usage {
  * Sprint 1a: cache_hit_rate 仅做总 cost 估算, 没暴露。Sprint 1b 起可观测。
  */
 
-/** chat() 完整调用的返回值。Sprint 1a 加 tool_calls + usage。 */
+/** chat() 完整调用的返回值。Sprint 1a 加 tool_calls + usage. */
 export interface ChatResult {
   model: ModelId;
   content: string;
   tool_calls?: ReadonlyArray<ToolCall>;
+  /**
+   * DeepSeek V4 thinking mode 思维链. 多轮必须回传, 否则 400.
+   * Sprint 1c-revive-2-D-21.1 (2026-06-06): parse.ts 不再主动丢这个字段,
+   * 而是从 LLM 响应 (choices[0].message.reasoning_content) 提取, 给 caller
+   * (tool-loop / session-adapter) 透传.
+   */
+  reasoning_content?: string;
   usage?: Usage;
   /**
    * finish_reason:
@@ -118,11 +143,19 @@ export interface ChatResult {
  * - delta.tool_calls: 增量 tool_call(Sprint 1a 一次性返回完整,Sprint 1b+ 再支持 incremental)
  * - usage: 只在最后一个 chunk 出现(OAI 协议)
  * - finish_reason: 同 ChatResult
+ *
+ * Sprint 1c-revive-2-D-21.1 (2026-06-06): delta.reasoning_content 增量
+ * 思维链. stream 期间逐 chunk 累加到 working, final ChatResult 拿到完整
+ * reasoning_content. 跟 content 一样, 有可能为空字符串 (纯 tool_call 增量).
  */
 export interface ChatChunk {
   delta: {
     content?: string;
     tool_calls?: ReadonlyArray<ToolCall>;
+    /**
+     * DeepSeek V4 thinking mode 增量. 累加给 final.reasoning_content.
+     */
+    reasoning_content?: string;
   };
   usage?: Usage;
   finish_reason?: ChatResult['finish_reason'];
