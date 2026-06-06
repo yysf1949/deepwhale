@@ -198,6 +198,88 @@ function formatTuiStatusBar(usage: string | null, model: string, theme: TuiTheme
   return colorize('  ' + text, 'divider', theme);
 }
 
+// ---- D-23.2 语法高亮 (2026-06-06) ----
+//
+// 用户拍板 B: onChunk 来的 assistant stream 染色 (不染 readline input, 染 cursor 会乱).
+// 4 类:
+//   1. 工具名 (BashTool / ReadFileTool / WriteFileTool / EditTool / GlobTool / GrepTool) → toolName role
+//   2. 数字 (整数 / 小数 / 百分号 / 倍数 / 货币) → success role
+//   3. 文件路径 (./rel / /abs / node_modules/...) → model role
+//   4. 其它 → 原样 (不染)
+//
+// 算法: 一次正则扫, 用 split-keep-separator 形式拼回原顺序. 非 TTY 退化到原 text (跟 colorize 一致).
+//
+// 风险: chunk content 是一次 fragment (e.g. "Hello, I "), 正则 match 走贪婪, 实际 chunk 长 50 chars 量级 OK.
+//       跟 Fish / Starship prompt 染色同形态. 不动 readline input 路径.
+
+/** 工具名白名单 (跟 registry.createDefaultRegistry 同步, 加新 tool 必加这里) */
+const TOOL_NAME_RE = /\b(BashTool|ReadFileTool|WriteFileTool|EditTool|GlobTool|GrepTool|ListDirectoryTool|FileReadTool|FileWriteTool)\b/g;
+/** 数字 (整数 / 小数 / 百分号 / 倍数 / 货币 / + 后缀 e.g. 100+) */
+const NUMBER_RE = /(\$?\d+(?:\.\d+)?(?:\+|%|x|ms|s|kb|mb|k|m|gb)?)/g;
+/** 文件路径 (./rel, /abs, 含 /) */
+const PATH_RE = /((?:\.{1,2}\/|\/)[^\s,;:'"`]+)/g;
+
+/**
+ * 语法高亮 chunk content. 非 TTY 退化到原 text (跟 colorize 行为一致, 跟 CI/管道 log 兼容).
+ *
+ * @param text - 单 chunk 文本 fragment
+ * @param theme - 当前 theme (从 runTuiMode 闭包传入)
+ * @param forceColor - D-23.2 测试 hook: 强制当 TTY (非默认) 用于 unit test 验证染色字节.
+ *                     生产路径 (runTuiMode) 不传, 走 isTty() 自动判断.
+ * @returns 染色后文本 (含 ANSI escape) 或原 text (非 TTY)
+ */
+export function highlightChunk(
+  text: string,
+  theme: TuiTheme = THEMES.default,
+  forceColor?: boolean,
+): string {
+  if (!forceColor && !isTty()) return text;
+  if (text.length === 0) return text;
+
+  // 用 1 个 split-keep 数组, 按出现顺序拼
+  // 简化: 用单个正则 union, 优先匹配顺序是 TOOL_NAME > PATH > NUMBER (用 capturing group).
+  // 但 4 类 union 互相覆盖 (path 含数字, 工具名可能跟 path 相邻), 改用"先标记后还原"算法:
+  //   1. 扫一遍, 收集 [start, end, role] 区间 (按优先级 tool > path > number)
+  //   2. 按顺序拼 (区间内用 theme 染色, 区间外原文)
+  // 这样避免 union 正则优先级错乱.
+
+  const ranges: Array<{ start: number; end: number; role: keyof TuiTheme }> = [];
+  // 1) tool name (优先级最高, 因为是 word boundary, 不跟 path 重叠)
+  for (const m of text.matchAll(TOOL_NAME_RE)) {
+    if (m.index === undefined) continue;
+    ranges.push({ start: m.index, end: m.index + m[0].length, role: 'toolName' });
+  }
+  // 2) path (跳过已被 tool 覆盖的区间)
+  for (const m of text.matchAll(PATH_RE)) {
+    if (m.index === undefined) continue;
+    const start = m.index;
+    const end = m.index + m[0].length;
+    if (ranges.some((r) => start >= r.start && end <= r.end)) continue; // 在 tool 内, 跳过
+    ranges.push({ start, end, role: 'model' });
+  }
+  // 3) number (跳过已被 tool/path 覆盖)
+  for (const m of text.matchAll(NUMBER_RE)) {
+    if (m.index === undefined) continue;
+    const start = m.index;
+    const end = m.index + m[0].length;
+    if (ranges.some((r) => start >= r.start && end <= r.end)) continue;
+    ranges.push({ start, end, role: 'success' });
+  }
+  if (ranges.length === 0) return text;
+
+  // 按 start 排序, 拼回
+  ranges.sort((a, b) => a.start - b.start);
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const r of ranges) {
+    if (r.start > cursor) parts.push(text.slice(cursor, r.start));
+    parts.push(colorize(text.slice(r.start, r.end), r.role, theme));
+    cursor = r.end;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts.join('');
+}
+
 // ---- D-22.1 命令历史持久化 (2026-06-06) ----
 //
 // 复用红线 (D-20.3 P0-B): TUI-only feature, 不动 REPL/print mode.
@@ -634,7 +716,8 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
             onChunk: (chunk) => {
               if (chunk.content) {
                 spinner.stop(out);
-                out.write(chunk.content);
+                // D-23.2 (2026-06-06): 语法高亮 assistant stream (tool 名 / 数字 / path 染色)
+                out.write(highlightChunk(chunk.content, theme));
               }
             },
             ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
@@ -657,7 +740,8 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
             onChunk: (chunk) => {
               if (chunk.delta.content) {
                 spinner.stop(out);
-                out.write(chunk.delta.content);
+                // D-23.2 (2026-06-06): 语法高亮 --no-tool-loop 直发 stream
+                out.write(highlightChunk(chunk.delta.content, theme));
               }
             },
           });

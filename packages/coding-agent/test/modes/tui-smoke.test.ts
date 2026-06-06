@@ -12,9 +12,13 @@
  *   - session writer close 在退出时跑 (不损坏 session)
  *   - 复用 runToolLoop + staticToolPolicy (不绕过 ToolPolicy)
  *   - 复用 SessionWriter (不绕过 session audit)
+ *
+ * D-23.2 (2026-06-06): highlightChunk 测 ANSI escape bytes (\x1b[...m) 是必要的,
+ * 需要在 regex 模板里直接放 control char, 关闭 no-control-regex 规则.
  */
+/* eslint-disable no-control-regex */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { Writable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
@@ -24,6 +28,7 @@ import type { ChatChunk, ChatMessage, ChatResult, LLMClient, ModelId } from '@de
 import { runTuiMode } from '../../src/modes/tui.js';
 import { Spinner as SpinnerCls } from '../../src/modes/tui.js';
 import { resolveTuiTheme, THEMES, type TuiThemeName } from '../../src/modes/tui.js';
+import { highlightChunk } from '../../src/modes/tui.js';
 
 // ---- 共享 helper: mock LLMClient stream 返受控 content ----
 
@@ -838,6 +843,136 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     expect(out.data).toContain('mock-deepseek-v4-flash');
     // /verify /help 不入历史 (跟 D-22.1 一致)
     // theme 选项被吃 (stderr 应无 'warning' 表明 monochrome 有效)
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // ========== D-23.2 语法高亮 (Sprint 1c-revive-2, 2026-06-06) ==========
+  //
+  // 拍板红线 (D-23.2 plan):
+  //   - 仅染 onChunk assistant stream (不染 readline input, cursor 会乱)
+  //   - 4 类: tool name (toolName role) / number (success role) / path (model role) / 其它原样
+  //   - 非 TTY 退化 (跟 colorize 一致, 跟 CI/管道 log 兼容)
+  //   - forceColor 测试 hook 用于 unit test 验染色字节
+
+  describe('highlightChunk (D-23.2)', () => {
+    // D-23.2 染色走 isTty() (跟 colorize 一致), test 验染色需 mock stdout.isTTY = true
+    // forceColor 参数已加, 但 colorize 内部仍走 isTty() — test 直接设 stdout.isTTY
+    const origIsTTY = process.stdout.isTTY;
+
+    afterEach(() => {
+      // 还原 stdout.isTTY
+      if (origIsTTY === undefined) {
+        // 17.x 之前是 getter, 18+ 可写, 但 undefined 表示原本不是 TTY, 清掉 (用 delete)
+        try {
+          delete (process.stdout as { isTTY?: boolean }).isTTY;
+        } catch {
+          // ignore
+        }
+      } else {
+        (process.stdout as { isTTY?: boolean }).isTTY = origIsTTY;
+      }
+    });
+
+    it('非 TTY 默认 → 原文 (退化, 跟 colorize 一致)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = false;
+      const out = highlightChunk('Use BashTool to run 100+ commands in /tmp', THEMES.default, false);
+      expect(out).toBe('Use BashTool to run 100+ commands in /tmp');
+      expect(out).not.toMatch(/\x1b\[/);
+    });
+
+    it('isTTY=true 工具名 (BashTool) → toolName role 染色 (default theme: magenta+bold)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('Use BashTool to run', THEMES.default, true);
+      expect(out).toContain('BashTool');
+      expect(out).toMatch(/\x1b\[35m\x1b\[1mBashTool\x1b\[0m/);
+      expect(out).toContain('Use ');
+      expect(out).toContain(' to run');
+    });
+
+    it('isTTY=true 数字 (100+, 2.5x, 50%) → success role 染色 (default theme: green)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('Found 100+ matches, 2.5x faster, 50% cached', THEMES.default, true);
+      expect(out).toMatch(/\x1b\[32m100\+\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[32m2\.5x\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[32m50%\x1b\[0m/);
+      expect(out).toContain('Found ');
+      expect(out).toContain(' matches, ');
+      expect(out).toContain(' faster, ');
+      expect(out).toContain(' cached');
+    });
+
+    it('isTTY=true 文件路径 (./rel, /abs) → model role 染色 (default theme: cyan+bold)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('Read ./src/foo.ts and /usr/local/bin/node', THEMES.default, true);
+      expect(out).toMatch(/\x1b\[36m\x1b\[1m\.\/src\/foo\.ts\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[36m\x1b\[1m\/usr\/local\/bin\/node\x1b\[0m/);
+    });
+
+    it('isTTY=true 混合 4 类按优先级染色 (tool > path > number)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('BashTool reads ./x.ts for 50% cache', THEMES.default, true);
+      expect(out).toMatch(/\x1b\[35m\x1b\[1mBashTool\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[36m\x1b\[1m\.\/x\.ts\x1b\[0m/);
+      expect(out).toMatch(/\x1b\[32m50%\x1b\[0m/);
+    });
+
+    it('空字符串 → 空字符串 (no throw)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      expect(highlightChunk('', THEMES.default, true)).toBe('');
+      (process.stdout as { isTTY?: boolean }).isTTY = false;
+      expect(highlightChunk('', THEMES.default, false)).toBe('');
+    });
+
+    it('无匹配 (普通文本) → 原文 (跟 isTTY 无关, 因为没东西可染)', () => {
+      const plain = 'Hello world, no tokens here';
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      expect(highlightChunk(plain, THEMES.default, true)).toBe(plain);
+    });
+
+    it('isTTY=true solarized theme → model role 染色 变 blue (theme 切换验证)', () => {
+      (process.stdout as { isTTY?: boolean }).isTTY = true;
+      const out = highlightChunk('Read ./x.ts', THEMES.solarized, true);
+      // solarized model role = blue + bold
+      expect(out).toMatch(/\x1b\[34m\x1b\[1m\.\/x\.ts\x1b\[0m/);
+      // 验没 cyan (solarized model 不是 cyan)
+      expect(out).not.toContain('\x1b[36m');
+    });
+  });
+
+  it('D-23.2 端到端 — 跑 turn 后 stdout 含 4 类染色 (非 TTY 退化, 验内容含 tool / 数字 / path)', async () => {
+    // 验: 跑 TUI, mock LLM 返 content 含 4 类关键字, stdout 应含原文 (非 TTY 退化, 但验关键词都在)
+    const mixedContent = 'Use BashTool to read ./src/foo.ts, found 100+ matches at 50% cache';
+    const client = makeMockStreamClient({ first: mixedContent });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-hl-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+      theme: 'default',
+    });
+
+    input.write('hello-highlight\n');
+    await new Promise((r) => setTimeout(r, 200));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // 非 TTY 退化: 关键词原文应在 stdout
+    expect(out.data).toContain('BashTool');
+    expect(out.data).toContain('./src/foo.ts');
+    expect(out.data).toContain('100+');
+    expect(out.data).toContain('50%');
+    // 横线 + banner 仍在 (theme 不破 base 渲染)
+    expect(out.data).toMatch(/─{3,}/);
+    expect(out.data).toContain('mock-deepseek-v4-flash');
 
     rmSync(tmpDir, { recursive: true, force: true });
   });
