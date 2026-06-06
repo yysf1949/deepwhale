@@ -36,6 +36,18 @@ interface MockStreamConfig {
 
 function makeMockStreamClient(cfg: MockStreamConfig): LLMClient {
   let callCount = 0;
+  // D-21.2 升级: 给 mock stream 加 usage 字段, 让 formatUsageStatus 不返 null,
+  // 走 status bar 上下双横线 (if 路径) 走完 2 条 horizontalRule, 跟生产一致.
+  // 数字随便, 跟 test 无关 (test 只验 status bar 出现 ≥ 4 次 ─{3,}, 不验数字).
+  const mockUsage = {
+    prompt_tokens: 100,
+    completion_tokens: 50,
+    total_tokens: 150,
+    // 跟 deepseek-client 真实形态对齐, 让 formatUsageStatus 不抛
+    cache_hit_tokens: 80,
+    cache_miss_tokens: 70,
+    cached: 80,
+  } as const;
   return {
     model: 'mock-deepseek-v4-flash' as ModelId,
     chat: async (): Promise<ChatResult> => {
@@ -55,17 +67,19 @@ function makeMockStreamClient(cfg: MockStreamConfig): LLMClient {
           model: 'mock-deepseek-v4-flash' as ModelId,
           content: c,
           finish_reason: 'stop',
+          // D-21.2: 加 usage 让 status bar 走 if 分支 (上下双横线)
+          usage: { ...mockUsage },
         };
       }
       // tool call path
       const toolCalls = (c as { toolCalls: { id: string; name: string; args: Record<string, unknown> }[] }).toolCalls;
       options.onChunk({ delta: { content: '', tool_calls: toolCalls as ChatResult['tool_calls'] } });
-      // 同时返一个空 content + tool_calls (跟真 LLM 行为一致)
       return {
         model: 'mock-deepseek-v4-flash' as ModelId,
         content: '',
         finish_reason: 'tool_calls',
         tool_calls: toolCalls as ChatResult['tool_calls'],
+        usage: { ...mockUsage },
       };
     },
   };
@@ -89,8 +103,12 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
   // (避免跨 it 状态污染)
 
   it('启动: stdout 含 header + prompt, /exit 走 finish path', async () => {
-    // 拍板: TUI 启动必显示 '╭─ deepwhale tui <model> ─╮' + '> ' prompt.
+    // 拍板: TUI 启动必显示 'deepwhale tui <model>' + 横线分隔 + '> ' prompt.
     // /exit 必须走 D-19.5 finish 路径, 印 'Goodbye!' + 关闭 session writer.
+    //
+    // D-21.2 轻量升级 (2026-06-06): header 改用 `─` 横线 repeat, 取代 v1.0 的 `╭─ ... ╮`
+    // 边框. 边框在 80 列终端看着局促, 横线更现代. 横线来自 horizontalRule() helper,
+    // width 自适应 terminal columns. 测试期待 '───' (3+ 个连续 ─) 即可.
     const client = makeMockStreamClient({ first: 'unused' });
     const out = new StringWritable();
     const err = new StringWritable();
@@ -113,8 +131,8 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
 
     // 头部 header 必须出现
     expect(out.data).toContain('deepwhale tui');
-    expect(out.data).toContain('╭─'); // 边框
-    expect(out.data).toContain('╰─');
+    // D-21.2: 横线分隔 (horizontalRule), 至少 1 处 3+ 连续 ─ 字符
+    expect(out.data).toMatch(/─{3,}/);
     // 提示行
     expect(out.data).toContain('/help');
     expect(out.data).toContain('/verify');
@@ -430,6 +448,43 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     // 二次 check: signal 字段在 stream options 里是存在 (boolean 检查)
     // 注: options.signal?.aborted ?? false 在没传时是 false, 传了 (未 abort) 也是 false,
     // 所以**光**靠 calls[0].aborted 不够. 我们另加一个 it 显式 abort.
+  });
+
+  it('D-21.2 轻量升级: header 横线 + 状态栏横线 出现 ≥ 4 次 (2 header + 2 status wrap)', async () => {
+    // D-21.2 升级验收: 走完一个 turn, 验 stdout 出现 ≥ 4 次 3+ 连续 ─ 字符
+    // (2 header 分隔 + 2 status bar 上下分隔). 跟 v1.0 比: v1.0 是 0 次
+    // (用了 ╭─╮ 边框, 没横线), 升级后必须能观察到.
+    const client = makeMockStreamClient({ first: 'mock-status-test' });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-status-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+    });
+
+    input.write('hi\n');
+    await new Promise((r) => setTimeout(r, 150));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // 数 ─{3,} 出现次数
+    const matches = out.data.match(/─{3,}/g);
+    expect(matches).not.toBeNull();
+    // header 2 条 + status bar 2 条 = ≥ 4
+    expect(matches!.length).toBeGreaterThanOrEqual(4);
+
+    // 状态栏文本必含 model (formatTuiStatusBar 把 model 拼在前面)
+    expect(out.data).toContain('mock-deepseek-v4-flash');
+
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('红线: abort error path — TUI 在 LLM 抛 abort 错误时不 hang 走 err (D-20.6.4 P2 fix 强化)', async () => {

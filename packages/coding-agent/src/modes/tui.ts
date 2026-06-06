@@ -77,6 +77,47 @@ function colorize(text: string, color: string): string {
   return isTty() ? `${color}${text}${ANSI.reset}` : text;
 }
 
+// ---- 视觉元素 (D-21.2 轻量升级, 2026-06-06) ----
+// 复用红线 (D-20.3 P0-B): 不装新依赖 (无 Ink), 仍用 readline + ANSI.
+// 新增仅 2 个 helper, 替换 header 1 处 + status bar 1 处. 不动 prompt / onChunk /
+// confirm / session 路径.
+
+/**
+ * 画一条横线分隔符, 宽度按 `width` 截 (默认终端列宽, fallback 80).
+ * 配色 dim + cyan 拼接, 非 TTY 退化到 `─` 重复, 让 CI/管道 log 也可读.
+ */
+function horizontalRule(width?: number): string {
+  const cols = width ?? (stdout.columns && stdout.columns > 20 ? stdout.columns : 80);
+  const w = Math.max(20, Math.min(cols - 4, 100));
+  const line = '─'.repeat(w);
+  return colorize('  ' + line, ANSI.dim);
+}
+
+/**
+ * 格式化状态栏 — D-21.2 升级:
+ * - 复用 formatUsageStatus 的 4 字段 (model / in / cached / out / cost)
+ * - 加分隔线 + 颜色 (key: cyan, value: 黄色 token, 灰色 cost)
+ * - 改成 1 行, 终端窄时(< 60 列) 截断不溢出
+ * - 非 TTY 退化到纯文本 (跟现状一样, 不破坏 test)
+ *
+ * @param usage - formatUsageStatus 返回的原始行, 已是 `tokens X · cached Y · out Z · cost $W` 形态
+ * @param model - 模型名, 走 formatUsageStatus 已含, 这里再拼前面 banner 用 cyan 加粗
+ */
+function formatTuiStatusBar(usage: string | null, model: string): string {
+  if (usage === null) {
+    return colorize(`  ${model} · (no usage)`, ANSI.dim);
+  }
+  // formatUsageStatus 输出形如 "tokens 1.2k · cached 80% · out 200 · cost $0.0012"
+  // 我们把 model 提到前面 + 加色 + 末尾补分隔线
+  const bar = `${model} · ${usage}`;
+  // 终端窄时: 简单截断, 不做折行 (readline prompt 单行假设)
+  const cols = stdout.columns && stdout.columns > 20 ? stdout.columns : 80;
+  const max = Math.max(40, cols - 4);
+  const text = bar.length > max ? bar.slice(0, max - 1) + '…' : bar;
+  // 颜色: model 走 cyan 加粗, usage 走 dim, 整体不染色避免跟 dim 横线撞
+  return colorize('  ' + text, ANSI.dim);
+}
+
 // ---- TUI options ----
 
 export interface TuiModeOptions {
@@ -168,13 +209,17 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
     // 注: print mode 抛 warning (D-6 拍板), TUI 不抛 (minimal scope, 留扩展点).
   }
 
-  // 顶部 header (D-20.3 TUI 标识)
+  // 顶部 header — D-21.2 轻量升级: 横线分隔 + banner
   const initialClientState = tryCreateClient();
   const modelName = initialClientState.client?.model ?? 'not-configured';
   out.write('\n');
-  out.write(colorize('  ╭─ deepwhale tui ', ANSI.bold) + colorize(modelName, ANSI.cyan + ANSI.bold) + colorize(' ─╮', ANSI.bold) + '\n');
-  out.write(colorize('  │ type a prompt, /help, /verify, /exit (or q) │\n', ANSI.dim));
-  out.write(colorize('  ╰──────────────────────────────────────────╯\n', ANSI.bold) + '\n');
+  out.write(horizontalRule() + '\n');
+  out.write(
+    colorize('  deepwhale tui ', ANSI.bold) +
+      colorize(modelName, ANSI.cyan + ANSI.bold) +
+      colorize('  ·  type a prompt, /help, /verify, /exit (or q)\n', ANSI.dim),
+  );
+  out.write(horizontalRule() + '\n\n');
   if (initialClientState.error) {
     err.write(`warning: API key not set, chat will fail until DEEPSEEK_API_KEY or ANTHROPIC_AUTH_TOKEN is set.\n`);
   }
@@ -387,12 +432,14 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
           ...result.messages,
         ];
 
-        // 状态栏 (复用 formatUsageStatus, 4 字段)
+        // 状态栏 (复用 formatUsageStatus, 4 字段) — D-21.2 轻量升级: 上下加横线分隔
         const usageLine: string | null = formatUsageStatus(result.final.usage);
         if (usageLine !== null) {
-          out.write('\n' + colorize('  ' + usageLine + '\n', ANSI.dim));
+          out.write('\n' + horizontalRule() + '\n');
+          out.write(formatTuiStatusBar(usageLine, modelName) + '\n');
+          out.write(horizontalRule() + '\n');
         } else {
-          out.write('\n');
+          out.write('\n' + horizontalRule() + '\n');
         }
       } catch (e) {
         if (isToolLoopError(e)) {
