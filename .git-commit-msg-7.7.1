@@ -1,0 +1,14 @@
+fix(verify): spawn-error Win32 shell 路径 exitCode 归一为 null (D-20.7.7.1)
+
+P1 final fix: looksLikeSpawnError 命中时 exitCode 强制 null, 跟 POSIX
+sync spawn-error (child.on('error') 路径, line 540+) shape 一致.
+caller 只需看 status='spawn-error' + exitCode=null 即可, 不必区分
+"启错 exit=1 vs 启错 sync 抛".
+
+D-20.7.7 初版用 code 实际值 (e.g. 1), 测 expect null fail. 修法:
+归一为 null, 跟 spawn-error 语义对齐 (启错而非退出码异常).
+
+验证 (本机 Linux baseline):
+- verify-runner.test.ts: 16/16
+- vitest run --exclude integration: 456/2/458, 0 failed
+- deepwhale --verify: 4/4 pass, exit 0 (24.3s)

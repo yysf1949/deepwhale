@@ -559,6 +559,12 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
       // Win32 走不到. 修法: shell 用过的路径 (useShell=true) + 启错文本命中 →
       // 'spawn-error', 跟 POSIX 行为对齐. 非 shell 路径不动 (Linux/macOS 默认
       // shell:false, ENOENT 由 child.on('error') 接, 不会到这条分支).
+      //
+      // Sprint D-20.7.7.1 (2026-06-06): exitCode 归一为 null. POSIX 同步 spawn 抛
+      // (child.on('error') 路径) 不暴露 exit code (line 540+). Win32 shell 路径
+      // 现在也归一, 保持两路 shape 一致 — caller 不必区分 "启错 exit=1 vs 启错 sync 抛"
+      // 只看 status='spawn-error' + exitCode=null. D-20.7.7 初版留 code 实际值
+      // (e.g. 1), 测 expect null fail. 修法: 强制 null.
       if (
         useShell &&
         code !== 0 &&
@@ -568,7 +574,7 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
           name: check.name,
           command: check.command,
           status: 'spawn-error',
-          exitCode: code,
+          exitCode: null,
           startedAt: start,
           endedAt: end,
           durationMs: end - start,
