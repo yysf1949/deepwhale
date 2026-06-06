@@ -28,9 +28,16 @@ import type { TuiTheme } from '../theme/index.js'
 
 // =================== Inline patterns ===================
 
-/** 内联 (跟 Hermes INLINE_RE 1:1 简化版, 9 类 → D-27 5 类) */
-// 5 类 inline: `code` / **bold** / *italic* / ~~strike~~ / [text](url)
+/** @deepwhale/tui-ink — Inline patterns (跟 Hermes INLINE_RE 1:1 简化版, 5 类) */
+// 5 类 inline: [text](url) / `code` / **bold** / *italic* / ~~strike~~
 const INLINE_RE = /(?:\[([^\]]+)\]\(([^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*|~~([^~]+)~~)/g
+
+// =================== Hermes 协议 (MEDIA / audio) ===================
+
+/** D-27 D4 拍: 跟 Hermes MEDIA_LINE_RE 1:1, 支持单引号/双引号/反引号包裹 */
+export const MEDIA_LINE_RE = /^\s*[`"']?MEDIA:\s*(\S+?)[`"']?\s*$/
+/** D-27 D4 拍: 跟 Hermes AUDIO_DIRECTIVE_RE 1:1 */
+export const AUDIO_DIRECTIVE_RE = /^\s*\[\[audio_as_voice\]\]\s*$/
 
 // =================== Block patterns ===================
 
@@ -209,6 +216,29 @@ export function renderMarkdown(text: string, theme: TuiTheme): ReactNode[] {
   while (i < lines.length) {
     const line = lines[i]!
     const blockKey = `md-${blockCounter++}`
+
+    // 0. media line / audio directive (D-27 D4 跟 Hermes 1:1 拍)
+    //   MEDIA:/path/to/image → 印 [image: /path/to/image]
+    //   [[audio_as_voice]] → 印 🔊 audio (TTS D-28+ 升级)
+    if (MEDIA_LINE_RE.test(line)) {
+      const path = line.match(MEDIA_LINE_RE)![1]!
+      out.push(
+        <Text key={blockKey} color={theme.toolName}>
+          {`[image: ${path}]`}
+        </Text>
+      )
+      i++
+      continue
+    }
+    if (AUDIO_DIRECTIVE_RE.test(line)) {
+      out.push(
+        <Text key={blockKey} color={theme.model}>
+          🔊 audio: (TTS pending — D-28+ 升级 mmx-cli TTS)
+        </Text>
+      )
+      i++
+      continue
+    }
 
     // 1. fence
     const fence = tryParseFence(lines, i)

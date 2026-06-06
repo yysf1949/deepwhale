@@ -211,4 +211,32 @@ describe('markdown/render (D-27 D1)', () => {
       expect(out).toContain('bold')
     })
   })
+
+  describe('MEDIA / audio 协议 (D-27 D4, 跟 Hermes 1:1)', () => {
+    it('8a. MEDIA:/path/to/image 1:1 印 [image: path]', () => {
+      // D-27 D4 拍: TUI 0 真实图, 跟 Hermes 1:1 印 [image: path]
+      const out = renderToText('MEDIA:/path/to/image.png')
+      expect(out).toContain('[image: /path/to/image.png]')
+    })
+    it('8b. MEDIA 接受单/双/反引号包裹 (跟 Hermes 1:1)', () => {
+      // 跟 Hermes MEDIA_LINE_RE 1:1 拍
+      expect(renderToText('MEDIA: /a.png')).toContain('[image: /a.png]')
+      expect(renderToText('`MEDIA: /b.png`')).toContain('[image: /b.png]')
+      expect(renderToText('"MEDIA: /c.png"')).toContain('[image: /c.png]')
+      expect(renderToText("'MEDIA: /d.png'")).toContain('[image: /d.png]')
+    })
+    it('8c. [[audio_as_voice]] 1:1 印 🔊 audio (TTS D-28+ 升级)', () => {
+      // D-27 D4 拍: TUI 0 调 mmx-cli TTS (D-28+ 升级), 1:1 印 🔊 占位
+      const out = renderToText('[[audio_as_voice]]')
+      expect(out).toContain('🔊')
+      expect(out).toContain('audio')
+    })
+    it('8d. MEDIA 跟 markdown 5 类基础 0 冲突 (混合测)', () => {
+      const text = '# Title\n\nMEDIA: /x.png\n\n**bold**'
+      const out = renderToText(text)
+      expect(out).toContain('Title')
+      expect(out).toContain('[image: /x.png]')
+      expect(out).toContain('bold')
+    })
+  })
 })
