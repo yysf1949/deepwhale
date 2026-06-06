@@ -4,6 +4,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/llm" },
     { "path": "./packages/coding-agent" },
-    { "path": "./packages/edit-engine" }
+    { "path": "./packages/edit-engine" },
+    { "path": "./packages/tui-ink" }
   ]
 }

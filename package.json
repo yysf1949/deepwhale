@@ -10,7 +10,7 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "build": "tsc -b --force && node packages/llm/scripts/copy-toml.mjs",
+    "build": "tsc -b --force && pnpm -F @deepwhale/tui-ink build && pnpm -F @deepwhale/coding-agent build && node packages/llm/scripts/copy-toml.mjs",
     "dev": "pnpm -r --parallel dev",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -b",

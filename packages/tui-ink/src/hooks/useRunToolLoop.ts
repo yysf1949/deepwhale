@@ -1,9 +1,16 @@
 /**
- * @deepwhale/tui-ink — useRunToolLoop hook (D-24.2).
+ * @deepwhale/tui-ink — useRunToolLoop hook (D-24.2 + D-25 B2).
  *
  * 跟 packages/coding-agent/src/modes/tui.ts line 600-770 turn 主循环 1:1 同步.
  * 业务逻辑 0 重写: 调 coding-agent 导出的 `runToolLoop`, 把 onChunk / step / usage
  * 推到 store + transcript.
+ *
+ * D-25 B2 (2026-06-06) — 修 F2 (useRunToolLoop 调错 3 参签名):
+ *   - 修前: runToolLoop(turnMessages, options)  (传 messages 当 client, TS2345 错)
+ *   - 修后: runToolLoop(client, turnMessages, options) (3 参签名跟 tool-loop.ts 1:1)
+ *   - client 来自: App 用 createDefaultClient({provider, model}) factory 注入
+ *   - registry 来自: App 用 createDefaultRegistry() 注入
+ *   - 跟 modes/tui.ts L482 + L770 1:1 同步 (legacy fallback 也修)
  *
  * 复用红线 (跟 D-20.3 P0-B 一致):
  *   - 不绕过 ToolPolicy (默认 staticToolPolicy, 跟 readline 容器同形态)
@@ -12,24 +19,34 @@
  *
  * 不做 (defer):
  *   - 真 LLM cache 命中验证 (sprint 2)
- *   - 集成测试 (留 D-24.4+)
  *   - 真 SIGINT 透传到 runToolLoop 的覆盖测 (D-24.7 P0)
  */
 
 import { useCallback } from 'react'
-import { runToolLoop, persistToolLoopSteps, staticToolPolicy, type ToolPolicy } from '@deepwhale/coding-agent'
+import {
+  runToolLoop,
+  persistToolLoopSteps,
+  staticToolPolicy,
+  type ToolPolicy,
+  type ToolRegistry,
+} from '@deepwhale/coding-agent'
+import type { LLMClient } from '@deepwhale/coding-agent'
 import { highlightChunk } from '../highlight/chunk.js'
 import { pushEntry, appendToLastAssistant, sealLastAssistant, $uiState } from '../store/ui.js'
 import type { TuiTheme } from '../theme/index.js'
 import type { TuiInkOptions } from '../types.js'
-import type { ChatMessage } from '@deepwhale/llm'
-import type { SessionWriter } from '@deepwhale/core'
+import type { ChatMessage } from '@deepwhale/coding-agent'
+import type { SessionWriter } from '@deepwhale/coding-agent'
 
 export interface UseRunToolLoopArgs {
   options: TuiInkOptions
   theme: TuiTheme
   signal: AbortSignal
   writer: SessionWriter | null
+  /** D-25 B2: 注入 LLM 客户端 (来自 createDefaultClient factory, App 容器初始化). */
+  client: LLMClient
+  /** D-25 B2: 注入 ToolRegistry (来自 createDefaultRegistry(), App 容器初始化). */
+  registry: ToolRegistry
   policy?: ToolPolicy
   /** working messages (loaded session + 累积 user/assistant/tool steps). 跟 tui.ts `workingMessages` 同形态. */
   workingMessages: ChatMessage[]
@@ -43,8 +60,8 @@ export interface UseRunToolLoopResult {
 export function useRunToolLoop(args: UseRunToolLoopArgs): UseRunToolLoopResult {
   const runTurn = useCallback(
     async (userPrompt: string): Promise<void> => {
-      const { options, theme, signal, writer, workingMessages } = args
-      const modelName = options.model ?? 'model'
+      const { options, theme, signal, writer, client, registry, workingMessages } = args
+      const modelName = options.model ?? client.model ?? 'model'
 
       // 1. push user entry
       pushEntry({ kind: 'user', text: userPrompt })
@@ -62,8 +79,10 @@ export function useRunToolLoop(args: UseRunToolLoopArgs): UseRunToolLoopResult {
       ]
 
       try {
-        const result = await runToolLoop(turnMessages, {
-          onChunk: (chunk) => {
+        // D-25 B2: runToolLoop(client, messages, options) 3 参签名
+        const result = await runToolLoop(client, turnMessages, {
+          registry,
+          onChunk: (chunk: { content?: string }) => {
             if (chunk.content) {
               // D-23.2: 染色后增量推 (跟 tui.ts L645 1:1)
               const colored = highlightChunk(chunk.content, theme, true)

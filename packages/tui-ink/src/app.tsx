@@ -45,9 +45,13 @@ import {
   type ReplConfirmController,
   staticToolPolicy,
   type ChatMessage,
+  type LLMClient,
+  type ToolRegistry,
   SessionReader,
   SessionWriter,
   loadSession,
+  createDefaultClient,
+  createDefaultRegistry,
 } from '@deepwhale/coding-agent'
 import { stdout } from 'node:process'
 
@@ -135,12 +139,36 @@ export function App({ options, onExit }: AppProps): ReactElement {
   // turn in-flight flag (跟 tui.ts `turnInFlight` 同形态)
   const [turnInFlight, setTurnInFlight] = useState(false)
 
+  // D-25 B2: 注入 LLM client + ToolRegistry (跟 modes/tui.ts L482 + L770 1:1 同步)
+  // client 走 createDefaultClient factory (env 推断 + flag 显式覆盖, 跟 REPL/print mode 同形态)
+  // 拍板: options.provider 是 string (TuiInkOptions 拍宽, 跟 bin/cli 兼容), narrow 到
+  //   'deepseek' | 'anthropic' 才传, 其它 (e.g. 'unknown' / 用户误传) 走 env 推断
+  const clientRef = useRef<LLMClient | null>(null)
+  if (clientRef.current === null) {
+    const providerNarrow = options.provider === 'deepseek' || options.provider === 'anthropic'
+      ? options.provider
+      : undefined
+    clientRef.current = createDefaultClient({
+      ...(providerNarrow ? { provider: providerNarrow } : {}),
+      ...(options.model ? { model: options.model } : {}),
+    })
+  }
+  const client = clientRef.current
+
+  const registryRef = useRef<ToolRegistry | null>(null)
+  if (registryRef.current === null) {
+    registryRef.current = createDefaultRegistry()
+  }
+  const registry = registryRef.current
+
   // runToolLoop wrapper — 每次 turn 用最新 workingMessages + writer
   const { runTurn } = useRunToolLoop({
     options,
     theme,
     signal: turnAbortController.signal,
     writer: writerRef.current,
+    client,
+    registry,
     policy: staticToolPolicy,
     workingMessages,
   })
