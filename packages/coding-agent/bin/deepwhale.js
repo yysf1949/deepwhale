@@ -165,7 +165,9 @@ const HELP_TEXT = `deepwhale — Coding Agent CLI
 Usage:
   deepwhale                         Start interactive REPL (default)
   deepwhale -p "<prompt>"           Print mode: single-shot chat + tool loop
-  deepwhale --verify                Verify mode: run build/lint/typecheck/test, no LLM
+  deepwhale --verify                Verify mode: run build/lint/typecheck/test in
+                                   monorepo, or syntax/import/bin/exports sanity
+                                   checks in npm-installed context. No LLM.
   deepwhale --rpc                   RPC mode: NDJSON over stdio (Sprint 1a stub)
   deepwhale tui                     TUI mode: minimal ANSI TUI (D-20.3, ships in v1.0)
 
@@ -197,7 +199,10 @@ Setup hint:
   If you see "API key not set" on first run:
     1. Set DEEPSEEK_API_KEY=<your-key>  (or ANTHROPIC_AUTH_TOKEN=...)
     2. Or place it in ./.env (project root, see .env.example)
-    3. --verify does not require any key (build/lint/typecheck/test only)
+    3. --verify does not require any key. It auto-detects monorepo vs npm-
+       installed context: in monorepo it runs build/lint/typecheck/test; in
+       installed context it runs syntax-check / import-check / bin-check /
+       exports-check to confirm the package is usable.
 `;
 
 /**

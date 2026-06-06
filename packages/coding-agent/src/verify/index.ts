@@ -6,11 +6,16 @@
 
 export {
   runVerify,
+  detectContext,
+  pickChecksForContext,
+  resolveRunner,
+  looksLikeSpawnError,
   type VerifyCheck,
   type VerifyCheckResult,
   type VerifyCheckStatus,
   type VerificationReport,
   type VerificationOverallStatus,
+  type VerifyContext,
   type RunVerifyOptions,
 } from './verify-runner.js';
 
