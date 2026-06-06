@@ -101,12 +101,12 @@ deepwhale 的 prefix-cache 不只是"算命中率", 还要保"不会因内部行
 
 ## 4 机制联动端到端测 (D-20.2 拍板)
 
-`packages/coding-agent/test/integration/prefix-cache-4-mechanisms.test.ts` (新建, 4 个 it):
+`packages/coding-agent/test/integration/prefix-cache-4-mechanisms-contract.test.ts` (新建, 8 个 contract it, 2026-06-06 D-20.6.5 review-fix 改名):
 
-- **it 1 - 全命中链路**: mock LLM 返 `cached_tokens=900, prompt_tokens=1000, completion=50` → 验 `cache_hit_rate=0.9` / `cost_turn` 走 V4-Flash cache_hit 折扣价 / REPL 4 字段含 `cache: 90% | ¥X/turn | prompt 1k (900 cached)`
-- **it 2 - 全 miss 链路**: mock LLM 返 `cached_tokens=0, prompt_tokens=1000, completion=50` → 验 `cache_hit_rate=0` / `cost_turn` 走 cache_miss 全价 / REPL 4 字段含 `cache: 0% | ¥X/turn` 不出现 `(N cached)` 提示
-- **it 3 - canonicalizeSchema 稳定**: 同样 tools 列表调 2 次, 第二次 SSE 带 `cached_tokens=900` (跟第一次 1000 prompt 共享 900, 只 100 增量) → 验 canonicalizeSchema 后 LLM 真命中 900 (不是 0)
-- **it 4 - Compaction 保 prefix**: 跑 tool loop 4 turn, 第 3 turn 触发 compaction → 验 session JSONL 写 'compaction' event + `replaced_range` 砍中段, 系统 prefix + 最近 2 turn 保留 → 验 LLM 端第 4 turn 仍能命中 cache (因为 prefix 没动)
+- **it 1 - 全命中链路**: mock LLM 返 `cached_tokens=900, prompt_tokens=1000, completion=50` → 验 `cache_hit_rate=0.9` / `cost_turn` 走 V4-Flash cache_hit 折扣价 / REPL 4 字段含 `cache: 90% | ¥X/turn | prompt 1k (900 cached)` (contract, 走 mock 算式)
+- **it 2 - 全 miss 链路**: mock LLM 返 `cached_tokens=0, prompt_tokens=1000, completion=50` → 验 `cache_hit_rate=0` / `cost_turn` 走 cache_miss 全价 / REPL 4 字段含 `cache: 0% | ¥X/turn` 不出现 `(N cached)` 提示 (contract, 走 mock 算式)
+- **it 3 - canonicalizeSchema 稳定**: 同样 tools 列表调 2 次, 第二次 SSE 带 `cached_tokens=900` (跟第一次 1000 prompt 共享 900, 只 100 增量) → 验 canonicalizeSchema 后 LLM 真命中 900 (不是 0) (contract, 验 schema 序列化稳定)
+- **it 4 - Compaction 保 prefix (D-20.6.5 真调)**: 真调 `@deepwhale/core` `compact()` (走真 resolveTail + summaryFn 路径), 验 result.replaced_range 跟 input messages + config 走确定性公式, 末尾 tail 保留 (跟 D-6 拍板一致)
 
 ## 4 机制的可观测性分级
 

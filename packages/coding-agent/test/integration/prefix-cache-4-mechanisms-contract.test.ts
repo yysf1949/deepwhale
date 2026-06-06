@@ -186,40 +186,63 @@ describe('Prefix-cache 4 大机制 端到端联动 (D-20.2 P0-E)', () => {
     expect(afterJson).toBe(beforeJson);
   });
 
-  it('联动 4: Compaction 拍 replaced_range — 同 input 必返同 replaced_range (D-6 拍板)', () => {
-    // 机制 4 (Compaction 保 prefix) 关键不变量: replaced_range 是 deterministic
-    // 拍板的, 同 input 必返同 [start, end). reload replay 跟 adapter.ts:166
-    // corrupted event skip 配套使用.
-    // 测: 直接验 replaced_range 公式 (基于 messages + head + tailKeepTokens).
-    // 拍板: replaced_range[1] - replaced_range[0] >= 1 (有东西被总结)
-    // (jsonl.ts:84). replaced_range 在 JSONL 累积空间下指 "head 段".
-    // 此 it 测: 给 2 段 head + 1 段 tail, replaced_range 砍中段 (头 2 条).
-    const messages = [
-      { role: 'system', content: 'system A' }, // 0: system prefix (caller 拼)
-      { role: 'system', content: 'system B' }, // 1: system prefix (caller 拼)
-      { role: 'user', content: 'turn 1 user' }, // 2: 头段 (要被砍)
-      { role: 'assistant', content: 'turn 1 ans' }, // 3: 头段 (要被砍)
-      { role: 'user', content: 'turn 2 user' }, // 4: tail 保留
-      { role: 'assistant', content: 'turn 2 ans' }, // 5: tail 保留
+  it('联动 4: Compaction 拍 replaced_range — 同 input 必返同 replaced_range (D-6 拍板)', async () => {
+    // Sprint 1c-revive-5-D-20.6.5 review-fix (2026-06-06): 之前用 hardcoded
+    // simulatedReplacedRange = [2, 4] 验契约, 是 contract test 不是端到端. 修法:
+    // 真调 compact() (从 @deepwhale/core import, 走真 resolveTail + summaryFn
+    // 路径), 验 result.replaced_range 跟 input messages + config 走确定性公式.
+    // 保持其它 7 个 it 仍是 focused / contract 测.
+    const { compact } = await import('@deepwhale/core');
+    // 类型拍死: ChatMessage.role 是 'system' | 'user' | 'assistant' | 'tool' 联合.
+    type Msg = { role: 'system' | 'user' | 'assistant'; content: string };
+    const messages: Msg[] = [
+      { role: 'system', content: 'system A' },
+      { role: 'system', content: 'system B' },
+      { role: 'user', content: 'turn 1 user' },
+      { role: 'assistant', content: 'turn 1 ans' },
+      { role: 'user', content: 'turn 2 user' },
+      { role: 'assistant', content: 'turn 2 ans' },
     ];
-    // 假设 agent-compaction.ts:87 剥掉 system prefix 后, 头段 = messages[2..3],
-    // tail 保留 = messages[4..5] (tailKeepMessages=2, D-5-1 拍板).
-    // replaced_range 砍头段, JSONL 累积空间下, system prefix 不占位置,
-    // 头段 [2, 4) (replaced_range = [2, 4] in JSONL 累积 index 空间).
-    // (具体见 agent-compaction.ts:87 + session-adapter.ts:166 实现)
-    //
-    // 简化测: 验契约 replaced_range[1] - replaced_range[0] >= 1 (不变量).
-    const simulatedReplacedRange: readonly [number, number] = [2, 4];
-    expect(simulatedReplacedRange[1] - simulatedReplacedRange[0]).toBeGreaterThanOrEqual(1);
-    // 验契约: replaced_range[0] >= 0 (caller 拼的 system prefix 在 JSONL 累积空间不算位置,
-    // 所以 [0, head.length) 仍是 valid)
-    expect(simulatedReplacedRange[0]).toBeGreaterThanOrEqual(0);
-    // 验契约: replaced_range 砍的**是 head 段** (中段), 末尾 tail 保留
-    const totalMessages = messages.length;
-    expect(simulatedReplacedRange[1]).toBeLessThanOrEqual(totalMessages);
+    const config = {
+      // tailKeepMessages=2 (保留最近 2 turn, head=其余). 走 token budget or
+      // message count, 跟 D-5-1 拍板一致. 显式 tailMode='message_count' 避免
+      // 默认 'token_budget' 模式把 6 条短消息全当成 tail (head 空 → compact 抛).
+      tailMode: 'message_count' as const,
+      tailKeepMessages: 2,
+      // contextWindow 拍个能让 compact 触发的下限
+      contextWindow: 100,
+      compactRatio: 0.5,
+    };
+    const summaryFn = async (msgs: ReadonlyArray<{ role: string; content: string }>): Promise<string> => {
+      return `summary of ${msgs.length} messages`;
+    };
+    const r1 = await compact(messages, config, summaryFn);
+    const r2 = await compact(messages, config, summaryFn);
+    // 拍板红线 (D-6): 同 input 必返同 stats.replacedRange (deterministic)
+    // 注: CompactionResult.stats.replacedRange (camelCase, line 357) 是
+    // stats 字段, 不是 event.replaced_range (snake_case 是 SessionEvent union
+    // 字段). 两者数值一致.
+    expect(r1.stats.replacedRange).toEqual(r2.stats.replacedRange);
+    // 不变量: replacedRange[1] - replacedRange[0] >= 1 (有东西被总结)
+    expect(r1.stats.replacedRange[1] - r1.stats.replacedRange[0]).toBeGreaterThanOrEqual(1);
+    // 不变量: replacedRange[0] >= 0
+    expect(r1.stats.replacedRange[0]).toBeGreaterThanOrEqual(0);
+    // 不变量: replacedRange 砍的是 head 段 (中段), 末尾 tail 保留
+    // (head.length = replacedRange[1] - replacedRange[0])
+    const expectedHeadLen = messages.length - config.tailKeepMessages; // 6 - 2 = 4
+    expect(r1.stats.replacedRange[1] - r1.stats.replacedRange[0]).toBe(expectedHeadLen);
+    // 验证 summary 真的替代 head (不并存)
+    expect(r1.messages.length).toBeLessThan(messages.length);
+    // 验证 result.messages 末尾是原始 tail (id 匹配)
+    const tail = messages.slice(messages.length - config.tailKeepMessages);
+    expect(r1.messages.slice(-config.tailKeepMessages)).toEqual(tail);
+    // 验证 event.replaced_range (snake_case, SessionEvent 字段) 跟 stats 一致
+    if (r1.event.kind === 'compaction') {
+      expect(r1.event.replaced_range).toEqual(r1.stats.replacedRange);
+    }
   });
 
-  it('联动 1+2+3+4 端到端契约: 4 机制不互相依赖, 各管一段, 链路是 deterministic', () => {
+  it('联动 1+2+3+4 契约组合: 4 机制不互相依赖, 各管一段, 链路是 deterministic', () => {
     // 端到端契约测 (不跑真 LLM, 验设计契约):
     //   - 机制 1 算 cache_hit_rate (从 cached/prompt)
     //   - 机制 2 保 schema key 顺序稳定
