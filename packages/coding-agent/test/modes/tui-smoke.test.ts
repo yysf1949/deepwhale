@@ -346,20 +346,23 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('红线: turnAbortController.signal 透传 runToolLoop (D-20.6.4 P2 fix)', async () => {
-    // D-19 P2-Ctrl+C 拍板: turnAbortController.abort() 必须透传到 runToolLoop.
+  it('红线: signal forwarding contract — TUI 透传 signal 给 runToolLoop (D-20.6.4 P2 fix)', async () => {
+    // D-19 P2-Ctrl+C 拍板: turnAbortController.signal 必须透传到 runToolLoop.
     // 之前 tui.ts 漏传 signal, onSigint 只 abort controller 不往下传, 工具循环
     // hang 住, Ctrl+C 路径不完整.
     //
-    // 测法: mock LLM stream() 在 1st call 返 tool_call, 2nd call 在调时立刻
-    // check `options.signal?.aborted`. 我们 pre-abort 一个 controller, 喂进
-    // 我们的 TUI 走 2 step, 验 2nd LLM call 立即抛 (走 abort path), TUI 不 hang,
-    // /exit 干净退出 (code=0).
+    // Sprint D-20.7.3 (2026-06-06) 降级: 本 it 只验证 **forwarding contract** — TUI
+    // 调用 runToolLoop 时传了 signal 参数, 走 options.signal?.aborted 链. **不**
+    // 验证 TUI 内部 turnAbortController 真 trigger (那是 D-20.7+ P0, 需要 tui.ts
+    // 暴露 controller 给测试). 真 abort trigger 留 D-20.7 P0.
     //
-    // 关键可观测指标: errorOutput 含 'aborted' 字符串 (runToolLoop 抛 LLMUnknownError
-    // 'Tool loop aborted by caller', TUI 走到 err.write 'error: ...').
+    // 测法: mock LLM stream() 在 1st call 返 tool_call (bash 'echo OK'), 2nd call
+    // 在调时 check `options.signal?.aborted`. 验 2nd LLM call 不发生 / 被 abort
+    // path 接住, TUI 不 hang, /exit 干净退出 (code=0).
+    //
+    // 关键可观测指标: 至少 1 次 LLM call, options.signal 不为 undefined
+    // (即 TUI 真传了 signal, 验证 forwarding contract).
     const calls: Array<{ aborted: boolean }> = [];
-    const controller = new AbortController();
     const client: LLMClient = {
       model: 'mock-deepseek-v4-flash' as ModelId,
       chat: async (): Promise<ChatResult> => {
@@ -429,23 +432,14 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     // 所以**光**靠 calls[0].aborted 不够. 我们另加一个 it 显式 abort.
   });
 
-  it('红线: turnAbortController.abort() 透传 → runToolLoop 第 2 步抛 abort (D-20.6.4 P2 fix 强化)', async () => {
-    // 强化版: 把 turnAbortController 暴露给测试, 显式 trigger abort, 验后续 LLM
-    // call 收到 aborted=true, runToolLoop 抛 abort error, TUI err.write 含 'abort'.
+  it('红线: abort error path — TUI 在 LLM 抛 abort 错误时不 hang 走 err (D-20.6.4 P2 fix 强化)', async () => {
+    // Sprint D-20.7.3 (2026-06-06) 降级: 本 it 验证 "abort error 到达 TUI 后正确
+    // 走 err path" — 也就是 runToolLoop 抛 LLMUnknownError('Tool loop aborted by
+    // caller') 时, TUI err.write 含 'abort', 不 hang, /exit 干净退出 (code=0).
     //
-    // 妥协: turnAbortController 内部 var, 没法外部 trigger. 改方案: 暴露 1 个
-    // optional abortController 字段给 runTuiMode options, 测试用. prod caller 不传
-    // → 内部仍 new 一个.
-    //
-    // 简单测法: mock stream 1st call 返 tool_call (bash 'sleep 999' 真 hang), mock
-    // stream 2nd call 收到 options.signal.aborted=true → 抛. 实测 abort 链.
-    // 注: bash 'sleep 999' 真跑会 hang 工具循环, 但我们靠 setTimeout 在 2nd LLM call
-    // 到达时手动 abort controller.
-    //
-    // 最务实: 改 mock 1st 返 tool_call, 2nd call 触发 options.signal.aborted = true
-    // 后抛. runToolLoop 收到抛 → TUI err 写 'aborted' (走 tool-loop.ts:150 LLMUnknownError).
-    // 我们不需要真 abort controller — 让 mock 自己模拟 signal.aborted 即可, 验证
-    // TUI 在收到 abort 错误时**不**hang, 走 err path, /exit 干净退出.
+    // **不** 验证 TUI 内部 turnAbortController 真 trigger (D-20.6.4 名实不符).
+    // 之前叫 "强化版" 是错的 — mock 自己 hardcoded 抛, 跟 TUI 内部 controller 无关.
+    // 真 trigger 需要 tui.ts 暴露 controller, 留 D-20.7 P0.
     const out = new StringWritable();
     const err = new StringWritable();
     const input = new PassThrough();
