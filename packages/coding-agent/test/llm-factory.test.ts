@@ -53,6 +53,43 @@ describe('llm-factory — C3 拍板: env 推断 + 显式 provider', () => {
       expect((e as Error).message).toMatch(/No LLM API key set/);
     }
   });
+
+  it('4. Sprint 1c-revive-2-D-21.1 (2026-06-06): DEEPWHALE_PROVIDER=deepseek 显式, 优先级最高, 决断 both-set 错', () => {
+    // D-21.1 拍板: user 在 shell 一行 set 决断 provider, 不必 unset 另一个 key.
+    // 之前: 两个 key 都设 → 报错; 现在: DEEPWHALE_PROVIDER=deepseek → 走 deepseek.
+    process.env['ANTHROPIC_AUTH_TOKEN'] = 'env-anthropic-key';
+    process.env['DEEPSEEK_API_KEY'] = 'env-deepseek-key';
+    process.env['DEEPWHALE_PROVIDER'] = 'deepseek';
+    const client = createDefaultClient();
+    expect(client.model).toBe('deepseek-v4-flash');
+  });
+
+  it('5. Sprint 1c-revive-2-D-21.1: DEEPWHALE_PROVIDER=anthropic 即使 DEEPSEEK_API_KEY 设了, 也走 anthropic', () => {
+    process.env['ANTHROPIC_AUTH_TOKEN'] = 'env-anthropic-key';
+    process.env['DEEPSEEK_API_KEY'] = 'env-deepseek-key';
+    process.env['DEEPWHALE_PROVIDER'] = 'anthropic';
+    const client = createDefaultClient();
+    expect(client.model).toBe('claude-sonnet-4-5');
+  });
+
+  it('6. Sprint 1c-revive-2-D-21.1: DEEPWHALE_PROVIDER 拼错 (e.g. depseek) 静默 fall through, 不 fatal', () => {
+    // 拍板: 拼错不该是 fatal, 静默忽略 → fall through 到 env 推断, 后续
+    // "Both set" / "No key" 错仍是 user 看到的最具体错. 行为: 不抛,
+    // 走到下面 hasAnthropic && hasDeepseek 抛 Both set.
+    process.env['ANTHROPIC_AUTH_TOKEN'] = 'env-anthropic-key';
+    process.env['DEEPSEEK_API_KEY'] = 'env-deepseek-key';
+    process.env['DEEPWHALE_PROVIDER'] = 'depseek';
+    expect(() => createDefaultClient()).toThrow(/Both ANTHROPIC_AUTH_TOKEN and DEEPSEEK_API_KEY/);
+  });
+
+  it('7. Sprint 1c-revive-2-D-21.1: 只设 DEEPSEEK_API_KEY → 走 deepseek (品牌默认, deepseek-first)', () => {
+    // 跟 README / package.json "DeepSeek-first" 品牌一致. 之前 1b.5 时代
+    // "Anthropic 排第一" 拍板跟品牌矛盾, D-21.1 修正 (行为没变, 单 key 路径
+    // 完全兼容, 测例保证不回归).
+    process.env['DEEPSEEK_API_KEY'] = 'env-deepseek-key';
+    const client = createDefaultClient();
+    expect(client.model).toBe('deepseek-v4-flash');
+  });
 });
 
 describe('llm-factory — 显式 provider 优先 (不读 env)', () => {

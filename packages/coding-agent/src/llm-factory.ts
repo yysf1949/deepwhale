@@ -5,6 +5,8 @@
  * REPL 启动时 provider 怎么选, 拍板为 "env 推断 + flag 显式覆盖":
  * 1. options.provider 显式给 → 优先用显式值 (REPL --provider flag)
  * 2. options.provider 未给 → 看 env:
+ *    - DEEPWHALE_PROVIDER=deepseek|anthropic 显式设 → 用该值 (D-21.1 拍板,
+ *      让 shell user 一行 set 决断, 不必 unset 另一个 key)
  *    - ANTHROPIC_AUTH_TOKEN 设了 + DEEPSEEK_API_KEY 没设 → anthropic (走 DeepSeek shim)
  *    - DEEPSEEK_API_KEY 设了 + ANTHROPIC_AUTH_TOKEN 没设 → deepseek
  *    - 两个都设了 → 报错 (静默走错 provider 误用 API key 是 P0 风险)
@@ -12,6 +14,7 @@
  *
  * 设计原则 (Hermes 1a follow-up #2 lesson):
  * - 不**静默** default 到某个 provider, 必报清晰错
+ * - DEEPWHALE_PROVIDER 是 "user 决断" 显式语义, 优先级高于 env 推断
  * - 不**做**汇率换算 / 跨 provider 兼容 (DeepSeek shim 走同一 endpoint, 接口层隔离)
  * - 注入点已存在 (ReplOptions.client), factory 只在 startRepl 入口用
  */
@@ -70,20 +73,39 @@ export function resolveAnthropicApiKey(): string | undefined {
  *   - 都没设 → 抛 APIKeyMissingError (跟 1b 时代一致, 引导 user)
  *   - 都设了 → 抛 'both-set' 错误 (P0 风险, 强制 user 决断)
  *   - 只设一个 → 返那个
+ *
+ * Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 Anthropic wins tiebreak bug):
+ * 之前 if-else 顺序是 "hasAnthropic 排第一", 跟产品 "DeepSeek-first" 品牌
+ * (README:18 / package.json:6 / DeepSeekClient 默认 model=deepseek-v4-flash)
+ * 矛盾. 两个都设的实情被 tryCreateClient catch 静默 + tryCreateClient
+ * 自身的 fallback 让用户误以为"在走 anthropic". 拍板: 跟品牌一致,
+ * hasDeepseek 排第一; 都设的 error 信息明示用户可以传 --provider 决断.
+ * 行为兼容: 单 key 路径 (只设 Anthropic 或只设 DeepSeek) 完全不变.
  */
 function resolveProvider(explicit: Provider | undefined): Provider {
+  // 优先级: 显式 options.provider > DEEPWHALE_PROVIDER env > 单 key 推断.
   if (explicit !== undefined) return explicit;
+  // Sprint 1c-revive-2-D-21.1 (2026-06-06): DEEPWHALE_PROVIDER 让 user shell 一行
+  // 决断 (e.g. `DEEPWHALE_PROVIDER=deepseek deepwhale` 即使两个 key 都设了也走 deepseek).
+  const providerEnv = process.env['DEEPWHALE_PROVIDER'];
+  if (providerEnv === 'deepseek' || providerEnv === 'anthropic') {
+    return providerEnv;
+  }
+  // DEEPWHALE_PROVIDER 设了非法值: 静默 fall through 到 env 推断, 不让 typo
+  // (e.g. `DEEPWHALE_PROVIDER=depseek`) 整个 CLI 崩. 拍板: 静默忽略, 因为
+  // "拼错" 不该是 fatal, user 该看到下面的 "Both set" 错才知道哪里设错了.
   const hasAnthropic = (process.env['ANTHROPIC_AUTH_TOKEN'] ?? '') !== '';
   const hasDeepseek = (process.env['DEEPSEEK_API_KEY'] ?? '') !== '';
   if (hasAnthropic && hasDeepseek) {
     throw new APIKeyMissingError(
       'Both ANTHROPIC_AUTH_TOKEN and DEEPSEEK_API_KEY are set. ' +
-        'Unset one or pass --provider explicitly. This is a safety check to prevent ' +
-        'silently using the wrong provider with the wrong API key.',
+        'Unset one, or set DEEPWHALE_PROVIDER=<deepseek|anthropic>, or pass --provider <name>. ' +
+        'This is a safety check to prevent silently using the wrong provider with the wrong API key. ' +
+        'Note: DeepWhale is DeepSeek-first (default model: deepseek-v4-flash).',
     );
   }
-  if (hasAnthropic) return 'anthropic';
   if (hasDeepseek) return 'deepseek';
+  if (hasAnthropic) return 'anthropic';
   throw new APIKeyMissingError(
     'No LLM API key set. Set DEEPSEEK_API_KEY (DeepSeek) or ' +
       'ANTHROPIC_AUTH_TOKEN (Anthropic, via DeepSeek shim /anthropic endpoint) ' +
