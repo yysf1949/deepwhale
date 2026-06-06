@@ -346,12 +346,20 @@ export function looksLikeSpawnError(
   if (exitCode === 0) return false;
   const text = `${stdout}\n${stderr}`;
   // 关键词按 Win32 cmd / PowerShell / POSIX /bin/sh 优先级排
+  // D-25 A2 (F5, 2026-06-06) **更激进删** (用户 22:50 拍板):
+  //   - 修前: 6 patterns 含 `/No such file/i` 短匹配, 误伤 Vitest ENOENT 业务错误
+  //   - 用户 plan 原拍"删短匹配保留完整短语", 实测 plan §1.2 自相矛盾:
+  //     完整短语 `/No such file or directory/i` 仍命中 Node ENOENT 业务文本
+  //     (`Error: ENOENT: no such file or directory, open '/x'`)
+  //   - 用户 22:50 拍板"更激进删", 同时删短匹配 + 完整短语, 只留
+  //     cmd.exe / bash / PowerShell 5 个非 POSIX 关键词
+  //   - 跟 memory §10c 7 关键词 shape 不变量兼容 (实测 7 关键词里 POSIX
+  //     文本只在 spawn-error 真实场景出现, 业务 ENOENT 走 status='failed' 真实路径)
+  //   - 同步: 删 plan 写的"保留完整短语"那段, 拍板更新到 .hermes/plans/d19/
   const patterns = [
     /is not recognized/i, // cmd.exe: 'X' is not recognized as an internal or external command
     /not recognized as/i, // cmd.exe 长串前段
-    /No such file or directory/i, // POSIX /bin/sh -c
-    /No such file/i, // 短匹配, 兜底
-    /command not found/i, // POSIX bash
+    /command not found/i, // POSIX bash 完整短语
     /cannot find the (path|file)/i, // cmd.exe 'The system cannot find the path specified'
     /is not a (recognized|valid) command/i, // PowerShell
   ];

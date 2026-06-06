@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import {
   runVerify,
   resolveRunner,
+  looksLikeSpawnError,
   type VerifyCheck,
   type VerificationReport,
 } from '../../../src/verify/verify-runner.js';
@@ -311,6 +312,38 @@ describe('verify-runner (D-11 2026-06-04)', () => {
     it('Linux: 任何 runner 透传, 不强制加 .cmd', () => {
       expect(resolveRunner('my-tool.exe', 'linux')).toBe('my-tool.exe');
       expect(resolveRunner('corepack.cmd', 'linux')).toBe('corepack.cmd');
+    });
+  });
+
+  // D-25 A2 (F5, 2026-06-06): looksLikeSpawnError 收窄 regression 测
+  // 修前: 短匹配 `/No such file/i` 误伤 Vitest ENOENT 业务错误, 误报 spawn-error
+  // 修后: 仅 5 关键词 (cmd.exe / bash / PowerShell), Vitest ENOENT 业务错误
+  //       走真实 status='failed' 路径 (D-25 plan F5, 2026-06-06 22:50 用户拍板"更激进删")
+  describe('looksLikeSpawnError 收窄 (D-25 A2 F5)', () => {
+    // 期望命中 (真 spawn-error 文本)
+    it('cmd.exe: "is not recognized" 命中', () => {
+      expect(looksLikeSpawnError('', `'foo' is not recognized as an internal or external command`, 1)).toBe(true);
+    });
+    it('cmd.exe: "cannot find the path" 命中', () => {
+      expect(looksLikeSpawnError('', `The system cannot find the path specified.`, 1)).toBe(true);
+    });
+    it('POSIX bash: "command not found" 命中', () => {
+      expect(looksLikeSpawnError('', `bash: foo: command not found`, 127)).toBe(true);
+    });
+    it('PowerShell: "is not a recognized command" 命中', () => {
+      expect(looksLikeSpawnError('', `foo : The term 'foo' is not recognized as the name of a cmdlet, function, script file, or operable program.`, 1)).toBe(true);
+    });
+    // 期望不命中 (业务 ENOENT 误伤源, D-25 A2 修后)
+    it('Vitest ENOENT 业务错误: "no such file or directory" 完整短语 — 现在 false (D-25 A2 更激进删)', () => {
+      // 修前 (6 patterns): 命中 (误报 spawn-error) → status='spawn-error' 错
+      // 修后 (5 patterns): 不命中 → status 走 'failed' 真实业务失败
+      // 用户 22:50 拍板: 同时删短匹配 + 完整短语, 不留 POSIX 文本 (跟
+      //   memory §10c 7 关键词 shape 不变量兼容, 实测业务里更干净)
+      const stderr = `Error: ENOENT: no such file or directory, open '/tmp/missing.txt'`;
+      expect(looksLikeSpawnError('', stderr, 1)).toBe(false);
+    });
+    it('exit code 0: 任何文本都不命中', () => {
+      expect(looksLikeSpawnError('No such file or directory', 'is not recognized', 0)).toBe(false);
     });
   });
 });
