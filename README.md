@@ -64,7 +64,7 @@ pnpm dev
 
 ## v1.0 capability matrix (D-20.4, 2026-06-05)
 
-| **Sprint 1c-revive-4 D-20.1-20.5 ship 现状** (commit 范围 `583a599..2f89926`, 6 颗 D-20 commit + `583a599..67aa39a` 11 颗含 D-20.6 review-fix + `583a599..2f89926` 14 颗含 D-20.7 merge-blocker-fix, 测试基线 521 passed / 20 skipped / 13.55s):
+| **Sprint 1c-revive-4 D-20.1-20.5 ship 现状** (commit 范围 `583a599..76d42ac`, 6 颗 D-20 commit + `583a599..67aa39a` 11 颗含 D-20.6 review-fix + `583a599..76d42ac` 16 颗含 D-20.7 merge-blocker-fix (round 1: 7 颗 + round 2: 9 颗), 测试基线 521 passed / 20 skipped / 13.55s):
 
 | 能力 | 状态 | 代码入口 | 测覆盖 | 备注 |
 | --- | --- | --- | --- | --- |
@@ -92,8 +92,16 @@ pnpm dev
 - 真 LLM cache 命中验证留 sprint 2 (D-20.2 P1 拍板)
 - 偶发 verify-runner.test.ts 1 it fail (跨 test 状态污染, 单跑 pass, 留 sprint 调查) — **D-20.6.6 (2026-06-06) 复现**: `signal 触发时 kill 当前 child, status=aborted` race (s1 50ms 内未跑完), 全量偶发 1/521 fail, focused 16/16 pass
 - 测试数持续漂移 — 真实数 521 passed / 20 skipped (跨 60 file, 偶发 -1) / 13.55s (D-20.6.6 拍)
-- **D-20.7 merge-blocker-fix (2026-06-06)**: Win32 shell:true + timeout 不在 timer fired 立刻 finalize + TUI signal 测降级 forwarding contract + docker-runner cleanup stderr 吞噪声. 4 commit 收 5 finding, 修后 focused 8+28+8+16=60/2 pass. 留给 Windows reviewer 跑 `pnpm test` + `deepwhale --verify` 验.
+- **D-20.7 merge-blocker-fix round 1 (2026-06-06)**: Win32 shell:true + timeout 不在 timer fired 立刻 finalize + TUI signal 测降级 forwarding contract + docker-runner cleanup stderr 吞噪声. 4 commit 收 5 finding, 修后 focused 8+28+8+16=60/2 pass.
   - **D-20.7 P0 (后续)**: 暴露 turnAbortController 给测试, 真 trigger abort, 验 runToolLoop 收到 aborted=true (替代当前 forwarding contract)
+- **D-20.7 merge-blocker-fix round 2 (2026-06-06)**: Win32 reviewer 报 4 新 finding. 2 commit 收:
+  - **D-20.7.7+9**: `looksLikeSpawnError()` helper (7 shell 启错关键词正则) + `useShell` hoist 闭包 (try 块内 const 外传不了) + verify 4 步 test step 排除 integration (避免网络/API key 依赖阻塞 --verify)
+  - **D-20.7.7.1**: spawn-error Win32 shell 路径 `exitCode` 归一 `null`, 跟 POSIX sync spawn-error shape 一致 (D-20.7.7 初版留 code 实际值, 测 expect null fail)
+  - **D-20.7.8**: AbortSignal 竞态 50ms → 1000ms (20x margin), 替代确定性 barrier 走实用主义
+  - Linux baseline: 16/16 + 456/2/458 (--exclude integration) + deepwhale --verify 4/4 pass exit 0
+- **D-20.7 P0 + D-20.8 风险项** (2026-06-06, 后续 sprint):
+  - 暴露 turnAbortController 给 TUI smoke 测, 真 trigger abort
+  - **DEP0190 shell:true + args Node warning** — `deepwhale --verify` / verify-runner 测仍打印, 当前不阻塞, D-20.8 改走显式 `cmd.exe /d /s /c ...` 兼容层更干净
 
 ## 测试
 
