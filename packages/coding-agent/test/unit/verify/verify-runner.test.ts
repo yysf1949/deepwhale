@@ -213,22 +213,27 @@ describe('verify-runner (D-11 2026-06-04)', () => {
     // 那是"signal 只影响下一 step" 的旧拍板. 修复后 s2 自己被 kill, s2 status = 'aborted',
     // fail-fast break, s3 不会 push 进 results.
     it('signal 触发时 kill 当前 child, status=aborted, fail-fast break 后 s3 不进 results', async () => {
+      // Sprint D-20.7.8 (2026-06-06): 从 50ms 增至 1000ms, 给 Win32 spawn 足够 margin.
+      // 旧测 50ms 太紧: Win32 上 s1 (delay:0) 还在 CreateProcessW, abort listener fire
+      // 时 s1 没跑完, 报 aborted 不是 passed. 新测: 1000ms (20x 比旧), s1 在任何平台上
+      // <100ms 跑完, abort 永远打 s2 (delay 1000ms 跑一半). 不完美但实用 — 跟替换 inline
+      // 拉长比 50ms 竞态根因是值太紧, 不是 sleep 本身.
       const ac = new AbortController();
       const reportPromise = runVerify({
         cwd: workDir,
         signal: ac.signal,
         checks: [
           nodeCheck('s1', '', { stdout: 'ok' }),
-          nodeCheck('s2', '', { delayMs: 200 }), // 200ms delay, 50ms 时 abort → 应被 kill
+          nodeCheck('s2', '', { delayMs: 1000 }), // 1000ms delay, 1000ms 时 abort → 应被 kill
           nodeCheck('s3', '', { stdout: 'should-not-run' }),
         ],
       });
-      // 跑 50ms 后 abort
-      setTimeout(() => ac.abort(), 50);
+      // 跑 1000ms 后 abort (vs 之前 50ms)
+      setTimeout(() => ac.abort(), 1000);
       const report = await reportPromise;
 
       expect(report.overallStatus).toBe('failed');
-      // s1 跑完 (50ms 内, delay 0)
+      // s1 跑完 (1000ms 内, delay 0)
       expect(report.checks[0]!.status).toBe('passed');
       // s2 还在跑被 signal 干掉: status='aborted', errorMessage 含 'aborted'
       const s2 = report.checks.find((c) => c.name === 's2');
