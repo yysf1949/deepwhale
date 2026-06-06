@@ -211,8 +211,16 @@ const INSTALLED_CHECKS_TEMPLATE: ReadonlyArray<Omit<VerifyCheck, 'command'> & { 
   },
   {
     name: 'bin-check',
-    commandTemplate: 'test -f ${CWD}/bin/deepwhale.js',
-    args: ['test', '-f', '__CWD__/bin/deepwhale.js'],
+    // D-25 A3 (F3, 2026-06-06): POSIX `test -f` 改 `node -e` inline JS, 跨平台 0 差异.
+    // 修前: args: ['test', '-f', '__CWD__/bin/deepwhale.js'] (Win32: 'test' is not recognized, fail)
+    // 修后: args: ['node', '-e', 'require("fs").existsSync(...) ? 0 : 1'] (跨平台一致)
+    commandTemplate:
+      "node -e \"require('fs').existsSync('${CWD}/bin/deepwhale.js') ? process.exit(0) : (process.stderr.write('missing: ' + '${CWD}/bin/deepwhale.js'), process.exit(1))\"",
+    args: [
+      'node',
+      '-e',
+      "require('fs').existsSync('__CWD__/bin/deepwhale.js') ? process.exit(0) : (process.stderr.write('missing: __CWD__/bin/deepwhale.js'), process.exit(1))",
+    ],
   },
   {
     name: 'exports-check',
@@ -242,7 +250,12 @@ const INSTALLED_CHECKS_TEMPLATE: ReadonlyArray<Omit<VerifyCheck, 'command'> & { 
  * 调用方 (pickChecksForContext) 用 resolveInstalledPackageRoot() 拿这个路径.
  * 包名 (PKG) 硬编码 '@deepwhale/coding-agent' — 这是 verify 验证的唯一目标包.
  */
-function renderInstalledChecks(packageRoot: string): ReadonlyArray<VerifyCheck> {
+/**
+ * D-25 A3 (F3, 2026-06-06): 内部 helper export 出, 仅供测试断言 args 形态.
+ * 业务 0 改, 仅 +1 个 export, 0 影响现有调用方 (pickChecksForContext 内部仍调).
+ * 测试用 `renderInstalledChecks('/fake/pkg/root')` 拿 4 check 验 args[0]==='node' / args[1] 不是 POSIX 标志.
+ */
+export function renderInstalledChecks(packageRoot: string): ReadonlyArray<VerifyCheck> {
   const pkgName = '@deepwhale/coding-agent';
   // 包根的父目录 = node_modules 所在目录. global: `<prefix>/lib/node_modules`;
   // local: `<proj>/node_modules`. Node 从这个目录起能找到包.

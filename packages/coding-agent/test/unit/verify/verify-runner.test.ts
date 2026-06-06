@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import {
   runVerify,
   resolveRunner,
+  renderInstalledChecks,
   looksLikeSpawnError,
   type VerifyCheck,
   type VerificationReport,
@@ -312,6 +313,51 @@ describe('verify-runner (D-11 2026-06-04)', () => {
     it('Linux: 任何 runner 透传, 不强制加 .cmd', () => {
       expect(resolveRunner('my-tool.exe', 'linux')).toBe('my-tool.exe');
       expect(resolveRunner('corepack.cmd', 'linux')).toBe('corepack.cmd');
+    });
+  });
+
+  // D-25 A3 (F3, 2026-06-06): installed 4 check shell-safe args 形态 regression
+  // 修前: bin-check 走 `test -f` POSIX 标志 (cmd.exe / PowerShell 不可用, 装出必挂)
+  // 修后: 全部 4 check args[0]==='node' (跨平台一致)
+  describe('installed 4 check shell-safe args (D-25 A3 F3)', () => {
+    const checks = renderInstalledChecks('/fake/pkg/root');
+    it('应返回 4 个 check (syntax / import / bin / exports)', () => {
+      expect(checks).toHaveLength(4);
+      expect(checks.map(c => c.name).sort()).toEqual(['bin-check', 'exports-check', 'import-check', 'syntax-check']);
+    });
+    it('全部 4 check args[0] === "node" (跨平台一致)', () => {
+      for (const c of checks) {
+        expect(c.args[0]).toBe('node');
+      }
+    });
+    it('args[1] 不是 POSIX 标志 (--check / -e 才是合规)', () => {
+      // 修前 bin-check: args[1] === 'test' (POSIX builtin), Win32 不可用
+      // 修后: 全部走 'node' + ('--check' | '-e'), 跨平台
+      for (const c of checks) {
+        const second = c.args[1];
+        // 合规: --check (syntax) / -e (import/bin/exports) / 其它 node 标志
+        // 不合规: 'test' / 'ls' / 任何 POSIX builtin
+        expect(['--check', '-e']).toContain(second);
+      }
+    });
+    it('bin-check 不再用 `test -f`, 改 `node -e` inline JS', () => {
+      const bin = checks.find(c => c.name === 'bin-check')!;
+      expect(bin.args).toEqual(['node', '-e', expect.stringContaining("require('fs').existsSync")]);
+      // 不应有 'test' 标志
+      expect(bin.args).not.toContain('test');
+    });
+    it('import-check 跟 exports-check 走 cwd = node_modules 父目录', () => {
+      const imp = checks.find(c => c.name === 'import-check')!;
+      const exp = checks.find(c => c.name === 'exports-check')!;
+      // 包根 = /fake/pkg/root, 父目录 = /fake/pkg (Node 解析包名从这起找 node_modules)
+      expect(imp.cwd).toBe('/fake/pkg');
+      expect(exp.cwd).toBe('/fake/pkg');
+    });
+    it('syntax-check 跟 bin-check 用绝对路径, 不需要特殊 cwd', () => {
+      const syn = checks.find(c => c.name === 'syntax-check')!;
+      const bin = checks.find(c => c.name === 'bin-check')!;
+      expect(syn.cwd).toBeUndefined();
+      expect(bin.cwd).toBeUndefined();
     });
   });
 
