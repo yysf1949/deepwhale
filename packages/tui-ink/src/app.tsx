@@ -225,9 +225,9 @@ export function App({ options, onExit }: AppProps): ReactElement {
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      {/* Header */}
+      {/* Header — D-25 B5 ship: bump v1.0.9 → v1.0.10 */}
       <Text color={theme.header}>
-        ⌬ deepwhale tui-ink v1.0.9
+        ⌬ deepwhale tui-ink v1.0.10
       </Text>
       <Divider theme={theme} />
 
