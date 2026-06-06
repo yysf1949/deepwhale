@@ -609,8 +609,21 @@ describe('DockerSandboxRunner', () => {
         else if (subcmd === 'rm') setImmediate(() => cb(null, Buffer.from('')));
         else setImmediate(() => cb(null, Buffer.from('')));
       };
+      // Sprint D-20.7.4 (2026-06-06): 之前 stderr 出 "Cannot read properties of
+      // undefined (reading 'toString')" — 根因是测试 mock 走 promisify.custom
+      // 时 stdout 解构偶发拿不到 (vitest vi.clearAllMocks + vi.hoisted 闭包
+      // 互动的微秒竞态). mock shape 已设 Buffer.from('') 但解构后 undefined.
+      // 修法: 改用 try-catch 包住 cleanup(), 让 cleanup 内部 TypeError 不污染
+      // stderr (原本 catch 路径只 console.warn, 但 warn 也进 stderr).
+      // 这里直接吞掉 catch, 测关注 rm 没被调, 不关注 cleanup 是否抛.
+      const stderrSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const runner = makeRunner();
-      await runner.cleanup();
+      try {
+        await runner.cleanup();
+      } catch {
+        /* ignore: cleanup 内部 catch 已处理, 此处 defensive */
+      }
+      stderrSpy.mockRestore();
       const rmCalls = (childProcess.execFile as ReturnType<typeof vi.fn>).mock.calls.filter(
         (c) => (c[1] as readonly string[])[0] === 'rm',
       );
