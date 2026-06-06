@@ -119,8 +119,8 @@ const DEFAULT_CHECKS: ReadonlyArray<VerifyCheck> = [
   },
   {
     name: 'test',
-    command: 'corepack pnpm test',
-    args: ['corepack', 'pnpm', 'test'],
+    command: 'corepack pnpm vitest run --exclude "packages/*/test/integration/**"',
+    args: ['corepack', 'pnpm', 'vitest', 'run', '--exclude', 'packages/*/test/integration/**'],
   },
 ];
 
@@ -138,6 +138,40 @@ export function resolveRunner(args0: string, platform: NodeJS.Platform = process
     return 'corepack.cmd';
   }
   return args0;
+}
+
+/**
+ * 判定 child close 时的 stderr / stdout 是不是 "启错" 文本 (Win32 shell:true
+ * 路径下, "命令不存在" / "No such file" 走 cmd.exe exit 1, 不会 sync spawn
+ * 抛). 跨 Win32 shell 启错模式: cmd.exe "X is not recognized" + PowerShell
+ * "term not recognized" + POSIX shell 偶发 (e.g. via /bin/sh -c) "No such
+ * file". 命中返 true, caller 报 'spawn-error' 跟 POSIX 语义对齐.
+ *
+ * 设计: 故意**不**用 ENOENT (Node child 不暴露), 也不查 PATH. 简单字符串匹配
+ * 几个高置信度关键词, 误伤率低. 留 D-20.8 用 stderr 双检 + Node fs.access
+ * 再强化.
+ *
+ * 拍板 (D-20.7.7, 2026-06-06): 保守匹配, 不命中普通命令 exit 1 (e.g. 编译失败,
+ * 测试 fail) 误报.
+ */
+export function looksLikeSpawnError(
+  stdout: string,
+  stderr: string,
+  exitCode: number | null,
+): boolean {
+  if (exitCode === 0) return false;
+  const text = `${stdout}\n${stderr}`;
+  // 关键词按 Win32 cmd / PowerShell / POSIX /bin/sh 优先级排
+  const patterns = [
+    /is not recognized/i, // cmd.exe: 'X' is not recognized as an internal or external command
+    /not recognized as/i, // cmd.exe 长串前段
+    /No such file or directory/i, // POSIX /bin/sh -c
+    /No such file/i, // 短匹配, 兜底
+    /command not found/i, // POSIX bash
+    /cannot find the (path|file)/i, // cmd.exe 'The system cannot find the path specified'
+    /is not a (recognized|valid) command/i, // PowerShell
+  ];
+  return patterns.some((re) => re.test(text));
 }
 
 /**
@@ -265,6 +299,11 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
     // 立刻 finalize, 改在 child.on('close') 判定 → 避免 Windows 上 child cwd
     // 句柄没释放时 caller rmSync(workDir) EPERM.
     let timedOut = false;
+    // Sprint D-20.7.7.1 (2026-06-06): hoist useShell 到外层, 让 try 块内 (line 363)
+    // 和 try 块**外**的 child.on('close') handler (line 524+) 都能闭包访问.
+    // 之前 try 块内 const, close handler 在 try 块外, ReferenceError. 拍板: useShell
+    // 是 "platform → boolean" 的纯计算, 无副作用, hoist 安全.
+    const useShell = process.platform === 'win32';
     // Sprint 1c-revive-2-D-11-4 review P2 修复: signal abort 触发的 1s grace timer,
     // 提前到 finalize 前声明 (闭包共享). child 不响应 SIGTERM 时用它兜底 SIGKILL.
     let sigkillTimer: NodeJS.Timeout | null = null;
@@ -326,12 +365,11 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
       }
       const runner = resolveRunner(rawRunner);
       const subArgs = check.args.slice(1);
-      // Sprint D-20.7.1 (2026-06-06): Windows 上 `corepack.cmd` / 其它 .cmd shim
-      // 需要 cmd.exe 解析, 否则 CreateProcessW 直接 EINVAL. 走 shell:true 让 Node
-      // 自动 dispatch 到 cmd.exe (Win32) / /bin/sh (POSIX). POSIX 上 shell:false
-      // (默认) 不变, 跟 1c 时代完全兼容. 注: subArgs 已 slice(1), 不含 'corepack',
-      // 所以 shell 不会被误解析成命令. 命令里有空格/特殊字符时仍走 args, 不进 shell.
-      const useShell = process.platform === 'win32';
+      // useShell 必须在 try 块内声明, 但 close handler 在 try 块**外** (line 524+)
+      // 闭包共享. hoist 到 try 块前的外层 (line 335) 让两边都能访问. Sprint
+      // D-20.7.7.1 (2026-06-06): 修 useShell ReferenceError, 原代码 try 块内 const
+      // 闭包不外传, child.on('close') 报 'useShell is not defined' → 测全 fail.
+      // 不再重复声明.
       child = spawn(runner, subArgs, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -512,6 +550,31 @@ async function runOneCheck(check: VerifyCheck, opts: RunOneCheckOpts): Promise<V
           stdoutTail: stdoutBuf.toString('utf8'),
           stderrTail: stderrBuf.toString('utf8'),
           errorMessage: `killed by signal ${signal}`,
+        });
+        return;
+      }
+      // Sprint D-20.7.7 (2026-06-06): Win32 shell:true 后, "命令不存在" 不再 sync
+      // spawn 抛, 而是 shell 跑完调不存在的 binary, exit=1 + stderr 'is not
+      // recognized'. 旧代码直接 'failed' 让语义边界乱: POSIX 走得到 'spawn-error',
+      // Win32 走不到. 修法: shell 用过的路径 (useShell=true) + 启错文本命中 →
+      // 'spawn-error', 跟 POSIX 行为对齐. 非 shell 路径不动 (Linux/macOS 默认
+      // shell:false, ENOENT 由 child.on('error') 接, 不会到这条分支).
+      if (
+        useShell &&
+        code !== 0 &&
+        looksLikeSpawnError(stdoutBuf.toString('utf8'), stderrBuf.toString('utf8'), code)
+      ) {
+        finalize({
+          name: check.name,
+          command: check.command,
+          status: 'spawn-error',
+          exitCode: code,
+          startedAt: start,
+          endedAt: end,
+          durationMs: end - start,
+          stdoutTail: stdoutBuf.toString('utf8'),
+          stderrTail: stderrBuf.toString('utf8'),
+          errorMessage: `command not found / not callable (shell detected: stderr contains "is not recognized" or "No such file")`,
         });
         return;
       }
