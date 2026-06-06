@@ -1,7 +1,8 @@
 {
   "name": "@deepwhale/core",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.1",
+  "description": "Core primitives for DeepWhale: i18n, session JSONL, compaction, types",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,6 +19,36 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "deepwhale",
+    "ai-agent",
+    "i18n",
+    "session",
+    "compaction",
+    "jsonl",
+    "deepseek",
+    "anthropic"
+  ],
+  "author": {
+    "name": "yysf1949",
+    "email": "butterfly443@openclaw.ai"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yysf1949/deepwhale.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/yysf1949/deepwhale#readme",
+  "bugs": {
+    "url": "https://github.com/yysf1949/deepwhale/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -b",
     "dev": "tsc -b --watch",
