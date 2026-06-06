@@ -32,7 +32,7 @@ import {
 } from '@deepwhale/coding-agent'
 import type { LLMClient } from '@deepwhale/coding-agent'
 import { highlightChunk } from '../highlight/chunk.js'
-import { pushEntry, appendToLastAssistant, sealLastAssistant, $uiState } from '../store/ui.js'
+import { pushEntry, appendToLastAssistant, appendReasoningChunk, sealLastAssistant, $uiState } from '../store/ui.js'
 import type { TuiTheme } from '../theme/index.js'
 import type { TuiInkOptions } from '../types.js'
 import type { ChatMessage } from '@deepwhale/coding-agent'
@@ -82,11 +82,16 @@ export function useRunToolLoop(args: UseRunToolLoopArgs): UseRunToolLoopResult {
         // D-25 B2: runToolLoop(client, messages, options) 3 参签名
         const result = await runToolLoop(client, turnMessages, {
           registry,
-          onChunk: (chunk: { content?: string }) => {
+          onChunk: (chunk: { content?: string; reasoning_content?: string }) => {
+            // D-23.2: 染色后增量推 (跟 tui.ts L645 1:1)
             if (chunk.content) {
-              // D-23.2: 染色后增量推 (跟 tui.ts L645 1:1)
               const colored = highlightChunk(chunk.content, theme, true)
               appendToLastAssistant(colored)
+            }
+            // D-27 D3: reasoning_content 增量推 (DeepSeek V4 thinking mode, 跟 D-21.1 1:1)
+            //   reasoning 单独累积, 不染色, 不跟 content 混合, 走 <Thinking/> 组件折叠
+            if (chunk.reasoning_content) {
+              appendReasoningChunk(chunk.reasoning_content)
             }
           },
           maxSteps: options.maxSteps ?? 5,

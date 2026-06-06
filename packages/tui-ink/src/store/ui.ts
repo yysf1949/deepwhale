@@ -56,6 +56,8 @@ export interface TranscriptEntry {
   text: string
   /** stream 模式下, assistant entry 的 text 持续 append (delta) */
   streaming?: boolean
+  /** D-27 D3: reasoning_content 累积 (DeepSeek V4 thinking mode), 跟 text 分离, 走 <Thinking/> 折叠 */
+  reasoning?: string
   /** tool entry 字段 */
   status?: 'success' | 'error'
   toolName?: string
@@ -89,5 +91,22 @@ export function sealLastAssistant(): void {
   const last = entries[entries.length - 1]
   if (last && last.kind === 'assistant' && last.streaming) {
     $transcript.set([...entries.slice(0, -1), { ...last, streaming: false }])
+  }
+}
+
+/**
+ * D-27 D3: 增量累积 reasoning_content (DeepSeek V4 thinking mode).
+ * 跟 appendToLastAssistant 1:1, 单独累积 reasoning 字段 (不跟 text 混合).
+ * 走 <Thinking/> 组件折叠渲染, 跟 Hermes thinking.tsx 1:1.
+ */
+export function appendReasoningChunk(delta: string): void {
+  const entries = $transcript.get()
+  const last = entries[entries.length - 1]
+  if (last && last.kind === 'assistant') {
+    const newReasoning = (last.reasoning ?? '') + delta
+    $transcript.set([...entries.slice(0, -1), { ...last, reasoning: newReasoning }])
+  } else {
+    // 无 last assistant → push 新 entry (跟 appendToLastAssistant 一致)
+    $transcript.set([...entries, { kind: 'assistant', text: '', reasoning: delta }])
   }
 }
