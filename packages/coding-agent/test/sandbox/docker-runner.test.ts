@@ -26,6 +26,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { promisify } from 'node:util';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import * as childProcess from 'node:child_process';
 import {
   DockerSandboxRunner,
@@ -98,7 +100,14 @@ vi.mock('node:child_process', async (importOriginal) => {
   };
 });
 
-const SANDBOX_ROOT = '/tmp/sbx-test';
+// Sprint 1c-revive-5-D-20.6.2 review-fix (2026-06-06): 用平台原生绝对路径
+// 替代 hardcode '/tmp/sbx-test'. 之前 Linux 测试过得了, 但 Windows 端
+// pathResolve('/tmp/sbx-test') 落到根盘符, 跟 pathResolve(req.cwd) 不在
+// 同空间, isInsideSandbox early return, mock child 不创建 → 4 个
+// docker-runner 测 fail. 修法: tmpdir() 拿平台原生 tmp dir, 跟 caller
+// 现实场景一致. docker-runner.ts 构造时 pathResolve(opts.sandboxRoot)
+// (D-20.6.1) 已保证 sandboxRoot 跟 req.cwd 走同空间.
+const SANDBOX_ROOT = join(tmpdir(), 'sbx-test');
 
 function makeRunner(
   overrides: Partial<{
@@ -140,10 +149,10 @@ describe('DockerSandboxRunner', () => {
   describe('buildDockerArgs 形状', () => {
     it('默认 image = node:22-alpine', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('deepwhale-sbx-abcdef12', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('deepwhale-sbx-abcdef12', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: ['-la'],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -152,10 +161,10 @@ describe('DockerSandboxRunner', () => {
 
     it('自定义 image 透传', () => {
       const runner = makeRunner({ image: 'alpine:3.20' });
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'echo',
         args: ['hi'],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -164,10 +173,10 @@ describe('DockerSandboxRunner', () => {
 
     it('args 包含 --rm, --label, --name, --read-only, --cap-drop=ALL, --security-opt', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -180,10 +189,10 @@ describe('DockerSandboxRunner', () => {
 
     it('容器名前缀是 deepwhale-sbx- + 8 字符', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('deepwhale-sbx-12345678', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('deepwhale-sbx-12345678', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -195,10 +204,10 @@ describe('DockerSandboxRunner', () => {
 
     it('默认 --network none (禁网)', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -208,10 +217,10 @@ describe('DockerSandboxRunner', () => {
 
     it('显式 network: bridge 才挂 bridge', () => {
       const runner = makeRunner({ network: 'bridge' });
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -221,23 +230,23 @@ describe('DockerSandboxRunner', () => {
 
     it('workspace 显式 bind mount: -v ${abs}:/workspace:rw', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test/sub', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}/sub`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test/sub',
+        cwd: `${SANDBOX_ROOT}/sub`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
       const vIdx = args.indexOf('-v');
-      expect(args[vIdx + 1]).toBe('/tmp/sbx-test/sub:/workspace:rw');
+      expect(args[vIdx + 1]).toBe(`${SANDBOX_ROOT}/sub:/workspace:rw`);
     });
 
     it('**不** 包含 --privileged (grep 自查)', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -246,10 +255,10 @@ describe('DockerSandboxRunner', () => {
 
     it('**不** 包含 --env-file (grep 自查)', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -258,10 +267,10 @@ describe('DockerSandboxRunner', () => {
 
     it('**不** 挂宿主根目录 (没有 -v /:/host 之类)', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -276,10 +285,10 @@ describe('DockerSandboxRunner', () => {
 
     it('**不** 传 DEEPSEEK_API_KEY / ANTHROPIC_AUTH_TOKEN (grep 自查)', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -290,10 +299,10 @@ describe('DockerSandboxRunner', () => {
 
     it('末尾是 [image, command, ...args]', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'node',
         args: ['-e', 'process.stdout.write("hi")'],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -310,10 +319,10 @@ describe('DockerSandboxRunner', () => {
     // 跟 Docker CLI 标准格式: --memory / --cpus / --pids-limit 字符串.
     it('默认: --memory=512m / --cpus=1.0 / --pids-limit=256', () => {
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 1_000,
         stdoutCapBytes: 1024,
       });
@@ -327,10 +336,10 @@ describe('DockerSandboxRunner', () => {
 
     it('构造参数覆盖 memory=1g → buildDockerArgs 用 1g', () => {
       const runner = makeRunner({ memory: '1g' });
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 1_000,
         stdoutCapBytes: 1024,
       });
@@ -342,10 +351,10 @@ describe('DockerSandboxRunner', () => {
 
     it('构造参数覆盖 cpus=0.5 → buildDockerArgs 用 0.5', () => {
       const runner = makeRunner({ cpus: '0.5' });
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 1_000,
         stdoutCapBytes: 1024,
       });
@@ -354,10 +363,10 @@ describe('DockerSandboxRunner', () => {
 
     it('构造参数覆盖 pidsLimit=1024 → buildDockerArgs 用 1024', () => {
       const runner = makeRunner({ pidsLimit: '1024' });
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 1_000,
         stdoutCapBytes: 1024,
       });
@@ -413,10 +422,10 @@ describe('DockerSandboxRunner', () => {
     it('红线: buildDockerArgs 不传 DEEPSEEK_API_KEY / ANTHROPIC_AUTH_TOKEN (跟 D-12 拍板一致)', () => {
       // 资源限制是新增字段, 不能意外让 API key 漏出.
       const runner = makeRunner();
-      const args = runner.buildDockerArgs('sbx-x', '/tmp/sbx-test', {
+      const args = runner.buildDockerArgs('sbx-x', `${SANDBOX_ROOT}`, {
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 1_000,
         stdoutCapBytes: 1024,
       });
@@ -435,7 +444,7 @@ describe('DockerSandboxRunner', () => {
       const promise = runner.run({
         command: 'echo',
         args: ['hello'],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -459,7 +468,7 @@ describe('DockerSandboxRunner', () => {
       const promise = runner.run({
         command: 'ls',
         args: ['/nonexistent'],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -478,7 +487,7 @@ describe('DockerSandboxRunner', () => {
       const promise = runner.run({
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 1024,
       });
@@ -497,7 +506,7 @@ describe('DockerSandboxRunner', () => {
       const promise = runner.run({
         command: 'ls',
         args: [],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 5_000,
         stdoutCapBytes: 512,
       });
@@ -520,7 +529,7 @@ describe('DockerSandboxRunner', () => {
       const promise = runner.run({
         command: 'sleep',
         args: ['999'],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 100,
         stdoutCapBytes: 1024,
       });
@@ -556,7 +565,7 @@ describe('DockerSandboxRunner', () => {
       const promise = runner.run({
         command: 'sleep',
         args: ['999'],
-        cwd: '/tmp/sbx-test',
+        cwd: `${SANDBOX_ROOT}`,
         timeoutMs: 50,
         stdoutCapBytes: 1024,
       });
