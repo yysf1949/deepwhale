@@ -64,7 +64,7 @@ pnpm dev
 
 ## v1.0 capability matrix (D-20.4, 2026-06-05)
 
-| **Sprint 1c-revive-4 D-20.1-20.5 ship 现状** (commit 范围 `583a599..731ff18`, 6 颗 D-20 commit + `583a599..67aa39a` 11 颗含 D-20.6 review-fix, 测试基线 521 passed / 20 skipped / 13.55s):
+| **Sprint 1c-revive-4 D-20.1-20.5 ship 现状** (commit 范围 `583a599..2f89926`, 6 颗 D-20 commit + `583a599..67aa39a` 11 颗含 D-20.6 review-fix + `583a599..2f89926` 14 颗含 D-20.7 merge-blocker-fix, 测试基线 521 passed / 20 skipped / 13.55s):
 
 | 能力 | 状态 | 代码入口 | 测覆盖 | 备注 |
 | --- | --- | --- | --- | --- |
@@ -92,6 +92,8 @@ pnpm dev
 - 真 LLM cache 命中验证留 sprint 2 (D-20.2 P1 拍板)
 - 偶发 verify-runner.test.ts 1 it fail (跨 test 状态污染, 单跑 pass, 留 sprint 调查) — **D-20.6.6 (2026-06-06) 复现**: `signal 触发时 kill 当前 child, status=aborted` race (s1 50ms 内未跑完), 全量偶发 1/521 fail, focused 16/16 pass
 - 测试数持续漂移 — 真实数 521 passed / 20 skipped (跨 60 file, 偶发 -1) / 13.55s (D-20.6.6 拍)
+- **D-20.7 merge-blocker-fix (2026-06-06)**: Win32 shell:true + timeout 不在 timer fired 立刻 finalize + TUI signal 测降级 forwarding contract + docker-runner cleanup stderr 吞噪声. 4 commit 收 5 finding, 修后 focused 8+28+8+16=60/2 pass. 留给 Windows reviewer 跑 `pnpm test` + `deepwhale --verify` 验.
+  - **D-20.7 P0 (后续)**: 暴露 turnAbortController 给测试, 真 trigger abort, 验 runToolLoop 收到 aborted=true (替代当前 forwarding contract)
 
 ## 测试
 
