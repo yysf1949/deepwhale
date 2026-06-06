@@ -64,7 +64,7 @@ pnpm dev
 
 ## v1.0 capability matrix (D-20.4, 2026-06-05)
 
-**Sprint 1c-revive-4 D-20.1-20.5 ship 现状** (commit 范围 `583a599..ce89090`, 测试基线 519 passed / 20 skipped / 12.94s):
+| **Sprint 1c-revive-4 D-20.1-20.5 ship 现状** (commit 范围 `583a599..731ff18`, 6 颗 D-20 commit + `583a599..67aa39a` 11 颗含 D-20.6 review-fix, 测试基线 521 passed / 20 skipped / 13.55s):
 
 | 能力 | 状态 | 代码入口 | 测覆盖 | 备注 |
 | --- | --- | --- | --- | --- |
@@ -89,9 +89,9 @@ pnpm dev
 - Desktop / Web UI (v4.0)
 
 **Accept risks** (跟 README L459-466 一致):
-- 测试数持续漂移 (D-20.4 拍板: 不硬编码, 跑 `pnpm test` 当前输出为准)
 - 真 LLM cache 命中验证留 sprint 2 (D-20.2 P1 拍板)
-- 偶发 verify-runner.test.ts 1 it fail (跨 test 状态污染, 单跑 pass, 留 sprint 调查)
+- 偶发 verify-runner.test.ts 1 it fail (跨 test 状态污染, 单跑 pass, 留 sprint 调查) — **D-20.6.6 (2026-06-06) 复现**: `signal 触发时 kill 当前 child, status=aborted` race (s1 50ms 内未跑完), 全量偶发 1/521 fail, focused 16/16 pass
+- 测试数持续漂移 — 真实数 521 passed / 20 skipped (跨 60 file, 偶发 -1) / 13.55s (D-20.6.6 拍)
 
 ## 测试
 

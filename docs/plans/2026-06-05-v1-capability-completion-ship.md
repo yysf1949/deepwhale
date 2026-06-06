@@ -1,9 +1,9 @@
-# v1.0 Capability Completion — D-20.1-20.5 Ship 总集
+# v1.0 Capability Completion — D-20.1-20.5 Ship 总集 + D-20.6 Review-Fix
 
-**Sprint**: 1c-revive-4 (2026-06-05)
-**Branch**: `feature/d19.5-repl-guard-cleanup` (领先 main 17 commits)
-**Commit range**: `583a599..5bb5ee3` (5 颗 commit cluster)
-**Goal**: 把 deepwhale 快速推进到 v1.0 可用形态, 不停在 plan, 按默认拍板直接开干.
+**Sprint**: 1c-revive-4 (D-20.1-20.5) + 1c-revive-5 (D-20.6 review-fix, 2026-06-06)
+**Branch**: `feature/d20.6-v1-review-fix` (领先 main 23 commits)
+**Commit range**: `583a599..67aa39a` (11 颗 commit cluster, 含 6 颗 D-20 ship + 5 颗 D-20.6 review-fix)
+**Goal**: 把 deepwhale 快速推进到 v1.0 可用形态, 不停在 plan, 按默认拍板直接开干; 2026-06-06 review 后 5 颗 review-fix 把 P1 + P2 红线全清.
 
 ## Background
 
@@ -25,6 +25,12 @@ D-19.5/6/6.1 ship 之后, deepwhale 还缺 v1.0 必填项:
 | **D-20.2 P0-E** | Prefix-cache 4 机制固化 | `docs/design/prefix-cache-4-mechanisms.md` + `test/integration/prefix-cache-4-mechanisms.test.ts` | 4 机制总集 (cache_hit_rate / canonicalizeSchema / cost_turn / Compaction 保 prefix) + 8 it 联动测 |
 | **D-20.3 P0-B** | Minimal TUI | `modes/tui.ts` + `bin/deepwhale.js` + `test/modes/tui-smoke.test.ts` | `deepwhale tui` 启动, **不**装 Ink, 复用 D-19 createReplConfirm, 5 it smoke |
 | **D-20.4 P2-D** | v1.0 docs truthfulness | `README.md` | v1.0 capability matrix (9 能力 + 9 NOT covered + 3 accept risks); TUI/Ink 修正为 minimal ANSI; 4 包 monorepo 改 5 包 → 4 包 |
+| **D-20.5** | ship 总集归档 | `docs/plans/2026-06-05-v1-capability-completion-ship.md` | 本文档初版 |
+| **D-20.6.1** (review-fix P1) | docker-runner source 规范化 | `src/sandbox/docker-runner.ts:184` | 构造时 `pathResolve(opts.sandboxRoot)`, 跟 req.cwd 走同空间 (Windows 兼容) |
+| **D-20.6.2** (review-fix P1) | docker-runner test 平台原生路径 | `test/sandbox/docker-runner.test.ts:101` | `SANDBOX_ROOT = join(tmpdir(), 'sbx-test')` 替 hardcode; 42 处改 template literal |
+| **D-20.6.3** (review-fix P1) | TUI policy 红线真测 | `test/modes/tui-smoke.test.ts:235` | 删 placeholder, 改 2 个真测 (n → user_denied + y → user_approved + 落 session audit) |
+| **D-20.6.4** (review-fix P2) | TUI 透传 abort signal | `src/modes/tui.ts:328` | `runToolLoop` 加 `signal: turnAbortController.signal`; 2 个真测 (透传 + abort path 行为) |
+| **D-20.6.5** (review-fix P2) | prefix-cache 名实相符 | `test/integration/prefix-cache-4-mechanisms-contract.test.ts` | git mv 改名, '联动 4' 改真调 `compact()`, 文档/README 同步标 "contract" |
 
 ## 默认拍板 (用户给的红线)
 
