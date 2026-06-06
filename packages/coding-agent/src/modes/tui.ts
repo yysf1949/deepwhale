@@ -334,6 +334,12 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
             policy: tuiPolicy,
             isInteractive: true, // TUI = 交互
             yes: policyYes,
+            // Sprint 1c-revive-5-D-20.6.4 review-fix (2026-06-06): 透传 turnAbortController.signal
+            // 给 runToolLoop, 让 SIGINT (onSigint) abort 时透传到 LLM stream / tool exec /
+            // policy.confirm. 跟 repl.ts:509 对齐. 之前漏传, SIGINT 只 abort controller
+            // 不往下传, 工具循环在 tool execution / confirm 等关键点收不到 abort,
+            // hang 住, 跟 D-19 Ctrl+C/cleanup 链路不完整.
+            signal: turnAbortController.signal,
             ...(writer ? { writer } : {}),
           });
         } else {
