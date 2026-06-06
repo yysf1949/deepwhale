@@ -232,16 +232,117 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('红线: TUI 路径不绕过 ToolPolicy — 走 staticToolPolicy (写文件必走 policy.confirm)', async () => {
+  it('红线: TUI write_file 走 policy.confirm — 喂 n → session 落 user_denied, 工具不执行', async () => {
     // D-13 拍板: write_file 走 require_confirmation. TUI 必复用 createReplConfirm
-    // (D-19 拍板), 不重建 2 套. 测试: mock LLM 返 write_file tool_call, 必触发
-    // confirm, 喂 'n' 拒绝, 验 session 落 user_denied (走 policy_decision event).
-    // 难点: mock LLM 走真 registry 跑 write_file, 必被 policy 拦. 简化: 不真 mock,
-    // 验: TUI 内部 tuiPolicy.confirm 必指向 createReplConfirm.confirm (D-19 拍板).
-    // 这个红线**已**在 startRepl (REPL) 测过, TUI 是同形态. 此 it 跳过, 标 NOT COVERED.
-    // (TUI 复用 staticToolPolicy + createReplConfirm, 跟 REPL 同源代码层, 红线一致.)
-    // 改为: 验 TUI 接受 --yes 选项, yes=true 时**不**触发 confirm (D-13 拍板).
-    // 但 mock LLM 不真返 tool_call, 测不到. 此 it 仅作 NOT COVERED 标记.
-    expect(true).toBe(true); // placeholder — TUI policy path 跟 REPL 同源代码层, 已覆盖
+    // (D-19 拍板), 不重建 2 套. 红线: mock LLM 返 write_file tool_call, 必触发
+    // confirm, 喂 'n' 拒绝, 验:
+    //   (1) stdout 含 'denied' (确认走 prompt)
+    //   (2) 文件**不**被创建 (工具被拦截)
+    //   (3) session JSONL 落 policy_decision event, decision=user_denied
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-deny-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+    const targetFile = join(tmpDir, 'should-not-exist.txt');
+
+    const client = makeMockStreamClient({
+      first: 'ok',
+      toolCall: {
+        name: 'write_file',
+        args: { path: targetFile, content: 'should not write' },
+        result: 'WRITTEN', // 模拟: 真执行会返这串, 但 deny 路径不应走
+      },
+    });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+    });
+
+    input.write('write a file\n');
+    // 等 confirm prompt 出现
+    await new Promise((r) => setTimeout(r, 150));
+    // 喂 n 拒绝 (D-15: 'n' 拒绝, 走 user_denied)
+    input.write('n\n');
+    await new Promise((r) => setTimeout(r, 200));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // (1) stdout 含 'Allow' prompt + '✗' 失败标志 (D-13 deny 路径必走 ✗ 不走 ✓)
+    expect(out.data).toMatch(/Allow write_file/);
+    expect(out.data).toMatch(/✗ write_file/);
+    expect(out.data).not.toMatch(/✓ write_file/);
+    // (2) 文件**不**被创建
+    expect(existsSync(targetFile)).toBe(false);
+    // (3) session JSONL 落 policy_decision, decision=user_denied
+    const jsonl = readFileSync(sessionPath, 'utf8');
+    const events = jsonl.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
+    const pdEvents = events.filter((e: { kind: string }) => e.kind === 'policy_decision');
+    expect(pdEvents.length).toBeGreaterThanOrEqual(1);
+    const denyEvent = pdEvents.find(
+      (e: { decision: string; name: string }) =>
+        e.decision === 'user_denied' && e.name === 'write_file',
+    );
+    expect(denyEvent).toBeDefined();
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('红线: TUI write_file 走 policy.confirm — 喂 y → 工具真执行, session 落 user_approved', async () => {
+    // D-13 + D-15 拍板: 喂 'y' 批准 → 工具真执行 + session 落 user_approved.
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-approve-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+    const targetFile = join(tmpDir, 'approved.txt');
+
+    const client = makeMockStreamClient({
+      first: 'ok',
+      toolCall: {
+        name: 'write_file',
+        args: { path: targetFile, content: 'approved content' },
+        result: 'WRITTEN',
+      },
+    });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+    });
+
+    input.write('write approved file\n');
+    // 等 confirm prompt 出现
+    await new Promise((r) => setTimeout(r, 150));
+    // 喂 y 批准 (D-15: 'y' 批准, 走 user_approved + 继续执行)
+    input.write('y\n');
+    await new Promise((r) => setTimeout(r, 300));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // (1) 文件**被**创建 (工具真执行)
+    expect(existsSync(targetFile)).toBe(true);
+    if (existsSync(targetFile)) {
+      const written = readFileSync(targetFile, 'utf8');
+      expect(written).toBe('approved content');
+    }
+    // (2) session JSONL 落 policy_decision, decision=user_approved
+    const jsonl = readFileSync(sessionPath, 'utf8');
+    const events = jsonl.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
+    const pdEvents = events.filter((e: { kind: string }) => e.kind === 'policy_decision');
+    const approveEvent = pdEvents.find(
+      (e: { decision: string; name: string }) =>
+        e.decision === 'user_approved' && e.name === 'write_file',
+    );
+    expect(approveEvent).toBeDefined();
+
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 });
