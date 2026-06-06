@@ -1,0 +1,48 @@
+{
+  "name": "@deepwhale/tui-ink",
+  "version": "1.0.9",
+  "private": true,
+  "type": "module",
+  "description": "TUI mode — Ink 6 + React 19 container for deepwhale coding-agent. D-24 full Ink migration (2026-06-06).",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:watch": "node scripts/build.mjs --watch",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "main": "./dist/tui.js",
+  "types": "./dist/tui.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/tui.d.ts",
+      "import": "./dist/tui.js",
+      "default": "./dist/tui.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "peerDependencies": {
+    "@deepwhale/core": "^1.0.0",
+    "@deepwhale/coding-agent": "^1.0.0",
+    "ink": ">=6.0.0",
+    "ink-text-input": ">=6.0.0",
+    "react": ">=19.0.0"
+  },
+  "dependencies": {
+    "@nanostores/react": "^1.1.0",
+    "nanostores": "^1.2.0",
+    "unicode-animations": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.14",
+    "esbuild": "~0.27.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
