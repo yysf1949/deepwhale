@@ -505,6 +505,60 @@ describe('DeepSeekClient', () => {
       await expect(c.chat([{ role: 'user', content: 'hi' }])).rejects.toBeInstanceOf(LLMAuthError);
     });
 
+    // P2 稳定性债 (D-21.1-P1, 2026-06-06): 假 key 时 DeepSeek 返 401 + JSON body 是 stream.
+    // 之前 throwOnHttpError 调 res.text() 跟 stream 状态机撞, libuv assertion crash.
+    // 修法: 改 throwOnHttpError 走 body.getReader() + reader.cancel(), 干净关 stream.
+    it('401 + JSON error body: 抛 LLMAuthError 含 status + snippet (不 crash stream)', async () => {
+      const jsonErrBody = JSON.stringify({
+        error: { message: 'Authentication Fails (no such user)', type: 'authentication_error' },
+      });
+      const { fn } = makeMockFetch(() => jsonResponse({ error: { message: 'Authentication Fails' } }, 401));
+      const c = new DeepSeekClient({ apiKey: 'fake-key', fetchImpl: fn });
+      try {
+        await c.chat([{ role: 'user', content: 'hi' }]);
+        expect.fail('expected throw');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LLMAuthError);
+        if (e instanceof LLMAuthError) {
+          expect(e.status).toBe(401);
+          // 错误 message 应含 status 401 + 短 body snippet, 至少 1 段 text 不为空
+          expect(e.message).toContain('401');
+        }
+      }
+      // 用不到的 jsonErrBody 留作占位, 提示 "我们模拟了 JSON error body" 这个意图
+      expect(jsonErrBody).toContain('Authentication Fails');
+    });
+
+    it('401 + body=null (旧 Node fetch 边缘): 抛 LLMAuthError 含 status, 不读 body 不 crash', async () => {
+      // 模拟 res.body 是 null 的边缘情况 (Node <18 fetch 在某些 4xx 上 body=null)
+      const { fn } = makeMockFetch(() => new Response(null, { status: 401 }));
+      const c = new DeepSeekClient({ apiKey: 'fake-key', fetchImpl: fn });
+      try {
+        await c.chat([{ role: 'user', content: 'hi' }]);
+        expect.fail('expected throw');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LLMAuthError);
+        if (e instanceof LLMAuthError) expect(e.status).toBe(401);
+      }
+    });
+
+    it('401 + body.locked (reader 已被外部占用): 抛 LLMAuthError 不死等', async () => {
+      // 模拟 body 被锁的情况 — 之前会 await res.text() 死等, 现在直接跳过 read 走 message-only
+      const res = jsonResponse({ error: { message: 'locked body' } }, 401);
+      // 主动 lock 住: 取一次 reader
+      const _locker = res.body!.getReader();
+      const { fn } = makeMockFetch(() => res);
+      const c = new DeepSeekClient({ apiKey: 'fake-key', fetchImpl: fn });
+      try {
+        await c.chat([{ role: 'user', content: 'hi' }]);
+        expect.fail('expected throw');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LLMAuthError);
+      }
+      // 释放 locker 避免 unhandled rejection
+      await _locker.cancel().catch(() => {});
+    });
+
     it('throws LLMAuthError on 403', async () => {
       const { fn } = makeMockFetch(() => textResponse('forbidden', 403));
       const c = new DeepSeekClient({ apiKey: 'k', fetchImpl: fn });

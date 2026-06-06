@@ -403,7 +403,23 @@ export class DeepSeekClient implements LLMClient {
   }
 
   private async throwOnHttpError(res: Response): Promise<never> {
-    const text = await res.text().catch(() => '');
+    // P2 稳定性债 (Sprint 1c-revive-2-D-21.1 P1 修复, 2026-06-06):
+    // 假 key 时 DeepSeek 返 401 + JSON error body, 但 body 是 stream。
+    // 之前直接 res.text() 读 stream, 跟调用方没建好的 reader 撞 libuv 状态机,
+    // Windows + libuv 内部报 assertion 后 crash 进程。修法: 先 cancel 掉 body
+    // (告诉 fetch "我不要了"), 再读 1 个 chunk 上限, 避免 await 死等。
+    // ref: https://undici.nodejs.org/#/docs/api/Response.md (body.cancel)
+    let text = '';
+    if (res.body && !res.body.locked) {
+      try {
+        const reader = res.body.getReader();
+        const { value } = await reader.read().catch(() => ({ value: undefined }));
+        if (value) text = new TextDecoder('utf-8').decode(value);
+        await reader.cancel().catch(() => {});
+      } catch {
+        // swallow — 我们只是想拿 status + 短 snippet, 不希望 network 异常覆盖
+      }
+    }
     const message = `DeepSeek API error ${res.status}: ${text.slice(0, 200)}`;
     if (res.status === 429) throw new LLMRateLimitError(message);
     if (res.status === 401 || res.status === 403) throw new LLMAuthError(res.status, message);
