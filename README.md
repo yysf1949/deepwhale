@@ -2,10 +2,16 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
+[![Release v1.0.0](https://img.shields.io/badge/release-v1.0.0-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 [![Status](https://img.shields.io/badge/status-Phase%201-yellow)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)]()
 [![Node](https://img.shields.io/badge/Node-%E2%89%A522-green)]()
+
+> 🎉 **v1.0.0 已发布** (2026-06-06) — 公开分支 [`release/v1.0`](https://github.com/yysf1949/deepwhale/tree/release/v1.0) (HEAD `03e584a`) · [tag `v1.0.0`](https://github.com/yysf1949/deepwhale/releases/tag/v1.0.0) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
+>
+> 5 项 release gate 全绿：lint / typecheck / build / 456+2 测试 / `deepwhale --verify` 4/4 pass exit 0
+> 留 D-20.8 风险项 (DEP0190 shell:true warning, 不阻塞 v1.0)
 
 ## 一句话定位
 
