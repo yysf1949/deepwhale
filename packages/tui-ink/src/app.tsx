@@ -1,25 +1,30 @@
-/**
- * @deepwhale/tui-ink — App 组件 (D-24.3).
+/** @deepwhale/tui-ink — App 组件 (D-24.3 + D-26 C4/C5, 跟 Hermes 对齐).
  *
- * Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9
+ * Sprint 1c-revive-2-D-24.3 (2026-06-06) v1.0.9:
+ *   - 5 子组件 + 3 hooks (useHistory + useAbortController + useRunToolLoop)
+ *   - confirm path: handlePromptSubmit 看 hasPending() 决定 offerLine / chat
+ *   - session writer/reader: 启动 loadSession, turn 完成 persist
+ *   - 内建命令: /exit / q / quit (跟 tui.ts 1:1)
  *
- * D-24.2 接 5 子组件 + 3 hooks. D-24.3 接:
- *   1. confirm path — Prompt 拿到 line → caller (App) 决定:
- *      - 有 pendingConfirm (D-19) → 喂 confirmController.offerLine(line)
- *      - 无 pending → chat turn
- *   2. session writer — App 持 SessionReader/Writer, 启动时 loadSession,
- *      turn 完成时 persistToolLoopSteps (跟 tui.ts L160-180 1:1)
- *   3. 内建命令 — /exit / q / quit 跟 tui.ts 1:1, /help / /verify 留 sprint 1.1
+ * Sprint 1c-revive-2-D-25 B2 (2026-06-06) v1.0.10:
+ *   - useRunToolLoop 接 client + registry 注入 (修 F2 useRunToolLoop 3 参签名错)
+ *   - root build 串 tui-ink (F1 验)
  *
- * 复用红线 (跟 D-20.3 P0-B / D-22 / D-23 一致):
+ * Sprint 1c-revive-2-D-26 C4/C5 (2026-06-07) v1.0.11:
+ *   - useSubmission hook 抽 input 路由 (slash vs chat), 跟 Hermes useSubmission 1:1
+ *   - 9 命令 走 slash registry (D-26 C2/C3), 0 字符串硬编码
+ *   - 内建命令 (/exit /q/quit 等) 0 走 App.tsx, 走 slash registry
+ *   - App.tsx 减重: 60+ 行 (line 195-224 删除, useSubmission 替代)
+ *
+ * 复用红线 (跟 D-20.3 P0-B / D-22 / D-23 / D-25 一致):
  *   - 0 改 packages/core / packages/llm / packages/edit-engine
  *   - 复用 runToolLoop / createReplConfirm / formatUsageStatus / staticToolPolicy
  *   - 复用 SessionReader/Writer / loadSession / persistToolLoopSteps (跟 tui.ts 同形态)
  *
  * 不接 (留 sprint 1.1+):
  *   - REPL mode 迁 Ink
- *   - /help / /verify 内建命令
  *   - 真 SIGINT trigger 测 (D-24.7 P0)
+ *   - useInputHandlers (D-26 C4 拍 defer, D-28+ 拍)
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
@@ -40,6 +45,8 @@ import { Confirm } from './components/Confirm.js'
 import { useHistory } from './hooks/useHistory.js'
 import { useAbortController } from './hooks/useAbortController.js'
 import { useRunToolLoop } from './hooks/useRunToolLoop.js'
+import { useSubmission } from './hooks/useSubmission.js'
+import { type SlashContext } from './commands/index.js'
 import {
   createReplConfirm,
   type ReplConfirmController,
@@ -61,15 +68,15 @@ export interface AppProps {
 }
 
 /**
- * <App/> 主组件 — D-24.3 完整实现.
+ * <App/> 主组件 — D-24.3 + D-25 B2 + D-26 C4/C5 完整实现.
  *
- * 架构 (跟 D-24.2 同 + 3 项新增):
+ * 架构 (跟 D-24.2 同 + 多项新增):
  *   - 5 子组件: <StatusBar/> + <Transcript/> + <Confirm/> + <Divider/> + <Prompt/>
- *   - 3 hooks: useHistory + useAbortController + useRunToolLoop
+ *   - 5 hooks: useHistory + useAbortController + useRunToolLoop + useSubmission
  *   - state: nanostore (跨 component 共享) + useState (local)
- *   - session: SessionReader/Writer 注入 useRunToolLoop.writer (D-24.2 留的)
- *   - confirm path: handlePromptSubmit 看 hasPending() 决定 offerLine / chat
- *   - 内建命令: /exit / q / quit
+ *   - session: SessionReader/Writer 注入 useRunToolLoop.writer
+ *   - confirm path: useSubmission 看 hasPending() 决定 offerLine / chat
+ *   - slash commands: useSubmission 走 slash registry (D-26 C2/C3)
  */
 export function App({ options, onExit }: AppProps): ReactElement {
   const { exit } = useApp()
@@ -79,7 +86,7 @@ export function App({ options, onExit }: AppProps): ReactElement {
   )
   const ui = useStore($uiState)
 
-  // 3 hooks
+  // 4 hooks
   const { history, append: appendHistory } = useHistory()
   const { controller: turnAbortController } = useAbortController(() => {
     // SIGINT 透传: caller (useRunToolLoop) 拿 signal 透传 runToolLoop.
@@ -161,6 +168,13 @@ export function App({ options, onExit }: AppProps): ReactElement {
   }
   const registry = registryRef.current
 
+  // D-26 C5: modelName 走 useState (D-26 C3 /model 拍 setModel 真的切)
+  // 修前: modelName 走 options.model ?? client.model, 不响应 /model slash
+  // 修后: useState 初值 options.model ?? client.model ?? 'model', setModel 改
+  const [modelName, setModelName] = useState<string>(
+    options.model ?? client.model ?? 'model'
+  )
+
   // runToolLoop wrapper — 每次 turn 用最新 workingMessages + writer
   const { runTurn } = useRunToolLoop({
     options,
@@ -192,36 +206,46 @@ export function App({ options, onExit }: AppProps): ReactElement {
     }
   }, [ui.mode, turnInFlight])
 
-  // Prompt submit handler — D-24.3 接 confirm path
-  const handlePromptSubmit = (assembled: string): void => {
-    const trimmed = assembled.trim()
-    if (!trimmed) return
-
-    // 1. 内建命令 (跟 tui.ts 1:1: /exit / q / quit)
-    if (trimmed === '/exit' || trimmed === 'q' || trimmed === 'quit') {
-      // D-19.5: writer.close 走 finish 路径
+  // D-26 C5: SlashContext 构造 (供 useSubmission 路由)
+  // 业务 0 改, 1:1 拍 Hermes SlashRunCtx (简化版, 0 gateway RPC)
+  const slashContext: SlashContext = useMemo(() => ({
+    theme,
+    ui: $uiState.get(), // snapshot (每次 submit 拿最新, 见 D-29+ 优化)
+    transcript: $transcript.get(),
+    model: modelName,
+    sessionPath,
+    pushEntry,
+    clearTranscript: () => { $transcript.set([]) },
+    setModel: (model) => { setModelName(model) },
+    exit: (result) => {
+      // D-19.5: writer.close 走 finish 路径 (跟 D-24.3 /exit 1:1)
       void writerRef.current?.close()
-      onExit({ exitCode: 0, reason: 'user-exit' })
+      onExit(result ?? { exitCode: 0, reason: 'user-exit' })
       exit()
-      return
-    }
+    },
+  }), [theme, modelName, sessionPath, onExit, exit])
 
-    // 2. Confirm path (D-19 串行化) — 跟 REPL/main rl 拿 line → offerLine 同形态
-    if (confirmController.hasPending()) {
-      // 有 pendingConfirm → 喂 confirm, 不走 chat
-      confirmController.offerLine(trimmed)
-      return
-    }
-
-    // 3. 提交 turn
-    if (turnInFlight) return // 防御
-    appendHistory(trimmed)
-    setTurnInFlight(true)
-    void (async (): Promise<void> => {
-      await runTurn(trimmed)
-      // workingMessages 在 useEffect 里累积, 这里不用 setState
-    })()
-  }
+  // D-26 C4: useSubmission hook — 抽 input 路由 (slash vs chat)
+  // 修前: handlePromptSubmit 60+ 行 (内建命令字符串硬编码 + confirm + chat)
+  // 修后: useSubmission submit() 调 cmd.run(arg, slashContext) (slash) 或 onChat (chat)
+  const { submit } = useSubmission({
+    slashContext,
+    onChat: (prompt) => {
+      // 1. Confirm path (D-19 串行化) — 跟 useSubmission 拍板前一致
+      if (confirmController.hasPending()) {
+        confirmController.offerLine(prompt)
+        return
+      }
+      // 2. 提交 turn
+      if (turnInFlight) return // 防御
+      appendHistory(prompt)
+      setTurnInFlight(true)
+      void (async (): Promise<void> => {
+        await runTurn(prompt)
+        // workingMessages 在 useEffect 里累积, 这里不用 setState
+      })()
+    },
+  })
 
   return (
     <Box flexDirection="column" paddingX={1}>
@@ -239,12 +263,11 @@ export function App({ options, onExit }: AppProps): ReactElement {
 
       {/* Confirm: 条件渲染 (D-19 串行化) */}
       <Confirm theme={theme} controller={confirmController} />
-
       {/* Prompt: 输入 */}
       <Prompt
         theme={theme}
         history={history}
-        onSubmit={handlePromptSubmit}
+        onSubmit={submit}
         disabled={turnInFlight}
       />
     </Box>
