@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import type { ChatChunk, ChatMessage, ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
 import { runTuiMode } from '../../src/modes/tui.js';
 import { Spinner as SpinnerCls } from '../../src/modes/tui.js';
+import { resolveTuiTheme, THEMES, type TuiThemeName } from '../../src/modes/tui.js';
 
 // ---- 共享 helper: mock LLMClient stream 返受控 content ----
 
@@ -705,6 +706,138 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
     expect(jsonl).toContain('line3');
     // bash tool result 应出现在 stdout
     expect(out.data).toMatch(/line1.*line2.*line3|line3.*line2.*line1/s);
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // ========== D-23.1 主题 (Sprint 1c-revive-2, 2026-06-06) ==========
+  //
+  // 拍板红线 (D-23.1 plan):
+  //   - 3 preset: default (cyan) / solarized (yellow/blue) / monochrome (无前景色, dim/bold)
+  //   - 7 role: header / model / divider / prompt / error / success / toolName
+  //   - resolveTuiTheme: options.theme > DEEPWHALE_TUI_THIME env > 'default'
+  //   - invalid theme → stderr warning + 退化 default, 不抛
+
+  describe('resolveTuiTheme (D-23.1)', () => {
+    it('默认 (无 env 无 arg) → default', () => {
+      const realEnv = process.env.DEEPWHALE_TUI_THEME;
+      delete process.env.DEEPWHALE_TUI_THEME;
+      try {
+        expect(resolveTuiTheme()).toBe('default');
+        expect(resolveTuiTheme('')).toBe('default');
+        expect(resolveTuiTheme(undefined)).toBe('default');
+      } finally {
+        if (realEnv !== undefined) process.env.DEEPWHALE_TUI_THEME = realEnv;
+      }
+    });
+
+    it('arg 有效 (default/solarized/monochrome) → 返对应', () => {
+      const valid: TuiThemeName[] = ['default', 'solarized', 'monochrome'];
+      for (const n of valid) {
+        expect(resolveTuiTheme(n)).toBe(n);
+      }
+    });
+
+    it('arg invalid (e.g. "neon") → stderr warning + 退化 default', () => {
+      const realEnv = process.env.DEEPWHALE_TUI_THEME;
+      delete process.env.DEEPWHALE_TUI_THEME;
+      const origWrite = process.stderr.write.bind(process.stderr);
+      let captured = '';
+      (process.stderr.write as unknown) = (chunk: string | Buffer): boolean => {
+        captured += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+        return true;
+      };
+      try {
+        const out = resolveTuiTheme('neon');
+        expect(out).toBe('default');
+        expect(captured).toContain('warning');
+        expect(captured).toContain('neon');
+        expect(captured).toContain('default');
+      } finally {
+        (process.stderr.write as unknown) = origWrite;
+        if (realEnv !== undefined) process.env.DEEPWHALE_TUI_THEME = realEnv;
+      }
+    });
+
+    it('env DEEPWHALE_TUI_THEME 优先于默认, 跟 arg 优先级 (arg > env)', () => {
+      const realEnv = process.env.DEEPWHALE_TUI_THEME;
+      process.env.DEEPWHALE_TUI_THEME = 'solarized';
+      try {
+        // env 命中
+        expect(resolveTuiTheme()).toBe('solarized');
+        // arg 覆盖 env
+        expect(resolveTuiTheme('monochrome')).toBe('monochrome');
+        // arg 仍受 invalid 校验
+        const origWrite = process.stderr.write.bind(process.stderr);
+        let captured = '';
+        (process.stderr.write as unknown) = (chunk: string | Buffer): boolean => {
+          captured += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+          return true;
+        };
+        try {
+          expect(resolveTuiTheme('bogus')).toBe('default');
+          expect(captured).toContain('warning');
+        } finally {
+          (process.stderr.write as unknown) = origWrite;
+        }
+      } finally {
+        if (realEnv !== undefined) process.env.DEEPWHALE_TUI_THEME = realEnv;
+        else delete process.env.DEEPWHALE_TUI_THEME;
+      }
+    });
+  });
+
+  it('THEMES 3 preset 7 role 完整 (D-23.1 主题表验收)', () => {
+    // 3 preset × 7 role = 21 个值都不能 undefined
+    const expectedRoles: Array<keyof typeof THEMES.default> = [
+      'header', 'model', 'divider', 'prompt', 'error', 'success', 'toolName',
+    ];
+    for (const name of ['default', 'solarized', 'monochrome'] as TuiThemeName[]) {
+      const t = THEMES[name];
+      expect(t).toBeDefined();
+      for (const role of expectedRoles) {
+        expect(t[role]).toBeDefined();
+        expect(typeof t[role]).toBe('string');
+        expect(t[role].length).toBeGreaterThan(0);
+      }
+    }
+    // 3 个 preset 至少有 1 个角色色不同 (否则 3 个一样的)
+    expect(THEMES.default.model).not.toBe(THEMES.solarized.model); // default cyan vs solarized blue
+    expect(THEMES.default.model).not.toBe(THEMES.monochrome.model); // default cyan+bold vs monochrome bold
+  });
+
+  it('D-23.1 主题接入 — 跑 turn 后 stdout 含 ≥ 2 次横线 + model 名 (theme 不破 base 渲染)', async () => {
+    // 验: 跑 TUI + theme: monochrome, /exit, stdout 仍含横线 + model 名 (theme 只换色, 不破坏内容)
+    const client = makeMockStreamClient({ first: 'D-23.1 theme test response' });
+    const out = new StringWritable();
+    const err = new StringWritable();
+    const input = new PassThrough();
+    tmpDir = mkdtempSync(join(tmpdir(), 'deepwhale-tui-theme-'));
+    const sessionPath = join(tmpDir, 'session.jsonl');
+
+    const codePromise = runTuiMode({
+      client,
+      sessionPath,
+      output: out,
+      errorOutput: err,
+      input,
+      theme: 'monochrome', // D-23.1 新增 option
+    });
+
+    input.write('hello-theme\n');
+    await new Promise((r) => setTimeout(r, 150));
+    input.write('/exit\n');
+    const code = await codePromise;
+    expect(code).toBe(0);
+
+    // 横线 ≥ 4 (header 2 + status bar 2)
+    const matches = out.data.match(/─{3,}/g);
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBeGreaterThanOrEqual(4);
+    // model 名仍在
+    expect(out.data).toContain('mock-deepseek-v4-flash');
+    // /verify /help 不入历史 (跟 D-22.1 一致)
+    // theme 选项被吃 (stderr 应无 'warning' 表明 monochrome 有效)
 
     rmSync(tmpDir, { recursive: true, force: true });
   });

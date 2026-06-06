@@ -1,6 +1,6 @@
 {
   "name": "@deepwhale/edit-engine",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "File editing engines: hashline + unified-diff with conflict detection",
   "license": "MIT",
   "type": "module",

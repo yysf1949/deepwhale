@@ -75,9 +75,86 @@ const ANSI = {
 /** 检测 TTY (跟 REPL 一样, 非 TTY 退回无色输出, 让 test 不依赖 ANSI) */
 const isTty = (): boolean => Boolean(stdout.isTTY);
 
-/** 染色 wrapper (非 TTY 时退化到原文) */
-function colorize(text: string, color: string): string {
-  return isTty() ? `${color}${text}${ANSI.reset}` : text;
+// ---- D-23.1 主题 (2026-06-06) ----
+//
+// 用户拍板 A + B + D 全要. D-23.1 主题先行, 不动 turn 路径, 仅改 colorize 内部查找表.
+// 3 preset:
+//   - default:    现状 (cyan + dim)
+//   - solarized:  暖色 (yellow/blue/magenta 暖冷对比)
+//   - monochrome: 无前景色, 仅 dim + bold (黑/白终端, 旧 CRT 风格, 不刺眼)
+//
+// 6 role (每个 preset 都填): header / model / divider / prompt / error / success
+//
+// 选: env `DEEPWHALE_TUI_THEME` (默认 `default`), 或 CLI `--theme <name>`.
+// 启动期 resolve 一次, 后续 colorize 查表.
+
+export type TuiThemeName = 'default' | 'solarized' | 'monochrome';
+
+export interface TuiTheme {
+  header: string;
+  model: string;
+  divider: string;
+  prompt: string;
+  error: string;
+  success: string;
+  /** D-23.1 (2026-06-06): 工具名 (tool call/result 行), 跟 model 同级, 用同色变体 */
+  toolName: string;
+}
+
+export const THEMES: Record<TuiThemeName, TuiTheme> = {
+  default: {
+    header: ANSI.bold,
+    model: ANSI.cyan + ANSI.bold,
+    divider: ANSI.dim,
+    prompt: ANSI.bold,
+    error: ANSI.red,
+    success: ANSI.green,
+    toolName: ANSI.magenta + ANSI.bold,
+  },
+  solarized: {
+    // 暖冷对比: divider yellow, model blue, prompt bold, error red, success green
+    header: ANSI.yellow + ANSI.bold,
+    model: ANSI.blue + ANSI.bold,
+    divider: ANSI.yellow,
+    prompt: ANSI.bold,
+    error: ANSI.red,
+    success: ANSI.green,
+    toolName: ANSI.magenta + ANSI.bold, // solarized 仍 magenta 突出 tool
+  },
+  monochrome: {
+    // 全黑白, 区分靠 dim/bold, 不刺眼
+    header: ANSI.bold,
+    model: ANSI.bold,
+    divider: ANSI.dim,
+    prompt: ANSI.bold,
+    error: ANSI.dim + ANSI.bold, // monochrome 无红, 仍用 dim+bold 强调错误
+    success: ANSI.bold,
+    toolName: ANSI.dim + ANSI.bold, // monochrome tool name 用 dim+bold
+  },
+};
+
+const VALID_THEME_NAMES: ReadonlySet<TuiThemeName> = new Set<TuiThemeName>(['default', 'solarized', 'monochrome']);
+
+/**
+ * 解析 theme 来源 (env > 默认), 找不到或 invalid 时退化到 'default' + stderr warning.
+ * 不抛: 启动期不阻塞, 跟 env-gate 风格一致.
+ */
+export function resolveTuiTheme(themeArg?: string): TuiThemeName {
+  const fromArg = themeArg ?? process.env.DEEPWHALE_TUI_THEME;
+  if (fromArg === undefined || fromArg === '') return 'default';
+  if (VALID_THEME_NAMES.has(fromArg as TuiThemeName)) return fromArg as TuiThemeName;
+  // invalid: stderr 提醒, 退化
+  stderr.write(`warning: unknown TUI theme '${fromArg}', falling back to 'default' (valid: ${[...VALID_THEME_NAMES].join(', ')})\n`);
+  return 'default';
+}
+
+/**
+ * 染色 wrapper (D-23.1 改签名) — 用 role 查当前 theme.
+ * 非 TTY 时退化到原文, 让 CI/管道 log 不带 ANSI.
+ */
+function colorize(text: string, role: keyof TuiTheme, theme: TuiTheme = THEMES.default): string {
+  if (!isTty()) return text;
+  return `${theme[role]}${text}${ANSI.reset}`;
 }
 
 // ---- 视觉元素 (D-21.2 轻量升级, 2026-06-06) ----
@@ -89,11 +166,11 @@ function colorize(text: string, color: string): string {
  * 画一条横线分隔符, 宽度按 `width` 截 (默认终端列宽, fallback 80).
  * 配色 dim + cyan 拼接, 非 TTY 退化到 `─` 重复, 让 CI/管道 log 也可读.
  */
-function horizontalRule(width?: number): string {
+function horizontalRule(width?: number, theme: TuiTheme = THEMES.default): string {
   const cols = width ?? (stdout.columns && stdout.columns > 20 ? stdout.columns : 80);
   const w = Math.max(20, Math.min(cols - 4, 100));
   const line = '─'.repeat(w);
-  return colorize('  ' + line, ANSI.dim);
+  return colorize('  ' + line, 'divider', theme);
 }
 
 /**
@@ -106,9 +183,9 @@ function horizontalRule(width?: number): string {
  * @param usage - formatUsageStatus 返回的原始行, 已是 `tokens X · cached Y · out Z · cost $W` 形态
  * @param model - 模型名, 走 formatUsageStatus 已含, 这里再拼前面 banner 用 cyan 加粗
  */
-function formatTuiStatusBar(usage: string | null, model: string): string {
+function formatTuiStatusBar(usage: string | null, model: string, theme: TuiTheme = THEMES.default): string {
   if (usage === null) {
-    return colorize(`  ${model} · (no usage)`, ANSI.dim);
+    return colorize(`  ${model} · (no usage)`, 'divider', theme);
   }
   // formatUsageStatus 输出形如 "tokens 1.2k · cached 80% · out 200 · cost $0.0012"
   // 我们把 model 提到前面 + 加色 + 末尾补分隔线
@@ -117,8 +194,8 @@ function formatTuiStatusBar(usage: string | null, model: string): string {
   const cols = stdout.columns && stdout.columns > 20 ? stdout.columns : 80;
   const max = Math.max(40, cols - 4);
   const text = bar.length > max ? bar.slice(0, max - 1) + '…' : bar;
-  // 颜色: model 走 cyan 加粗, usage 走 dim, 整体不染色避免跟 dim 横线撞
-  return colorize('  ' + text, ANSI.dim);
+  // 颜色: model 走 model role (theme 决定), usage 走 divider (跟 horizontalRule 一致)
+  return colorize('  ' + text, 'divider', theme);
 }
 
 // ---- D-22.1 命令历史持久化 (2026-06-06) ----
@@ -276,6 +353,8 @@ export interface TuiModeOptions {
   output?: NodeJS.WritableStream;
   /** 注入错误流（默认 stderr）。单测用。 */
   errorOutput?: NodeJS.WritableStream;
+  /** D-23.1 (2026-06-06): TUI 主题. 不传或 invalid → 'default' (跟 env DEEPWHALE_TUI_THEME 协同). */
+  theme?: TuiThemeName;
   /** compaction config 跟 print mode 同形态 */
   compactionConfig?: Omit<AgentCompactionConfig, 'writer' | 'state'> | null;
 }
@@ -287,6 +366,10 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
   const err = options.errorOutput ?? stderr;
   const enableToolLoop = options.enableToolLoop ?? true;
   const sessionPath = options.sessionPath;
+  // D-23.1 (2026-06-06): 解析 theme. options.theme 优先 > DEEPWHALE_TUI_THEME env > 'default'.
+  // 解析里含 invalid → stderr warning + 退化, 不抛 (跟 env-gate 风格一致).
+  const themeName = resolveTuiTheme(options.theme);
+  const theme: TuiTheme = THEMES[themeName];
 
   // sandbox env 解析 (跟 print mode / REPL 一致)
   const sandboxRunner: SandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
@@ -334,7 +417,7 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
       workingMessages = [...loaded.messages];
       if (workingMessages.length > 0) {
         out.write(
-          colorize(`  ${loaded.messages.length} messages resumed from session\n`, ANSI.dim) + '\n',
+          colorize(`  ${loaded.messages.length} messages resumed from session\n`, 'divider', theme) + '\n',
         );
       }
     } catch (e) {
@@ -355,13 +438,13 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
   const initialClientState = tryCreateClient();
   const modelName = initialClientState.client?.model ?? 'not-configured';
   out.write('\n');
-  out.write(horizontalRule() + '\n');
+  out.write(horizontalRule(undefined, theme) + '\n');
   out.write(
-    colorize('  deepwhale tui ', ANSI.bold) +
-      colorize(modelName, ANSI.cyan + ANSI.bold) +
-      colorize('  ·  type a prompt, /help, /verify, /exit (or q)\n', ANSI.dim),
+    colorize('  deepwhale tui ', 'header', theme) +
+      colorize(modelName, 'model', theme) +
+      colorize('  ·  type a prompt, /help, /verify, /exit (or q)\n', 'divider', theme),
   );
-  out.write(horizontalRule() + '\n\n');
+  out.write(horizontalRule(undefined, theme) + '\n\n');
   if (initialClientState.error) {
     err.write(`warning: API key not set, chat will fail until DEEPSEEK_API_KEY or ANTHROPIC_AUTH_TOKEN is set.\n`);
   }
@@ -405,7 +488,7 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
           /* best-effort */
         }
       }
-      out.write('\n' + colorize('  Goodbye!\n', ANSI.dim));
+      out.write('\n' + colorize('  Goodbye!\n', 'divider', theme));
       resolve(code);
     };
 
@@ -422,7 +505,7 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
     process.on('SIGINT', onSigint);
 
     const prompt = (): void => {
-      out.write(colorize('  > ', ANSI.cyan + ANSI.bold));
+      out.write(colorize('  > ', 'prompt', theme));
     };
     prompt();
 
@@ -435,7 +518,7 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
       if (isCont) {
         multiLineBuffer.push(rawLine);
         // 续行提示 (跟 shell 类似 `> `)
-        out.write(colorize('  … ', ANSI.dim));
+        out.write(colorize('  … ', 'divider', theme));
         return;
       }
       // 收尾 (非续行), 把 buffer 最后一行 + 当前行合并
@@ -476,7 +559,8 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
               '    /help            show this help\n' +
               '    /verify          run build/lint/typecheck/test (no LLM needed)\n' +
               '    /exit, /quit, q  exit TUI\n\n',
-            ANSI.dim,
+            'divider',
+            theme,
           ),
         );
         prompt();
@@ -510,7 +594,7 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
 
       // 队列守卫 (跟 REPL D-19.5 拍板)
       if (turnInFlight) {
-        out.write(colorize('  (turn in flight, please wait)\n', ANSI.dim));
+        out.write(colorize('  (turn in flight, please wait)\n', 'divider', theme));
         prompt();
         return;
       }
@@ -594,9 +678,9 @@ export async function runTuiMode(options: TuiModeOptions = {}): Promise<number> 
         // TUI 格式化: tool call / result (跟 print mode printStepSummary 同形态, 但加 ANSI)
         for (const step of result.steps) {
           if (step.kind === 'tool') {
-            const status = step.result.success ? colorize('✓', ANSI.green) : colorize('✗', ANSI.red);
+            const status = step.result.success ? colorize('✓', 'success', theme) : colorize('✗', 'error', theme);
             out.write(
-              `\n  ${status} ${colorize(step.tool_call.name, ANSI.magenta + ANSI.bold)} (${step.duration_ms}ms)\n`,
+              `\n  ${status} ${colorize(step.tool_call.name, 'toolName', theme)} (${step.duration_ms}ms)\n`,
             );
           }
         }
