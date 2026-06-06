@@ -121,9 +121,12 @@ describe('tuiHistory', () => {
     tmpHome = mkdtempSync(join(tmpdir(), 'tui-ink-test-'))
     process.env.HOME = tmpHome
     process.env.USERPROFILE = tmpHome
+    // D-25 A1: 测 DEEPWHALE_HOME 优先级时必清, 避免污染
+    delete process.env.DEEPWHALE_HOME
   })
   afterEach(() => {
     rmSync(tmpHome, { recursive: true, force: true })
+    delete process.env.DEEPWHALE_HOME
   })
   it('4a. empty load 返 []', () => {
     expect(tuiHistoryLoad()).toEqual([])
@@ -150,6 +153,51 @@ describe('tuiHistory', () => {
     // 1500 - 1000 = 500, 截断后保留最后 1000 条, 即 line 500..1499
     expect(truncated[0]).toBe('line 500')
     expect(truncated[999]).toBe('line 1499')
+  })
+  // D-25 A1 (F4): 3 路径优先级 + Windows USERPROFILE 探测
+  it('4f. homeOverride 优先于 env (D-25 A1)', () => {
+    const overrideHome = mkdtempSync(join(tmpdir(), 'override-'))
+    try {
+      process.env.DEEPWHALE_HOME = mkdtempSync(join(tmpdir(), 'env-'))
+      tuiHistoryAppend('via-override', overrideHome)
+      // override home 应有 1 条
+      expect(tuiHistoryLoad(overrideHome)).toEqual(['via-override'])
+      // env home 仍 0 条 (被 override 跳过)
+      expect(tuiHistoryLoad(process.env.DEEPWHALE_HOME)).toEqual([])
+    } finally {
+      rmSync(overrideHome, { recursive: true, force: true })
+      rmSync(process.env.DEEPWHALE_HOME!, { recursive: true, force: true })
+    }
+  })
+  it('4g. DEEPWHALE_HOME env 优先于 HOME/USERPROFILE (D-25 A1)', () => {
+    const envHome = mkdtempSync(join(tmpdir(), 'env-home-'))
+    try {
+      process.env.DEEPWHALE_HOME = envHome
+      tuiHistoryAppend('via-env')
+      // env home 应有 1 条
+      expect(tuiHistoryLoad(envHome)).toEqual(['via-env'])
+      // tmpHome (HOME+USERPROFILE) 仍 0 条
+      expect(tuiHistoryLoad(tmpHome)).toEqual([])
+    } finally {
+      rmSync(envHome, { recursive: true, force: true })
+    }
+  })
+  it('4h. Windows: USERPROFILE 优先, HOME fallback (D-25 A1)', () => {
+    // 模拟 Windows: USERPROFILE 跟 HOME 不一致, USERPROFILE 应胜出
+    const winHome = mkdtempSync(join(tmpdir(), 'win-home-'))
+    const unixHome = mkdtempSync(join(tmpdir(), 'unix-home-'))
+    try {
+      process.env.USERPROFILE = winHome
+      process.env.HOME = unixHome
+      delete process.env.DEEPWHALE_HOME
+      tuiHistoryAppend('windows-style')
+      // 应该是 winHome 收到 (USERPROFILE 优先)
+      expect(tuiHistoryLoad(winHome)).toEqual(['windows-style'])
+      expect(tuiHistoryLoad(unixHome)).toEqual([])
+    } finally {
+      rmSync(winHome, { recursive: true, force: true })
+      rmSync(unixHome, { recursive: true, force: true })
+    }
   })
 })
 
