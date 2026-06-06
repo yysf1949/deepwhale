@@ -23,6 +23,9 @@ export * from './modes/index.js';
 export * from './verify/index.js'; // Sprint 1c-revive-2-D-11-4 (2026-06-04): verify module
 export * from './policy/index.js'; // Sprint 1c-revive-2-D-24.2 (2026-06-06): tui-ink needs ToolPolicy/staticToolPolicy
 export * from './util/index.js'; // Sprint 1c-revive-2-D-25 B4 (2026-06-06): tui-ink + tui.ts 共享 util (tui-history)
+// Sprint 1c-revive-2-D-26 C3 (2026-06-07): tui-ink /verify slash command 调 runVerify
+//   runVerify 在 verify barrel 里已 export, 这里再 re-export 出顶层供 tui-ink 用
+export { runVerify, detectContext, type RunVerifyOptions, type VerificationReport } from './verify/index.js';
 // Sprint 1c-revive-2-D-24.3 (2026-06-06): tui-ink App needs ChatMessage / SessionReader/Writer types + loadSession
 export type { ChatMessage, LLMClient } from '@deepwhale/llm';
 export { SessionReader, SessionWriter } from '@deepwhale/core';
