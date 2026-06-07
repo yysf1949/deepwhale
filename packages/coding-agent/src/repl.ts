@@ -410,37 +410,59 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       // 紧贴时 /verify 跑 runVerify + 写 verification event, 跟 turn 输出/session 交错.
       // 红线: turnInFlight=true 时已经在上面 lineQueue.push + return, 不会跑到这里.
       if (line === '/verify') {
+        // === Sprint 1c-revive-3-D-19.5p1 (2026-06-07): P1 边缘 — /verify 补 pendingExit on EOF ===
+        // 拍板 (D-19.5p1, user review 2026-06-07): D-19.5p close drain 修法只覆盖 chat
+        // 路径 (finally 块 L498-513), /verify 走 try/await runVerify, 内部 try/catch 后
+        // 手动 turnInFlight=false + prompt, 没有 finally 兜底. 边缘: turnInFlight=true 期间
+        // 用户 EOF (Ctrl-D / 管道断) → rl.on('close') (L539-546) 走 turnInFlight 分支
+        // 标 pendingExit=true + abort, 但 /verify 路径没 finally 查 pendingExit, 直接
+        // return → REPL 永远不退 (finish 0 没人调). 修法: 镜像 chat 路径 finally (L498-513),
+        // 把 turnInFlight=false + pendingExit 走 finish + drain lineQueue 链兜底.
+        // 复用 6afccc8 pendingExit/lineQueue/setImmediate drain, 不新建状态/结构/timer.
+        // finally 不能 return (no-unsafe-finally 红线), 用 if/else if/else 链.
         try {
-          const report = await runVerify(
-            options.verifyChecks !== undefined ? { checks: options.verifyChecks } : {},
-          );
-          const filled = buildSummaryAndNext(report);
-          const text = formatReport({
-            ...report,
-            summary: filled.summary,
-            nextSuggestedAction: filled.nextSuggestedAction,
-          });
-          out.write(`${text}\n`);
-          if (writer) {
-            // 写 verification event 到 session (跟 CLI 不同: REPL 用户有 session, 应该审计)
-            const failedCount = report.checks.filter((c) => c.status !== 'passed').length;
-            await appendVerificationEvent(writer, {
-              status: report.overallStatus,
-              durationMs: report.durationMs,
-              commandCount: report.checks.length,
-              failedCount,
+          try {
+            const report = await runVerify(
+              options.verifyChecks !== undefined ? { checks: options.verifyChecks } : {},
+            );
+            const filled = buildSummaryAndNext(report);
+            const text = formatReport({
+              ...report,
               summary: filled.summary,
+              nextSuggestedAction: filled.nextSuggestedAction,
             });
+            out.write(`${text}\n`);
+            if (writer) {
+              // 写 verification event 到 session (跟 CLI 不同: REPL 用户有 session, 应该审计)
+              const failedCount = report.checks.filter((c) => c.status !== 'passed').length;
+              await appendVerificationEvent(writer, {
+                status: report.overallStatus,
+                durationMs: report.durationMs,
+                commandCount: report.checks.length,
+                failedCount,
+                summary: filled.summary,
+              });
+            }
+          } catch (e) {
+            err.write(
+              `error: verify failed to start: ${e instanceof Error ? e.message : String(e)}\n\n`,
+            );
           }
-        } catch (e) {
-          err.write(
-            `error: verify failed to start: ${e instanceof Error ? e.message : String(e)}\n\n`,
-          );
+        } finally {
+          // 拍板 (D-19.5p1): 镜像 chat 路径 finally (L498-513). 顺序: pendingExit 优先
+          // (走 finish 丢弃排队), 否则 drain lineQueue (setImmediate 避免同步递归爆栈),
+          // 都 false 才 prompt. 红线: 不在 finally 重复 process.off (finish 入口 L286 已有).
+          turnInFlight = false;
+          if (pendingExit) {
+            pendingExit = false;
+            void finish(0);
+          } else if (lineQueue.length > 0 && !exiting) {
+            const next = lineQueue.shift()!;
+            setImmediate(() => rl.emit('line', next));
+          } else {
+            prompt();
+          }
         }
-        // 拍板 (D-19.5p): /verify 走的是 try/await runVerify, 不进 runAgentTurn try 块,
-        // finally 不会跑, 必须手动 turnInFlight=false + prompt (跟 /help /unknown 一致).
-        turnInFlight = false;
-        prompt();
         return;
       }
       if (line === '/help') {
