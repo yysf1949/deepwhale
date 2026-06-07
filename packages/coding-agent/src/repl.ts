@@ -13,9 +13,18 @@
  *   - 不做 multi-session 切换
  *   - 错误用 i18n + 不污染 messages
  *
- * 文件职责：
- *   - runOneTurn: 仍保留为低层单轮 API（不持久化，无 tool loop）
- *   - startRepl: 接 tool loop + session 的入口
+ * 文件职责 (D-29.x 拆分后):
+ *   - runOneTurn: 单轮 chat 工具函数 (不持久化, 无 tool loop)
+ *   - startRepl: REPL 主循环 + 5 红线 (signal-coord / turnInFlight / slash guard / finally drain)
+ *   - 子模块 (./repl/*.ts):
+ *     - repl-confirm.ts           y/N confirm 工厂 (D-15)
+ *     - repl-signal-coordinator.ts  SIGINT + turn AbortController (D-29.1.1)
+ *     - repl-session.ts           usage status + EMA state (D-29.1.2)
+ *     - repl-command-router.ts    slash builtin 派发 (D-29.1.3)
+ *     - repl-agent-turn.ts        runAgentTurn 主体 (D-29.2)
+ *     - repl-format-error.ts      LLM 错误 → i18n (D-29.2)
+ *     - repl-compaction-summary.ts  compaction summary 工厂 (D-29.2)
+ *     - repl-step-summary.ts      tool step 摘要 (D-29.2)
  */
 
 import { createInterface, type Interface as RLInterface } from 'node:readline';
@@ -500,11 +509,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   });
 }
 
-// === Sprint 1c-revive-3-D-29.2 (2026-06-07): 4 个独立职责模块抽到 repl/*.ts 子目录 ===
-// - runAgentTurn  →  ./repl/repl-agent-turn.ts        (150L → 1:1 迁移)
-// - formatError   →  ./repl/repl-format-error.ts      (27L  → 1:1 迁移)
-// - makeLlmSummarizeFn → ./repl/repl-compaction-summary.ts (32L → 1:1 迁移)
-// - appendStepSummary  → ./repl/repl-step-summary.ts   (14L  → 1:1 迁移)
-// 公共 API 1:1 保: repl.ts re-export runAgentTurn 给 test/modes-followup.test.ts:18
-// (`import { runAgentTurn } from '../src/repl.js'`) 跟 src/index.ts (`export * from
-// './repl.js'`). 行为 1:1 保 628 既有测试, 0 改业务, 0 改 5 红线 (startRepl 内 4 段).
+// === Sprint 1c-revive-3-D-29.2 (2026-06-07): 4 个独立职责模块抽到 repl/*.ts ===
+// runAgentTurn → repl-agent-turn.ts, formatError → repl-format-error.ts,
+// makeLlmSummarizeFn → repl-compaction-summary.ts, appendStepSummary → repl-step-summary.ts.
+// 公共 API 1:1 保 (re-export runAgentTurn 保 test/modes-followup.test.ts:18), 628 既有测试 0 new fail.
