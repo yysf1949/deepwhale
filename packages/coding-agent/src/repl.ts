@@ -357,14 +357,17 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         }
       }
 
-      // 内建命令 — /exit 走 fast-path (复用 D-19.5 pendingExit 兜底); 其它 builtin
-      // (/help /verify /unknown) 推到 turn guard 之后, turnInFlight 时入队不入 builtin.
-      // 拍板 (D-19.5p, user review 2026-06-05 P2): D-19.5 注释 "全部 fast-path" 把所有 builtin
-      // 提前 return, 但这违反 "turn running 时下一行不进入 builtin/chat" 语义 — y\n/verify\n
-      // 紧贴会让 /verify 跑 runVerify + 写 verification event, 输出/session 交错. 修法:
-      // /help /verify /unknown 跟 chat 路径一样在 turnInFlight 时入 lineQueue, finally drain.
-      // 红线: /exit 例外, 走 fast-path + pendingExit (用户 /exit 语义是"立刻走", 不该 drain
-      // 排队行, 跟 D-19.5 拍板一致). confirm 期间 /exit 仍走 confirm-dismiss 分支 (D-19.5 修法).
+      // === Sprint 1c-revive-3-D-19.5p2 (2026-06-07): P1 /help /unknown fast-path ===
+      // 拍板 (D-19.5p2, user review 2026-06-07 Block 1): D-19.5p 拍板 /help /verify /unknown
+      // 都排 lineQueue 跟 chat 一起等 turn. 但 /help /unknown 是**同步/纯本地**命令 (不调
+      // runVerify, 不写 session, 不调 LLM), 30s 长 turn 期间用户输错命令要等 30s 才告知,
+      // 反 UX. 修法: /help /unknown 放回 turn guard 之前 fast-path, /verify 仍排 lineQueue
+      // (异步 runVerify + 写 session, 必须等 turn 完避免交错, D-11-4 + D-19.5p1 拍板不变).
+      // 红线:
+      //   - /exit 仍走 fast-path (L372-380 已有, D-19.5 拍板不变)
+      //   - /help /unknown 改 fast-path 不需要 turnInFlight 收束 (turn guard 之前 turnInFlight
+      //     必 false, D-19.5p L470/476 turnInFlight=false 是 dead code, 顺手清)
+      //   - /verify 仍排 lineQueue (D-19.5p1 完整 try/finally 保留, 不破 close drain 链路)
       if (line === '') {
         prompt();
         return;
@@ -376,6 +379,23 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
           return;
         }
         await finish(0);
+        return;
+      }
+      // /help /unknown fast-path (D-19.5p2 拍板): turn guard 之前, 不设 turnInFlight.
+      if (line === '/help') {
+        out.write(`${t('cli.builtin_help')}\n`);
+        prompt();
+        return;
+      }
+      // === Sprint 1c-revive-3-D-19.5p2 (2026-06-07): /verify 白名单 — /verify 仍走 turn guard 之后 ===
+      // 拍板 (D-19.5p2): /verify 异步 + 写 verification event, D-19.5p 拍板它在 turn guard
+      // 之后 (跟 chat 路径一起), turnInFlight=true 时入 lineQueue, finally drain. /unknown
+      // 白名单必须排除 /verify, 否则 /verify 被 /unknown 吞, 跑不到 turn guard 之后的 /verify
+      // 块, 出 "Unknown command: /verify" 错 (repl-verify.test.ts 2 fail 已证). 红线: /verify
+      // 块本身不动 (D-19.5p1 完整 try/finally 保留, 跨 PR 拍板不变), 只在 /unknown 分发加白名单.
+      if (line.startsWith('/') && line !== '/verify') {
+        out.write(`${t('cli.builtin_unknown', line)}\n`);
+        prompt();
         return;
       }
 
@@ -465,18 +485,6 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         }
         return;
       }
-      if (line === '/help') {
-        out.write(`${t('cli.builtin_help')}\n`);
-        turnInFlight = false;
-        prompt();
-        return;
-      }
-      if (line.startsWith('/')) {
-        out.write(`${t('cli.builtin_unknown', line)}\n`);
-        turnInFlight = false;
-        prompt();
-        return;
-      }
 
       // chat — Sprint 1c-revive-2-D-11-4 review P1 修复: client lazy 化后, chat
       // 路径首次调 tryCreateClient() 真创. 创失败 (无 key) → i18n stderr 提示 + 跳
@@ -564,6 +572,26 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         }
         // 复用 pendingExit 兜底, finally 跑完 turn 审计落盘后再 finish.
         pendingExit = true;
+        // === Sprint 1c-revive-3-D-19.5p2 (2026-06-07): P2 EOF 兜底 timer — turn hang 不再裸奔 ===
+        // 拍板 (D-19.5p2, user review 2026-06-07 Block 2): 上面 `pendingExit=true + return`
+        // 依赖 turn finally 自然跑完才能走 finish. 但 turn finally 可能 hang (runToolLoop 内
+        // 部 try/catch 吞 abort 异常 / 网络断流永远 await / streaming 帧卡死). 修法: 挂
+        // 30s 兜底 timer, turn finally 没跑完 (exiting 仍 false) → hard exit(0) 留 stderr 痕迹.
+        // 红线:
+        //   - 不在 finish() 入口加 (L278-294) — 正常退出不应被 timer 误杀
+        //   - 不在 SIGINT 路径加 (L321-330) — 用户按 Ctrl+C 不应被强退 (D-19 拍板不变)
+        //   - 不在 line handler `/exit` fast-path 加 (L376-380) — /exit 用户意图明确, 走完 finish
+        //   - 只在 `EOF + turnInFlight` 路径加, 跟原 D-19.5p P1 "不新增 turnDrain Promise" 红线
+        //     不冲突 — 这里是"实在救不回来就 hard exit"兜底, 不是"drain 排队行" promise
+        //   - .unref() 必须加 — 进程不依赖此 timer 保持存活, finish 后 timer 不会阻塞进程退出
+        setTimeout(() => {
+          if (!exiting) {
+            process.stderr.write(
+              `\n[warn] REPL hard exit: turn finally not finished in 30s (EOF timer 兜底)\n`,
+            );
+            process.exit(0);
+          }
+        }, 30000).unref();
         return;
       }
       void finish(0);
