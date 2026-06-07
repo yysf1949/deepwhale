@@ -209,7 +209,7 @@ describe('REPL /verify (D-11-4 2026-06-04)', () => {
       // 3) chat 触发 lazy create 失败 → i18n error 到 stderr (REPL 不退)
       expect(errText).toMatch(/api_key_missing|API/i);
       // 4) /exit 仍能退出 (REPL 没被无 key 状态卡死)
-      expect(outText).toMatch(/goodbye/i);
+      expect(outText).toMatch(/再见/);
       // 5) session JSONL 写了 verification event (REPL /verify 行为不变)
       const events = await readSessionEvents(sessionFile);
       const verifyEvent = events.find((e) => e.kind === 'verification');

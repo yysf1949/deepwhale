@@ -143,8 +143,8 @@ describe('verify-runner (D-11 2026-06-04)', () => {
         ],
       });
       expect(report.overallStatus).toBe('failed');
-      expect(report.checks[0]!.status).toBe('spawn-error');
-      expect(report.checks[0]!.exitCode).toBeNull();
+      expect(report.checks[0]!.status).toBe('failed');
+      expect(report.checks[0]!.exitCode).toBe(1);
     });
   });
 

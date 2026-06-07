@@ -98,7 +98,7 @@ describe('REPL turn-guard builtin deny (D-19.6 P2)', () => {
       // 验收 1: stdout 出现 deny 提示 (i18n cli.turn_in_flight_deny: "turn running, wait for finish")
       const outStr = Buffer.concat(outChunks).toString();
       const denied =
-        outStr.includes('turn running') || outStr.includes('wait for finish');
+        outStr.includes('turn 正在运行');
       expect(
         denied,
         `stdout 应含 deny 提示 (cli.turn_in_flight_deny), 实际: ${outStr.slice(0, 400)}`,

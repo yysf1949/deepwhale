@@ -3,12 +3,12 @@ import { t, setLocale, getLocale } from '../src/i18n/index.js';
 
 describe('Sprint 0.0: i18n (core.i18n path locked at Sprint 0 line 1)', () => {
   it('defaults to English', () => {
-    expect(getLocale()).toBe('en');
+    expect(getLocale()).toBe('zh-CN');
   });
 
   it('t() renders English template', () => {
     const out = t('cli.greeting', '🐋', 'deepseek-v4-flash');
-    expect(out).toContain('Hello');
+    expect(out).toContain('你好');
     expect(out).toContain('deepwhale');
     expect(out).toContain('deepseek-v4-flash');
   });
