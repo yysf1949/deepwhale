@@ -45,6 +45,7 @@ import { dispatchSlashBuiltin, type SlashContext } from './repl/repl-command-rou
 import { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: agent turn 主体抽 (persist user + runToolLoop + catch 4-branch + 持久化)
 export { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: re-export 保 test/modes-followup.test.ts:18 import path
 import { formatError } from './repl/repl-format-error.js'; // D-29.2: LLM 错误 → i18n 文案映射 (runOneTurn + runAgentTurn 复用)
+import { createFinish, type ReplFinishState } from './repl/repl-finish.js'; // D-29.3.1: finish 抽工厂, 共享 exiting/exitTimer state (close handler + line handler + prompt 共读)
 import type { ToolPolicy } from './policy/types.js';
 
 const VERSION = '0.1.0';
@@ -275,7 +276,29 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   });
 
   return new Promise<number>((resolve) => {
-    let exiting = false;
+    // === Sprint 1c-revive-3-D-29.3.1 (2026-06-07): 抽 finish 工厂 + state 共享 ===
+    // 红线 (D-19.5 P2-SIGINT + D-19.6 P1): exiting / exitTimer 是 finish 写者,
+    // close handler 读者 (exiting 守卫幂等, exitTimer 30s 兜底). 抽到 ReplFinishState
+    // 共享引用 — finish 通过 createFinish({state, ...}) 写, close handler 通过
+    // state.exiting / state.exitTimer 读 (D-29.3.3 抽 close handler 时也用同一 state).
+    // prompt 跟 finally 块 (D-29.3.2 抽 line handler 时) 也用 state.exiting 守卫幂等.
+    // 红线: dispose 顺序 (signalCoordinator.dispose → rl.close → writer.close →
+    // out.write → resolve) 1:1 保, 工厂内部按此顺序处理, 调用方不感知.
+    const state: ReplFinishState = { exiting: false, exitTimer: null };
+
+    // === Sprint 1c-revive-3-D-29.1.1 (2026-06-07): SIGINT + turn AbortController 抽 ===
+    // 拍板 (D-29.1.1): signal-coordinator 持有 turnAbortController 闭包 + SIGINT listener
+    // 生命周期, repl.ts 通过 getSignal() / refresh() / abortIfActive() / dispose() 4 方法
+    // 跟它交互. 行为 1:1 等价 D-19 P1/P2 拍板: dismiss in-flight confirm 先 (落 user_denied
+    // 审计), 再 abort turn; 进程不退出, 用户可继续. dispose() 幂等, finish() 入口调
+    // (D-19.5 顺序红线: off 必须在 rl.close() 之前, coordinator 内部按此顺序处理).
+    // === Sprint 1c-revive-3-D-29.3.1 (2026-06-07): signalCoordinator 创建挪到 finish 之前 ===
+    // 拍板: createFinish 需要 signalCoordinator (D-19.5 P2-SIGINT dispose 顺序), 必须
+    // 在 createFinish({...}) 之前建. 原 D-29.1.1 时建在 finish 之后, 0 顺序问题;
+    // D-29.3.1 抽 finish 后, 顺序显式化. 行为 1:1 保, 0 业务改.
+    const signalCoordinator = createSignalCoordinator({
+      confirmController,
+    });
 
     // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P2-SIGINT 修法 — finish 移除全局 listener ===
     // 拍板 (D-19.5, user review 2026-06-05 P2): repl.ts:307 每次 startRepl() 挂全局
@@ -284,29 +307,17 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     // 顺序: .off 必须在 rl.close() 之前, 否则 close 派发 'close' event 期间 Ctrl+C 还能
     // 触达 onSigint 闭包. 红线: 跟 D-19 P2-Ctrl+C 拍板不冲突 — finish 才清理, SIGINT
     // 触发的 dismiss + abort 仍由 onSigint 兜底 (D-19 行为不变).
-    const finish = async (code: number): Promise<void> => {
-      if (exiting) return;
-      exiting = true;
-      // === Sprint 1c-revive-3-D-19.6 (2026-06-05): 清 exitTimer 防止 P1 兜底 timer 泄漏 ===
-      if (exitTimer) {
-        clearTimeout(exitTimer);
-        exitTimer = null;
-      }
-      // === Sprint 1c-revive-3-D-29.1.1 (2026-06-07): SIGINT 清理走 coordinator dispose() ===
-      // 红线 (D-19.5): off 必须在 rl.close() 之前, 否则 close 派发 'close' event 期间
-      // Ctrl+C 还能触达 onSigint 闭包. coordinator.dispose() 内部按此顺序处理, 幂等.
-      signalCoordinator.dispose();
-      rl.close();
-      if (writer) {
-        try {
-          await writer.close();
-        } catch {
-          /* 关闭失败 best-effort,REPL 退出码仍按 caller 决定 */
-        }
-      }
-      out.write(`${t('cli.goodbye')}\n`);
-      resolve(code);
-    };
+    // === Sprint 1c-revive-3-D-29.3.1 (2026-06-07): finish() 抽到 createFinish 工厂 ===
+    // 行为 1:1 保 (exiting 守卫 / exitTimer 清理 / dispose / close / writer.close / out / resolve).
+    const finish = createFinish({
+      state,
+      signalCoordinator,
+      rl,
+      writer,
+      out,
+      t,
+      resolve,
+    });
 
     // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard + 排队 + SIGINT/dismiss 链路 ===
     // 拍板 (D-19.5, user review 2026-06-05 P1): 旧 line handler 在 confirm settle 之后, 紧
@@ -329,18 +340,11 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     // 强制 finish. 变量与 pendingExit 同 scope (Q2=方案 2): REPL 单次生命周期状态,
     // 模块级会让嵌入式/并行多 REPL 实例互相污染. 仅 turnInFlight=true 启动 (Q3=b):
     // 没有 in-flight turn 时直接 finish, 不需要兜底.
-    let exitTimer: NodeJS.Timeout | null = null;
+    // === Sprint 1c-revive-3-D-29.3.1 (2026-06-07): exitTimer 走 state.exitTimer ===
+    // 拍板: finish 抽工厂后, exitTimer 是 finish 写者 (clear + null) + close handler
+    // 写者 (setTimeout). 共享 state.exitTimer 引用, 1:1 保 D-19.6 P1 行为.
+    // (D-29.3.3 抽 close handler 时也用同一 state.exitTimer)
     const lineQueue: string[] = [];
-
-    // === Sprint 1c-revive-3-D-29.1.1 (2026-06-07): SIGINT + turn AbortController 抽 ===
-    // 拍板 (D-29.1.1): signal-coordinator 持有 turnAbortController 闭包 + SIGINT listener
-    // 生命周期, repl.ts 通过 getSignal() / refresh() / abortIfActive() / dispose() 4 方法
-    // 跟它交互. 行为 1:1 等价 D-19 P1/P2 拍板: dismiss in-flight confirm 先 (落 user_denied
-    // 审计), 再 abort turn; 进程不退出, 用户可继续. dispose() 幂等, finish() 入口调
-    // (D-19.5 顺序红线: off 必须在 rl.close() 之前, coordinator 内部按此顺序处理).
-    const signalCoordinator = createSignalCoordinator({
-      confirmController,
-    });
 
     rl.on('line', async (rawLine: string) => {
       const line = rawLine.trim();
@@ -462,7 +466,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         if (pendingExit) {
           pendingExit = false;
           void finish(0);
-        } else if (lineQueue.length > 0 && !exiting) {
+        } else if (lineQueue.length > 0 && !state.exiting) {
           const next = lineQueue.shift()!;
           setImmediate(() => rl.emit('line', next));
         } else {
@@ -483,16 +487,16 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       }
       pendingExit = true;
       if (turnInFlight) {
-        if (exitTimer) clearTimeout(exitTimer);
-        exitTimer = setTimeout(() => {
+        if (state.exitTimer) clearTimeout(state.exitTimer);
+        state.exitTimer = setTimeout(() => {
           // 30s 兜底: turn 卡死时强制 finish, stderr warning 走 i18n (Q1=A).
           // 注: t() 是位置参数, 模板用 {0}, 不是 {ms}.
-          if (exiting) return;
+          if (state.exiting) return;
           err.write(`${t('cli.repl_force_exit_timeout', 30000)}\n`);
           void finish(0);
         }, 30_000);
         // unref: 不让 timer 阻止进程退出 (finish 自己会调 process.exit / resolve).
-        exitTimer.unref?.();
+        state.exitTimer.unref?.();
       } else {
         // turn 没在跑, 直接 finish (Q3=b 的 else 分支).
         void finish(0);
@@ -500,7 +504,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     });
 
     const prompt = (): void => {
-      if (exiting) return;
+      if (state.exiting) return;
       out.write(t('cli.prompt'));
     };
 
