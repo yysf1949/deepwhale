@@ -36,6 +36,7 @@ import { StatusBar } from './components/StatusBar.js'
 import { Divider } from './components/Divider.js'
 import { Transcript } from './components/Transcript.js'
 import { Prompt } from './components/Prompt.js'
+import { TodoList } from './components/TodoList.js'
 import { Confirm } from './components/Confirm.js'
 import { useHistory } from './hooks/useHistory.js'
 import { useAbortController } from './hooks/useAbortController.js'
@@ -288,6 +289,9 @@ export function App({ options, onExit }: AppProps): ReactElement {
 
       {/* StatusBar: 状态栏 (D-21.2) */}
       <StatusBar theme={theme} />
+
+      {/* D-30.2.6: TodoList (空时不渲染, 跟 store $todos 同步) */}
+      <TodoList theme={theme} />
 
       {/* Transcript: 历史 + 流式 (D-22 + D-23.2) */}
       <Transcript theme={theme} />

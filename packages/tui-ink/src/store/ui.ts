@@ -64,6 +64,39 @@ export interface TranscriptEntry {
 
 export const $transcript = atom<TranscriptEntry[]>([])
 
+// ---- D-30.2.6: todos + plan state ----
+
+/** todo item (跟 coding-agent/tools/todo.ts TodoItem 1:1 同步, 0 改业务). */
+export interface TodoUiItem {
+  id: string
+  text: string
+  done: boolean
+}
+
+/** $todos — TodoList 组件订阅. 业务层 (coding-agent TodoStore) 喂数据. */
+export const $todos = atom<TodoUiItem[]>([])
+
+/** $plan — PlanView 组件订阅. steps 列表, 0 步 = 未进入 plan mode. */
+export interface PlanStep {
+  /** step 编号 (1-based, 给 UI 渲染) */
+  no: number
+  /** step 描述 */
+  text: string
+  /** step 状态 */
+  status: 'pending' | 'in_progress' | 'done'
+}
+
+export const $plan = atom<PlanStep[]>([])
+
+/** helpers — 跟 pushEntry 形态 1:1. */
+export function setTodos(items: TodoUiItem[]): void {
+  $todos.set(items)
+}
+
+export function setPlan(steps: PlanStep[]): void {
+  $plan.set(steps)
+}
+
 // ---- helpers (跟 D-22/D-23 store 操作 1:1) ----
 
 /** append 一条新 entry (user / tool 一次性, assistant 起始). */
