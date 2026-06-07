@@ -55,11 +55,15 @@
   "dependencies": {
     "@deepwhale/core": "^1.0.0",
     "@deepwhale/edit-engine": "^1.0.0",
-    "@deepwhale/llm": "^1.0.0"
+    "@deepwhale/llm": "^1.0.0",
+    "sql.js-fts5": "^1.4.0"
   },
   "scripts": {
     "build": "tsc -b --force && node ../llm/scripts/copy-toml.mjs && node scripts/copy-tui-ink-bundle.mjs",
     "dev": "tsc -b --watch",
     "clean": "rm -rf dist .tsbuildinfo"
+  },
+  "devDependencies": {
+    "@types/sql.js": "^1.4.11"
   }
 }
