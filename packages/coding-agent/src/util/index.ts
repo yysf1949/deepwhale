@@ -19,3 +19,17 @@ export {
   tuiHistoryTruncate,
   TUI_HISTORY_MAX,
 } from './tui-history.js';
+// Sprint 1c-revive-3-D-30.1δ.1 (2026-06-07): ~/.deepwhale/ 4 路径 + memory store
+// 跟 tui-history 形态 1:1 兼容 (优先 DEEPWHALE_HOME env > USERPROFILE > HOME).
+export {
+  resolveDeepwhaleHome,
+  deepwhaleRoot,
+  deepwhaleMemoryDir,
+  deepwhaleMemoryFile,
+  deepwhaleUserFile,
+  deepwhaleSkillsDir,
+  deepwhaleCronDir,
+  deepwhaleCronJobsFile,
+  deepwhaleSessionsDbPath,
+} from './deepwhale-paths.js';
+export { MemoryStore } from './memory-store.js';
