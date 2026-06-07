@@ -81,7 +81,19 @@ export async function dispatchSlashBuiltin(
   ctx: SlashContext,
 ): Promise<{ handled: boolean }> {
   if (line === '/help') {
-    ctx.out.write(`${t('cli.builtin_help')}\n`)
+    const help = [
+      'Available slash commands:',
+      '  /help      show this help',
+      '  /clear     clear the screen',
+      '  /new       start a new session (clears working messages)',
+      '  /status    show current state (model, session, ema)',
+      '  /verify    run verify checks',
+      '  /theme     switch theme (default/solarized/monochrome)',
+      '  /model     switch LLM model',
+      '  /tools     list registered tools',
+      '  /exit, /q, /quit   exit REPL',
+    ].join('\n')
+    ctx.out.write(`${help}\n\n`)
     ctx.prompt()
     return { handled: true }
   }
