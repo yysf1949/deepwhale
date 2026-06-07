@@ -33,3 +33,6 @@ export {
   deepwhaleSessionsDbPath,
 } from './deepwhale-paths.js';
 export { MemoryStore } from './memory-store.js';
+// Sprint 1c-revive-3-D-30.1δ.10 (2026-06-07): JSON 兜底 sessions-index (替 FTS5).
+export { SessionIndex } from './session-index.js';
+export type { SessionEntry } from './session-index.js';
