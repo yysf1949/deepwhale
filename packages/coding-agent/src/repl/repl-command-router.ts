@@ -57,6 +57,28 @@ export interface SlashContext {
    * Sub-burst α 不接 REPL/TUI 端 wiring (留给后续 sub-burst), undefined 时走 fallback.
    */
   getStatus?: () => ReplStatus
+  /**
+   * D-30.1β.1: /theme 触发, 由 caller 注入 theme setter (REPL/TUI 各自接 store / useState).
+   * 不在 router 里直接持 theme — 跟 D-30.1α.3 onNewSession 1:1, 保 "闭包内不持 state" 红线.
+   */
+  setTheme?: (name: string) => void
+  /**
+   * D-30.1β.1: /theme 无 arg 时列出当前 theme 名. 跟 setTheme 1:1 配对.
+   */
+  getThemeName?: () => string
+  /**
+   * D-30.1β.2: /model 触发, 由 caller 注入 model setter (REPL/TUI 各自接 client swap).
+   */
+  setModel?: (id: string) => void
+  /**
+   * D-30.1β.2: /model 无 arg 时列出当前 model id.
+   */
+  getCurrentModel?: () => string
+  /**
+   * D-30.1β.4: /tools 触发, 由 caller 提供 tool registry 列表.
+   * 返回 tool 数组 (name + description), router 渲染对齐输出.
+   */
+  listTools?: () => ReadonlyArray<{ name: string; description: string }>
 }
 
 /**
@@ -191,6 +213,56 @@ export async function dispatchSlashBuiltin(
     } else {
       ctx.out.write('status: (no status provider wired)\n\n')
     }
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/theme' || line.startsWith('/theme ')) {
+    // D-30.1β.1: /theme 走 setTheme 回调切主题. 拍板 valid: default, solarized, monochrome
+    // (跟 tui-ink/src/theme/index.ts THEMES 3 preset 1:1 对齐).
+    const arg = line.slice('/theme'.length).trim()
+    if (!arg) {
+      const current = ctx.getThemeName?.() ?? 'default'
+      ctx.out.write(`current theme: ${current}\nvalid: default, solarized, monochrome\n\n`)
+      ctx.prompt()
+      return { handled: true }
+    }
+    if (!['default', 'solarized', 'monochrome'].includes(arg)) {
+      ctx.out.write(`unknown theme: ${arg}\nvalid: default, solarized, monochrome\n\n`)
+      ctx.prompt()
+      return { handled: true }
+    }
+    ctx.setTheme?.(arg)
+    ctx.out.write(`theme: ${arg}\n\n`)
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/model' || line.startsWith('/model ')) {
+    // D-30.1β.2: /model 走 setModel 回调切 LLM model.
+    const arg = line.slice('/model'.length).trim()
+    if (!arg) {
+      const current = ctx.getCurrentModel?.() ?? 'unset'
+      ctx.out.write(`model: ${current}\n\n`)
+      ctx.prompt()
+      return { handled: true }
+    }
+    ctx.setModel?.(arg)
+    ctx.out.write(`model: ${arg}\n\n`)
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/tools') {
+    // D-30.1β.4: /tools 走 listTools 回调拉 tool registry, 列出 name + description.
+    if (!ctx.listTools) {
+      ctx.out.write('no tool registry wired\n\n')
+      ctx.prompt()
+      return { handled: true }
+    }
+    const tools = ctx.listTools()
+    ctx.out.write(`${tools.length} tools:\n`)
+    for (const t of tools) {
+      ctx.out.write(`  ${t.name.padEnd(20)} ${t.description}\n`)
+    }
+    ctx.out.write('\n')
     ctx.prompt()
     return { handled: true }
   }
