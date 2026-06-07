@@ -41,3 +41,9 @@ export type { CronJob } from './cron-store.js';
 // Sprint 1c-revive-3-D-30.1δ.10 (2026-06-07): JSON 兜底 sessions-index (替 FTS5).
 export { SessionIndex } from './session-index.js';
 export type { SessionEntry } from './session-index.js';
+// D-30.3.3 (2026-06-07): skill auto-load (启动时 detect ~/.deepwhale/skills).
+export { SkillLoader } from './skill-loader.js';
+export type { LoadedSkill } from './skill-loader.js';
+// D-30.3.4 (2026-06-07): cron daemon stub (setInterval tick → onTick).
+export { CronDaemon } from './cron-daemon.js';
+export type { CronTickHandler } from './cron-daemon.js';
