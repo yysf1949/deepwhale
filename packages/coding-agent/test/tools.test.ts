@@ -11,11 +11,11 @@ import { promises as fs, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools) + D-30.2 (5 new tools) + D-30.3 (1 subagent)', () => {
+describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools) + D-30.2 (5 new tools) + D-30.3 (1 subagent) + D-30.4 (2 vision/tts)', () => {
   describe('ToolRegistry', () => {
-    it('createDefaultRegistry registers 6 + 3 + 5 + 1 = 15 tools', () => {
+    it('createDefaultRegistry registers 6 + 3 + 5 + 1 + 2 = 17 tools', () => {
       const reg = createDefaultRegistry();
-      expect(reg.size()).toBe(15);
+      expect(reg.size()).toBe(17);
       expect(reg.get('read_file')?.name).toBe('read_file');
       expect(reg.get('write_file')?.name).toBe('write_file');
       expect(reg.get('edit_file')?.name).toBe('edit_file');
@@ -34,6 +34,9 @@ describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools) + D-30.2 (5 
       expect(reg.get('plan')?.name).toBe('plan');
       // D-30.3 (2026-06-07): 1 subagent tool
       expect(reg.get('delegate_task')?.name).toBe('delegate_task');
+      // D-30.4 (2026-06-07): 2 vision / tts tools
+      expect(reg.get('vision_analyze')?.name).toBe('vision_analyze');
+      expect(reg.get('text_to_speech')?.name).toBe('text_to_speech');
     });
 
     it('rejects duplicate tool names (pi #5316 教训)', () => {
