@@ -129,6 +129,10 @@ export function createLineHandler(deps: ReplLineDeps): (rawLine: string) => Prom
       writer: deps.writer,
       verifyChecks: deps.verifyChecks,
       prompt: deps.prompt,
+      // D-30.1α.3: /new 触发, 清 workingMessages (router 不直接持 state).
+      onNewSession: () => {
+        deps.workingMessages.length = 0;
+      },
     };
     if ((await deps.dispatchSlashBuiltinFn(line, slashCtx)).handled) return;
 

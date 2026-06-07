@@ -47,6 +47,11 @@ export interface SlashContext {
   verifyChecks: VerifyCheck[] | undefined
   /** re-prompt the user (write prompt char + flush) */
   prompt: () => void
+  /**
+   * D-30.1α.3: /new 触发, 由 caller 注入 (createLineHandler 内部清 workingMessages).
+   * 不在 router 里直接持 workingMessages — router "闭包内不持 state" 红线 (D-29.1.3).
+   */
+  onNewSession?: () => void
 }
 
 /**
@@ -139,6 +144,14 @@ export async function dispatchSlashBuiltin(
     // D-30.1α.2: ANSI clear screen + cursor home + redraw prompt.
     // 不调 console.clear (强耦合 stdout TTY 检测), 直接 ANSI escape 给 ctx.out.
     ctx.out.write('\x1b[2J\x1b[H')
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/new') {
+    // D-30.1α.3: /new 走 onNewSession 回调清 workingMessages (注入端在 createLineHandler).
+    // router 本身不持 workingMessages, 保 D-29.1.3 "闭包内不持 state" 红线.
+    ctx.out.write('starting new session...\n\n')
+    if (ctx.onNewSession) ctx.onNewSession()
     ctx.prompt()
     return { handled: true }
   }
