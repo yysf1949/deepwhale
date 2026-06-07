@@ -571,9 +571,13 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
 
   it('D-22.1: 命令历史持久化 — turn 完写 ~/.deepwhale/tui-history, 0o600 权限', async () => {
     // mock HOME → tmp dir
+    // D-25 A1: util/tui-history.ts 优先查 DEEPWHALE_HOME (最高), 设它确保跨平台生效
+    // (Windows 上 USERPROFILE 默认存在, 单设 HOME 会被 USERPROFILE 抢, 见 util resolveTuiHome)
     const realHome = process.env.HOME;
+    const realDwh = process.env.DEEPWHALE_HOME;
     const homeDir = mkdtempSync(join(tmpdir(), 'deepwhale-history-home-'));
     process.env.HOME = homeDir;
+    process.env.DEEPWHALE_HOME = homeDir;
     try {
       const client = makeMockStreamClient({ first: 'D-22.1 history test response' });
       const out = new StringWritable();
@@ -599,24 +603,28 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
       // ~/.deepwhale/tui-history 应存在
       const histPath = join(homeDir, '.deepwhale', 'tui-history');
       expect(existsSync(histPath)).toBe(true);
-      const jsonl = readFileSync(histPath, 'utf-8');
-      // 1 turn → 至少 1 条 JSONL 行
-      const lines = jsonl.split('\n').filter((l) => l.trim().length > 0);
+      const content = readFileSync(histPath, 'utf-8');
+      // 1 turn → 至少 1 条 raw line (D-25 B4 util 改 JSONL→raw 契约, 跟 tui-ink useHistory 一致)
+      const lines = content.split('\n').filter((l) => l.trim().length > 0);
       expect(lines.length).toBeGreaterThanOrEqual(1);
-      // JSON parse + 含 'hello-history' 原文
-      const obj = JSON.parse(lines[0]) as { line?: string };
-      expect(obj.line).toBe('hello-history');
+      // raw 契约: 原文写入, 不再包 JSON 对象
+      expect(lines[0]).toBe('hello-history');
     } finally {
       process.env.HOME = realHome;
+      process.env.DEEPWHALE_HOME = realDwh;
       rmSync(homeDir, { recursive: true, force: true });
       rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
   it('D-22.1: 历史过滤内建命令 (/help, /verify, /exit) 不写入', async () => {
+    // D-25 A1: util/tui-history.ts 优先查 DEEPWHALE_HOME (最高), 设它确保跨平台生效
+    // (Windows 上 USERPROFILE 默认存在, 单设 HOME 会被 USERPROFILE 抢, 见 util resolveTuiHome)
     const realHome = process.env.HOME;
+    const realDwh = process.env.DEEPWHALE_HOME;
     const homeDir = mkdtempSync(join(tmpdir(), 'deepwhale-history-filter-'));
     process.env.HOME = homeDir;
+    process.env.DEEPWHALE_HOME = homeDir;
     try {
       const client = makeMockStreamClient({ first: 'filter test' });
       const out = new StringWritable();
@@ -641,14 +649,15 @@ describe('runTuiMode (TUI smoke, D-20.3 P0-B)', () => {
       await codePromise;
 
       const histPath = join(homeDir, '.deepwhale', 'tui-history');
-      const jsonl = readFileSync(histPath, 'utf-8').trim();
+      const content = readFileSync(histPath, 'utf-8').trim();
       // 期望: 只 real-prompt 一行 (内建命令不过滤)
-      const lines = jsonl ? jsonl.split('\n') : [];
+      // raw 契约 (D-25 B4): 原文写入, 不再包 JSON 对象
+      const lines = content ? content.split('\n') : [];
       expect(lines.length).toBe(1);
-      const obj = JSON.parse(lines[0]) as { line?: string };
-      expect(obj.line).toBe('real-prompt');
+      expect(lines[0]).toBe('real-prompt');
     } finally {
       process.env.HOME = realHome;
+      process.env.DEEPWHALE_HOME = realDwh;
       rmSync(homeDir, { recursive: true, force: true });
       rmSync(tmpDir, { recursive: true, force: true });
     }

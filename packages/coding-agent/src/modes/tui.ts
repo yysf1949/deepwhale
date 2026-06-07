@@ -45,11 +45,14 @@
 
 import { createInterface, type Interface as RLInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
-import { homedir } from 'node:os';
-import { mkdirSync, readFileSync, appendFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
 import type { ChatMessage, LLMClient } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
+import {
+  tuiHistoryPath,
+  tuiHistoryLoad,
+  tuiHistoryAppend,
+  TUI_HISTORY_MAX,
+} from '../util/tui-history.js';
 import {
   isToolLoopError,
   loadSession,
@@ -299,60 +302,9 @@ export function highlightChunk(
 //
 // 存储: ~/.deepwhale/tui-history (JSONL, 每行 1 条 raw prompt, 0o600 权限, max 1000 条 LRU).
 // readline history 数组语义: 最新一条在尾部 (所以 load 时反序, append 时 push 后写尾).
-
-const TUI_HISTORY_MAX = 1000;
-
-function tuiHistoryPath(): string {
-  return join(homedir(), '.deepwhale', 'tui-history');
-}
-
-function tuiHistoryLoad(): string[] {
-  const p = tuiHistoryPath();
-  try {
-    const text = readFileSync(p, 'utf-8');
-    // JSONL: 1 行 = 1 个对象 { ts, line }
-    const lines = text.split('\n').filter((l) => l.trim().length > 0);
-    const out: string[] = [];
-    for (const l of lines) {
-      try {
-        const obj = JSON.parse(l) as { line?: unknown };
-        if (typeof obj.line === 'string' && obj.line.length > 0) {
-          out.push(obj.line);
-        }
-      } catch {
-        // 跳过坏行, 不破坏整个文件
-      }
-    }
-    // 保留最新 1000 条 (LRU 截断)
-    if (out.length > TUI_HISTORY_MAX) {
-      out.splice(0, out.length - TUI_HISTORY_MAX);
-    }
-    return out;
-  } catch {
-    // 文件不存在 / 权限错 → 返空 (不抛, 不阻塞启动)
-    return [];
-  }
-}
-
-function tuiHistoryAppend(line: string): void {
-  // 过滤空行 + 内建命令 (跟其它 shell history 一样, 跟 token 浪费)
-  if (line.length === 0) return;
-  if (line.startsWith('/')) return; // /help /verify /exit 不入历史
-  if (line === 'q' || line === 'exit' || line === 'quit') return;
-
-  const p = tuiHistoryPath();
-  try {
-    // 0o700 权限父目录 + 0o600 文件 (跟 ~/.bash_history 一样, 仅用户可读)
-    mkdirSync(dirname(p), { mode: 0o700, recursive: true });
-    const entry = JSON.stringify({ ts: Date.now(), line }) + '\n';
-    appendFileSync(p, entry, { mode: 0o600 });
-  } catch {
-    // best-effort, 不阻塞 turn 完成
-  }
-}
-
-// 暴露 tuiHistoryAppend 供测试用 (D-22.1 verification)
-export { tuiHistoryAppend, tuiHistoryLoad, tuiHistoryPath, TUI_HISTORY_MAX };
+//
+// D-25 (2026-06-06) 抽 tuiHistoryPath/Load/Append/Truncate 到 coding-agent util
+// (跟 tui-ink 1:1 共享). 详见 ../util/tui-history.ts.
 
 // ---- D-22.2 流式 token spinner (2026-06-06) ----
 //
