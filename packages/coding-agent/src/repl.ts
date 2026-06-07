@@ -40,7 +40,6 @@ import {
   persistToolLoopSteps,
   runToolLoop,
   runToolLoopWithCompaction,
-  appendVerificationEvent,
   ToolLoopLimitError,
   type AgentCompactionConfig,
   type ToolLoopResult,
@@ -49,7 +48,6 @@ import {
 import { CompactionState, type SummarizeFn } from '@deepwhale/core';
 import { createDefaultRegistry } from './tools/registry.js';
 import { createDefaultClient, type Provider } from './llm-factory.js';
-import { buildSummaryAndNext, formatReport, runVerify } from './verify/index.js';
 import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
 import { staticToolPolicy } from './policy/static-rules.js';
 import { createReplConfirm } from './repl/repl-confirm.js'; // D-15: REPL y/N confirm 工厂
@@ -57,6 +55,7 @@ export { createReplConfirm } from './repl/repl-confirm.js'; // Sprint 1c-revive-
 import { createSignalCoordinator } from './repl/repl-signal-coordinator.js'; // D-29.1.1: SIGINT + turn AbortController 抽
 import { formatUsageStatus, appendUsageStatus, type UsageEmaState } from './repl/repl-session.js'; // D-29.1.2: EMA state + usage status 抽
 export { formatUsageStatus, appendUsageStatus, type UsageEmaState } from './repl/repl-session.js'; // D-29.1.2: re-export 保公共 API 1:1
+import { dispatchSlashBuiltin, type SlashContext } from './repl/repl-command-router.js'; // D-29.1.3: slash builtin 派发抽 (1ceef94 + D-19.6.1 guard)
 import type { ToolPolicy } from './policy/types.js';
 import type { SandboxRunner } from './sandbox/types.js';
 
@@ -431,54 +430,20 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         await finish(0);
         return;
       }
-      if (line === '/help') {
-        out.write(`${t('cli.builtin_help')}\n`);
-        prompt();
-        return;
-      }
-      if (line === '/verify') {
-        // Sprint 1c-revive-2-D-11-4 (2026-06-04): REPL `/verify` 内建命令.
-        // 跟 CLI `deepwhale --verify` 走同一 runVerify() — 不走 LLM / tool loop.
-        // 拍板 (D-11-4 review, 2026-06-04): REPL 里 /verify 走**异步** runVerify,
-        // 跑完打 formatReport 到 out (跟其它内建命令风格一致), 然后**写 verification
-        // event 到 session JSONL** (因为用户在 REPL 里跑了 verify, session 走 audit
-        // 轨迹, 跟 CLI 不写 session 形成差异).
-        // 退出: REPL 不退, 跑完回到 prompt 继续.
-        try {
-          const report = await runVerify(
-            options.verifyChecks !== undefined ? { checks: options.verifyChecks } : {},
-          );
-          const filled = buildSummaryAndNext(report);
-          const text = formatReport({
-            ...report,
-            summary: filled.summary,
-            nextSuggestedAction: filled.nextSuggestedAction,
-          });
-          out.write(`${text}\n`);
-          if (writer) {
-            // 写 verification event 到 session (跟 CLI 不同: REPL 用户有 session, 应该审计)
-            const failedCount = report.checks.filter((c) => c.status !== 'passed').length;
-            await appendVerificationEvent(writer, {
-              status: report.overallStatus,
-              durationMs: report.durationMs,
-              commandCount: report.checks.length,
-              failedCount,
-              summary: filled.summary,
-            });
-          }
-        } catch (e) {
-          err.write(
-            `error: verify failed to start: ${e instanceof Error ? e.message : String(e)}\n\n`,
-          );
-        }
-        prompt();
-        return;
-      }
-      if (line.startsWith('/')) {
-        out.write(`${t('cli.builtin_unknown', line)}\n`);
-        prompt();
-        return;
-      }
+      // === Sprint 1c-revive-3-D-29.1.3 (2026-06-07): slash builtin 派发抽到 dispatchSlashBuiltin ===
+      // 拍板 (D-29.1.3): router 派发顺序保 1:1 (跟原 L434-481): /help → /verify → /unknown slash.
+      // 5 红线 0 改: turnInFlight guard (D-19.6.1 + 6afccc8) 仍在本函数 L409-418,
+      //              /verify try/finally (1ceef94) 走 router 内部 try/catch 等价.
+      //              confirm 期间 /exit dismiss (D-19.5 P2-dismiss) 仍在本函数 L370-373.
+      //              /exit fast-path (D-19.5 P1) 走 L412 exclude, 不入 router.
+      const slashCtx: SlashContext = {
+        out,
+        err,
+        writer,
+        verifyChecks: options.verifyChecks,
+        prompt,
+      };
+      if ((await dispatchSlashBuiltin(line, slashCtx)).handled) return;
 
       // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard — 排队 turnInFlight 期间 line ===
       // 拍板 (D-19.5, user review 2026-06-05 P1): 旧逻辑紧跟 chat turn 的下一行 (紧贴
