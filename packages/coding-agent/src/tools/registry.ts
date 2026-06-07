@@ -20,6 +20,9 @@ import { BashTool } from './bash.js';
 import { FindTool } from './find.js';
 import { GrepTool } from './grep.js';
 import { LocalSandboxRunner } from '../sandbox/local-runner.js';
+import { WebSearchTool } from './web-search.js'; // D-30.1γ.4 (2026-06-07): web tool
+import { WebExtractTool } from './web-extract.js'; // D-30.1γ.4
+import { BrowserNavigateTool } from './browser-navigate.js'; // D-30.1γ.4
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -80,5 +83,9 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   reg.register(new BashTool(runner));
   reg.register(new FindTool());
   reg.register(new GrepTool());
+  // D-30.1γ.4 (2026-06-07): 装 3 web tools. 跟 6 工具同形态 (read-only, low risk).
+  reg.register(new WebSearchTool());
+  reg.register(new WebExtractTool());
+  reg.register(new BrowserNavigateTool());
   return reg;
 }
