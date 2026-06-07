@@ -45,7 +45,9 @@ import { dispatchSlashBuiltin, type SlashContext } from './repl/repl-command-rou
 import { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: agent turn 主体抽 (persist user + runToolLoop + catch 4-branch + 持久化)
 export { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: re-export 保 test/modes-followup.test.ts:18 import path
 import { formatError } from './repl/repl-format-error.js'; // D-29.2: LLM 错误 → i18n 文案映射 (runOneTurn + runAgentTurn 复用)
-import { createFinish, type ReplFinishState } from './repl/repl-finish.js'; // D-29.3.1: finish 抽工厂, 共享 exiting/exitTimer state (close handler + line handler + prompt 共读)
+import { createFinish, type ReplFinishDeps } from './repl/repl-finish.js'; // D-29.3.1: finish 抽工厂, 共享 exiting/exitTimer state (close handler + line handler + prompt 共读)
+import { createLineHandler } from './repl/repl-line-handler.js'; // D-29.3.2: 抽 line handler 工厂 (D-19.5 P1 + 6afccc8 + D-19.6.1 + 1ceef94 + no-unsafe-finally 5 红线 1:1 保)
+import type { ReplState } from './repl/repl-state.js'; // D-29.3.2: 5 字段 mutable state (finish + line + close + prompt 共享)
 import type { ToolPolicy } from './policy/types.js';
 
 const VERSION = '0.1.0';
@@ -284,7 +286,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     // prompt 跟 finally 块 (D-29.3.2 抽 line handler 时) 也用 state.exiting 守卫幂等.
     // 红线: dispose 顺序 (signalCoordinator.dispose → rl.close → writer.close →
     // out.write → resolve) 1:1 保, 工厂内部按此顺序处理, 调用方不感知.
-    const state: ReplFinishState = { exiting: false, exitTimer: null };
+    const state: ReplState = { exiting: false, exitTimer: null, turnInFlight: false, pendingExit: false, lineQueue: [] };
 
     // === Sprint 1c-revive-3-D-29.1.1 (2026-06-07): SIGINT + turn AbortController 抽 ===
     // 拍板 (D-29.1.1): signal-coordinator 持有 turnAbortController 闭包 + SIGINT listener
@@ -319,6 +321,10 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       resolve,
     });
 
+    // === Sprint 1c-revive-3-D-29.3.2 (2026-06-07): 抽 line handler 工厂 ===
+    // 拍板: turnInFlight / pendingExit / lineQueue 走 state (ReplState 5 字段共享).
+    // state 已在 L287 创, 0 重复 let 声明. 5 红线 1:1 保 (D-19.5 / D-19.6.1 / 6afccc8
+    // / 1ceef94 / no-unsafe-finally). 行为 1:1 保 628 既有测试, 0 业务改.
     // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard + 排队 + SIGINT/dismiss 链路 ===
     // 拍板 (D-19.5, user review 2026-06-05 P1): 旧 line handler 在 confirm settle 之后, 紧
     // 跟的下一行 (e.g. /exit\n) 立刻 leak 到 main chat/builtin 分支, /exit 提前 close
@@ -331,149 +337,8 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     //   - confirm 期间: 旧 D-19 offerLine 派发仍走, 但 line 不能 leak 到 chat 分支
     //   - drain 用 setImmediate 避免同步递归爆栈 (P-verify-4 实测, 同步 emit 在大量排队
     //     时撞 V8 10000 帧限制)
-    let turnInFlight = false;
-    let pendingExit = false;
-    // === Sprint 1c-revive-3-D-19.6 (2026-06-05): P1 close-during-turn 30s 兜底 timer ===
-    // 拍板 (D-19.6, user review 2026-06-05 P1): close handler 走 pendingExit + finally
-    // 兜底 finish() 后, 若 in-flight turn 永远不收束 (e.g. 网络卡死/无限 retry), REPL
-    // 永远不退出. exitTimer 启动 30s 硬 timeout, 触发时 stderr warning (i18n) +
-    // 强制 finish. 变量与 pendingExit 同 scope (Q2=方案 2): REPL 单次生命周期状态,
-    // 模块级会让嵌入式/并行多 REPL 实例互相污染. 仅 turnInFlight=true 启动 (Q3=b):
-    // 没有 in-flight turn 时直接 finish, 不需要兜底.
-    // === Sprint 1c-revive-3-D-29.3.1 (2026-06-07): exitTimer 走 state.exitTimer ===
-    // 拍板: finish 抽工厂后, exitTimer 是 finish 写者 (clear + null) + close handler
-    // 写者 (setTimeout). 共享 state.exitTimer 引用, 1:1 保 D-19.6 P1 行为.
-    // (D-29.3.3 抽 close handler 时也用同一 state.exitTimer)
-    const lineQueue: string[] = [];
-
-    rl.on('line', async (rawLine: string) => {
-      const line = rawLine.trim();
-
-      // 拍板 (D-19 + D-19.5): 主 rl 是 stdin 唯一消费者, 确认期间 line 喂 confirm resolver.
-      // D-19.5 P2-dismiss 修: confirm 期间 /exit 先 dismiss confirm 再 pendingExit, finally 兜底.
-      if (confirmController.hasPending()) {
-        if (line === 'exit' || line === 'quit' || line === '/exit' || line === '/quit') {
-          confirmController.dismiss();
-          pendingExit = true;
-          return;
-        }
-        const consumed = confirmController.offerLine(line);
-        if (consumed) {
-          // confirm resolver 已 settle, 等待 promise 走完; 调 prompt() 让用户看见下一轮.
-          // 注意: confirmController 内部在 offerLine 同步 settle, 但 await 仍在 tool-loop 端.
-          // 拍板 (D-19): 不在这里 await confirm 本身, 避免阻塞 rl 内部 line queue.
-          return;
-        }
-      }
-
-      // 拍板 (D-19.6.1 + 6afccc8): slash builtin guard. turnInFlight 时除 /exit /quit
-      // 之外的 slash builtin (/verify /help /unknown) 走 deny, 不入 lineQueue.
-      // lineQueue 只排 chat line (D-19.5 红线), defer 会让 finally drain 还要判
-      // builtin vs chat. 位置: confirm 守卫后, 内建 dispatcher 前.
-      if (
-        turnInFlight &&
-        line.startsWith('/') &&
-        line !== '/exit' &&
-        line !== '/quit'
-      ) {
-        out.write(`${t('cli.turn_in_flight_deny')}\n\n`);
-        prompt();
-        return;
-      }
-
-      // 内建命令 — 全部 fast-path, 不走 turnInFlight (内建不等 chat turn)
-      if (line === '') {
-        prompt();
-        return;
-      }
-      if (line === 'exit' || line === 'quit' || line === '/exit' || line === '/quit') {
-        // 拍板 (D-19.5): turn 不在跑直接 finish; 在跑标 pendingExit, finally 兜底.
-        if (turnInFlight) {
-          pendingExit = true;
-          return;
-        }
-        await finish(0);
-        return;
-      }
-      // === Sprint 1c-revive-3-D-29.1.3 (2026-06-07): slash builtin 派发抽到 dispatchSlashBuiltin ===
-      // 拍板 (D-29.1.3): router 派发顺序保 1:1 (跟原 L434-481): /help → /verify → /unknown slash.
-      // 5 红线 0 改: turnInFlight guard (D-19.6.1 + 6afccc8) 仍在本函数 L409-418,
-      //              /verify try/finally (1ceef94) 走 router 内部 try/catch 等价.
-      //              confirm 期间 /exit dismiss (D-19.5 P2-dismiss) 仍在本函数 L370-373.
-      //              /exit fast-path (D-19.5 P1) 走 L412 exclude, 不入 router.
-      const slashCtx: SlashContext = {
-        out,
-        err,
-        writer,
-        verifyChecks: options.verifyChecks,
-        prompt,
-      };
-      if ((await dispatchSlashBuiltin(line, slashCtx)).handled) return;
-
-      // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard — 排队 turnInFlight 期间 line ===
-      // 拍板 (D-19.5, user review 2026-06-05 P1): 旧逻辑紧跟 chat turn 的下一行 (紧贴
-      // y\n 或 turn 还没跑完时 stdin 排队的行) 立刻进 chat 分支, 用旧 workingMessages
-      // 并发跑第二轮, /exit 提前 close writer. 修法: 派发前检查 turnInFlight, true
-      // → 入队不入 chat. finally 块跑完 turn, 检查 pendingExit (走 finish) → 否则
-      // drain lineQueue 下一条 (setImmediate 避免爆栈). 红线: pendingExit 优先级高于
-      // drain, 因为 /exit 应该是"不处理后续, 立刻走"语义, 不应该 drain 排队行.
-      if (turnInFlight) {
-        lineQueue.push(line);
-        return;
-      }
-      turnInFlight = true;
-
-      // chat — client lazy 化 (D-11-4), refresh AbortController 走 signalCoordinator (D-29.1.1).
-      // 红线: 不要 add 多份 SIGINT listener (coordinator 内部 process.on 一次).
-      signalCoordinator.refresh();
-      const c = clientFromOptions ? { client: clientFromOptions, error: null } : tryCreateClient();
-      if (c.client === null) {
-        err.write(`${t('error.api_key_missing')}\n\n`);
-        turnInFlight = false;
-        prompt();
-        return;
-      }
-      const liveClient = c.client;
-      try {
-        if (enableToolLoop) {
-          await runAgentTurn(
-            liveClient,
-            line,
-            workingMessages,
-            writer,
-            out,
-            err,
-            signalCoordinator.getSignal(),
-            compactionConfig,
-            sandboxRunner,
-            policyYes,
-            replPolicy, // D-15: 注入 y/N confirm; 默认 staticToolPolicy 向后兼容
-            emaState, // D-21.1: EMA 平滑闭包 state 透传
-          );
-        } else {
-          const turn = await runOneTurn(liveClient, line, [], { signal: signalCoordinator.getSignal() });
-          if (turn.kind === 'error') {
-            err.write(`${turn.error}\n\n`);
-          } else if (turn.kind === 'chat') {
-            out.write(`${turn.assistant}\n\n`);
-          }
-        }
-      } finally {
-        // 拍板 (D-19.5): pendingExit 优先 (走 finish, 丢弃排队) → drain 下一条
-        // (setImmediate 防同步递归爆栈) → prompt 继续. finally 不能 return
-        // (no-unsafe-finally), 用 if/else if/else 链.
-        turnInFlight = false;
-        if (pendingExit) {
-          pendingExit = false;
-          void finish(0);
-        } else if (lineQueue.length > 0 && !state.exiting) {
-          const next = lineQueue.shift()!;
-          setImmediate(() => rl.emit('line', next));
-        } else {
-          prompt();
-        }
-      }
-    });
+    // (D-29.3.2): turnInFlight / pendingExit / lineQueue 状态字段迁到 ReplState,
+    // let 声明删除.
 
     rl.on('close', () => {
       // stdin EOF (管道/Ctrl-D) → 优雅退出.
@@ -482,11 +347,11 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       if (confirmController.hasPending()) {
         confirmController.dismiss();
       }
-      if (turnInFlight && !signalCoordinator.getSignal().aborted) {
+      if (state.turnInFlight && !signalCoordinator.getSignal().aborted) {
         signalCoordinator.abortIfActive();
       }
-      pendingExit = true;
-      if (turnInFlight) {
+      state.pendingExit = true;
+      if (state.turnInFlight) {
         if (state.exitTimer) clearTimeout(state.exitTimer);
         state.exitTimer = setTimeout(() => {
           // 30s 兜底: turn 卡死时强制 finish, stderr warning 走 i18n (Q1=A).
@@ -507,6 +372,38 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       if (state.exiting) return;
       out.write(t('cli.prompt'));
     };
+
+    // === Sprint 1c-revive-3-D-29.3.2 (2026-06-07): 抽 line handler 工厂调用 ===
+    // 5 红线 1:1 保: turnInFlight guard (D-19.6.1 + 6afccc8) / /verify (1ceef94) /
+    // pendingExit 兜底 / setImmediate drain / no-unsafe-finally 都在 createLineHandler
+    // 内部 1:1 实现. 行为 1:1 保 628 既有测试. 位置: prompt() 后 (lineHandler deps
+    // 收 prompt 闭包), rl.on('line') 挂在 close handler 之后.
+    const lineHandler = createLineHandler({
+      state,
+      finish,
+      signalCoordinator,
+      confirmController,
+      tryCreateClient,
+      clientFromOptions,
+      runAgentTurnFn: runAgentTurn,
+      runOneTurnFn: runOneTurn,
+      dispatchSlashBuiltinFn: dispatchSlashBuiltin,
+      out,
+      err,
+      writer,
+      workingMessages,
+      emaState,
+      compactionConfig,
+      sandboxRunner,
+      policyYes,
+      replPolicy,
+      enableToolLoop,
+      verifyChecks: options.verifyChecks,
+      t,
+      prompt,
+      rl,
+    });
+    rl.on('line', lineHandler);
 
     // 第一个 prompt
     prompt();

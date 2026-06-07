@@ -34,19 +34,21 @@ import type { t as T } from '@deepwhale/core';
 import type { Interface as RLInterface } from 'node:readline';
 import type { SessionWriter } from '@deepwhale/core';
 import type { ReplSignalCoordinator } from './repl-signal-coordinator.js';
+import type { ReplState } from './repl-state.js';
 
 /**
- * Finish 写者 state — finish 是唯一写者 (exiting / exitTimer), close handler 是
- * 唯一读者 (exiting 守卫幂等 / exitTimer 30s 兜底). 跟 line handler 的
- * ReplLineState (turnInFlight / pendingExit / lineQueue) 共享**同一** state 引用.
+ * 红线 (D-19.5 P2-SIGINT + D-19.6 P1): finish 是 state.exiting / state.exitTimer 写者,
+ * close handler 是读者 (exiting 守卫幂等, exitTimer 30s 兜底). 共享 ReplState 引用 —
+ * finish 通过 createFinish({state, ...}) 写, close handler 通过 state.exiting /
+ * state.exitTimer 读 (D-29.3.3 抽 close handler 时也用同一 state). prompt 跟 finally
+ * 块 (D-29.3.2 抽 line handler 时) 也用 state.exiting 守卫幂等.
+ * 红线: dispose 顺序 (signalCoordinator.dispose → rl.close → writer.close →
+ * out.write → resolve) 1:1 保, 工厂内部按此顺序处理, 调用方不感知.
  */
-export interface ReplFinishState {
-  exiting: boolean;
-  exitTimer: NodeJS.Timeout | null;
-}
+export type { ReplState };
 
 export interface ReplFinishDeps {
-  state: ReplFinishState;
+  state: ReplState;
   signalCoordinator: ReplSignalCoordinator;
   rl: RLInterface;
   writer: SessionWriter | null;
