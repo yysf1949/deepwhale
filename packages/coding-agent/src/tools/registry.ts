@@ -23,6 +23,11 @@ import { LocalSandboxRunner } from '../sandbox/local-runner.js';
 import { WebSearchTool } from './web-search.js'; // D-30.1γ.4 (2026-06-07): web tool
 import { WebExtractTool } from './web-extract.js'; // D-30.1γ.4
 import { BrowserNavigateTool } from './browser-navigate.js'; // D-30.1γ.4
+import { PatchTool } from './patch.js'; // D-30.2.3 (2026-06-07): find/replace unique string
+import { SearchFilesTool } from './search-files.js'; // D-30.2.4: ripgrep 搜索
+import { ExecuteCodeTool } from './execute-code.js'; // D-30.2.5: python/node sandbox
+import { TodoTool } from './todo.js'; // D-30.2.6: todo store
+import { PlanTool } from './plan.js'; // D-30.2.7: plan mode
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -87,5 +92,12 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   reg.register(new WebSearchTool());
   reg.register(new WebExtractTool());
   reg.register(new BrowserNavigateTool());
+  // D-30.2 (2026-06-07): 装 5 新工具 — patch (medium) + search_files (low) + execute_code
+  // (medium) + todo (low) + plan (low). 跟 9 工具 1:1 同形态 (先 register).
+  reg.register(new PatchTool());
+  reg.register(new SearchFilesTool());
+  reg.register(new ExecuteCodeTool());
+  reg.register(new TodoTool());
+  reg.register(new PlanTool());
   return reg;
 }

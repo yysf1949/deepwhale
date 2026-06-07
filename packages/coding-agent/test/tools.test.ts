@@ -11,11 +11,11 @@ import { promises as fs, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools)', () => {
+describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools) + D-30.2 (5 new tools)', () => {
   describe('ToolRegistry', () => {
-    it('createDefaultRegistry registers 6 + 3 = 9 tools', () => {
+    it('createDefaultRegistry registers 6 + 3 + 5 = 14 tools', () => {
       const reg = createDefaultRegistry();
-      expect(reg.size()).toBe(9);
+      expect(reg.size()).toBe(14);
       expect(reg.get('read_file')?.name).toBe('read_file');
       expect(reg.get('write_file')?.name).toBe('write_file');
       expect(reg.get('edit_file')?.name).toBe('edit_file');
@@ -26,6 +26,12 @@ describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools)', () => {
       expect(reg.get('web_search')?.name).toBe('web_search');
       expect(reg.get('web_extract')?.name).toBe('web_extract');
       expect(reg.get('browser_navigate')?.name).toBe('browser_navigate');
+      // D-30.2 (2026-06-07): 5 new tools
+      expect(reg.get('patch')?.name).toBe('patch');
+      expect(reg.get('search_files')?.name).toBe('search_files');
+      expect(reg.get('execute_code')?.name).toBe('execute_code');
+      expect(reg.get('todo')?.name).toBe('todo');
+      expect(reg.get('plan')?.name).toBe('plan');
     });
 
     it('rejects duplicate tool names (pi #5316 教训)', () => {
