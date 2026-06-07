@@ -274,7 +274,13 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   });
 }
 
-// === Sprint 1c-revive-3-D-29.2 (2026-06-07): 4 个独立职责模块抽到 repl/*.ts ===
-// runAgentTurn → repl-agent-turn.ts, formatError → repl-format-error.ts,
-// makeLlmSummarizeFn → repl-compaction-summary.ts, appendStepSummary → repl-step-summary.ts.
-// 公共 API 1:1 保 (re-export runAgentTurn 保 test/modes-followup.test.ts:18), 628 既有测试 0 new fail.
+// === Sprint 1c-revive-3-D-29.2~3 (2026-06-07): 10 个独立职责模块抽到 repl/*.ts ===
+// D-29.2 (3 commit): runAgentTurn / formatError / makeLlmSummarizeFn / appendStepSummary
+// D-29.3.1 (1 commit): createFinish 工厂
+// D-29.3.2 (1 commit): createLineHandler 工厂 + ReplState 5 字段共享
+// D-29.3.3 (1 commit): createCloseHandler 工厂
+// D-29.3.4 (1 commit): createReplBootstrap 工厂 (preamble)
+// D-29.3.5 (1 commit): trim marker
+// 公共 API 1:1 保 (re-export runAgentTurn / createReplConfirm / UsageEmaState
+// 保 test 公共 import path), 628 既有测试 0 new fail.
+// 累计: repl.ts 947L → 280L (-70%, -667L 抽到 10 个子模块).
