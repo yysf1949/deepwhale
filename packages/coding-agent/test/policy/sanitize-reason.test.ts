@@ -82,9 +82,15 @@ describe('policy/sanitize-reason.sanitizeReason', () => {
 
   it('truncate 在 redact 之前 (D-29.2 候选 1 拍板: 200 字符窗口内 secret 必 redact)', () => {
     // 候选 1 拍板 (2026-06-07 user review): 流程顺序 truncate 先 → redact 后.
-    // 200 字符窗口内 secret 必完整 redact. 跨 200 边界 (>200 字符) 的极长 secret
-    // (如 800 字符 JWT) 接受 truncate 切后子串漏 redact 边缘 — 拍板记录, 不进测强约束
-    // (200 字符足够覆盖实际 API key 长度, OpenAI sk- 51 / GitHub PAT 40 / AWS 40).
+    // 200 字符窗口内 secret 必完整 redact. 跨 200 字符边界的 secret 接受 truncate
+    // 切后子串漏 redact 边缘 — 拍板记录, 不进测强约束.
+    //
+    // 重要 (reviewer 校正 2026-06-07 v3): 不是 "极长 800 字符 JWT 才漏" — 任何
+    // 长度 secret 撞在 200 字符边界附近都会被切. 实测 252 字符输入 + 20 字符
+    // sk-abcdefghij1234567 → 切在 sk-abcd (4 字符子串), 漏 redact 4 字符.
+    // 200 字符窗口覆盖常用 API key 长度 (OpenAI sk- 51 / GitHub PAT 40 /
+    // AWS 20-40 / DeepSeek 35 / Anthropic 108), 撞边界场景是 secret 嵌在
+    // 长 reason (e.g. 长 error message 含内嵌 token) 的中后段.
     //
     // 测 A: secret 在 200 字符内 → 必被 redact (跟原测 L83-91 期望一致)
     const sk = 'sk-' + 'abcdefghij1234567'; // 20 chars
@@ -93,14 +99,13 @@ describe('policy/sanitize-reason.sanitizeReason', () => {
     expect(r1).toContain('***REDACTED***');
     expect(r1).not.toContain(sk);
 
-    // 测 B: secret 跨 200 字符边界 → truncate 切, 切后子串可能漏 redact
-    // 拍板接受 (候选 1 边缘 case), 测只断言 truncate marker 在, 不断言完整 redact
+    // 测 B: secret 跨 200 字符边界 → truncate 切, 切后子串漏 redact (拍板接受)
     const long = 'a'.repeat(180) + ' ' + sk + ' ' + 'b'.repeat(50); // 252 chars
     const r2 = sanitizeReason(long);
     expect(r2).toMatch(/\[truncated\]$/);
-    // r2 可能是 'aaa...aaa sk-abcd…[truncated]' (secret 被切, 漏 redact 接受)
-    // 或 'aaa...aaa ***REDACTED***…[truncated]' (边界恰好在 secret 之前, 完整 redact)
-    // 两者皆符合候选 1 拍板.
+    // r2 实际: 'aaa...aaa sk-abcd…[truncated]' (secret 在 187 字符处被切, 漏 sk-abcd 4 字符)
+    // 候选 1 拍板接受. 防止 future reviewer 加 not.toMatch(/sk-/) 强约束
+    // 致候选 1 实现 fail, 看本注释知拍板已明示接受.
   });
 
   it('顺序: 先 redact 再折叠 (D-29.2)', () => {

@@ -48,10 +48,13 @@ function redactSecrets(s: string): string {
 //   4. 去 NUL
 // 拍板理由 (候选 1 vs 候选 2/3): 候选 1 保证 secret 在 200 字符内永远完整
 // redact, 候选 2 (smart truncate) marker 长度不固定复杂度+1, 候选 3
-// (改测松) 测松了 silent bug. 候选 1 牺牲极长 secret (>200 字符, 如 800 字符
-// JWT) 跨 truncate 边界漏 redact 边缘 — 拍板接受 (200 字符窗口足够覆盖
-// 实际 API key 长度, OpenAI sk- 通常 51 字符, GitHub PAT 40 字符, AWS secret
-// 40 字符).
+// (改测松) 测松了 silent bug. 候选 1 牺牲"任何 secret 撞 200 字符边界"的
+// 部分泄漏 — 拍板接受 (实测 252 字符输入 + 20 字符 sk- → 切在 sk-abcd
+// 4 字符子串, 漏 4 字符).
+//
+// 200 字符窗口覆盖常用 API key 长度 (OpenAI sk- 51 / GitHub PAT 40 /
+// AWS secret 40 / DeepSeek 35 / Anthropic 108), 撞边界场景是 secret 嵌在
+// 长 reason (e.g. 长 error message 含内嵌 token) 的中后段.
 //
 // 拍板红线: 0 改 sanitizeReason 签名, 6 调用点 (tool-loop.ts:318, 352, 359,
 // 381, 405 + 1 链) 全部向后兼容.
