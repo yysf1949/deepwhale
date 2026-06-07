@@ -32,3 +32,6 @@ export type { ReplOptions } from './repl.js';
 // Sprint 1c-revive-2-D-25 B2 (2026-06-06): tui-ink App needs LLMClient factory + ToolRegistry
 // (useRunToolLoop 修 3 参签名, 业务 1:1 跟 modes/tui.ts L482 + L770 同形态)
 export { createDefaultClient, type CreateClientOptions, type Provider } from './llm-factory.js';
+// Sprint 1c-revive-3-D-30.1β.5 (2026-06-07): tui-ink App needs dispatchSlashBuiltin
+// 走 D-29.1.3 router. 跟 tui-ink peer dep 拉主包 import 1:1 兼容.
+export { dispatchSlashBuiltin, type SlashContext, type ReplStatus } from './repl/repl-command-router.js';

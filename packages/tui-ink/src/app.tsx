@@ -52,6 +52,7 @@ import {
   loadSession,
   createDefaultClient,
   createDefaultRegistry,
+  dispatchSlashBuiltin,
 } from '@deepwhale/coding-agent'
 import { stdout } from 'node:process'
 
@@ -85,6 +86,10 @@ export function App({ options, onExit }: AppProps): ReactElement {
     // SIGINT 透传: caller (useRunToolLoop) 拿 signal 透传 runToolLoop.
     // 这里只 no-op, 跟 tui.ts D-19 onSigint 1:1
   })
+
+  // D-30.1β.5: 启动时间戳 (供 /status uptimeMs 用)
+  const startedAtRef = useRef<number>(Date.now())
+  const startedAt = startedAtRef.current
 
   // working messages (累积 user + assistant, 跟 tui.ts `workingMessages` 同形态)
   const [workingMessages, setWorkingMessages] = useState<ChatMessage[]>([])
@@ -203,6 +208,56 @@ export function App({ options, onExit }: AppProps): ReactElement {
       void writerRef.current?.close()
       onExit({ exitCode: 0, reason: 'user-exit' })
       exit()
+      return
+    }
+
+    // 1.5. router cases (D-30.1β TUI 集成) — 走 dispatchSlashBuiltin (D-29.1.3 工厂)
+    // 拍板: TUI 端 stub setTheme/setModel/listTools (后续 sprint 接 theme state + client swap);
+    // prompt 是 no-op (TUI 不重 prompt, 让用户接着输).
+    if (
+      trimmed === '/help' ||
+      trimmed === '/clear' ||
+      trimmed === '/new' ||
+      trimmed === '/status' ||
+      trimmed === '/theme' ||
+      trimmed.startsWith('/theme ') ||
+      trimmed === '/model' ||
+      trimmed.startsWith('/model ') ||
+      trimmed === '/verify' ||
+      trimmed === '/tools'
+    ) {
+      void dispatchSlashBuiltin(trimmed, {
+        out: stdout,
+        err: process.stderr,
+        writer: writerRef.current,
+        verifyChecks: [],
+        prompt: () => {},
+        setTheme: (name: string) => {
+          // TODO D-30.1.2: theme state 注入 (store/ui)
+          void name
+        },
+        getThemeName: () => 'default',
+        setModel: (id: string) => {
+          // TODO D-30.1.2: client swap 注入
+          void id
+        },
+        getCurrentModel: () => 'unset',
+        listTools: () => {
+          // TODO D-30.1.2: registry.list() 暴露 + 描述映射
+          const tools = registry.list()
+          return tools.map((t) => ({ name: t.name, description: t.description }))
+        },
+        onNewSession: () => {
+          setWorkingMessages([])
+        },
+        getStatus: () => ({
+          model: 'unset',
+          sessionPath: sessionPath,
+          emaSampleCount: 0,
+          theme: 'default',
+          uptimeMs: Date.now() - startedAt,
+        }),
+      })
       return
     }
 
