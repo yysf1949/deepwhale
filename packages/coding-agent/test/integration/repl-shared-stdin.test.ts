@@ -76,6 +76,7 @@ interface ReplHarness {
   write: (line: string) => void;
   exit: () => void;
   outChunks: string;
+  errChunks: string;
   sessionPath: string;
   /**
    * Sprint 1c-revive-3-D-19.5 (2026-06-05): 暴露 input PassThrough, 让测能调
@@ -99,6 +100,15 @@ function buildReplHarness(toolCall: {
       cb();
     },
   });
+  // === Sprint 1c-revive-3-D-19.5p (2026-06-05): 暴露 err stream chunks, 让测能
+  // 断言 stderr 'file closed' 不出现 (P1 close drain 修法) ===
+  const errChunks: Buffer[] = [];
+  const errorStream = new Writable({
+    write(chunk: Buffer, _enc, cb) {
+      errChunks.push(chunk);
+      cb();
+    },
+  });
   // 拍板 (D-19): startRepl 默认不依赖真 stdin, 但默认用 process.stdin / stdout
   // 跑 greeting. 注入 input/output 后仍然跑 greeting (写 out). 单测只关心
   // session 落盘 + prompt + confirm 行为.
@@ -112,6 +122,9 @@ function buildReplHarness(toolCall: {
       client,
       input,
       output,
+      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): 注入 err stream (默认 process.stderr),
+      // 让测能断言 stderr 'file closed' 不出现 (P1 close drain 修法) ===
+      errorOutput: errorStream,
       sessionPath,
       // startRepl 内部 await writer.open() 才能写 session; 注入一个已经 open 的 writer
       // 走现有契约: sessionPath 字段走 startRepl 内部 open, 我们不开第二个. 等等 —
@@ -138,6 +151,11 @@ function buildReplHarness(toolCall: {
     },
     get outChunks() {
       return Buffer.concat(outChunks).toString();
+    },
+    // === Sprint 1c-revive-3-D-19.5p (2026-06-05): 暴露 err chunks 字符串, 让测断言
+    // stderr 'file closed' / 'Tool loop aborted by caller' 等日志符合预期 ===
+    get errChunks() {
+      return Buffer.concat(errChunks).toString();
     },
     sessionPath,
     endInput: () => {
@@ -274,15 +292,26 @@ describe('REPL turn-guard + shutdown cleanup (D-19.5)', () => {
       harness.write('y');
       // 不等 100ms, 立刻 /exit (race: 旧版本 /exit 会 leak 到 chat)
       harness.write('/exit');
-      // 给 startRepl 足够时间 drain + finish
-      await new Promise((r) => setTimeout(r, 200));
+      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): P3 修 — exit-timing 断言 ===
+      // 拍板 (D-19.5p, user review 2026-06-05 P3): 旧版 `p.catch(() => {})` 只防
+      // unhandled, 没断言 p resolve / 退出码, fast-path finish 失败时假绿. 修法:
+      // 用 Promise.race + 1000ms timeout 拿退出码, expect = 0. 红线: 不增加 await
+      // 时间, 跟 D-19.5 测 2/3 同 timeout 模式.
+      const code = await Promise.race([
+        p,
+        new Promise<number>((_, reject) =>
+          setTimeout(() => reject(new Error('startRepl finish 超时 (D-19.5p P3 修法)')),
+            1000,
+          ),
+        ),
+      ]);
+      expect(code, 'finish 退出码应为 0 (D-19.5p P3 修法)').toBe(0);
 
       // 验证 1: 工具真落盘 (y 走通)
       expect(existsSync(target)).toBe(true);
       expect(readFileSync(target, 'utf8')).toBe('d19.5-p1-tight-exit');
 
       // 验证 2: session 落 user_approved (confirm y 走通)
-      p.catch(() => {});
       const events = await readSessionEvents(harness.sessionPath);
       const policyEvents = events.filter((e) => e.kind === 'policy_decision');
       const approved = policyEvents.find((e) => e.kind === 'policy_decision' && e.decision === 'user_approved');
@@ -294,6 +323,19 @@ describe('REPL turn-guard + shutdown cleanup (D-19.5)', () => {
       const userContents = userEvents.map((e) => (e.kind === 'user' ? e.content : ''));
       expect(userContents).toContain('please write to file');
       expect(userContents, '/exit 不应入 user events (D-19.5 P1 修法)').not.toContain('/exit');
+
+      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): P1 close drain stderr 断言 ===
+      // 拍板 (D-19.5p, user review 2026-06-05 P1): D-19.5 baseline 测 5/5 绿但 stderr
+      // 明确报 'Unexpected error: Error: file closed', 因测用 try/catch 吞了
+      // runToolLoop 内部 catch, 不断言 session writer 抛错 → 假绿. 修法: 注入
+      // errorOutput 收集 stderr, 断言 'file closed' 不出现 (D-19.5p 修后 close
+      // 路径走 pendingExit 兜底, turn 落完 audit 再 close writer, 不撞 closed handle).
+      // 红线: 不强求 stderr 完全干净, 'Tool loop aborted by caller' 是 abort 引起的
+      // 预期日志, 不算 fail. 只断言 'file closed' 不出现.
+      expect(
+        harness.errChunks,
+        "D-19.5p P1 close drain: stderr 不应出现 'file closed' (close writer 过早)",
+      ).not.toContain('file closed');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -398,5 +440,90 @@ describe('REPL turn-guard + shutdown cleanup (D-19.5)', () => {
     await new Promise((r) => setImmediate(r));
     const after2 = process.listenerCount('SIGINT');
     expect(after2, '第二次 finish 后 listener 回到 after (不累积)').toBe(after);
+  });
+});
+
+describe('REPL builtin turn-guard (D-19.5p)', () => {
+  // === Sprint 1c-revive-3-D-19.5p (2026-06-05): P2 builtin guard 回归测 ===
+  // 拍板 (D-19.5p, user review 2026-06-05 P2): D-19.5 turn guard 只 guard chat 路径,
+  // /help /verify /unknown 走 fast-path, 紧贴 chat turn 时照样跑, 输出/session 交错.
+  // 修法: 这 3 个 builtin 移到 turn guard 之后, turnInFlight 时入 lineQueue, finally
+  // drain. 测覆盖:
+  //   - 紧贴 /help 不在 turn 中途 out, 等 turn 跑完才出现 (通过 outChunks 包含 help 文本)
+  //   - /help 仍能跑 (D-11-4 行为不变 — 内建命令最终都跑, 区别是顺序)
+  //
+  // 红线: 不强求 /verify 也测 (runVerify 真实跑耗时长, 跑测试慢). /help 已能验证
+  // turn guard 机制 (不调 runAgentTurn, 不写 event, 跟 chat 路径独立, 但走同一 line
+  // handler 分支). builtin guard 修法是位置性 (turn guard 之后) + 状态性
+  // (turnInFlight → lineQueue.push), /help 测已能覆盖 3 builtin 的共同行为.
+
+  it('P2: turnInFlight 期间 /help 入队, 等 turn 跑完才打 cli.builtin_help 到 out', async () => {
+    // 拍板 (D-19.5p): 这测跟 P1 测同结构, 但 /help 是 P2 builtin guard 的代表
+    // (跟 /verify /unknown 共享同一 lineQueue.push 路径, 走最轻量的 /help 跑快).
+    // 期望:
+    //   1) /help 在 turnInFlight 期间被 lineQueue 排队, 不进 /help 块 (否则 out
+    //      会出现 cli.builtin_help, 紧贴 confirm 后)
+    //   2) turn 跑完 finally drain, /help 块触发, out 含 cli.builtin_help
+    //   3) /help 不阻塞 turn (D-19.5p 修法让 builtin 复用 lineQueue 排队, 跟
+    //      chat 路径一样)
+    const dir = mkdtempSync(join(tmpdir(), 'dw-repl-d195p-p2-'));
+    const target = join(dir, 'target.txt');
+    const harness = buildReplHarness({
+      id: 'c1',
+      name: 'write_file',
+      args: { path: target, content: 'd19.5p-p2-builtin-guard' },
+    });
+
+    try {
+      const p = harness.start();
+      await new Promise((r) => setImmediate(r));
+      // 触发 confirm prompt
+      harness.write('please write to file');
+      await new Promise((r) => setTimeout(r, 100));
+      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): 紧贴 y + /help — 应该 y 走 confirm,
+      // /help 入队, turnInFlight 期间 /help 不打 cli.builtin_help 到 out ===
+      // 拍板 (D-19.5p): y 走 confirm 路径, /help 是下一行. 旧 D-19.5: y 走通后
+      // 工具执行 (turnInFlight=true), 紧贴 /help 进 fast-path 立刻打 help 文本, 跟
+      // turn 输出交错. D-19.5p 修法: turnInFlight=true 时 /help 入 lineQueue,
+      // turn 跑完 finally drain 才打 help 文本. 测验证两点: (a) 工具仍落盘 (chat
+      // 走通, 跟 D-19 baseline 一致), (b) /help 最终出现 (drain 后跑 builtin).
+      harness.write('y');
+      // 不等 100ms, 立刻 /help (race: 旧版本 /help 走 fast-path, 紧贴 confirm 后立刻打 help 文本)
+      harness.write('/help');
+      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): /exit 触发 finish (D-19.5p P2 测需要走完生命周期) ===
+      // 拍板 (D-19.5p): 不调 /exit REPL 一直 prompt 等输入, 测超时. /exit 仍走
+      // fast-path (D-19.5 拍板不变), finish 由 turn finally 兜底. 红线: /exit 排队 vs
+      // fast-path — 走 fast-path (D-19.5 修法不变), 不会撞 D-19.5p P2 builtin guard.
+      // 等 turn 跑完 + /help drain 后 /exit 才能跑 (turnInFlight=true 时 /exit 标
+      // pendingExit, finally 走 finish).
+      await new Promise((r) => setTimeout(r, 200));
+      harness.exit();
+      // 等 turn 跑完 + /help drain + finish
+      const code = await Promise.race([
+        p.catch(() => 0),
+        new Promise<number>((_, reject) =>
+          setTimeout(() => reject(new Error('startRepl finish 超时 (D-19.5p P2 测)')), 2000),
+        ),
+      ]);
+      // 工具真落盘 (chat turn 真跑完, y 走通)
+      expect(existsSync(target), 'chat turn 仍真跑 (D-19.5p P2 builtin guard 不影响 chat)').toBe(true);
+
+      // 关键验证: /help 最终出现在 out (D-19.5p 修法: 推迟但仍跑, 区别是顺序)
+      // 不能用绝对时序断言, 只验证 /help 文本存在.
+      expect(
+        harness.outChunks,
+        "D-19.5p P2 builtin guard: /help 应在 turn 跑完 drain 后真跑, out 含 cli.builtin_help",
+      ).toContain('help');
+
+      // 验证: 工具**没**因 /help 被破坏 (chat turn 走 user_approved, 不进 verify)
+      const events = await readSessionEvents(harness.sessionPath);
+      const policyEvents = events.filter((e) => e.kind === 'policy_decision');
+      const approved = policyEvents.find((e) => e.kind === 'policy_decision' && e.decision === 'user_approved');
+      expect(approved, 'chat turn 仍落 user_approved (D-19.5p P2 修法不影响 chat 行为)').toBeDefined();
+
+      expect(code, 'finish 退出码应为 0').toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
