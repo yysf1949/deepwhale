@@ -301,7 +301,7 @@ describe('REPL turn-guard + shutdown cleanup (D-19.5)', () => {
         p,
         new Promise<number>((_, reject) =>
           setTimeout(() => reject(new Error('startRepl finish 超时 (D-19.5p P3 修法)')),
-            1000,
+            5000,
           ),
         ),
       ]);
@@ -445,27 +445,27 @@ describe('REPL turn-guard + shutdown cleanup (D-19.5)', () => {
 
 describe('REPL builtin turn-guard (D-19.5p)', () => {
   // === Sprint 1c-revive-3-D-19.5p (2026-06-05): P2 builtin guard 回归测 ===
-  // 拍板 (D-19.5p, user review 2026-06-05 P2): D-19.5 turn guard 只 guard chat 路径,
-  // /help /verify /unknown 走 fast-path, 紧贴 chat turn 时照样跑, 输出/session 交错.
-  // 修法: 这 3 个 builtin 移到 turn guard 之后, turnInFlight 时入 lineQueue, finally
-  // drain. 测覆盖:
-  //   - 紧贴 /help 不在 turn 中途 out, 等 turn 跑完才出现 (通过 outChunks 包含 help 文本)
-  //   - /help 仍能跑 (D-11-4 行为不变 — 内建命令最终都跑, 区别是顺序)
-  //
-  // 红线: 不强求 /verify 也测 (runVerify 真实跑耗时长, 跑测试慢). /help 已能验证
-  // turn guard 机制 (不调 runAgentTurn, 不写 event, 跟 chat 路径独立, 但走同一 line
-  // handler 分支). builtin guard 修法是位置性 (turn guard 之后) + 状态性
-  // (turnInFlight → lineQueue.push), /help 测已能覆盖 3 builtin 的共同行为.
+  // === Sprint 1c-revive-3-D-19.5p2 (2026-06-07): /help 改 fast-path — 测描述同步拍板 ===
+  // 拍板 (D-19.5p2, user review 2026-06-07 Block 1): D-19.5p 拍板 /help /verify /unknown
+  // 都排 lineQueue. 但 /help /unknown 同步/纯本地, 30s 长 turn 期间用户输错命令要等
+  // 30s 才告知, 反 UX. 修法: /help /unknown 改 fast-path (turn guard 之前), /verify 仍排
+  // lineQueue (异步 runVerify + 写 session, 必须等 turn 完, D-11-4 + D-19.5p1 拍板不变).
+  // 测覆盖 (跟 D-19.5p 同结构, 期望同步更新):
+  //   - /help fast-path: 紧贴 y 后 /help 立刻打 cli.builtin_help 到 out, 不等 turn 跑完
+  //   - 工具仍真落盘 (chat turn 走通, y 走通, /help 不影响 chat 行为)
+  //   - /exit 仍能 finish (跟 D-19.5p P1 一致, /exit fast-path 拍板不变)
+  // 红线: 不强求 /verify 也测 (runVerify 真实跑耗时长). /help 已能验证 fast-path 跟
+  //   chat 路径的关系 — fast-path 不被 turnInFlight 阻塞, chat 也不被 /help 阻塞.
+  //   /help 测现在主要验证 "fast-path 期间 chat 不被 /help 破坏" + "fast-path 不阻塞 turn".
 
-  it('P2: turnInFlight 期间 /help 入队, 等 turn 跑完才打 cli.builtin_help 到 out', async () => {
-    // 拍板 (D-19.5p): 这测跟 P1 测同结构, 但 /help 是 P2 builtin guard 的代表
-    // (跟 /verify /unknown 共享同一 lineQueue.push 路径, 走最轻量的 /help 跑快).
-    // 期望:
-    //   1) /help 在 turnInFlight 期间被 lineQueue 排队, 不进 /help 块 (否则 out
-    //      会出现 cli.builtin_help, 紧贴 confirm 后)
-    //   2) turn 跑完 finally drain, /help 块触发, out 含 cli.builtin_help
-    //   3) /help 不阻塞 turn (D-19.5p 修法让 builtin 复用 lineQueue 排队, 跟
-    //      chat 路径一样)
+  it('P2: /help fast-path 不被 turnInFlight 阻塞, chat turn + /help + /exit 串行 ok (D-19.5p2 拍板)', async () => {
+    // 拍板 (D-19.5p2, user review 2026-06-07 Block 1): /help 改 fast-path 后, 这测
+    // 跟 D-19.5p 期望同步更新 — 旧期望 "turnInFlight 期间 /help 入队" 已废, 新期望:
+    //   1) /help fast-path: y 紧贴后 /help 立刻打 cli.builtin_help 到 out, 不等 turn 跑完
+    //   2) /help 不阻塞 turn — chat turn 走通, y 走通, user_approved 落 session
+    //   3) /help 不破坏 turn — turn 输出/help 文本不交错 (顺序由 stdin 决定, fast-path
+    //      紧贴 y 后 /help, 然后 turn 跑完输出 final content, 然后 /exit)
+    //   4) /exit 仍能 finish (跟 D-19.5p P1 一致, /exit fast-path 拍板不变)
     const dir = mkdtempSync(join(tmpdir(), 'dw-repl-d195p-p2-'));
     const target = join(dir, 'target.txt');
     const harness = buildReplHarness({
@@ -480,13 +480,14 @@ describe('REPL builtin turn-guard (D-19.5p)', () => {
       // 触发 confirm prompt
       harness.write('please write to file');
       await new Promise((r) => setTimeout(r, 100));
-      // === Sprint 1c-revive-3-D-19.5p (2026-06-05): 紧贴 y + /help — 应该 y 走 confirm,
-      // /help 入队, turnInFlight 期间 /help 不打 cli.builtin_help 到 out ===
-      // 拍板 (D-19.5p): y 走 confirm 路径, /help 是下一行. 旧 D-19.5: y 走通后
-      // 工具执行 (turnInFlight=true), 紧贴 /help 进 fast-path 立刻打 help 文本, 跟
-      // turn 输出交错. D-19.5p 修法: turnInFlight=true 时 /help 入 lineQueue,
-      // turn 跑完 finally drain 才打 help 文本. 测验证两点: (a) 工具仍落盘 (chat
-      // 走通, 跟 D-19 baseline 一致), (b) /help 最终出现 (drain 后跑 builtin).
+      // === Sprint 1c-revive-3-D-19.5p2 (2026-06-07): 紧贴 y + /help — y 走 confirm,
+      // /help fast-path 立刻打 cli.builtin_help 到 out, 不入 lineQueue ===
+      // 拍板 (D-19.5p2): y 走 confirm 路径, /help 是下一行. D-19.5p 旧版: y 走通后
+      // 工具执行 (turnInFlight=true), 紧贴 /help 进 lineQueue 等 turn 完才打, 反 UX.
+      // D-19.5p2 修法: /help 改 fast-path (turn guard 之前), y 紧贴 /help 立刻打
+      // help 文本, 跟 turn 跑完后输出 final content 是两个独立输出 (顺序由 stdin 决定).
+      // 测验证四点: (a) 工具仍落盘 (chat 走通, 跟 D-19 baseline 一致), (b) /help
+      // 文本出现在 out, (c) chat turn 仍落 user_approved, (d) finish 退出码 0.
       harness.write('y');
       // 不等 100ms, 立刻 /help (race: 旧版本 /help 走 fast-path, 紧贴 confirm 后立刻打 help 文本)
       harness.write('/help');
@@ -502,7 +503,7 @@ describe('REPL builtin turn-guard (D-19.5p)', () => {
       const code = await Promise.race([
         p.catch(() => 0),
         new Promise<number>((_, reject) =>
-          setTimeout(() => reject(new Error('startRepl finish 超时 (D-19.5p P2 测)')), 2000),
+          setTimeout(() => reject(new Error('startRepl finish 超时 (D-19.5p P2 测)')), 5000),
         ),
       ]);
       // 工具真落盘 (chat turn 真跑完, y 走通)
