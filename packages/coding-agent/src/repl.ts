@@ -47,6 +47,7 @@ export { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: re-export �
 import { formatError } from './repl/repl-format-error.js'; // D-29.2: LLM 错误 → i18n 文案映射 (runOneTurn + runAgentTurn 复用)
 import { createFinish, type ReplFinishDeps } from './repl/repl-finish.js'; // D-29.3.1: finish 抽工厂, 共享 exiting/exitTimer state (close handler + line handler + prompt 共读)
 import { createLineHandler } from './repl/repl-line-handler.js'; // D-29.3.2: 抽 line handler 工厂 (D-19.5 P1 + 6afccc8 + D-19.6.1 + 1ceef94 + no-unsafe-finally 5 红线 1:1 保)
+import { createCloseHandler } from './repl/repl-close-handler.js'; // D-29.3.3: 抽 close handler 工厂 (D-19.5 P2-dismiss + D-19.6 P1 30s 兜底 1:1 保)
 import type { ReplState } from './repl/repl-state.js'; // D-29.3.2: 5 字段 mutable state (finish + line + close + prompt 共享)
 import type { ToolPolicy } from './policy/types.js';
 
@@ -340,33 +341,18 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     // (D-29.3.2): turnInFlight / pendingExit / lineQueue 状态字段迁到 ReplState,
     // let 声明删除.
 
-    rl.on('close', () => {
-      // stdin EOF (管道/Ctrl-D) → 优雅退出.
-      // 红线 (D-19.5 P2-dismiss + D-19.6 P1): dismiss 先于 abort (audit 顺序),
-      // pendingExit 让 finally 兜底 finish, exitTimer 30s 兜底卡死 turn.
-      if (confirmController.hasPending()) {
-        confirmController.dismiss();
-      }
-      if (state.turnInFlight && !signalCoordinator.getSignal().aborted) {
-        signalCoordinator.abortIfActive();
-      }
-      state.pendingExit = true;
-      if (state.turnInFlight) {
-        if (state.exitTimer) clearTimeout(state.exitTimer);
-        state.exitTimer = setTimeout(() => {
-          // 30s 兜底: turn 卡死时强制 finish, stderr warning 走 i18n (Q1=A).
-          // 注: t() 是位置参数, 模板用 {0}, 不是 {ms}.
-          if (state.exiting) return;
-          err.write(`${t('cli.repl_force_exit_timeout', 30000)}\n`);
-          void finish(0);
-        }, 30_000);
-        // unref: 不让 timer 阻止进程退出 (finish 自己会调 process.exit / resolve).
-        state.exitTimer.unref?.();
-      } else {
-        // turn 没在跑, 直接 finish (Q3=b 的 else 分支).
-        void finish(0);
-      }
+    // === Sprint 1c-revive-3-D-29.3.3 (2026-06-07): 抽 close handler 工厂调用 ===
+    // 红线 (D-19.5 P2-dismiss + D-19.6 P1) 1:1 保: dismiss 先于 abort (audit 顺序),
+    // pendingExit 让 finally 兜底 finish, exitTimer 30s 兜底卡死 turn.
+    const closeHandler = createCloseHandler({
+      state,
+      signalCoordinator,
+      confirmController,
+      finish,
+      err,
+      t,
     });
+    rl.on('close', closeHandler);
 
     const prompt = (): void => {
       if (state.exiting) return;
