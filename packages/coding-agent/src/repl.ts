@@ -54,6 +54,7 @@ import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
 import { staticToolPolicy } from './policy/static-rules.js';
 import { createReplConfirm } from './repl/repl-confirm.js'; // D-15: REPL y/N confirm 工厂
 export { createReplConfirm } from './repl/repl-confirm.js'; // Sprint 1c-revive-2-D-24.2: re-export for tui-ink
+import { createSignalCoordinator } from './repl/repl-signal-coordinator.js'; // D-29.1.1: SIGINT + turn AbortController 抽
 import type { ToolPolicy } from './policy/types.js';
 import type { SandboxRunner } from './sandbox/types.js';
 
@@ -302,7 +303,10 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
         clearTimeout(exitTimer);
         exitTimer = null;
       }
-      process.off('SIGINT', onSigint);
+      // === Sprint 1c-revive-3-D-29.1.1 (2026-06-07): SIGINT 清理走 coordinator dispose() ===
+      // 红线 (D-19.5): off 必须在 rl.close() 之前, 否则 close 派发 'close' event 期间
+      // Ctrl+C 还能触达 onSigint 闭包. coordinator.dispose() 内部按此顺序处理, 幂等.
+      signalCoordinator.dispose();
       rl.close();
       if (writer) {
         try {
@@ -339,28 +343,15 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     let exitTimer: NodeJS.Timeout | null = null;
     const lineQueue: string[] = [];
 
-    // === Sprint 1c-revive-3-D-19 (2026-06-05): P2-Ctrl+C 修法 — turn AbortController ===
-    // 拍板 (D-19): turnAbortController 闭包共享, 让 SIGINT handler 能 abort 它,
-    // 透传到 runToolLoop → executeToolCall → policy.confirm 的 signal 参数.
-    // 注意: plan R-1 实测 — terminal:false rl 不自动派发 SIGINT 事件, 必须挂 process.
-    // 单测用 mock 的 process, 通过 rl.input (PassThrough) 触发不了 SIGINT; 测 Ctrl+C
-    // 行为走 turnAbortController.abort() 直接调 (见 repl-shared-stdin / tool-loop-policy test).
-    //
-    // turn 生命周期: 每次 chat 入口 new 一个新 controller, 旧的引用还在闭包里
-    // (供 SIGINT handler 用). 拍板 (D-19): AbortController 单次 abort 语义, 一次
-    // turn SIGINT 之后, 下一个 turn 用新 controller + 重新挂 SIGINT (drain old handler).
-    let turnAbortController = new AbortController();
-    const onSigint = (): void => {
-      // Ctrl+C: dismiss in-flight confirm first (落 user_denied), 然后 abort turn.
-      // 拍板 (D-19): 进程不退出, 用户可继续. finish() 仍由 /exit 或 EOF 触发.
-      if (confirmController.hasPending()) {
-        confirmController.dismiss();
-      }
-      if (!turnAbortController.signal.aborted) {
-        turnAbortController.abort();
-      }
-    };
-    process.on('SIGINT', onSigint);
+    // === Sprint 1c-revive-3-D-29.1.1 (2026-06-07): SIGINT + turn AbortController 抽 ===
+    // 拍板 (D-29.1.1): signal-coordinator 持有 turnAbortController 闭包 + SIGINT listener
+    // 生命周期, repl.ts 通过 getSignal() / refresh() / abortIfActive() / dispose() 4 方法
+    // 跟它交互. 行为 1:1 等价 D-19 P1/P2 拍板: dismiss in-flight confirm 先 (落 user_denied
+    // 审计), 再 abort turn; 进程不退出, 用户可继续. dispose() 幂等, finish() 入口调
+    // (D-19.5 顺序红线: off 必须在 rl.close() 之前, coordinator 内部按此顺序处理).
+    const signalCoordinator = createSignalCoordinator({
+      confirmController,
+    });
 
     rl.on('line', async (rawLine: string) => {
       const line = rawLine.trim();
@@ -503,11 +494,12 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       // chat — Sprint 1c-revive-2-D-11-4 review P1 修复: client lazy 化后, chat
       // 路径首次调 tryCreateClient() 真创. 创失败 (无 key) → i18n stderr 提示 + 跳
       // 过本次 turn (不退出 REPL, 用户可继续 /verify 或 /exit).
-      // Sprint 1c-revive-3-D-19 (2026-06-05): 续命 turnAbortController. 上一个 turn 已被
-      // SIGINT abort, 复用同一个 controller 第二次 abort 无效, new 一个新的. onSigint
-      // 闭包持有的是变量名 (let), 新 controller 一被赋值, 下次 SIGINT 自动 abort 新的,
-      // 不需要重建 handler. 红线: 不要 add 多份 SIGINT listener 重复触发.
-      turnAbortController = new AbortController();
+      // === Sprint 1c-revive-3-D-29.1.1 (2026-06-07): 续命走 coordinator.refresh() ===
+      // 拍板 (D-19): AbortController 单次 abort 语义 — 上一个 turn 已被 SIGINT abort,
+      // 复用同一个 controller 第二次 abort 无效, 必须 refresh. signalCoordinator 闭包
+      // 持有 controller 变量名, refresh 后下次 SIGINT 自动 abort 新的, 不需要重建 handler.
+      // 红线: 不要 add 多份 SIGINT listener 重复触发 (coordinator 内部 process.on 一次).
+      signalCoordinator.refresh();
       const c = clientFromOptions ? { client: clientFromOptions, error: null } : tryCreateClient();
       if (c.client === null) {
         err.write(`${t('error.api_key_missing')}\n\n`);
@@ -525,7 +517,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
             writer,
             out,
             err,
-            turnAbortController.signal,
+            signalCoordinator.getSignal(),
             compactionConfig,
             sandboxRunner,
             policyYes,
@@ -533,7 +525,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
             emaState, // D-21.1: EMA 平滑闭包 state 透传
           );
         } else {
-          const turn = await runOneTurn(liveClient, line, [], { signal: turnAbortController.signal });
+          const turn = await runOneTurn(liveClient, line, [], { signal: signalCoordinator.getSignal() });
           if (turn.kind === 'error') {
             err.write(`${turn.error}\n\n`);
           } else if (turn.kind === 'chat') {
@@ -580,8 +572,8 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       if (confirmController.hasPending()) {
         confirmController.dismiss();
       }
-      if (turnInFlight && !turnAbortController.signal.aborted) {
-        turnAbortController.abort();
+      if (turnInFlight && !signalCoordinator.getSignal().aborted) {
+        signalCoordinator.abortIfActive();
       }
       pendingExit = true;
       if (turnInFlight) {
