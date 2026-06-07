@@ -41,8 +41,12 @@ export class BrowserNavigateTool implements Tool {
       }
       const html = await res.text();
       const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? '(no title)';
-      const links = [...html.matchAll(/<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)]
-        .map((m) => `  - ${m[1]}: ${m[2].replace(/<[^>]+>/g, '').trim()}`)
+      const links = Array.from(html.matchAll(/<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi))
+        .map((m) => {
+          const href = m[1] ?? '';
+          const text = (m[2] ?? '').replace(/<[^>]+>/g, '').trim();
+          return `  - ${href}: ${text}`;
+        })
         .slice(0, 20)
         .join('\n');
       return {
