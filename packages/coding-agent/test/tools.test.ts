@@ -11,17 +11,21 @@ import { promises as fs, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-describe('Sprint 0.2: 6 tools (v1.0 MVP)', () => {
+describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools)', () => {
   describe('ToolRegistry', () => {
-    it('createDefaultRegistry registers 6 tools', () => {
+    it('createDefaultRegistry registers 6 + 3 = 9 tools', () => {
       const reg = createDefaultRegistry();
-      expect(reg.size()).toBe(6);
+      expect(reg.size()).toBe(9);
       expect(reg.get('read_file')?.name).toBe('read_file');
       expect(reg.get('write_file')?.name).toBe('write_file');
       expect(reg.get('edit_file')?.name).toBe('edit_file');
       expect(reg.get('bash')?.name).toBe('bash');
       expect(reg.get('find')?.name).toBe('find');
       expect(reg.get('grep')?.name).toBe('grep');
+      // D-30.1γ.4 (2026-06-07): 3 web tools
+      expect(reg.get('web_search')?.name).toBe('web_search');
+      expect(reg.get('web_extract')?.name).toBe('web_extract');
+      expect(reg.get('browser_navigate')?.name).toBe('browser_navigate');
     });
 
     it('rejects duplicate tool names (pi #5316 教训)', () => {
