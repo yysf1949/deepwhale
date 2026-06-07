@@ -179,6 +179,7 @@ describe('useRunToolLoop 集成 (D-25 B3)', () => {
     // 测不强求 'echo:' raw, 验 '非空 + 含 echo 字符' 即可
     expect(assistantText.length).toBeGreaterThan(0)
     // 去掉 ANSI escape 再匹配
+    // eslint-disable-next-line no-control-regex
     const stripped = assistantText.replace(/\x1b\[[0-9;]*m/g, '')
     expect(stripped).toContain('echo')
   })

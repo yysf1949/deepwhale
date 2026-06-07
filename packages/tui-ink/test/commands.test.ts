@@ -23,7 +23,6 @@ import {
   SLASH_COMMANDS,
   findSlashCommand,
   isSlashCommand,
-  type SlashCommand,
   type SlashContext,
 } from '../src/commands/index.js'
 import type { TranscriptEntry } from '../src/store/ui.js'

@@ -125,7 +125,7 @@ describe('Transcript thinking 接入 (D-27 D3)', () => {
       reasoning: 'thinking here',
       streaming: false,
     })
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <Transcript theme={theme} />  // thinking default true
     )
     // 注: Static 组件 0 计入 lastFrame(), 测里 0 直接验 lastFrame 内容
@@ -142,7 +142,7 @@ describe('Transcript thinking 接入 (D-27 D3)', () => {
       reasoning: 'thinking here',
       streaming: false,
     })
-    const { lastFrame, unmount } = render(
+    const { lastFrame: _lastFrame, unmount } = render(
       <Transcript theme={theme} thinking={false} />
     )
     // thinking=false 0 渲染 Thinking 组件, 但 reasoning 字段 仍 1:1 保留

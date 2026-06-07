@@ -17,7 +17,6 @@ import { stripAnsi, hasAnsi, estimateTokensRough, fmtK, sanitizeLine } from '../
 import { CircularBuffer } from '../src/lib/circularBuffer.js'
 import { upsert, type Msg } from '../src/lib/messages.js'
 import { isMac, isActionMod, isAction } from '../src/lib/platform.js'
-import { setupGracefulExit } from '../src/lib/gracefulExit.js'
 
 describe('lib/text (D-26 C1)', () => {
   it('1. stripAnsi 去掉 ANSI 转义', () => {
