@@ -135,6 +135,13 @@ export async function dispatchSlashBuiltin(
     ctx.prompt()
     return { handled: true }
   }
+  if (line === '/clear') {
+    // D-30.1α.2: ANSI clear screen + cursor home + redraw prompt.
+    // 不调 console.clear (强耦合 stdout TTY 检测), 直接 ANSI escape 给 ctx.out.
+    ctx.out.write('\x1b[2J\x1b[H')
+    ctx.prompt()
+    return { handled: true }
+  }
   if (line.startsWith('/')) {
     ctx.out.write(`${t('cli.builtin_unknown', line)}\n`)
     ctx.prompt()
