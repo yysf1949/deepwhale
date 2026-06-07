@@ -20,33 +20,10 @@
 
 import { createInterface, type Interface as RLInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
-import { t } from '@deepwhale/core';
-import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
-import {
-  APIKeyMissingError,
-  ChatMessage,
-  isLLMError,
-  LLMAuthError,
-  LLMClient,
-  LLMNetworkError,
-  LLMRateLimitError,
-  LLMStreamError,
-  LLMUnknownError,
-  type Usage,
-} from '@deepwhale/llm';
-import {
-  isToolLoopError,
-  loadSession,
-  persistToolLoopSteps,
-  runToolLoop,
-  runToolLoopWithCompaction,
-  ToolLoopLimitError,
-  type AgentCompactionConfig,
-  type ToolLoopResult,
-  type ToolLoopStep,
-} from './agent/index.js';
-import { CompactionState, type SummarizeFn } from '@deepwhale/core';
-import { createDefaultRegistry } from './tools/registry.js';
+import { t, CompactionState } from '@deepwhale/core';
+import { SessionReader, SessionWriter } from '@deepwhale/core';
+import { ChatMessage, type LLMClient } from '@deepwhale/llm';
+import { loadSession, type AgentCompactionConfig } from './agent/index.js';
 import { createDefaultClient, type Provider } from './llm-factory.js';
 import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
 import { staticToolPolicy } from './policy/static-rules.js';
@@ -56,8 +33,10 @@ import { createSignalCoordinator } from './repl/repl-signal-coordinator.js'; // 
 import { formatUsageStatus, appendUsageStatus, type UsageEmaState } from './repl/repl-session.js'; // D-29.1.2: EMA state + usage status 抽
 export { formatUsageStatus, appendUsageStatus, type UsageEmaState } from './repl/repl-session.js'; // D-29.1.2: re-export 保公共 API 1:1
 import { dispatchSlashBuiltin, type SlashContext } from './repl/repl-command-router.js'; // D-29.1.3: slash builtin 派发抽 (1ceef94 + D-19.6.1 guard)
+import { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: agent turn 主体抽 (persist user + runToolLoop + catch 4-branch + 持久化)
+export { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: re-export 保 test/modes-followup.test.ts:18 import path
+import { formatError } from './repl/repl-format-error.js'; // D-29.2: LLM 错误 → i18n 文案映射 (runOneTurn + runAgentTurn 复用)
 import type { ToolPolicy } from './policy/types.js';
-import type { SandboxRunner } from './sandbox/types.js';
 
 const VERSION = '0.1.0';
 
@@ -521,234 +500,11 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
   });
 }
 
-/**
- * 跑一轮 agent turn:append user → runToolLoop → 持久化 → 打印 final content。
- *
- * workingMessages 由 caller 持有（startRepl 闭包），turn 跑完后 caller 用新 messages 覆盖。
- *
- * Sprint 1a 修 P1:user 必须进 LLM。Sprint 1a 修 P2-A:流式不再重复打印 final content。
- * Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): 可选 compactionConfig — 传
- * 时调 runToolLoopWithCompaction (入口测 token, 触发则 compact + 写 event),
- * 不传 = 走裸 runToolLoop (向后兼容, 单测 baseline 244 不变). summaryFn 内部
- * 用 client + 固定 prompt 模板生成, 跟 test 1c-revive-2-D-5 cluster 拍板一致.
- * 单测通过 export 暴露,直接注入 mock LLMClient + WritableStream 验证行为。
- */
-export async function runAgentTurn(
-  client: LLMClient,
-  userInput: string,
-  workingMessages: ChatMessage[],
-  writer: SessionWriter | null,
-  out: NodeJS.WritableStream,
-  err: NodeJS.WritableStream,
-  signal: AbortSignal,
-  compactionConfig: AgentCompactionConfig | null = null,
-  // Sprint 1c-revive-3-D-12 review P1 修复: startRepl 把 env 解析的 runner
-  // 传进来, 工具注册表跟 env 状态对齐. 不传 = 用 LocalSandboxRunner (向后兼容).
-  sandboxRunner?: SandboxRunner,
-  // Sprint 1c-revive-3-D-13: 透传 yes 进 turn.
-  yes?: boolean,
-  // Sprint 1c-revive-3-D-15: 透传 policy 进 turn (REPL 注入 replPolicy; 单测传
-  // staticToolPolicy 走 baseline). undefined = 默认 staticToolPolicy (向后兼容).
-  policy?: ToolPolicy,
-  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 cache 96%↔85% 跳变 footer 焦虑):
-  // EMA state 透传 (闭包持有). 旧 caller 不传 = 默认 { sampleCount: 0 }, 行为兼容
-  // (不显示 avg 段). REPL 路径必传, 跨 turn 累积.
-  emaState?: UsageEmaState,
-): Promise<void> {
-  // 1) 持久化 user 输入
-  if (writer) {
-    const userEvent: SessionEvent = {
-      kind: 'user',
-      ts: Date.now(),
-      content: userInput,
-    };
-    await writer.append(userEvent);
-  }
-
-  // 2) 构造 turn 消息:历史 + 本轮 user。Sprint 1a 修 P1 — user 必须进 LLM。
-  const turnMessages: ChatMessage[] = [...workingMessages, { role: 'user', content: userInput }];
-
-  // 3) 调 tool loop. Sprint 1c-revive-2-D-6: 传 compactionConfig 时走
-  //    runToolLoopWithCompaction (带入口 compaction + 写 compaction event),
-  //    不传 = 裸 runToolLoop (向后兼容, baseline 244 不变).
-  const summaryFn: SummarizeFn | null = compactionConfig
-    ? makeLlmSummarizeFn(client, compactionConfig.protocol)
-    : null;
-  // 拍板 (D-15, 2026-06-05): REPL 注入 replPolicy; 显式传 policy 也用, 默认 staticToolPolicy.
-  // 拍板红线 (D-13.5 P1 重排): --yes 永远先于 confirm, replPolicy.confirm 只在 yes=false 才被调.
-  const resolvedPolicy: ToolPolicy = policy ?? staticToolPolicy;
-  let result: ToolLoopResult;
-  try {
-    if (compactionConfig !== null && summaryFn !== null) {
-      result = await runToolLoopWithCompaction(
-        client,
-        turnMessages,
-        {
-          registry: createDefaultRegistry({
-            ...(sandboxRunner !== undefined ? { sandboxRunner } : {}),
-          }),
-          onChunk: (chunk) => {
-            if (chunk.content) out.write(chunk.content);
-          },
-          signal,
-          policy: resolvedPolicy,
-          isInteractive: true, // REPL = 交互模式 (D-13 拍板)
-          yes: yes ?? false,
-          ...(writer ? { writer } : {}),
-        },
-        compactionConfig,
-        summaryFn,
-      );
-    } else {
-      result = await runToolLoop(client, turnMessages, {
-        registry: createDefaultRegistry({
-          ...(sandboxRunner !== undefined ? { sandboxRunner } : {}),
-        }),
-        onChunk: (chunk) => {
-          if (chunk.content) out.write(chunk.content);
-        },
-        signal,
-        policy: resolvedPolicy,
-        isInteractive: true, // REPL = 交互模式 (D-13 拍板)
-        yes: yes ?? false,
-        ...(writer ? { writer } : {}),
-      });
-    }
-  } catch (e) {
-    // === Sprint 1c-revive-3-D-19.6.1 (2026-06-05): Q3 修法 — abort-aware 分支 ===
-    // 拍板 (D-19.6.1, user review 2026-06-05 P2.1): D-19.6 P1 修法让 close 路径 abort
-    // in-flight turn, runToolLoop 内部 throw "Tool loop aborted by caller", 老 catch
-    // 走 cli.error.unknown ("Unexpected error: {0}") 污染 stderr 为 unexpected error.
-    // 修法: 检测 signal.aborted 优先于 isToolLoopError/isLLMError, 走专门 i18n key
-    // (cli.turn_aborted_shutdown). 文案 "no audit gap" 强调 user_denied 该落的都
-    // 落了 (D-19.6 P1 dismiss+abort+pendingExit 链路已保审计). 不走 unexpected
-    // 路径, stderr 不再被 intentional shutdown 污染.
-    //
-    // 顺序红线: signal.aborted 检查必须在 isToolLoopError 之前 — runToolLoop 内部
-    // abort 时 throw Error('Tool loop aborted by caller'), 这 Error 满足 isToolLoopError
-    // 的某些宽松判定 (e.g. 有 .message 但无 .steps) 是不稳的. signal.aborted 是
-    // 最直接的真相, 优先.
-    if (signal.aborted) {
-      err.write(`${t('cli.turn_aborted_shutdown')}\n\n`);
-    } else if (isToolLoopError(e)) {
-      err.write(`${t('cli.tool_loop_limit', e.steps)}\n\n`);
-    } else if (isLLMError(e)) {
-      err.write(`${formatError(e)}\n\n`);
-    } else {
-      err.write(`${t('cli.error.unknown', String(e))}\n\n`);
-    }
-    return;
-  }
-
-  // 4) 流式已实时打印;非流式分支此处补打印 final content(给上层 caller 留 fallback)。
-  //    Sprint 1a REPL 总是传 onChunk 走流式,所以这里不再重复打印。
-
-  // 4) 持久化 steps
-  if (writer) {
-    try {
-      await persistToolLoopSteps(writer, result.steps);
-    } catch (e) {
-      err.write(`${t('cli.session_write_warning', String(e))}\n`);
-    }
-  }
-
-  // 5) 更新 working messages（startRepl 闭包会保留新值）
-  workingMessages.length = 0;
-  workingMessages.push(...result.messages);
-
-  // 6) Step summary（人类可读）
-  for (const step of result.steps) {
-    appendStepSummary(step, out, err);
-  }
-
-  // 7) Sprint 1b: Prefix-cache 可观测性 — 每 turn 打印一行 status 到 stderr
-  // 风格: 分两行(跟 plan 拍板), 不污染 stdout 流式输出, 不打 prompt 前面
-  // 字段: cache_hit_rate / cost_turn / prompt / completion, 多字段同值时去冗余(Hermes footer 教训)
-  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 cache 96%↔85% 跳变 footer 焦虑):
-  // 加 EMA 滚动平均 5-turn 平滑, 显示 "cache: 90% (avg 85%)". per-turn 数字
-  // 仍是真实值, avg 是过去 5 turn 平滑趋势. user 不会被单 turn 抖动骗.
-  // === Sprint 1c-revive-3-D-29.1.2 (2026-06-07): EMPTY_EMA 内联, repl-session.ts 内私有 ===
-  // 行为 1:1: 旧 EMPTY_EMA = { sampleCount: 0 }, 旧 caller 兜底 = 内联值保持.
-  appendUsageStatus(result.final.usage, err, emaState ?? { sampleCount: 0 });
-}
-
-function appendStepSummary(
-  step: ToolLoopStep,
-  out: NodeJS.WritableStream,
-  err: NodeJS.WritableStream,
-): void {
-  if (step.kind === 'tool') {
-    const status = step.result.success ? '✓' : '✗';
-    out.write(`  ${status} ${step.tool_call.name} (${step.duration_ms}ms)\n`);
-    if (!step.result.success && step.result.error) {
-      err.write(`    ${step.result.error}\n`);
-    }
-  }
-  // 'assistant' / 'limit' / 'error' 的 summary 留 Sprint 1b（不污染 Sprint 1a 验收面）
-}
-
-// === Sprint 1c-revive-3-D-29.1.2 (2026-06-07): UsageEmaState / formatUsageStatus / appendUsageStatus 抽到 repl-session.ts ===
-// 公共 API re-export 在 L58-59 (跟 signal-coordinator re-export 形态对齐). 1:1 行为保:
-// formatUsageStatus 输出字符串逐字保持, appendUsageStatus in-place update 顺序 (update ema →
-// format → write) 保持. EMPTY_EMA 在 repl-session.ts 内私有, 旧 caller 兜底 = 内联 { sampleCount: 0 }.
-
-function formatError(e: unknown): string {
-  if (e instanceof APIKeyMissingError) return t('error.api_key_missing');
-  if (e instanceof LLMAuthError) {
-    // Sprint 1b.5 Step 2.5 修: tsc strict 看 LLMAuthError.status 在 .status 上
-    return t('cli.error.auth', String((e as { status: number }).status));
-  }
-  if (e instanceof LLMRateLimitError) return t('cli.error.rate_limit');
-  if (e instanceof LLMNetworkError) {
-    const err = e as { cause?: unknown; message: string };
-    const msg = err.cause instanceof Error ? err.cause.message : err.message;
-    return t('cli.error.network', msg);
-  }
-  if (e instanceof LLMStreamError) {
-    return t('cli.error.stream', (e as Error).message);
-  }
-  if (e instanceof LLMUnknownError) {
-    const err = e as { status?: number; message: string };
-    const detail = err.status !== undefined ? `HTTP ${err.status}` : err.message;
-    return t('cli.error.unknown', detail);
-  }
-  if (e instanceof ToolLoopLimitError) {
-    return t('cli.tool_loop_limit', (e as { steps: number }).steps);
-  }
-  if (isLLMError(e)) return t('cli.error.unknown', e.message);
-  if (e instanceof Error) return t('cli.error.unknown', e.message);
-  return t('cli.error.unknown', String(e));
-}
-
-/**
- * 生成 LLM summary callback (Sprint 1c-revive-2-D-6).
- *
- * 跟 1c-revive-2-D-5 cluster test (compaction-cross-protocol-2d5.test.ts:231)
- * 拍板一致: 走 client.chat 调 LLM 生成 1 short paragraph summary. 跨
- * openai/anthropic 同形态, 因为 client.chat 是 LLMClient 契约的统一入口.
- *
- * 不**在**这里拼 protocol-specific system prompt: Anthropic protocol
- * 走 client.chat 时已由 client 内部加 (跟 agent-compaction.ts protocol
- * 字段对齐). 1c-revive-2-D-6 拍板: protocol 字段保留供未来 system
- * prompt 模板差异化用, 当前 D-6 默认用同 system prompt 模板 (跨协议一致).
- */
-function makeLlmSummarizeFn(client: LLMClient, _protocol: 'openai' | 'anthropic'): SummarizeFn {
-  return async (toSummarize: ReadonlyArray<ChatMessage>): Promise<string> => {
-    const summaryMessages: ChatMessage[] = [
-      {
-        role: 'system',
-        content:
-          'You are a concise summarizer. Compress the following conversation into 1 short paragraph ' +
-          '(max 200 words). Preserve key arithmetic results, tool calls, and final answers.',
-      },
-      {
-        role: 'user',
-        content: toSummarize
-          .map((m, i) => `[${i}] ${m.role}: ${m.content ?? '(empty)'}`)
-          .join('\n'),
-      },
-    ];
-    const r = await client.chat(summaryMessages, {});
-    return r.content;
-  };
-}
+// === Sprint 1c-revive-3-D-29.2 (2026-06-07): 4 个独立职责模块抽到 repl/*.ts 子目录 ===
+// - runAgentTurn  →  ./repl/repl-agent-turn.ts        (150L → 1:1 迁移)
+// - formatError   →  ./repl/repl-format-error.ts      (27L  → 1:1 迁移)
+// - makeLlmSummarizeFn → ./repl/repl-compaction-summary.ts (32L → 1:1 迁移)
+// - appendStepSummary  → ./repl/repl-step-summary.ts   (14L  → 1:1 迁移)
+// 公共 API 1:1 保: repl.ts re-export runAgentTurn 给 test/modes-followup.test.ts:18
+// (`import { runAgentTurn } from '../src/repl.js'`) 跟 src/index.ts (`export * from
+// './repl.js'`). 行为 1:1 保 628 既有测试, 0 改业务, 0 改 5 红线 (startRepl 内 4 段).
