@@ -29,8 +29,7 @@
 
 import { createInterface, type Interface as RLInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
-import { t, CompactionState } from '@deepwhale/core';
-import { SessionReader, SessionWriter } from '@deepwhale/core';
+import { t } from '@deepwhale/core';
 import { ChatMessage, type LLMClient } from '@deepwhale/llm';
 import { loadSession, type AgentCompactionConfig } from './agent/index.js';
 import { createDefaultClient, type Provider } from './llm-factory.js';
@@ -48,6 +47,7 @@ import { formatError } from './repl/repl-format-error.js'; // D-29.2: LLM 错误
 import { createFinish, type ReplFinishDeps } from './repl/repl-finish.js'; // D-29.3.1: finish 抽工厂, 共享 exiting/exitTimer state (close handler + line handler + prompt 共读)
 import { createLineHandler } from './repl/repl-line-handler.js'; // D-29.3.2: 抽 line handler 工厂 (D-19.5 P1 + 6afccc8 + D-19.6.1 + 1ceef94 + no-unsafe-finally 5 红线 1:1 保)
 import { createCloseHandler } from './repl/repl-close-handler.js'; // D-29.3.3: 抽 close handler 工厂 (D-19.5 P2-dismiss + D-19.6 P1 30s 兜底 1:1 保)
+import { createReplBootstrap } from './repl/repl-bootstrap.js'; // D-29.3.4: 抽 preamble (lazy client + sandbox + confirm + greeting + session + compaction + rl setup) 工厂
 import type { ReplState } from './repl/repl-state.js'; // D-29.3.2: 5 字段 mutable state (finish + line + close + prompt 共享)
 import type { ToolPolicy } from './policy/types.js';
 
@@ -143,139 +143,17 @@ export async function runOneTurn(
 export async function startRepl(options: ReplOptions = {}): Promise<number> {
   const out = options.output ?? stdout;
   const err = options.errorOutput ?? stderr;
-  // Sprint 1b.5 Step 2 (2.5 C3 拍板): provider 由 options.client / options.provider / env 推断
-  // - client 显式给 → 走 client (单测路径)
-  // - client 未给 + provider 显式给 → 走 createDefaultClient({provider})
-  // - client 未给 + provider 未给 → 走 createDefaultClient() (env 推断 + 双设报错)
-  // 任何抛 APIKeyMissingError 都被 catch 后写到 stderr (跟 1b 时代行为一致)
-  //
-  // Sprint 1c-revive-2-D-11-4 review P1 修复 (2026-06-04): **lazy** client 初始化.
-  // 之前 146 行抢创 createDefaultClient() 在无 LLM key 时抛 APIKeyMissingError,
-  // REPL 根本进不去 → 跟 README "/verify 不依赖 key" 承诺冲突. 修复:
-  //   1. options.client 显式给 → 立即 bind (单测路径不变)
-  //   2. options.client 未给 → 走 tryCreateClient, 失败存 clientError, 不抛
-  //   3. /verify 路径完全跳过 client 引用 (跟 deepwhale --verify 同语义)
-  //   4. chat 路径首次调 getClient() 时才真创, clientError 走 i18n 输出
-  const clientFromOptions = options.client;
-  let client: LLMClient | null = clientFromOptions ?? null;
-  let clientError: Error | null = clientFromOptions ? null : null;
-  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修默认走 Anthropic 误判 bug):
-  // tryCreateClient 之前 catch 静默存 clientError, stderr 啥都不说, 用户根本
-  // 不知道. 现在 catch 时显式 stderr 写一行 [deepwhale] init error, 跟 chat
-  // 路径 (L494 error.api_key_missing) 互补. 走 createDefaultClient → resolveProvider
-  // "Both set" 错时, 显式 message 让用户立刻看到 "改用 --provider 决断".
-  let initErrorReported = false;
-  const tryCreateClient = (): { client: LLMClient | null; error: Error | null } => {
-    if (clientFromOptions) return { client: clientFromOptions, error: null };
-    if (client !== null || clientError !== null) {
-      return { client, error: clientError };
-    }
-    try {
-      const c = createDefaultClient({
-        ...(options.provider !== undefined ? { provider: options.provider } : {}),
-        ...(options.model !== undefined ? { model: options.model } : {}),
-      });
-      client = c;
-      clientError = null;
-      return { client: c, error: null };
-    } catch (e) {
-      const err = e instanceof Error ? e : new Error(String(e));
-      clientError = err;
-      if (!initErrorReported) {
-        initErrorReported = true;
-        // 走 stderr, 跟 chat 路径保持一致, 避免用户看不到. 拍板: message 含
-        // 原始 err.message (有 "Both set" 关键信息), 不强行套 i18n (i18n 太泛
-        // 用户看不出是 Both set 还是 No key).
-        stderr.write(`[deepwhale] init error: ${err.message}\n`);
-      }
-      return { client: null, error: err };
-    }
-  };
-  // Sprint 1c-revive-2-D-6 (review P2 修复, 2026-06-04): 拿掉 anthropic × tool loop
-  // 温柔降级. 拍板: D-4 (commit 80d3fd7/bbf1bf6) 已实装 AnthropicClient tool
-  // schema 转换 (toAnthropicMessages 合并连续 tool 消息), --provider anthropic
-  // 选了 anthropic 就该跑 tool loop. 旧 1b.5 Step 2.5 时代 'Sprint 1b.5 does not
-  // support tool loop' 拍板已废 (Step 2.5 → 1c, Anthropic tool protocol 已 ship).
-  // 兜底: requestedToolLoop 默认 true, caller 显式 false 才不跑.
-  const enableToolLoop = options.enableToolLoop ?? true;
-  const sessionPath = options.sessionPath;
-
-  // Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 入口解析 sandbox env.
-  // 未知值 throw (fail-closed), 由 CLI `main().catch` 写到 stderr + exit 1.
-  const sandboxRunner = resolveSandboxRunnerFromEnv({ sandboxRoot: process.cwd() });
-  // Sprint 1c-revive-3-D-13: REPL = 交互模式 (isInteractive=true), --yes 标志透传.
-  const policyYes = options.yes ?? false;
-  // Sprint 1c-revive-3-D-19 (2026-06-05): P1 修法 — 不再开第二个 readline 抢同一 input.
-  // createReplConfirm 现在返回 controller (confirm + offerLine + hasPending + dismiss),
-  // 主 rl.on('line') 是 stdin 唯一消费者, 确认期间用 offerLine() 串行化.
-  // 拍板 (D-19): 单 readline 路径, 删 D-15 R-1 "子 rl 短窗口" 妥协.
-  // 拍板红线: --yes 永远先于 confirm (D-13.5 P1 重排), replPolicy.confirm 只在 yes=false
-  // 才被 tool-loop 调. runAgentTurn 加可选 policy 参数透传 (默认 staticToolPolicy 向后兼容).
-  const confirmController = createReplConfirm({
-    output: options.output ?? stdout,
-  });
-  const replPolicy: ToolPolicy = {
-    ...staticToolPolicy,
-    confirm: confirmController.confirm,
-  };
-
-  // greeting — Sprint 1c-revive-2-D-11-4 review P1 修复: 不依赖 client.model (lazy 化后
-  // client 可能未创). 真创只在 chat 首次发生; 创失败 i18n 错误到 stderr. 这里 greeting
-  // 只显示 ready + 版本号, 跟 1b.5 时代 'model 在 greeting 显示' 比, 牺牲一点 UX
-  // (用户得 chat 一次才能看到 model 名) 换 REPL 可在无 key 状态启动.
-  const initialClientState = tryCreateClient();
-  out.write(
-    `${t('cli.greeting', VERSION, initialClientState.client?.model ?? 'not-configured')}\n`,
-  );
-  if (initialClientState.error) {
-    // 无 key 提示沿用 1b.5 时代 163-166 行的 stderr 警告语义, 但挪到 lazy create 之后
-    err.write(`${t('error.api_key_missing')}\n`);
-  }
-  out.write(`${t('cli.no_api_key_hint')}\n\n`);
-
-  // session 加载
-  let workingMessages: ChatMessage[] = [];
-  // Sprint 1c-revive-2-D-21.1 (2026-06-06, 修 cache 96%↔85% 跳变 footer 焦虑):
-  // EMA 平滑闭包 state. appendUsageStatus 每 turn in-place 更新, formatUsageStatus
-  // 读 ema 显示 (avg NN%). 跨 turn 累积, 闭包内 mutable, 不持久化 (session reload
-  // 后 sampleCount 重置为 0, 避免误导 — user 看到 avg 段消失就知道 reload 过了).
-  const emaState: UsageEmaState = { sampleCount: 0 };
-  const writer = sessionPath ? new SessionWriter(sessionPath) : null;
-  const reader = sessionPath ? new SessionReader(sessionPath) : null;
-  if (writer && reader) {
-    try {
-      await writer.open();
-      const loaded = await loadSession(reader);
-      workingMessages = [...loaded.messages];
-      if (workingMessages.length > 0) {
-        out.write(`${t('cli.session_resumed', workingMessages.length, sessionPath)}\n\n`);
-      }
-    } catch (e) {
-      err.write(`${t('cli.session_load_warning', String(e))}\n\n`);
-    }
-  }
-
-  // Sprint 1c-revive-2-D-6 (review P1 修复, 2026-06-04): CompactionState 闭包持有,
-  // 跨 turn 持续累计 failures (paused 状态跨 turn 生效, 跟 test 1c-revive-2-D-5-2 拍板).
-  // - 传 options.compactionConfig + writer 存在 → 构造完整 AgentCompactionConfig 注入
-  // - 不传 / writer 缺失 → 走 baseline 行为, compactionConfig = null
-  let compactionConfig: AgentCompactionConfig | null = null;
-  if (options.compactionConfig && writer) {
-    compactionConfig = {
-      ...options.compactionConfig,
-      writer,
-      state: new CompactionState(options.compactionConfig.pauseAfterFailures ?? 2),
-    };
-  } else if (options.compactionConfig && !writer) {
-    err.write(
-      'warning: compactionConfig requires sessionPath; falling back to baseline (no compaction).\n',
-    );
-  }
-
-  const rl: RLInterface = createInterface({
-    input: options.input ?? stdin,
-    terminal: false,
-    output: options.output ?? stdout,
+  // === Sprint 1c-revive-3-D-29.3.4 (2026-06-07): 抽 preamble → createReplBootstrap ===
+  // 拍板: 5 段 (lazy client / sandbox / policy / confirm / greeting / session / compaction /
+  // rl setup) 1 工厂返 ReplBootstrapResult, startRepl 主体收 boot = await createReplBootstrap(...)
+  // 抽后行为 1:1 保. D-11-4 (lazy client) / D-6 (compaction) / D-12 (sandbox) / D-13
+  // (--yes) / D-19 (confirm) / D-21.1 (EMA) 6 红线 1:1 抽到 bootstrap 内部, 0 业务改.
+  const boot = await createReplBootstrap({
+    options,
+    out,
+    err,
+    version: VERSION,
+    t,
   });
 
   return new Promise<number>((resolve) => {
@@ -300,7 +178,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     // 在 createFinish({...}) 之前建. 原 D-29.1.1 时建在 finish 之后, 0 顺序问题;
     // D-29.3.1 抽 finish 后, 顺序显式化. 行为 1:1 保, 0 业务改.
     const signalCoordinator = createSignalCoordinator({
-      confirmController,
+      confirmController: boot.confirmController,
     });
 
     // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P2-SIGINT 修法 — finish 移除全局 listener ===
@@ -315,8 +193,8 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     const finish = createFinish({
       state,
       signalCoordinator,
-      rl,
-      writer,
+      rl: boot.rl,
+      writer: boot.writer,
       out,
       t,
       resolve,
@@ -347,12 +225,12 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
     const closeHandler = createCloseHandler({
       state,
       signalCoordinator,
-      confirmController,
+      confirmController: boot.confirmController,
       finish,
       err,
       t,
     });
-    rl.on('close', closeHandler);
+    boot.rl.on('close', closeHandler);
 
     const prompt = (): void => {
       if (state.exiting) return;
@@ -368,28 +246,28 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
       state,
       finish,
       signalCoordinator,
-      confirmController,
-      tryCreateClient,
-      clientFromOptions,
+      confirmController: boot.confirmController,
+      tryCreateClient: boot.tryCreateClient,
+      clientFromOptions: boot.clientFromOptions,
       runAgentTurnFn: runAgentTurn,
       runOneTurnFn: runOneTurn,
       dispatchSlashBuiltinFn: dispatchSlashBuiltin,
       out,
       err,
-      writer,
-      workingMessages,
-      emaState,
-      compactionConfig,
-      sandboxRunner,
-      policyYes,
-      replPolicy,
-      enableToolLoop,
+      writer: boot.writer,
+      workingMessages: boot.workingMessages,
+      emaState: boot.emaState,
+      compactionConfig: boot.compactionConfig,
+      sandboxRunner: boot.sandboxRunner,
+      policyYes: boot.policyYes,
+      replPolicy: boot.replPolicy,
+      enableToolLoop: boot.enableToolLoop,
       verifyChecks: options.verifyChecks,
       t,
       prompt,
-      rl,
+      rl: boot.rl,
     });
-    rl.on('line', lineHandler);
+    boot.rl.on('line', lineHandler);
 
     // 第一个 prompt
     prompt();
