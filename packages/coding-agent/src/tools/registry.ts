@@ -1,5 +1,5 @@
 /**
- * Tool Registry — 6 工具的注册中心
+ * Tool Registry — 17 工具的注册中心 (D-30.4.6, 2026-06-07).
  *
  * Sprint 0.2 范围：
  * - register / get / list 基础 API
@@ -29,6 +29,8 @@ import { ExecuteCodeTool } from './execute-code.js'; // D-30.2.5: python/node sa
 import { TodoTool } from './todo.js'; // D-30.2.6: todo store
 import { PlanTool } from './plan.js'; // D-30.2.7: plan mode
 import { DelegateTaskTool } from './delegate-task.js'; // D-30.3.1: subagent 并行 max 5
+import { VisionAnalyzeTool } from './vision-analyze.js'; // D-30.4.1: 本地 base64 + URL
+import { TextToSpeechTool } from './text-to-speech.js'; // D-30.4.2: text stub -> ~/.deepwhale/tts/
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -102,5 +104,9 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   reg.register(new PlanTool());
   // D-30.3.1 (2026-06-07): 装 delegate_task (medium) — subagent 并行 max 5.
   reg.register(new DelegateTaskTool());
+  // D-30.4.1 (2026-06-07): 装 vision_analyze (medium) — 本地 base64 + URL.
+  reg.register(new VisionAnalyzeTool());
+  // D-30.4.2 (2026-06-07): 装 text_to_speech (medium) — 写 text stub 到 ~/.deepwhale/tts/.
+  reg.register(new TextToSpeechTool());
   return reg;
 }

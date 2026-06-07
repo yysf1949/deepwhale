@@ -23,6 +23,7 @@ export * from './modes/index.js';
 export * from './verify/index.js'; // Sprint 1c-revive-2-D-11-4 (2026-06-04): verify module
 export * from './policy/index.js'; // Sprint 1c-revive-2-D-24.2 (2026-06-06): tui-ink needs ToolPolicy/staticToolPolicy
 export * from './util/index.js'; // Sprint 1c-revive-2-D-25 B4 (2026-06-06): tui-ink + tui.ts 共享 util (tui-history)
+export * from './channel/index.js'; // D-30.4.6 (2026-06-07): Telegram / Discord / Router
 // Sprint 1c-revive-2-D-24.3 (2026-06-06): tui-ink App needs ChatMessage / SessionReader/Writer types + loadSession
 export type { ChatMessage, LLMClient } from '@deepwhale/llm';
 export { SessionReader, SessionWriter } from '@deepwhale/core';
