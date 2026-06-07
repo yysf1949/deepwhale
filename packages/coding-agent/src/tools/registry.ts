@@ -28,6 +28,7 @@ import { SearchFilesTool } from './search-files.js'; // D-30.2.4: ripgrep 搜索
 import { ExecuteCodeTool } from './execute-code.js'; // D-30.2.5: python/node sandbox
 import { TodoTool } from './todo.js'; // D-30.2.6: todo store
 import { PlanTool } from './plan.js'; // D-30.2.7: plan mode
+import { DelegateTaskTool } from './delegate-task.js'; // D-30.3.1: subagent 并行 max 5
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -99,5 +100,7 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   reg.register(new ExecuteCodeTool());
   reg.register(new TodoTool());
   reg.register(new PlanTool());
+  // D-30.3.1 (2026-06-07): 装 delegate_task (medium) — subagent 并行 max 5.
+  reg.register(new DelegateTaskTool());
   return reg;
 }
