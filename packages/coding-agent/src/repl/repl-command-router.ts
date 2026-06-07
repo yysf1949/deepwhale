@@ -52,6 +52,24 @@ export interface SlashContext {
    * 不在 router 里直接持 workingMessages — router "闭包内不持 state" 红线 (D-29.1.3).
    */
   onNewSession?: () => void
+  /**
+   * D-30.1α.4: /status 触发, 由 caller 提供当前 REPL/TUI 状态快照.
+   * Sub-burst α 不接 REPL/TUI 端 wiring (留给后续 sub-burst), undefined 时走 fallback.
+   */
+  getStatus?: () => ReplStatus
+}
+
+/**
+ * D-30.1α.4: REPL/TUI 状态快照 (/status 输出).
+ * model: 当前 LLM model id; sessionPath: session JSONL 路径 (undefined = 无 session);
+ * emaSampleCount: D-21.1 EMA 平滑累计样本数; theme: UI 主题; uptimeMs: REPL 启动至今毫秒.
+ */
+export interface ReplStatus {
+  model: string
+  sessionPath: string | undefined
+  emaSampleCount: number
+  theme: string
+  uptimeMs: number
 }
 
 /**
@@ -152,6 +170,27 @@ export async function dispatchSlashBuiltin(
     // router 本身不持 workingMessages, 保 D-29.1.3 "闭包内不持 state" 红线.
     ctx.out.write('starting new session...\n\n')
     if (ctx.onNewSession) ctx.onNewSession()
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/status') {
+    // D-30.1α.4: /status 走 getStatus 回调拉 ReplStatus, REPL/TUI 各自提供.
+    // Sub-burst α 不接 REPL 端 wiring (留给后续 sub-burst), undefined 时走 fallback.
+    // 格式: `key: value` 简单对齐 (跟 test 断言 1:1 spec, TDD-driven).
+    if (ctx.getStatus) {
+      const s = ctx.getStatus()
+      const status = [
+        'Current status:',
+        `  model: ${s.model}`,
+        `  session: ${s.sessionPath ?? '(no session)'}`,
+        `  ema samples: ${s.emaSampleCount}`,
+        `  theme: ${s.theme}`,
+        `  uptime: ${Math.floor(s.uptimeMs / 1000)}s`,
+      ].join('\n')
+      ctx.out.write(`${status}\n\n`)
+    } else {
+      ctx.out.write('status: (no status provider wired)\n\n')
+    }
     ctx.prompt()
     return { handled: true }
   }
