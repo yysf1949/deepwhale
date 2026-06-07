@@ -91,21 +91,29 @@ export interface SlashContext {
   listSkills?: () => Promise<string[]>
   readSkill?: (name: string) => Promise<string>
   /**
-   * D-30.1δ.4: /cron 触发, caller 提供 cron job 列表回调.
+   * D-30.1δ.11: /cron 触发, caller 提供 cron job 列表回调 (CronStore.list 注入).
+   * D-30.1δ 重命名 (d51b12e 拍板 listCronJobs → listCron), shape 1:1 保.
    */
-  listCronJobs?: () => Promise<Array<{ id: string; schedule: string; prompt: string; enabled: boolean }>>
+  listCron?: () => Promise<Array<{ id: string; schedule: string; prompt: string; enabled: boolean }>>
   /**
-   * D-30.1δ.5: /sessions 触发, caller 提供 session 搜索回调.
+   * D-30.1δ.12: /sessions 触发, caller 提供 session 列表回调 (SessionIndex.list 注入).
+   * D-30.1δ 重命名 (d51b12e 拍板 searchSessions → listSessions), shape 扩 messageCount /
+   * createdAt, 0 query param (caller 自己 search + filter).
    */
-  searchSessions?: (query: string) => Promise<Array<{ id: string; path: string; firstUser: string }>>
+  listSessions?: () => Promise<
+    Array<{ id: string; path: string; messageCount: number; firstUser: string; createdAt: number }>
+  >
   /**
-   * D-30.1δ.6: /load 触发, caller 提供 session 加载回调 (返 path 即可).
+   * D-30.1δ.13: /load 触发, caller 提供 session 加载回调 (side-effect, 无 return).
+   * D-30.1δ 重命名 + 改 shape (d51b12e loadSessionById 返 path → loadSession 返 void),
+   * caller 自己内部 load + 切 workingMessages.
    */
-  loadSessionById?: (id: string) => Promise<string | null>
+  loadSession?: (id: string) => Promise<void>
   /**
-   * D-30.1δ.7: /plan 触发, caller 提供当前 plan 内容 (TUI Plan mode 后续 sprint 接).
+   * D-30.1δ.14: /plan 触发, caller 注入 enter plan mode 副作用 (TUI Plan mode D-30.2 接).
+   * D-30.1δ 重命名 (d51b12e getPlan 返 string → enterPlanMode 返 void).
    */
-  getPlan?: () => string | null
+  enterPlanMode?: () => void
 }
 
 /**
@@ -353,21 +361,21 @@ export async function dispatchSlashBuiltin(
     return { handled: true }
   }
   if (line === '/cron' || line.startsWith('/cron ')) {
-    // D-30.1δ.4: /cron 走 listCronJobs 回调. 拍板: 列出所有 jobs.
-    // 加 /add / /remove 子命令留 D-30.2 (本期只读, 0 改 cron daemon).
-    if (!ctx.listCronJobs) {
+    // D-30.1δ.11: /cron 走 listCron 回调 (CronStore.list 注入).
+    // 拍板: 列出所有 jobs, 0 query param. 加 /add / /remove 子命令留 D-30.2.
+    if (!ctx.listCron) {
       ctx.out.write('cron list not wired\n\n')
       ctx.prompt()
       return { handled: true }
     }
-    const jobs = await ctx.listCronJobs()
+    const jobs = await ctx.listCron()
     if (jobs.length === 0) {
       ctx.out.write('no cron jobs\n\n')
     } else {
       ctx.out.write(`${jobs.length} cron jobs:\n`)
       for (const j of jobs) {
         const flag = j.enabled ? '✓' : '✗'
-        ctx.out.write(`  ${flag} [${j.id}] ${j.schedule} — ${j.prompt}\n`)
+        ctx.out.write(`  ${flag} ${j.id} (${j.schedule}): ${j.prompt}\n`)
       }
       ctx.out.write('\n')
     }
@@ -375,58 +383,43 @@ export async function dispatchSlashBuiltin(
     return { handled: true }
   }
   if (line === '/sessions' || line.startsWith('/sessions ')) {
-    // D-30.1δ.5: /sessions 走 searchSessions 回调 (SQLite FTS5).
-    // - 无 arg: 列出最近 20 条
-    // - 有 arg: 走 FTS5 搜索
-    if (!ctx.searchSessions) {
-      ctx.out.write('session search not wired\n\n')
+    // D-30.1δ.12: /sessions 走 listSessions 回调 (SessionIndex.list 注入).
+    // 拍板: 0 query param, caller 自己 search + filter; router 只渲染.
+    if (!ctx.listSessions) {
+      ctx.out.write('session list not wired\n\n')
       ctx.prompt()
       return { handled: true }
     }
-    const arg = line.slice('/sessions'.length).trim()
-    const results = await ctx.searchSessions(arg)
-    if (results.length === 0) {
-      ctx.out.write(`no sessions found${arg ? ` for "${arg}"` : ''}\n\n`)
+    const sessions = await ctx.listSessions()
+    if (sessions.length === 0) {
+      ctx.out.write('no sessions found\n\n')
     } else {
-      ctx.out.write(`${results.length} sessions:\n`)
-      for (const r of results) {
-        ctx.out.write(`  [${r.id}] ${r.firstUser.slice(0, 60)}\n   ${r.path}\n`)
+      ctx.out.write(`${sessions.length} sessions:\n`)
+      for (const s of sessions) {
+        ctx.out.write(`  ${s.id} (${s.messageCount} msgs): ${s.firstUser}\n`)
       }
       ctx.out.write('\n')
     }
     ctx.prompt()
     return { handled: true }
   }
-  if (line.startsWith('/load ')) {
-    // D-30.1δ.6: /load <id> 走 loadSessionById 回调 (返 path 即可, caller 自己 load).
-    const id = line.slice('/load '.length).trim()
-    if (!id) {
+  if (line === '/load' || line.startsWith('/load ')) {
+    // D-30.1δ.13: /load <id> 走 loadSession 回调 (side-effect, 无 return).
+    // caller (createLineHandler) 内部 load + 切 workingMessages.
+    const arg = line.slice('/load'.length).trim()
+    if (!arg) {
       ctx.out.write('usage: /load <session-id>\n\n')
-      ctx.prompt()
-      return { handled: true }
-    }
-    if (!ctx.loadSessionById) {
-      ctx.out.write('session load not wired\n\n')
-      ctx.prompt()
-      return { handled: true }
-    }
-    const path = await ctx.loadSessionById(id)
-    if (path) {
-      ctx.out.write(`loaded: ${path}\n\n`)
-    } else {
-      ctx.out.write(`session not found: ${id}\n\n`)
+    } else if (ctx.loadSession) {
+      await ctx.loadSession(arg)
+      ctx.out.write(`loaded: ${arg}\n\n`)
     }
     ctx.prompt()
     return { handled: true }
   }
-  if (line === '/plan') {
-    // D-30.1δ.7: /plan 走 getPlan 回调 (TUI Plan mode 留 D-30.2 接).
-    const plan = ctx.getPlan?.() ?? null
-    if (plan) {
-      ctx.out.write(`=== Plan ===\n${plan}\n\n`)
-    } else {
-      ctx.out.write('no plan\n\n')
-    }
+  if (line === '/plan' || line.startsWith('/plan ')) {
+    // D-30.1δ.14: /plan 走 enterPlanMode 副作用 (TUI Plan mode D-30.2 接).
+    ctx.enterPlanMode?.()
+    ctx.out.write('plan mode: enter\n\n')
     ctx.prompt()
     return { handled: true }
   }

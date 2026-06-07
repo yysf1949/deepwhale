@@ -39,6 +39,13 @@ import type { VerifyCheck } from '../verify/index.js';
 import type { runOneTurn } from '../repl.js';
 import type { runAgentTurn } from './repl-agent-turn.js';
 import type { dispatchSlashBuiltin, SlashContext } from './repl-command-router.js';
+import {
+  deepwhaleRoot,
+  MemoryStore,
+  SkillStore,
+  CronStore,
+  SessionIndex,
+} from '../util/index.js';
 
 export interface ReplLineDeps {
   state: ReplState;
@@ -132,6 +139,19 @@ export function createLineHandler(deps: ReplLineDeps): (rawLine: string) => Prom
       // D-30.1α.3: /new 触发, 清 workingMessages (router 不直接持 state).
       onNewSession: () => {
         deps.workingMessages.length = 0;
+      },
+      // D-30.1δ.11-δ.14: 4 store 注入 (Memory / Skills / Cron / Sessions).
+      // 拍板: store 实例化在 line handler 创建 (跟 deepwhaleRoot 路径 1:1),
+      // loadSession / enterPlanMode 留 D-30.2 (TUI Plan mode + session reload).
+      getMemory: async () => new MemoryStore(deepwhaleRoot()).readMemory(),
+      appendMemory: async (text) => {
+        await new MemoryStore(deepwhaleRoot()).appendMemory(text)
+      },
+      listSkills: async () => new SkillStore(deepwhaleRoot()).list(),
+      listCron: async () => new CronStore(deepwhaleRoot()).list(),
+      listSessions: async () => {
+        const all = await new SessionIndex(deepwhaleRoot()).list()
+        return all.sort((a, b) => b.createdAt - a.createdAt)
       },
     };
     if ((await deps.dispatchSlashBuiltinFn(line, slashCtx)).handled) return;

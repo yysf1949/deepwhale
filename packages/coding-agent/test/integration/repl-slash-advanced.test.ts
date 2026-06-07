@@ -1,8 +1,12 @@
 /**
- * D-30.1δ.2-δ.7: REPL 6 advanced slash 验证.
+ * D-30.1δ.2-δ.7 → δ.11-δ.16: REPL 6 advanced slash 验证.
  *
  * 拍板 (D-30.1δ): /memory /skills /cron /sessions /load /plan 走 router, 由 caller
- * 注入 store 回调 (MemoryStore / SkillStore / CronStore / SessionStore).
+ * 注入 store 回调 (MemoryStore / SkillStore / CronStore / SessionIndex).
+ *
+ * D-30.1δ.11-δ.14: callback 重命名 + shape 调整 (listCronJobs → listCron,
+ *   searchSessions → listSessions, loadSessionById → loadSession (Promise<void>),
+ *   getPlan → enterPlanMode (void)). 行为 1:1 保, 渲染格式跟 plan 1:1 对齐.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { dispatchSlashBuiltin } from '../../src/repl/repl-command-router.js';
@@ -48,6 +52,7 @@ describe('repl slash /skills (D-30.1δ.3)', () => {
     const outText = out.mock.calls.map((c) => c[0]).join('');
     expect(outText).toContain('code-review');
     expect(outText).toContain('refactor');
+    expect(outText).toContain('2 skills');
   });
 
   it('reads skill by name', async () => {
@@ -63,13 +68,13 @@ describe('repl slash /skills (D-30.1δ.3)', () => {
   });
 });
 
-describe('repl slash /cron (D-30.1δ.4)', () => {
+describe('repl slash /cron (D-30.1δ.11)', () => {
   it('lists cron jobs', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
     const result = await dispatchSlashBuiltin('/cron', {
       out: outStream, err: outStream, writer: null, verifyChecks: [], prompt: () => {},
-      listCronJobs: async () => [
+      listCron: async () => [
         { id: 'j1', schedule: '0 * * * *', prompt: 'hourly check', enabled: true },
         { id: 'j2', schedule: '0 0 * * *', prompt: 'daily cleanup', enabled: false },
       ],
@@ -83,80 +88,86 @@ describe('repl slash /cron (D-30.1δ.4)', () => {
   });
 });
 
-describe('repl slash /sessions (D-30.1δ.5)', () => {
-  it('lists recent sessions when no arg', async () => {
+describe('repl slash /sessions (D-30.1δ.12)', () => {
+  it('lists sessions from SessionIndex', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
     const result = await dispatchSlashBuiltin('/sessions', {
       out: outStream, err: outStream, writer: null, verifyChecks: [], prompt: () => {},
-      searchSessions: async () => [
-        { id: 's1', path: '/tmp/s1.jsonl', firstUser: 'fix bug' },
-        { id: 's2', path: '/tmp/s2.jsonl', firstUser: 'add feature' },
+      listSessions: async () => [
+        { id: 's1', path: '/tmp/s1.jsonl', messageCount: 3, firstUser: 'fix bug', createdAt: 1000 },
+        { id: 's2', path: '/tmp/s2.jsonl', messageCount: 7, firstUser: 'add feature', createdAt: 2000 },
       ],
     });
     expect(result.handled).toBe(true);
     const outText = out.mock.calls.map((c) => c[0]).join('');
     expect(outText).toContain('s1');
+    expect(outText).toContain('s2');
     expect(outText).toContain('fix bug');
+    expect(outText).toContain('3 msgs');
   });
 
-  it('searches sessions with query', async () => {
+  it('handles empty session list', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
-    const searchFn = vi.fn().mockResolvedValue([
-      { id: 's1', path: '/tmp/s1.jsonl', firstUser: 'fix bug' },
-    ]);
-    const result = await dispatchSlashBuiltin('/sessions bug', {
+    const result = await dispatchSlashBuiltin('/sessions', {
       out: outStream, err: outStream, writer: null, verifyChecks: [], prompt: () => {},
-      searchSessions: searchFn,
+      listSessions: async () => [],
     });
     expect(result.handled).toBe(true);
-    expect(searchFn).toHaveBeenCalledWith('bug');
+    const outText = out.mock.calls.map((c) => c[0]).join('');
+    expect(outText).toContain('no sessions found');
   });
 });
 
-describe('repl slash /load (D-30.1δ.6)', () => {
+describe('repl slash /load (D-30.1δ.13)', () => {
   it('loads session by id', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
+    let capturedId = '';
     const result = await dispatchSlashBuiltin('/load s1', {
       out: outStream, err: outStream, writer: null, verifyChecks: [], prompt: () => {},
-      loadSessionById: async () => '/tmp/s1.jsonl',
+      loadSession: async (id: string) => {
+        capturedId = id;
+      },
     });
     expect(result.handled).toBe(true);
+    expect(capturedId).toBe('s1');
     const outText = out.mock.calls.map((c) => c[0]).join('');
-    expect(outText).toContain('loaded');
-    expect(outText).toContain('/tmp/s1.jsonl');
+    expect(outText).toContain('loaded: s1');
   });
 
-  it('reports session not found', async () => {
+  it('shows usage when no id', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
-    const result = await dispatchSlashBuiltin('/load nope', {
+    const result = await dispatchSlashBuiltin('/load', {
       out: outStream, err: outStream, writer: null, verifyChecks: [], prompt: () => {},
-      loadSessionById: async () => null,
+      loadSession: vi.fn(),
     });
     expect(result.handled).toBe(true);
     const outText = out.mock.calls.map((c) => c[0]).join('');
-    expect(outText).toContain('not found');
+    expect(outText).toContain('usage');
   });
 });
 
-describe('repl slash /plan (D-30.1δ.7)', () => {
-  it('shows current plan', async () => {
+describe('repl slash /plan (D-30.1δ.14)', () => {
+  it('enters plan mode', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
+    let entered = false;
     const result = await dispatchSlashBuiltin('/plan', {
       out: outStream, err: outStream, writer: null, verifyChecks: [], prompt: () => {},
-      getPlan: () => 'Step 1: do X\nStep 2: do Y',
+      enterPlanMode: () => {
+        entered = true;
+      },
     });
     expect(result.handled).toBe(true);
+    expect(entered).toBe(true);
     const outText = out.mock.calls.map((c) => c[0]).join('');
-    expect(outText).toContain('Plan');
-    expect(outText).toContain('Step 1');
+    expect(outText).toContain('plan mode');
   });
 
-  it('shows no plan fallback', async () => {
+  it('handles missing enterPlanMode callback', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
     const result = await dispatchSlashBuiltin('/plan', {
@@ -164,6 +175,6 @@ describe('repl slash /plan (D-30.1δ.7)', () => {
     });
     expect(result.handled).toBe(true);
     const outText = out.mock.calls.map((c) => c[0]).join('');
-    expect(outText).toContain('no plan');
+    expect(outText).toContain('plan mode');
   });
 });
