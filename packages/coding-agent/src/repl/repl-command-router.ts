@@ -79,6 +79,33 @@ export interface SlashContext {
    * 返回 tool 数组 (name + description), router 渲染对齐输出.
    */
   listTools?: () => ReadonlyArray<{ name: string; description: string }>
+  /**
+   * D-30.1δ.2: /memory 触发, 由 caller 提供 MemoryStore read 回调.
+   * router 渲染当前 MEMORY.md 内容; 有 arg 时改走 appendMemory.
+   */
+  getMemory?: () => Promise<string>
+  appendMemory?: (text: string) => Promise<void>
+  /**
+   * D-30.1δ.3: /skills 触发, caller 提供 skill 列表 + 内容回调.
+   */
+  listSkills?: () => Promise<string[]>
+  readSkill?: (name: string) => Promise<string>
+  /**
+   * D-30.1δ.4: /cron 触发, caller 提供 cron job 列表回调.
+   */
+  listCronJobs?: () => Promise<Array<{ id: string; schedule: string; prompt: string; enabled: boolean }>>
+  /**
+   * D-30.1δ.5: /sessions 触发, caller 提供 session 搜索回调.
+   */
+  searchSessions?: (query: string) => Promise<Array<{ id: string; path: string; firstUser: string }>>
+  /**
+   * D-30.1δ.6: /load 触发, caller 提供 session 加载回调 (返 path 即可).
+   */
+  loadSessionById?: (id: string) => Promise<string | null>
+  /**
+   * D-30.1δ.7: /plan 触发, caller 提供当前 plan 内容 (TUI Plan mode 后续 sprint 接).
+   */
+  getPlan?: () => string | null
 }
 
 /**
@@ -263,6 +290,143 @@ export async function dispatchSlashBuiltin(
       ctx.out.write(`  ${t.name.padEnd(20)} ${t.description}\n`)
     }
     ctx.out.write('\n')
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/memory' || line.startsWith('/memory ')) {
+    // D-30.1δ.2: /memory 走 getMemory / appendMemory 回调.
+    // - 无 arg: 列出 MEMORY.md 内容
+    // - 有 arg: append 到 MEMORY.md
+    const arg = line.slice('/memory'.length).trim()
+    if (arg) {
+      if (!ctx.appendMemory) {
+        ctx.out.write('memory append not wired\n\n')
+        ctx.prompt()
+        return { handled: true }
+      }
+      await ctx.appendMemory(arg)
+      ctx.out.write(`memory appended: ${arg}\n\n`)
+      ctx.prompt()
+      return { handled: true }
+    }
+    const mem = (await ctx.getMemory?.()) ?? '(empty)'
+    ctx.out.write(`=== MEMORY.md ===\n${mem}\n\n`)
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/skills' || line.startsWith('/skills ')) {
+    // D-30.1δ.3: /skills 走 listSkills / readSkill 回调.
+    // - 无 arg: 列出 skills 目录
+    // - 有 arg: 读 SKILL.md
+    const arg = line.slice('/skills'.length).trim()
+    if (arg) {
+      if (!ctx.readSkill) {
+        ctx.out.write('skill read not wired\n\n')
+        ctx.prompt()
+        return { handled: true }
+      }
+      try {
+        const content = await ctx.readSkill(arg)
+        ctx.out.write(`=== ${arg}/SKILL.md ===\n${content}\n\n`)
+      } catch (e) {
+        ctx.err.write(`error: ${e instanceof Error ? e.message : String(e)}\n\n`)
+      }
+      ctx.prompt()
+      return { handled: true }
+    }
+    if (!ctx.listSkills) {
+      ctx.out.write('skill list not wired\n\n')
+      ctx.prompt()
+      return { handled: true }
+    }
+    const skills = await ctx.listSkills()
+    if (skills.length === 0) {
+      ctx.out.write('no skills installed\n\n')
+    } else {
+      ctx.out.write(`${skills.length} skills:\n`)
+      for (const s of skills) {
+        ctx.out.write(`  - ${s}\n`)
+      }
+      ctx.out.write('\n')
+    }
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/cron' || line.startsWith('/cron ')) {
+    // D-30.1δ.4: /cron 走 listCronJobs 回调. 拍板: 列出所有 jobs.
+    // 加 /add / /remove 子命令留 D-30.2 (本期只读, 0 改 cron daemon).
+    if (!ctx.listCronJobs) {
+      ctx.out.write('cron list not wired\n\n')
+      ctx.prompt()
+      return { handled: true }
+    }
+    const jobs = await ctx.listCronJobs()
+    if (jobs.length === 0) {
+      ctx.out.write('no cron jobs\n\n')
+    } else {
+      ctx.out.write(`${jobs.length} cron jobs:\n`)
+      for (const j of jobs) {
+        const flag = j.enabled ? '✓' : '✗'
+        ctx.out.write(`  ${flag} [${j.id}] ${j.schedule} — ${j.prompt}\n`)
+      }
+      ctx.out.write('\n')
+    }
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/sessions' || line.startsWith('/sessions ')) {
+    // D-30.1δ.5: /sessions 走 searchSessions 回调 (SQLite FTS5).
+    // - 无 arg: 列出最近 20 条
+    // - 有 arg: 走 FTS5 搜索
+    if (!ctx.searchSessions) {
+      ctx.out.write('session search not wired\n\n')
+      ctx.prompt()
+      return { handled: true }
+    }
+    const arg = line.slice('/sessions'.length).trim()
+    const results = await ctx.searchSessions(arg)
+    if (results.length === 0) {
+      ctx.out.write(`no sessions found${arg ? ` for "${arg}"` : ''}\n\n`)
+    } else {
+      ctx.out.write(`${results.length} sessions:\n`)
+      for (const r of results) {
+        ctx.out.write(`  [${r.id}] ${r.firstUser.slice(0, 60)}\n   ${r.path}\n`)
+      }
+      ctx.out.write('\n')
+    }
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line.startsWith('/load ')) {
+    // D-30.1δ.6: /load <id> 走 loadSessionById 回调 (返 path 即可, caller 自己 load).
+    const id = line.slice('/load '.length).trim()
+    if (!id) {
+      ctx.out.write('usage: /load <session-id>\n\n')
+      ctx.prompt()
+      return { handled: true }
+    }
+    if (!ctx.loadSessionById) {
+      ctx.out.write('session load not wired\n\n')
+      ctx.prompt()
+      return { handled: true }
+    }
+    const path = await ctx.loadSessionById(id)
+    if (path) {
+      ctx.out.write(`loaded: ${path}\n\n`)
+    } else {
+      ctx.out.write(`session not found: ${id}\n\n`)
+    }
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/plan') {
+    // D-30.1δ.7: /plan 走 getPlan 回调 (TUI Plan mode 留 D-30.2 接).
+    const plan = ctx.getPlan?.() ?? null
+    if (plan) {
+      ctx.out.write(`=== Plan ===\n${plan}\n\n`)
+    } else {
+      ctx.out.write('no plan\n\n')
+    }
     ctx.prompt()
     return { handled: true }
   }
