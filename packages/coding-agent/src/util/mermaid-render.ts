@@ -15,7 +15,7 @@ export interface MermaidNode {
   shape: MermaidShape;
 }
 
-export type MermaidEdge = [string, string, string?];
+export type MermaidEdge = readonly [string, string] | readonly [string, string, string];
 
 const SHAPE_RE = /^(\w+)\s*([\[{])\s*([^\]}{]+?)\s*([\]}])$/;
 
@@ -23,7 +23,10 @@ function parseNode(token: string): MermaidNode | null {
   const t = token.trim();
   const m = t.match(SHAPE_RE);
   if (!m) return null;
-  const [, id, open, label, close] = m;
+  const id = m[1]!;
+  const open = m[2]!;
+  const label = m[3] ?? '';
+  const close = m[4]!;
   if (open === '{' && close === '}') {
     return { id, label: label.trim(), shape: 'diamond' };
   }
@@ -74,7 +77,11 @@ export function renderMermaid(src: string): string {
     nodes.set(fromNode.id, fromNode);
     const toNode = parseNode(parts.right) ?? parseBareNode(parts.right);
     nodes.set(toNode.id, toNode);
-    edges.push([fromNode.id, toNode.id, parts.label]);
+    if (parts.label !== undefined) {
+      edges.push([fromNode.id, toNode.id, parts.label]);
+    } else {
+      edges.push([fromNode.id, toNode.id]);
+    }
   }
 
   if (nodes.size === 0) return '(unparseable diagram)';
