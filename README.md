@@ -1,8 +1,8 @@
 # 🐋 deepwhale
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
-[![Release v1.0.15](https://img.shields.io/badge/release-v1.0.15-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
-> 🎉 **v1.0.15 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
+[![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
+> 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
 [![Status](https://img.shields.io/badge/status-Phase%201-yellow)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)]()
