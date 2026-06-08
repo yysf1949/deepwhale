@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
 
-describe('registry (D-31.1.7 + D-31.2.6 + D-31.3.5)', () => {
-  it('contains 33 tools (17 + 6 + 4 research + 4 productivity)', () => {
+describe('registry (D-31.1.7 + D-31.2.6 + D-31.3.5 + D-32.1.7 + D-32.1.7 + D-32.1.7)', () => {
+  it('contains 33 tools (17 + 6 + 4 research + 4 productivity + 4 code-intel)', () => {
     const reg = createDefaultRegistry();
-    expect(reg.size()).toBe(33);
+    expect(reg.size()).toBe(37);
   });
 
   it('registers github_pr_workflow', () => {
