@@ -9,6 +9,11 @@
  * - getTranscript:  parse youtube-transcript JSON, output <text> per line
  *
  * 0 业务改业务, 5 红线 0 触碰. risk: low (只读网络).
+ *
+ * D-31.4 review B-5 (2026-06-08): searchVideos URL 模板 不带 `&key=...`. API key
+ *   完全 走 fetcher URL params (caller responsibility). 文档化 拍. 默认
+ *   fetcher throws on no-injection, 0 production 未授权 风险 (key 缺失 401).
+ *   自动 拼 `&key=YOUTUBE_API_KEY` env 是 D-32+ 拍板.
  */
 
 import type { ToolName } from '@deepwhale/core';
