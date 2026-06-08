@@ -12,6 +12,11 @@
  * - currentTrack:  GET /v1/me/player/currently-playing
  *
  * 0 业务改业务, 5 红线 0 触碰. risk: medium (写 playback 状态).
+ *
+ * D-31.4 review B-4 (2026-06-08): fetcher 注入 后 caller responsibility 控制
+ *   timeout / retry. 默认 fetcher throws on no-injection, 0 production hang 风险.
+ *   如果 caller 注入 无 timeout fetcher, 可能 hang indefinitely. 文档化 拍
+ *   "caller 需 自己 wrap timeout". 写 timeout 注入 是 D-32+ 任务.
  */
 
 import type { ToolName } from '@deepwhale/core';
