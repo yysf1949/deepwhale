@@ -27,9 +27,9 @@ export class YoutubeContentTool implements Tool {
   readonly schema: ToolInputSchema = {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['searchVideos', 'getTranscript'] },
-      query: { type: 'string' },
-      videoId: { type: 'string' },
+      action: { type: 'string', description: 'youtube action', enum: ['searchVideos', 'getTranscript'] },
+      query: { type: 'string', description: 'search query (searchVideos action)' },
+      videoId: { type: 'string', description: 'video id (getTranscript action)' },
     },
     required: ['action'],
   };

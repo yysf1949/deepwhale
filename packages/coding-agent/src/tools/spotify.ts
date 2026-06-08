@@ -30,9 +30,9 @@ export class SpotifyTool implements Tool {
   readonly schema: ToolInputSchema = {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['search', 'play', 'pause', 'next', 'queue', 'currentTrack'] },
-      query: { type: 'string' },
-      trackId: { type: 'string' },
+      action: { type: 'string', description: 'spotify action', enum: ['search', 'play', 'pause', 'next', 'queue', 'currentTrack'] },
+      query: { type: 'string', description: 'search query (search action)' },
+      trackId: { type: 'string', description: 'track id (play / queue)' },
     },
     required: ['action'],
   };
@@ -54,8 +54,9 @@ export class SpotifyTool implements Tool {
         }
         case 'play': {
           const id = input['trackId'];
-          const body = id ? JSON.stringify({ uris: [`spotify:track:${id}`] }) : undefined;
-          await this.fetcher(`${BASE}/me/player/play`, { method: 'PUT', body });
+          const opts: { method: string; body?: string } = { method: 'PUT' };
+          if (id) opts.body = JSON.stringify({ uris: [`spotify:track:${id}`] });
+          await this.fetcher(`${BASE}/me/player/play`, opts);
           return { success: true, content: 'playing', meta: { trackId: id } };
         }
         case 'pause': {
