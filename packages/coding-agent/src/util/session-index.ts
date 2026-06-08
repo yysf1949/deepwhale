@@ -1,5 +1,6 @@
 /**
  * @deepwhale/coding-agent — Session index FTS5 升级 (D-30.3.2, 2026-06-07).
+ *                                  D-31.2.5 加 index(entry, content) (2026-06-08).
  *
  * 拍板 (D-30.3): JSON 兜底 (D-30.1δ.10) → FTS5 sql.js (纯 JS, 0 native dep).
  *   1:1 API 兼容 (list/add/remove/search), schema 跟 better-sqlite3 一致.
@@ -7,7 +8,10 @@
  * - 文件: ~/.deepwhale/sessions.db (FTS5 virtual table sessions)
  * - 列: id UNINDEXED, path UNINDEXED, first_user UNINDEXED,
  *        message_count UNINDEXED, created_at UNINDEXED, content (FTS5 indexed)
- * - 0 改业务, 5 红线 0 触碰
+ * 拍板 (D-31.2.5, 2026-06-08): 加 init() + index(entry, content) 跟 D-31.2 llm-wiki
+ *   1:1 协议.  add() 保持原 firstUser-stuff 入 content 行为 (D-30.3.2 backward
+ *   compat), index() 走新语义: firstUser 只填 first_user 列, content 走真 message
+ *   body.  0 改业务, 5 红线 0 触碰.
  */
 
 import { promises as fs } from 'node:fs';
@@ -78,6 +82,16 @@ export class SessionIndex {
     return join(this.rootDir, 'sessions.db');
   }
 
+  /**
+   * D-31.2.5 (2026-06-08): 显式 init — 跟 llm-wiki 1:1 协议. 预热 sql.js
+   * WASM, 打开 sessions.db (无则创建 + 建 schema). 业务调用 index() 之前必
+   * 须先 await init().  D-30.3.2 隐式 lazy init (ensureDb) 保留以维持 add()
+   *   1:1 backward compat.
+   */
+  async init(): Promise<void> {
+    await this.ensureDb();
+  }
+
   private async ensureDb(): Promise<SqlDatabase> {
     if (this.db) return this.db;
     const SQL = await getSQL();
@@ -145,6 +159,35 @@ export class SessionIndex {
         entry.messageCount,
         entry.createdAt,
         entry.firstUser,
+      ],
+    );
+    await this.persist();
+  }
+
+  /**
+   * D-31.2.5 (2026-06-08): 显式 content column 索引. 跟 add() 1:1 协议但
+   *   content 走真 message body (add() 走 firstUser, backward compat).
+   *   用途: caller 已读 session JSONL 拿到 message[].text, 直接传进 content
+   *   让 search 跨 message 全文命中.  firstUser + content 拼一起入 FTS5 列
+   *   维持 D-30.3.2 backward compat (title 仍能命中).
+   */
+  async index(entry: SessionEntry, content: string): Promise<void> {
+    const db = await this.ensureDb();
+    const del = db.prepare(`DELETE FROM sessions WHERE id = ?`);
+    del.bind([entry.id]);
+    while (del.step()) {
+      /* drain */
+    }
+    del.free();
+    db.run(
+      `INSERT INTO sessions (id, path, first_user, message_count, created_at, content) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        entry.id,
+        entry.path,
+        entry.firstUser,
+        entry.messageCount,
+        entry.createdAt,
+        `${entry.firstUser}\n${content}`,
       ],
     );
     await this.persist();
