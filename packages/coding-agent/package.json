@@ -53,6 +53,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@deepwhale/code-intel": "^2.0.0",
     "@deepwhale/core": "^1.0.0",
     "@deepwhale/edit-engine": "^1.0.0",
     "@deepwhale/llm": "^1.0.0",
