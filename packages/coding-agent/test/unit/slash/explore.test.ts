@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseExploreCommand, runExplore } from '../../src/slash/explore.js';
+import { parseExploreCommand, runExplore } from '../../../src/slash/explore.js';
 import { resolve } from 'node:path';
 
 const FIXTURE_DIR = resolve(
