@@ -1,5 +1,5 @@
 /**
- * Tool Registry — 31 工具的注册中心 (D-31.3.5, 2026-06-08).
+ * Tool Registry — 33 工具的注册中心 (D-31.4.4, 2026-06-08).
  *
  * Sprint 0.2 范围：
  * - register / get / list 基础 API
@@ -45,6 +45,8 @@ import { NotionTool } from './notion.js'; // D-31.3.1 (2026-06-08): notion REST
 import { LinearTool } from './linear.js'; // D-31.3.2: linear GraphQL
 import { AirtableTool } from './airtable.js'; // D-31.3.3: airtable REST
 import { OcrAndDocumentsTool } from './ocr-and-documents.js'; // D-31.3.4: tesseract + pdf-parse
+import { SpotifyTool } from './spotify.js'; // D-31.4.1 (2026-06-08): spotify Web API
+import { YoutubeContentTool } from './youtube-content.js'; // D-31.4.2: youtube data + transcript
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -145,5 +147,9 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   reg.register(new LinearTool());
   reg.register(new AirtableTool());
   reg.register(new OcrAndDocumentsTool());
+  // D-31.4 (2026-06-08): 装 2 media 工具 — 31 → 33. (obsidian-bridge 是 skill
+  // 不进 registry, 走 skill-loader)
+  reg.register(new SpotifyTool());
+  reg.register(new YoutubeContentTool());
   return reg;
 }
