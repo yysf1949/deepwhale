@@ -1,5 +1,5 @@
 /**
- * Tool Registry — 17 工具的注册中心 (D-30.4.6, 2026-06-07).
+ * Tool Registry — 23 工具的注册中心 (D-31.1.7, 2026-06-08).
  *
  * Sprint 0.2 范围：
  * - register / get / list 基础 API
@@ -31,6 +31,12 @@ import { PlanTool } from './plan.js'; // D-30.2.7: plan mode
 import { DelegateTaskTool } from './delegate-task.js'; // D-30.3.1: subagent 并行 max 5
 import { VisionAnalyzeTool } from './vision-analyze.js'; // D-30.4.1: 本地 base64 + URL
 import { TextToSpeechTool } from './text-to-speech.js'; // D-30.4.2: text stub -> ~/.deepwhale/tts/
+import { GitHubPrWorkflowTool } from './github-pr-workflow.js'; // D-31.1.1
+import { GitHubIssuesTool } from './github-issues.js'; // D-31.1.2
+import { GitHubCodeReviewTool } from './github-code-review.js'; // D-31.1.3
+import { KanbanOrchestratorTool, kanbanOrchestrator } from './kanban-orchestrator.js'; // D-31.1.4
+import { CloudflarePagesDeployTool } from './cloudflare-pages-deploy.js'; // D-31.1.5
+import { WebhookSubscriptionsTool, webhookSubscriptions } from './webhook-subscriptions.js'; // D-31.1.6
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -108,5 +114,14 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   reg.register(new VisionAnalyzeTool());
   // D-30.4.2 (2026-06-07): 装 text_to_speech (medium) — 写 text stub 到 ~/.deepwhale/tts/.
   reg.register(new TextToSpeechTool());
+  // D-31.1 (2026-06-08): 装 6 engineering automation 工具 — 17 → 23.
+  reg.register(new GitHubPrWorkflowTool());
+  reg.register(new GitHubIssuesTool());
+  reg.register(new GitHubCodeReviewTool());
+  // D-31.1.4/6: kanban / webhooks need boardDir / subsDir — reuse the pre-constructed
+  //   default instances (same `~/.deepwhale/...` paths the tools export).
+  reg.register(kanbanOrchestrator);
+  reg.register(new CloudflarePagesDeployTool());
+  reg.register(webhookSubscriptions);
   return reg;
 }

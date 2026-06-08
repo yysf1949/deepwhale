@@ -29,6 +29,15 @@ export { DelegateTaskTool, delegateTask } from './delegate-task.js';
 export { VisionAnalyzeTool, visionAnalyze } from './vision-analyze.js';
 // D-30.4.2 (2026-06-07): text_to_speech
 export { TextToSpeechTool, textToSpeech } from './text-to-speech.js';
+// D-31.1 (2026-06-08): 6 engineering automation tools.
+export { GitHubPrWorkflowTool, githubPrWorkflow } from './github-pr-workflow.js';
+export { GitHubIssuesTool, githubIssues } from './github-issues.js';
+export { GitHubCodeReviewTool, githubCodeReview } from './github-code-review.js';
+export { KanbanOrchestratorTool, kanbanOrchestrator } from './kanban-orchestrator.js';
+export type { KanbanCard, Board, KanbanOptions, Lane, SubTaskRunner as KanbanSubTaskRunner } from './kanban-orchestrator.js';
+export { CloudflarePagesDeployTool, cloudflarePagesDeploy } from './cloudflare-pages-deploy.js';
+export { WebhookSubscriptionsTool, webhookSubscriptions } from './webhook-subscriptions.js';
+export type { Subscription, WebhookOptions } from './webhook-subscriptions.js';
 export type { SubTask, SubTaskRunner } from './delegate-task.js';
 export type { VisionRunner } from './vision-analyze.js';
 export type { TextToSpeechOptions } from './text-to-speech.js';
