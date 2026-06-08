@@ -4,7 +4,7 @@ import { createDefaultRegistry } from '../../src/tools/registry.js';
 describe('registry (D-31.3.5 + D-32.1.7)', () => {
   it('contains 33 tools (27 + 4 productivity + 4 code-intel + 1 cross-file)', () => {
     const reg = createDefaultRegistry();
-    expect(reg.size()).toBe(38);
+    expect(reg.size()).toBe(40);
   });
 
   it('registers notion / linear / airtable / ocr_and_documents', () => {

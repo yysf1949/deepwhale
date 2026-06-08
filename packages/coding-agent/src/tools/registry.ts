@@ -52,6 +52,8 @@ import { GetSymbolsTool } from './get-symbols.js'; // D-32.1.2: extract symbols 
 import { AnalyzeRepoTool } from './analyze-repo.js'; // D-32.1.3: walk repo + lang stats
 import { FindDefinitionTool } from './find-definition.js'; // D-32.1.4: single-file symbol search
 import { FindReferencesTool } from './find-references.js'; // D-32.2.2: cross-file find references
+import { CallGraphTool } from './call-graph.js'; // D-32.2.3: cross-file call chain
+import { RenameSymbolTool } from './rename-symbol.js'; // D-32.2.4: cross-file rename (word-boundary)
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -165,5 +167,10 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   // D-32.2.2 (2026-06-08): 装 find_references — 37 → 38. 走 @deepwhale/code-intel
   //   buildSymbolGraph + findReferences, 跨文件 search (references / count 2 mode).
   reg.register(new FindReferencesTool());
+  // D-32.2.3 + D-32.2.4 (2026-06-08): 装 call_graph + rename_symbol — 38 → 40.
+  //   call_graph: 跨文件 call chain (for-symbol / for-file / for-repo).
+  //   rename_symbol: 跨文件 rename (dry-run by default, apply=true to write).
+  reg.register(new CallGraphTool());
+  reg.register(new RenameSymbolTool());
   return reg;
 }

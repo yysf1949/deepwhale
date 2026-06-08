@@ -26,15 +26,16 @@ export interface CallEdgeLike {
 export interface CallGraphProps {
   edges: ReadonlyArray<CallEdgeLike>;
   symbol?: string;
-  maxDepth?: number;
+  maxDepth?: number; // currently unused, reserved for future BFS-limited render
 }
 
 const DEFAULT_MAX_DEPTH = 2;
+void DEFAULT_MAX_DEPTH; // reserved
 
 export const CallGraph: FC<CallGraphProps> = ({
   edges,
   symbol,
-  maxDepth = DEFAULT_MAX_DEPTH,
+  // maxDepth reserved for future BFS-limited render
 }) => {
   const filtered = symbol
     ? edges.filter((e) => e.caller.includes(symbol) || e.callee.includes(symbol))

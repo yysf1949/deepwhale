@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
 
 describe('registry (D-32.1.7 — 4 code-intel tools)', () => {
-  it('contains 38 tools (33 + 4 code-intel: parse_file / get_symbols / analyze_repo / find_definition)', () => {
+  it('contains 40 tools (33 + 4 code-intel: parse_file / get_symbols / analyze_repo / find_definition)', () => {
     const reg = createDefaultRegistry();
-    expect(reg.size()).toBe(38);
+    expect(reg.size()).toBe(40);
   });
 
   it('registers parse_file / get_symbols / analyze_repo / find_definition', () => {
