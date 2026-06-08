@@ -1,5 +1,5 @@
 /**
- * Tool Registry — 23 工具的注册中心 (D-31.1.7, 2026-06-08).
+ * Tool Registry — 27 工具的注册中心 (D-31.2.6, 2026-06-08).
  *
  * Sprint 0.2 范围：
  * - register / get / list 基础 API
@@ -37,6 +37,10 @@ import { GitHubCodeReviewTool } from './github-code-review.js'; // D-31.1.3
 import { KanbanOrchestratorTool, kanbanOrchestrator } from './kanban-orchestrator.js'; // D-31.1.4
 import { CloudflarePagesDeployTool } from './cloudflare-pages-deploy.js'; // D-31.1.5
 import { WebhookSubscriptionsTool, webhookSubscriptions } from './webhook-subscriptions.js'; // D-31.1.6
+import { ArxivTool } from './arxiv.js'; // D-31.2.1 (2026-06-08): arxiv paper search
+import { BlogwatcherTool } from './blogwatcher.js'; // D-31.2.2: RSS/Atom 订阅
+import { LlmWikiTool, llmWiki } from './llm-wiki.js'; // D-31.2.3: Karpathy LLM Wiki
+import { PolymarketTool } from './polymarket.js'; // D-31.2.4: prediction market
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -123,5 +127,13 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   reg.register(kanbanOrchestrator);
   reg.register(new CloudflarePagesDeployTool());
   reg.register(webhookSubscriptions);
+  // D-31.2 (2026-06-08): 装 4 research 工具 — 23 → 27.
+  //   arxiv / blogwatcher / llm_wiki / polymarket 全 low risk (read-only or local IO).
+  reg.register(new ArxivTool());
+  reg.register(new BlogwatcherTool({ rootDir: process.env.HOME || process.env.USERPROFILE || '.' }));
+  // D-31.2.3/2/4: llm_wiki / blogwatcher / polymarket reuse pre-constructed default
+  //   instances (same `~/.deepwhale/...` paths the tools export).
+  reg.register(llmWiki);
+  reg.register(new PolymarketTool());
   return reg;
 }
