@@ -39,8 +39,8 @@ export const ProfileSwitcher: FC<ProfileSwitcherProps> = ({
         </Text>
       );
     })}
-    {profiles.length > 0 && (
-      <Text dimColor>(press number to switch)</Text>
-    )}
+    {/* D-31.4 review B-2 fix (2026-06-08): 删 "(press number to switch)" 假文案.
+        ProfileSwitcher 自身 不 接 keybinding (跟 D-31.4.6 拍 1:1). 切 profile 走
+        父组件 onSwitch callback + useInput. UI 不应 promise 能力. */}
   </Box>
 );
