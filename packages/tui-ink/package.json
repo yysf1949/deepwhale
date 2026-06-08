@@ -1,6 +1,6 @@
 {
   "name": "@deepwhale/tui-ink",
-  "version": "1.0.16",
+  "version": "1.0.18",
   "private": false,
   "type": "module",
   "description": "TUI mode — Ink 6 + React 19 container for deepwhale coding-agent. D-24 full Ink migration (2026-06-06).",
