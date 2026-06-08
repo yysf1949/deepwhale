@@ -17,8 +17,8 @@ describe('tool registry (web tools, D-30.1γ.4)', () => {
     expect(registry.get('browser_navigate')).toBeDefined();
   });
 
-  it('registry total size = 6 + 3 + 5 + 1 + 2 = 17 (D-30.4.6 follow-up)', () => {
+  it('registry total size = 6 + 3 + 5 + 1 + 2 + 6 = 23 (D-31.1.7 follow-up)', () => {
     const registry = createDefaultRegistry();
-    expect(registry.size()).toBe(17);
+    expect(registry.size()).toBe(23);
   });
 });

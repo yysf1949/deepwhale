@@ -10,8 +10,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { dispatchSlashBuiltin } from '../../src/repl/repl-command-router.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
 
-describe('repl slash /tools (with vision + tts, D-30.4.7)', () => {
-  it('lists vision_analyze + text_to_speech alongside other tools (17 total)', async () => {
+describe('repl slash /tools (with vision + tts, D-30.4.7; +6 D-31.1.7)', () => {
+  it('lists vision_analyze + text_to_speech alongside other tools (23 total)', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
     const errStream = { write: vi.fn(), isTTY: true } as unknown as NodeJS.WritableStream;
@@ -29,6 +29,6 @@ describe('repl slash /tools (with vision + tts, D-30.4.7)', () => {
     const outText = out.mock.calls.map((c) => c[0]).join('');
     expect(outText).toContain('vision_analyze');
     expect(outText).toContain('text_to_speech');
-    expect(outText).toMatch(/17 tools/);
+    expect(outText).toMatch(/23 tools/);
   });
 });
