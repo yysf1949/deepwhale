@@ -126,7 +126,7 @@ function extractTsLike(
   opts: { methodName: string; importName: string },
 ): Symbol[] {
   const out: Symbol[] = [];
-  const visit = (node: Node, scope: string | undefined): void => {
+  const visit = (node: Node, file: string, scope: string | undefined): void => {
     const t = node.type;
     if (t === 'function_declaration' || t === 'function') {
       const name = node.childForFieldName('name')?.text ?? firstIdentifierText(node);
@@ -161,14 +161,14 @@ function extractTsLike(
     }
     visitChildren(node, file, scope, visit);
   };
-  visit(root, undefined);
+  visit(root, file, undefined);
   return out;
 }
 
 /** Python: functions, classes, methods (function def inside a class), imports. */
 function extractPython(root: Node, file: string): Symbol[] {
   const out: Symbol[] = [];
-  const visit = (node: Node, scope: string | undefined): void => {
+  const visit = (node: Node, file: string, scope: string | undefined): void => {
     const t = node.type;
     if (t === 'function_definition') {
       const name = node.childForFieldName('name')?.text ?? firstIdentifierText(node);
@@ -193,14 +193,14 @@ function extractPython(root: Node, file: string): Symbol[] {
     }
     visitChildren(node, file, scope, visit);
   };
-  visit(root, undefined);
+  visit(root, file, undefined);
   return out;
 }
 
 /** Go: functions, methods, type declarations, imports. */
 function extractGo(root: Node, file: string): Symbol[] {
   const out: Symbol[] = [];
-  const visit = (node: Node, scope: string | undefined): void => {
+  const visit = (node: Node, file: string, scope: string | undefined): void => {
     const t = node.type;
     if (t === 'function_declaration') {
       const name = node.childForFieldName('name')?.text;
@@ -231,14 +231,14 @@ function extractGo(root: Node, file: string): Symbol[] {
     }
     visitChildren(node, file, scope, visit);
   };
-  visit(root, undefined);
+  visit(root, file, undefined);
   return out;
 }
 
 /** Bash: function definitions + top-level variable assignments. */
 function extractBash(root: Node, file: string): Symbol[] {
   const out: Symbol[] = [];
-  const visit = (node: Node, scope: string | undefined): void => {
+  const visit = (node: Node, file: string, scope: string | undefined): void => {
     const t = node.type;
     if (t === 'function_definition') {
       const name = node.childForFieldName('name')?.text ?? firstIdentifierText(node);
@@ -255,14 +255,14 @@ function extractBash(root: Node, file: string): Symbol[] {
     }
     visitChildren(node, file, scope, visit);
   };
-  visit(root, undefined);
+  visit(root, file, undefined);
   return out;
 }
 
 /** Rust: functions, structs, enums, traits, impl bodies, use declarations. */
 function extractRust(root: Node, file: string): Symbol[] {
   const out: Symbol[] = [];
-  const visit = (node: Node, scope: string | undefined): void => {
+  const visit = (node: Node, file: string, scope: string | undefined): void => {
     const t = node.type;
     if (t === 'function_item') {
       const name = node.childForFieldName('name')?.text;
@@ -289,7 +289,7 @@ function extractRust(root: Node, file: string): Symbol[] {
     }
     visitChildren(node, file, scope, visit);
   };
-  visit(root, undefined);
+  visit(root, file, undefined);
   return out;
 }
 
