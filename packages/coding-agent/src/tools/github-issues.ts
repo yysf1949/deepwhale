@@ -23,13 +23,13 @@ export class GitHubIssuesTool implements Tool {
   readonly schema: ToolInputSchema = {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['createIssue', 'listIssues', 'closeIssue', 'comment'] },
-      owner: { type: 'string' },
-      repo: { type: 'string' },
-      title: { type: 'string' },
-      body: { type: 'string' },
-      issueNumber: { type: 'number' },
-      state: { type: 'string', enum: ['OPEN', 'CLOSED', 'ALL'] },
+      action: { type: 'string', description: 'Action: createIssue | listIssues | closeIssue | comment', enum: ['createIssue', 'listIssues', 'closeIssue', 'comment'] },
+      owner: { type: 'string', description: 'Repo owner' },
+      repo: { type: 'string', description: 'Repo name' },
+      title: { type: 'string', description: 'Issue title (createIssue)' },
+      body: { type: 'string', description: 'Issue or comment body' },
+      issueNumber: { type: 'number', description: 'Issue number (closeIssue | comment)' },
+      state: { type: 'string', description: 'Filter by state (listIssues)', enum: ['OPEN', 'CLOSED', 'ALL'] },
     },
     required: ['action', 'owner', 'repo'],
   };

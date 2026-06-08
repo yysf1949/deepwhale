@@ -46,11 +46,11 @@ export class KanbanOrchestratorTool implements Tool {
   readonly schema: ToolInputSchema = {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['addCard', 'moveCard', 'list', 'delegate'] },
-      title: { type: 'string' },
-      lane: { type: 'string' },
-      cardId: { type: 'string' },
-      prompt: { type: 'string' },
+      action: { type: 'string', description: 'Action: addCard | moveCard | list | delegate', enum: ['addCard', 'moveCard', 'list', 'delegate'] },
+      title: { type: 'string', description: 'Card title (addCard)' },
+      lane: { type: 'string', description: 'Lane: todo | in_progress | review | done | failed' },
+      cardId: { type: 'string', description: 'Card id (moveCard | delegate)' },
+      prompt: { type: 'string', description: 'Sub-task prompt (delegate)' },
     },
     required: ['action'],
   };

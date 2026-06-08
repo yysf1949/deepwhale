@@ -35,14 +35,14 @@ export class GitHubPrWorkflowTool implements Tool {
   readonly schema: ToolInputSchema = {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['createPR', 'mergePR', 'closePR', 'listPRs'] },
-      owner: { type: 'string' },
-      repo: { type: 'string' },
-      title: { type: 'string' },
-      body: { type: 'string' },
-      head: { type: 'string' },
-      base: { type: 'string' },
-      prNumber: { type: 'number' },
+      action: { type: 'string', description: 'Action: createPR | mergePR | closePR | listPRs', enum: ['createPR', 'mergePR', 'closePR', 'listPRs'] },
+      owner: { type: 'string', description: 'Repo owner' },
+      repo: { type: 'string', description: 'Repo name' },
+      title: { type: 'string', description: 'PR title (createPR)' },
+      body: { type: 'string', description: 'PR body (createPR)' },
+      head: { type: 'string', description: 'Head branch (createPR)' },
+      base: { type: 'string', description: 'Base branch (createPR)' },
+      prNumber: { type: 'number', description: 'PR number (mergePR | closePR)' },
     },
     required: ['action', 'owner', 'repo'],
   };

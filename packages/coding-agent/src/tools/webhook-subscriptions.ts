@@ -35,10 +35,10 @@ export class WebhookSubscriptionsTool implements Tool {
   readonly schema: ToolInputSchema = {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['add', 'list', 'remove'] },
-      url: { type: 'string' },
-      event: { type: 'string' },
-      subId: { type: 'string' },
+      action: { type: 'string', description: 'Action: add | list | remove', enum: ['add', 'list', 'remove'] },
+      url: { type: 'string', description: 'Webhook URL (add)' },
+      event: { type: 'string', description: 'Event filter (add, * for all)' },
+      subId: { type: 'string', description: 'Subscription id (remove)' },
     },
     required: ['action'],
   };

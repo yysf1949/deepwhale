@@ -26,14 +26,14 @@ export class GitHubCodeReviewTool implements Tool {
   readonly schema: ToolInputSchema = {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['addReviewComment', 'submitReview'] },
-      owner: { type: 'string' },
-      repo: { type: 'string' },
-      prNumber: { type: 'number' },
-      path: { type: 'string' },
-      line: { type: 'number' },
-      body: { type: 'string' },
-      verdict: { type: 'string', enum: ['approve', 'request-changes', 'comment'] },
+      action: { type: 'string', description: 'Action: addReviewComment | submitReview', enum: ['addReviewComment', 'submitReview'] },
+      owner: { type: 'string', description: 'Repo owner' },
+      repo: { type: 'string', description: 'Repo name' },
+      prNumber: { type: 'number', description: 'PR number' },
+      path: { type: 'string', description: 'File path (addReviewComment)' },
+      line: { type: 'number', description: 'Line number (addReviewComment)' },
+      body: { type: 'string', description: 'Comment text' },
+      verdict: { type: 'string', description: 'Verdict (submitReview)', enum: ['approve', 'request-changes', 'comment'] },
     },
     required: ['action', 'owner', 'repo', 'prNumber'],
   };

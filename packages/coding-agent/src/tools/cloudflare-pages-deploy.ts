@@ -26,10 +26,10 @@ export class CloudflarePagesDeployTool implements Tool {
   readonly schema: ToolInputSchema = {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['deploy', 'listDeploys', 'rollback'] },
-      project: { type: 'string' },
-      directory: { type: 'string' },
-      deploymentId: { type: 'string' },
+      action: { type: 'string', description: 'Action: deploy | listDeploys | rollback', enum: ['deploy', 'listDeploys', 'rollback'] },
+      project: { type: 'string', description: 'Cloudflare Pages project name' },
+      directory: { type: 'string', description: 'Directory to deploy (deploy)' },
+      deploymentId: { type: 'string', description: 'Deployment id (rollback)' },
     },
     required: ['action', 'project'],
   };
