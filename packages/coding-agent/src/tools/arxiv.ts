@@ -19,11 +19,11 @@ const defaultFetcher: Fetcher = async () => { throw new Error('arxiv: no fetcher
 
 function parseEntry(xml: string): { title: string; summary: string; authors: string[]; pdfUrl: string; id: string } | null {
   const m = xml.match(/<entry>([\s\S]*?)<\/entry>/);
-  if (!m) return null;
+  if (!m || !m[1]) return null;
   const block = m[1];
   const title = (block.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '').trim();
   const summary = (block.match(/<summary>([\s\S]*?)<\/summary>/)?.[1] ?? '').trim();
-  const authors = Array.from(block.matchAll(/<author>\s*<name>([\s\S]*?)<\/name>/g)).map(x => x[1].trim());
+  const authors = Array.from(block.matchAll(/<author>\s*<name>([\s\S]*?)<\/name>/g)).map(x => (x[1] ?? '').trim());
   const pdfUrl = block.match(/<link[^>]*href="([^"]*\.pdf)"/)?.[1] ?? '';
   const id = (block.match(/<id>([\s\S]*?)<\/id>/)?.[1] ?? '').trim();
   return { title, summary, authors, pdfUrl, id };
@@ -31,7 +31,12 @@ function parseEntry(xml: string): { title: string; summary: string; authors: str
 
 function parseFeed(xml: string): Array<{ title: string; summary: string; authors: string[]; pdfUrl: string; id: string }> {
   const blocks = xml.split(/<entry>/).slice(1);
-  return blocks.map(b => parseEntry('<entry>' + b)).filter((x): x is NonNullable<typeof x> => x !== null);
+  const out: Array<{ title: string; summary: string; authors: string[]; pdfUrl: string; id: string }> = [];
+  for (const b of blocks) {
+    const entry = parseEntry('<entry>' + b);
+    if (entry) out.push(entry);
+  }
+  return out;
 }
 
 export class ArxivTool implements Tool {

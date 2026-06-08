@@ -121,8 +121,8 @@ export class LlmWikiTool implements Tool {
   private pageId(title: string): number | null {
     if (!this.db) return null;
     const r = this.db.exec(`SELECT id FROM pages WHERE title = ?`, [title]);
-    if (r.length === 0 || r[0].values.length === 0) return null;
-    return r[0].values[0][0] as number;
+    if (r.length === 0 || r[0]!.values.length === 0) return null;
+    return r[0]!.values[0]![0] as number;
   }
 
   async execute(input: Record<string, unknown>): Promise<ToolResult> {
@@ -154,14 +154,14 @@ export class LlmWikiTool implements Tool {
           const q = input['query'];
           if (typeof q !== 'string' || q.length === 0) return { success: false, content: '', error: 'invalid-input: query required' };
           const r = this.db!.exec(`SELECT title, content FROM pages_fts WHERE pages_fts MATCH ?`, [q]);
-          if (r.length === 0 || r[0].values.length === 0) return { success: true, content: '(no match)' };
-          const lines = r[0].values.map((row) => `# ${row[0]}\n${row[1]}`);
+          if (r.length === 0 || !r[0] || r[0].values.length === 0) return { success: true, content: '(no match)' };
+          const lines = r[0].values.map((row) => `# ${row[0] ?? ''}\n${row[1] ?? ''}`);
           return { success: true, content: lines.join('\n\n'), meta: { count: r[0].values.length } };
         }
         case 'list': {
           const r = this.db!.exec(`SELECT title FROM pages ORDER BY id`);
-          if (r.length === 0 || r[0].values.length === 0) return { success: true, content: '(empty wiki)' };
-          return { success: true, content: r[0].values.map((row) => `- ${row[0]}`).join('\n') };
+          if (r.length === 0 || !r[0] || r[0].values.length === 0) return { success: true, content: '(empty wiki)' };
+          return { success: true, content: r[0].values.map((row) => `- ${row[0] ?? ''}`).join('\n') };
         }
         default:
           return { success: false, content: '', error: `unknown-action: ${String(action)}` };

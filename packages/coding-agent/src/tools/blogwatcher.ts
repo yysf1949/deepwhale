@@ -40,7 +40,8 @@ function parseRss(xml: string): Array<{ id: string; title: string; link: string;
     const title = (block.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '').trim();
     const link = (block.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? '').trim();
     const body = (block.match(/<description>([\s\S]*?)<\/description>/)?.[1] ?? '').trim();
-    const slug = (link.split('/').filter(Boolean).pop() ?? Math.random().toString(36).slice(2, 8)).replace(/[^\w-]/g, '_');
+    const rawSlug = link.split('/').filter(Boolean).pop() ?? Math.random().toString(36).slice(2, 8);
+    const slug = String(rawSlug).replace(/[^\w-]/g, '_');
     return { id: slug, title, link, body };
   });
 }
@@ -116,7 +117,9 @@ export class BlogwatcherTool implements Tool {
         case 'read': {
           const id = input['entryId'];
           if (typeof id !== 'string') return { success: false, content: '', error: 'invalid-input: entryId required' };
-          const [host, slug] = id.split('/');
+          const parts = id.split('/');
+          const host = parts[0] ?? '';
+          const slug = parts[1] ?? id;
           const file = join(this.entriesDir, host, `${slug}.md`);
           const body = await fs.readFile(file, 'utf8');
           return { success: true, content: body };
