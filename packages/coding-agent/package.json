@@ -1,6 +1,6 @@
 {
   "name": "@deepwhale/coding-agent",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "DeepWhale CLI: DeepSeek-first AI coding agent. Linear sessions, 6 tools, Docker sandbox.",
   "license": "MIT",
   "type": "module",

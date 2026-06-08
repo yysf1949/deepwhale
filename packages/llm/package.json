@@ -1,6 +1,6 @@
 {
   "name": "@deepwhale/llm",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "LLM client factory: DeepSeek + Anthropic providers with token pricing",
   "license": "MIT",
   "type": "module",

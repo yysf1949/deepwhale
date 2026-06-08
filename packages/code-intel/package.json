@@ -1,6 +1,6 @@
 {
   "name": "@deepwhale/code-intel",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Code Intelligence Foundation: tree-sitter WASM-based parsing and symbol extraction for deepwhale (D-32.1, 2026-06-08).",
   "license": "MIT",
   "type": "module",
