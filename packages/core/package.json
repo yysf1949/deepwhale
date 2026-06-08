@@ -1,6 +1,6 @@
 {
   "name": "@deepwhale/core",
-  "version": "1.0.16",
+  "version": "2.0.0",
   "description": "Core primitives for DeepWhale: i18n, session JSONL, compaction, types",
   "license": "MIT",
   "type": "module",
