@@ -47,6 +47,10 @@ import { AirtableTool } from './airtable.js'; // D-31.3.3: airtable REST
 import { OcrAndDocumentsTool } from './ocr-and-documents.js'; // D-31.3.4: tesseract + pdf-parse
 import { SpotifyTool } from './spotify.js'; // D-31.4.1 (2026-06-08): spotify Web API
 import { YoutubeContentTool } from './youtube-content.js'; // D-31.4.2: youtube data + transcript
+import { ParseFileTool } from './parse-file.js'; // D-32.1.1 (2026-06-08): parse file via web-tree-sitter
+import { GetSymbolsTool } from './get-symbols.js'; // D-32.1.2: extract symbols from file
+import { AnalyzeRepoTool } from './analyze-repo.js'; // D-32.1.3: walk repo + lang stats
+import { FindDefinitionTool } from './find-definition.js'; // D-32.1.4: single-file symbol search
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -151,5 +155,11 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   // 不进 registry, 走 skill-loader)
   reg.register(new SpotifyTool());
   reg.register(new YoutubeContentTool());
+  // D-32.1 (2026-06-08): 装 4 code-intel 工具 — 33 → 37. All low risk (read-only
+  //   file walking / AST parsing via web-tree-sitter WASM, 0 native build).
+  reg.register(new ParseFileTool());
+  reg.register(new GetSymbolsTool());
+  reg.register(new AnalyzeRepoTool());
+  reg.register(new FindDefinitionTool());
   return reg;
 }
