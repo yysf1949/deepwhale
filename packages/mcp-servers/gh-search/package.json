@@ -1,0 +1,20 @@
+{
+  "name": "@deepwhale/mcp-gh-search",
+  "version": "2.2.0",
+  "description": "MCP server wrapping gh CLI for GitHub public code search (D-32.3.3)",
+  "type": "module",
+  "main": "bin/gh-search-mcp.mjs",
+  "bin": {
+    "deepwhale-mcp-gh-search": "bin/gh-search-mcp.mjs"
+  },
+  "files": [
+    "bin/"
+  ],
+  "scripts": {
+    "start": "node bin/gh-search-mcp.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
