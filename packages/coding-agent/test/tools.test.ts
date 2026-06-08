@@ -13,9 +13,9 @@ import { join } from 'node:path';
 
 describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools) + D-30.2 (5 new tools) + D-30.3 (1 subagent) + D-30.4 (2 vision/tts) + D-31.1 (6 engineering tools) + D-31.2 (4 research tools)', () => {
   describe('ToolRegistry', () => {
-    it('createDefaultRegistry registers 6 + 3 + 5 + 1 + 2 + 6 + 4 = 27 tools', () => {
+    it('createDefaultRegistry registers 6 + 3 + 5 + 1 + 2 + 6 + 4 = 31 tools', () => {
       const reg = createDefaultRegistry();
-      expect(reg.size()).toBe(27);
+      expect(reg.size()).toBe(31);
       expect(reg.get('read_file')?.name).toBe('read_file');
       expect(reg.get('write_file')?.name).toBe('write_file');
       expect(reg.get('edit_file')?.name).toBe('edit_file');

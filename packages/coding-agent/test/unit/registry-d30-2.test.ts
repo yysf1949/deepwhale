@@ -31,9 +31,9 @@ describe('tool registry (D-30.2.8 — 5 new tools, D-30.3.5 — 1 subagent, D-30
     expect(registry.get('text_to_speech')).toBeDefined();
   });
 
-  it('registry total size = 15 + 2 + 6 + 4 = 27 (D-31.2.6 follow-up)', () => {
+  it('registry total size = 15 + 2 + 6 + 4 = 31 (D-31.3.5 follow-up)', () => {
     const registry = createDefaultRegistry();
-    expect(registry.size()).toBe(27);
+    expect(registry.size()).toBe(31);
   });
 
   it('5 new tools have correct risk levels', () => {
