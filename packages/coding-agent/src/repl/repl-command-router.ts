@@ -114,6 +114,17 @@ export interface SlashContext {
    * D-30.1δ 重命名 (d51b12e getPlan 返 string → enterPlanMode 返 void).
    */
   enterPlanMode?: () => void
+  /**
+   * D-31.3.7: /profile 触发, caller 提供 profile-store 注入.
+   * - listProfiles:    无 arg 列出所有 profile
+   * - currentProfile:  /profile current 显当前
+   * - switchProfile:   /profile <name> 切, 失败抛 (router 兜底 stderr)
+   * - createProfile:   /profile create <name> (留 D-31.4+, 本 sub-burst 未接 CLI)
+   */
+  listProfiles?: () => Promise<string[]>
+  switchProfile?: (name: string) => Promise<{ model?: string; theme?: string; [k: string]: unknown }>
+  currentProfile?: () => Promise<{ name: string; config: { model?: string; theme?: string; [k: string]: unknown } } | null>
+  createProfile?: (name: string) => Promise<void>
 }
 
 /**
@@ -174,6 +185,7 @@ export async function dispatchSlashBuiltin(
       '    /theme [n]   switch theme (default/solarized/monochrome)',
       '    /model [id]  switch LLM model',
       '    /tools       list registered tools',
+      '    /profile [name|current]   switch user profile (config.json + theme + model)',
       '',
       '  Knowledge:',
       '    /memory      view MEMORY.md',
@@ -436,6 +448,48 @@ export async function dispatchSlashBuiltin(
     // D-30.1δ.14: /plan 走 enterPlanMode 副作用 (TUI Plan mode D-30.2 接).
     ctx.enterPlanMode?.()
     ctx.out.write('plan mode: enter\n\n')
+    ctx.prompt()
+    return { handled: true }
+  }
+  if (line === '/profile' || line.startsWith('/profile ')) {
+    // D-31.3.7: /profile 走 profile-store 注入.
+    // - 无 arg:      listProfiles 列所有
+    // - 'current':   currentProfile 显当前
+    // - '<name>':    switchProfile 切 (fallback 兜底 not-found)
+    const arg = line.slice('/profile'.length).trim()
+    if (!ctx.listProfiles) {
+      ctx.out.write('profile store not wired\n\n')
+      ctx.prompt()
+      return { handled: true }
+    }
+    if (!arg) {
+      const profiles = await ctx.listProfiles()
+      if (profiles.length === 0) {
+        ctx.out.write('no profiles\n\n')
+      } else {
+        ctx.out.write(`${profiles.length} profiles:\n`)
+        for (const p of profiles) ctx.out.write(`  - ${p}\n`)
+        ctx.out.write('\n')
+      }
+      ctx.prompt()
+      return { handled: true }
+    }
+    if (arg === 'current') {
+      const cur = await ctx.currentProfile?.()
+      if (!cur) {
+        ctx.out.write('no current profile\n\n')
+      } else {
+        ctx.out.write(`current: ${cur.name}\n  ${JSON.stringify(cur.config)}\n\n`)
+      }
+      ctx.prompt()
+      return { handled: true }
+    }
+    try {
+      const cfg = await ctx.switchProfile?.(arg)
+      if (cfg) ctx.out.write(`profile: ${arg}\n  ${JSON.stringify(cfg)}\n\n`)
+    } catch (e) {
+      ctx.err.write(`error: ${e instanceof Error ? e.message : String(e)}\n\n`)
+    }
     ctx.prompt()
     return { handled: true }
   }
