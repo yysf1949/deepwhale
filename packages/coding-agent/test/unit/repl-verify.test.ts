@@ -15,13 +15,13 @@
  *   - 不 mock runVerify, 用真 node 子进程 (通过注入 options.checks)
  *   - 不写 key, 不读 .env
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import type { ChatMessage, ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
-import { readSessionEvents } from '@deepwhale/core';
+import { readSessionEvents, setLocale } from '@deepwhale/core';
 import { startRepl } from '../../src/repl.js';
 import type { VerifyCheck } from '../../src/verify/verify-runner.js';
 
@@ -59,6 +59,13 @@ function _makePassCheckUnused(_i: number): never {
 void _makePassCheckUnused;
 
 describe('REPL /verify (D-11-4 2026-06-04)', () => {
+  beforeEach(() => {
+    // 测试机 env 无 zh 时默认 en, /exit 提示 "Goodbye!" 不含 "再见", 中文断言 fail.
+    // stub env + 强制 setLocale 让 currentLocale 落 zh-CN, 测试独立于 host env.
+    vi.stubEnv('DEEPWHALE_LANG', 'zh-CN');
+    setLocale('zh-CN');
+  });
+
   it('REPL 收 /verify → 调 runVerify (4 简单 pass) → formatReport 输出到 out + 写 session event', async () => {
     const out = new CollectingWritable();
     const err = new CollectingWritable();

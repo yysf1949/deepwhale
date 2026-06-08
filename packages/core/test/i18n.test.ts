@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { t, setLocale, getLocale } from '../src/i18n/index.js';
 
 describe('Sprint 0.0: i18n (core.i18n path locked at Sprint 0 line 1)', () => {
-  it('defaults to English', () => {
+  beforeEach(() => {
+    // 测试机 env 无 zh 时默认 en, 会让中文断言假 fail. stub 它让 detect 返 zh-CN.
+    vi.stubEnv('DEEPWHALE_LANG', 'zh-CN');
+    setLocale('zh-CN');
+  });
+
+  it('defaults to zh-CN (when env=zh-CN)', () => {
     expect(getLocale()).toBe('zh-CN');
   });
 

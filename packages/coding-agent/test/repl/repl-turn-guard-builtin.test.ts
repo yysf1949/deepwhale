@@ -21,9 +21,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PassThrough, Writable } from 'node:stream';
 import { startRepl } from '../../src/repl.js';
-import { readSessionEvents } from '@deepwhale/core';
+import { readSessionEvents, setLocale } from '@deepwhale/core';
 import type { LLMClient, ChatResult, ChatChunk, ModelId } from '@deepwhale/llm';
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 
 // mock client: stream() 永不 resolve, turnInFlight 一直 true.
 function makeHangingClient(): LLMClient {
@@ -49,6 +49,13 @@ function makeHangingClient(): LLMClient {
 }
 
 describe('REPL turn-guard builtin deny (D-19.6 P2)', () => {
+  beforeEach(() => {
+    // 测试机 env 无 zh 时默认 en, i18n 返英文, "turn 正在运行" 中文断言 fail.
+    // stub env + 强制 setLocale 让 currentLocale 落 zh-CN, 测试独立于 host env.
+    vi.stubEnv('DEEPWHALE_LANG', 'zh-CN');
+    setLocale('zh-CN');
+  });
+
   it('P2: turnInFlight 时 /verify 走 deny, stdout 含 i18n 提示, session 无 verification event', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dw-d196-p2-'));
     const sessionPath = join(dir, 'session.jsonl');
