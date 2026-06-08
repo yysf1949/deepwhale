@@ -1,5 +1,5 @@
 /**
- * Tool Registry — 27 工具的注册中心 (D-31.2.6, 2026-06-08).
+ * Tool Registry — 31 工具的注册中心 (D-31.3.5, 2026-06-08).
  *
  * Sprint 0.2 范围：
  * - register / get / list 基础 API
@@ -41,6 +41,10 @@ import { ArxivTool } from './arxiv.js'; // D-31.2.1 (2026-06-08): arxiv paper se
 import { BlogwatcherTool } from './blogwatcher.js'; // D-31.2.2: RSS/Atom 订阅
 import { LlmWikiTool, llmWiki } from './llm-wiki.js'; // D-31.2.3: Karpathy LLM Wiki
 import { PolymarketTool } from './polymarket.js'; // D-31.2.4: prediction market
+import { NotionTool } from './notion.js'; // D-31.3.1 (2026-06-08): notion REST
+import { LinearTool } from './linear.js'; // D-31.3.2: linear GraphQL
+import { AirtableTool } from './airtable.js'; // D-31.3.3: airtable REST
+import { OcrAndDocumentsTool } from './ocr-and-documents.js'; // D-31.3.4: tesseract + pdf-parse
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -135,5 +139,11 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   //   instances (same `~/.deepwhale/...` paths the tools export).
   reg.register(llmWiki);
   reg.register(new PolymarketTool());
+  // D-31.3 (2026-06-08): 装 4 productivity 工具 — 27 → 31.
+  //   notion / linear / airtable medium risk (write remote), ocr_and_documents low (read-only).
+  reg.register(new NotionTool());
+  reg.register(new LinearTool());
+  reg.register(new AirtableTool());
+  reg.register(new OcrAndDocumentsTool());
   return reg;
 }
