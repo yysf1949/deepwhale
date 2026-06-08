@@ -47,9 +47,20 @@ export class ObsidianBridge {
       }
       for (const e of entries) {
         const full = join(dir, e.name);
-        if (e.isDirectory()) {
+        // D-31.4 review B-3 (2026-06-08): skip hidden dirs (e.g. `.obsidian/`
+        // plugin cache, `.git/`, `.trash/`). 它们 不 是 user note, walk
+        // 它们 = 浪费 I/O, 污染 listNotes 结果.
+        if (e.isDirectory() && !e.name.startsWith('.')) {
           await walk(full);
-        } else if (e.isFile() && e.name.endsWith('.md')) {
+        } else if (
+          e.isFile() &&
+          // D-31.4 review B-6 (2026-06-08): skip symlinks, 防 walk 进入 infinite
+          // loop (例如 vault 内 symlink 指向 自己). `Dirent.isSymbolicLink()`
+          // 跟 `Dirent.isFile()` 是 mutually exclusive on most platforms, 但
+          // 检查 显式 更 安全.
+          !e.isSymbolicLink() &&
+          e.name.endsWith('.md')
+        ) {
           const stat = await fs.stat(full);
           const rel = this.toPosix(relative(this.vaultPath, full));
           const title = e.name.replace(/\.md$/, '');
