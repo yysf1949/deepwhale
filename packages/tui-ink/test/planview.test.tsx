@@ -14,8 +14,10 @@ import React from 'react'
 import { PlanView } from '../src/components/PlanView.js'
 import { $plan, setPlan, type PlanStep } from '../src/store/ui.js'
 
+const ANSI_RE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
+
 function stripAnsi(s: string): string {
-  return s.replace(/\x1b\[[0-9;]*m/g, '')
+  return s.replace(ANSI_RE, '')
 }
 
 describe('PlanView (D-30.2.7)', () => {

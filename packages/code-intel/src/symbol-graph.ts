@@ -31,6 +31,12 @@ const MAX_REFERENCES_PER_NAME = 1000;
 export interface Import {
   /** imported name in this file (e.g. 'foo' in `import { foo }`) */
   local: string;
+  /** exported/source symbol name before local aliasing (e.g. 'foo' in `import { foo as bar }`) */
+  imported?: string;
+  /** `export * from './module'` edge used to resolve barrel files. */
+  exportAll?: boolean;
+  /** `import * as ns from './module'` namespace binding. */
+  namespace?: boolean;
   /** source path (e.g. './bar' or 'os' for Python's `import os`) */
   from: string;
   line: number;
@@ -48,14 +54,24 @@ export interface Reference {
   file: string;
   line: number;
   col: number;
-  kind: 'import' | 'declaration' | 'call' | 'type' | 'property';
+  kind: 'import' | 'declaration' | 'call' | 'type' | 'property' | 'reference';
   scope?: string;
 }
 
 export interface SymbolGraph {
+  /** Absolute repo root used to resolve `files` relative paths. */
+  repoRoot: string;
+  pathAliases: PathAlias[];
   files: Map<string, FileSymbols>;
   /** symbol name → all references (declarations + usages) across all files */
   byName: Map<string, Reference[]>;
+}
+
+interface PathAlias {
+  prefix: string;
+  suffix: string;
+  targetPrefix: string;
+  targetSuffix: string;
 }
 
 export interface CallEdge {
@@ -85,6 +101,7 @@ export async function buildSymbolGraph(repoPath: string, options: { maxDepth?: n
 
   const fileMap = new Map<string, FileSymbols>();
   const byName = new Map<string, Reference[]>();
+  const pathAliases = await readTsconfigPathAliases(abs);
 
   for (const file of files) {
     const lang = getLanguageForExtension(file);
@@ -92,8 +109,8 @@ export async function buildSymbolGraph(repoPath: string, options: { maxDepth?: n
     try {
       const parsed = await parseFile(file);
       const symbols = extractSymbols(parsed.tree, lang as LanguageId, file);
-      const imports = extractImports(parsed.tree, lang as LanguageId, file);
       const rel = relative(abs, file).split(sep).join('/');
+      const imports = extractImports(parsed.source, lang as LanguageId);
       fileMap.set(rel, { path: rel, language: lang, symbols, imports });
 
       for (const s of symbols) {
@@ -102,19 +119,29 @@ export async function buildSymbolGraph(repoPath: string, options: { maxDepth?: n
         pushRef(byName, s.name, ref);
       }
       for (const imp of imports) {
+        if (imp.exportAll) continue;
         pushRef(byName, imp.local, {
           file: rel,
           line: imp.line,
           col: imp.col,
           kind: 'import',
         });
+        if (imp.imported && imp.imported !== imp.local) {
+          pushRef(byName, imp.imported, {
+            file: rel,
+            line: imp.line,
+            col: imp.col,
+            kind: 'import',
+          });
+        }
       }
+      indexTextReferences(byName, parsed.source, rel, symbols, imports);
     } catch {
       // skip files that fail to parse
     }
   }
 
-  return { files: fileMap, byName };
+  return { repoRoot: abs, pathAliases, files: fileMap, byName };
 }
 
 // ── findReferences ────────────────────────────────────────────────────────
@@ -143,7 +170,7 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
 
   // For each function/method, scan its source for call candidates
   for (const [filePath, fileSym] of graph.files) {
-    const source = await readFile(resolve(filePath), 'utf8').catch(() => '');
+    const source = await readFile(resolve(graph.repoRoot, filePath), 'utf8').catch(() => '');
     if (!source) continue;
     const lines = source.split('\n');
     for (const sym of fileSym.symbols) {
@@ -152,19 +179,29 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
       const start = Math.max(0, sym.line - 1);
       const endLine = (sym as unknown as { endLine?: number }).endLine ?? start + 50;
       const end = Math.min(lines.length, endLine);
+      const importTargets = buildImportTargetMap(filePath, fileSym, graph);
       for (let ln = start; ln < end; ln++) {
         const line = lines[ln] ?? '';
-        for (const [name, calleeIds] of nameToIds) {
+        for (const call of scanCallExpressions(line)) {
+          const namespaceTarget = call.qualifier
+            ? resolveNamespaceMemberTarget(filePath, fileSym, call.qualifier, call.name, graph)
+            : undefined;
+          if (call.qualifier && isNamespaceImportQualifier(fileSym, call.qualifier) && !namespaceTarget) {
+            continue;
+          }
+          const importTarget = namespaceTarget ?? importTargets.get(call.name);
+          const targetName = importTarget?.split(':').slice(1).join(':') ?? call.name;
+          const calleeIds = nameToIds.get(targetName);
+          if (!calleeIds) continue;
+          const name = call.name;
           if (name === sym.name) continue;
           if (name.length < 2) continue;
-          const re = new RegExp(`\\b${escapeRegExp(name)}\\b`, 'g');
-          if (re.test(line)) {
-            for (const calleeId of calleeIds) {
-              const edge: CallEdge = { caller: callerId, callee: calleeId, line: ln + 1, file: filePath };
-              edges.push(edge);
-              pushEdge(byCaller, callerId, edge);
-              pushEdge(byCallee, calleeId, edge);
-            }
+          const filteredCalleeIds = filterCalleeIdsByImportTarget(calleeIds, importTarget);
+          for (const calleeId of filteredCalleeIds) {
+            const edge: CallEdge = { caller: callerId, callee: calleeId, line: ln + 1, file: filePath };
+            edges.push(edge);
+            pushEdge(byCaller, callerId, edge);
+            pushEdge(byCallee, calleeId, edge);
           }
         }
       }
@@ -176,10 +213,22 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
-function extractImports(_tree: unknown, _lang: LanguageId, _file: string): Import[] {
-  // Simplified: defer full import extraction to D-32.2.2 (find_references tool)
-  // where language-specific heuristics are added per language. For now, the
-  // graph's byName index is built from symbol declarations only.
+function extractImports(source: string, lang: LanguageId): Import[] {
+  if (lang === 'typescript' || lang === 'tsx' || lang === 'javascript') {
+    return extractTsLikeImports(source);
+  }
+  if (lang === 'python') {
+    return extractPythonImports(source);
+  }
+  if (lang === 'go') {
+    return extractGoImports(source);
+  }
+  if (lang === 'rust') {
+    return extractRustImports(source);
+  }
+  if (lang === 'bash') {
+    return extractBashImports(source);
+  }
   return [];
 }
 
@@ -207,6 +256,9 @@ async function walk(root: string, dir: string, depth: number, maxDepth: number, 
 function pushRef(map: Map<string, Reference[]>, name: string, ref: Reference): void {
   if (ref.line === 0) return;
   const arr = map.get(name) ?? [];
+  if (arr.some((r) => r.file === ref.file && r.line === ref.line && r.col === ref.col && r.kind === ref.kind)) {
+    return;
+  }
   if (arr.length >= MAX_REFERENCES_PER_NAME) return;
   arr.push(ref);
   map.set(name, arr);
@@ -218,6 +270,459 @@ function pushEdge(map: Map<string, CallEdge[]>, key: string, edge: CallEdge): vo
   map.set(key, arr);
 }
 
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function scanCallExpressions(line: string): Array<{ name: string; qualifier?: string }> {
+  const calls: Array<{ name: string; qualifier?: string }> = [];
+  const re = /(?:(\b[A-Za-z_$][\w$]*)\s*\.\s*)?(\b[A-Za-z_$][\w$]*)\b\s*\(/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(line)) !== null) {
+    const qualifier = match[1];
+    const name = match[2];
+    if (!name) continue;
+    const col = match.index;
+    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) continue;
+    const call: { name: string; qualifier?: string } = { name };
+    if (qualifier) call.qualifier = qualifier;
+    calls.push(call);
+  }
+  return calls;
+}
+
+function buildImportTargetMap(filePath: string, fileSym: FileSymbols, graph: SymbolGraph): Map<string, string> {
+  const targets = new Map<string, string>();
+  for (const imp of fileSym.imports) {
+    if (imp.namespace) continue;
+    const resolved = resolveImportedSymbolTarget(filePath, imp, graph);
+    if (resolved) targets.set(imp.local, resolved);
+  }
+  return targets;
+}
+
+function resolveNamespaceMemberTarget(
+  filePath: string,
+  fileSym: FileSymbols,
+  qualifier: string,
+  member: string,
+  graph: SymbolGraph,
+): string | undefined {
+  const namespaceImport = fileSym.imports.find((imp) => imp.namespace && imp.local === qualifier);
+  if (!namespaceImport) return undefined;
+  const resolved = resolveRelativeImportFile(filePath, namespaceImport.from, graph);
+  if (!resolved) return undefined;
+  return resolveReExportTarget(resolved, member, graph, new Set());
+}
+
+function isNamespaceImportQualifier(fileSym: FileSymbols, qualifier: string): boolean {
+  return fileSym.imports.some((imp) => imp.namespace && imp.local === qualifier);
+}
+
+function resolveImportedSymbolTarget(
+  filePath: string,
+  imp: Import,
+  graph: SymbolGraph,
+  seen: Set<string> = new Set(),
+): string | undefined {
+  const resolved = resolveRelativeImportFile(filePath, imp.from, graph);
+  if (!resolved) return undefined;
+  const symbolName = imp.imported ?? imp.local;
+  return resolveReExportTarget(resolved, symbolName, graph, seen) ?? `${resolved}:${symbolName}`;
+}
+
+function resolveReExportTarget(
+  filePath: string,
+  symbolName: string,
+  graph: SymbolGraph,
+  seen: Set<string>,
+): string | undefined {
+  const key = `${filePath}:${symbolName}`;
+  if (seen.has(key)) return undefined;
+  seen.add(key);
+
+  const fileSym = graph.files.get(filePath);
+  if (!fileSym) return undefined;
+  if (fileSym.symbols.some((symbol) => symbol.name === symbolName)) return key;
+
+  for (const imp of fileSym.imports) {
+    if (imp.local !== symbolName) continue;
+    const target = resolveImportedSymbolTarget(filePath, imp, graph, seen);
+    if (target) return target;
+  }
+  for (const imp of fileSym.imports) {
+    if (!imp.exportAll) continue;
+    const resolved = resolveRelativeImportFile(filePath, imp.from, graph);
+    if (!resolved) continue;
+    const target = resolveReExportTarget(resolved, symbolName, graph, seen);
+    if (target) return target;
+  }
+  return undefined;
+}
+
+function resolveRelativeImportFile(filePath: string, from: string, graph: SymbolGraph): string | undefined {
+  if (!from.startsWith('.')) return resolvePathAliasImportFile(from, graph);
+  const fromParts = from.split('/').filter((part) => part.length > 0);
+  const fileDir = filePath.split('/').slice(0, -1);
+  const stack = [...fileDir];
+  for (const part of fromParts) {
+    if (part === '.') continue;
+    if (part === '..') {
+      stack.pop();
+    } else {
+      stack.push(part);
+    }
+  }
+  const raw = stack.join('/');
+  const withoutJsExt = raw.replace(/\.(js|jsx|mjs|cjs)$/i, '');
+  const candidates = [
+    raw,
+    withoutJsExt,
+    `${withoutJsExt}.ts`,
+    `${withoutJsExt}.tsx`,
+    `${withoutJsExt}.js`,
+    `${withoutJsExt}.jsx`,
+    `${withoutJsExt}.mjs`,
+    `${withoutJsExt}.cjs`,
+    `${withoutJsExt}/index.ts`,
+    `${withoutJsExt}/index.tsx`,
+    `${withoutJsExt}/index.js`,
+  ];
+  return candidates.find((candidate) => graph.files.has(candidate));
+}
+
+function resolvePathAliasImportFile(from: string, graph: SymbolGraph): string | undefined {
+  for (const alias of graph.pathAliases) {
+    if (!from.startsWith(alias.prefix) || !from.endsWith(alias.suffix)) continue;
+    const matched = from.slice(alias.prefix.length, from.length - alias.suffix.length);
+    const raw = `${alias.targetPrefix}${matched}${alias.targetSuffix}`.replace(/\\/g, '/');
+    const withoutJsExt = raw.replace(/\.(js|jsx|mjs|cjs)$/i, '');
+    const candidates = [
+      raw,
+      withoutJsExt,
+      `${withoutJsExt}.ts`,
+      `${withoutJsExt}.tsx`,
+      `${withoutJsExt}.js`,
+      `${withoutJsExt}.jsx`,
+      `${withoutJsExt}.mjs`,
+      `${withoutJsExt}.cjs`,
+      `${withoutJsExt}/index.ts`,
+      `${withoutJsExt}/index.tsx`,
+      `${withoutJsExt}/index.js`,
+    ];
+    const found = candidates.find((candidate) => graph.files.has(candidate));
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function filterCalleeIdsByImportTarget(calleeIds: string[], target: string | undefined): string[] {
+  if (!target) return calleeIds;
+  const [targetFile, ...targetNameParts] = target.split(':');
+  const targetName = targetNameParts.join(':');
+  const filtered = calleeIds.filter((id) => {
+    const [file, ...symbolParts] = id.split(':');
+    return file === targetFile && symbolParts.join(':').split('.').pop() === targetName;
+  });
+  return filtered.length > 0 ? filtered : calleeIds;
+}
+
+async function readTsconfigPathAliases(repoRoot: string): Promise<PathAlias[]> {
+  const raw = await readFile(resolve(repoRoot, 'tsconfig.json'), 'utf8').catch(() => '');
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripJsonBom(raw));
+  } catch {
+    return [];
+  }
+
+  const compilerOptions = asRecord(parsed)?.compilerOptions;
+  const options = asRecord(compilerOptions);
+  const paths = asRecord(options?.paths);
+  if (!paths) return [];
+
+  const baseUrl = typeof options?.baseUrl === 'string' ? options.baseUrl : '.';
+  const aliases: PathAlias[] = [];
+  for (const [pattern, targets] of Object.entries(paths)) {
+    if (!Array.isArray(targets)) continue;
+    const target = targets.find((candidate): candidate is string => typeof candidate === 'string');
+    if (!target) continue;
+    const alias = parsePathAlias(pattern, normalizeAliasTarget(baseUrl, target));
+    if (alias) aliases.push(alias);
+  }
+  return aliases;
+}
+
+function parsePathAlias(pattern: string, target: string): PathAlias | undefined {
+  const patternParts = pattern.split('*');
+  const targetParts = target.split('*');
+  if (patternParts.length > 2 || targetParts.length > 2) return undefined;
+  if (patternParts.length === 1) {
+    return { prefix: pattern, suffix: '', targetPrefix: target, targetSuffix: '' };
+  }
+  return {
+    prefix: patternParts[0] ?? '',
+    suffix: patternParts[1] ?? '',
+    targetPrefix: targetParts[0] ?? '',
+    targetSuffix: targetParts[1] ?? '',
+  };
+}
+
+function normalizeAliasTarget(baseUrl: string, target: string): string {
+  const normalizedBase = baseUrl.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/$/, '');
+  const normalizedTarget = target.replace(/\\/g, '/').replace(/^\.\//, '');
+  return normalizedBase && normalizedBase !== '.'
+    ? `${normalizedBase}/${normalizedTarget}`
+    : normalizedTarget;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function stripJsonBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+function indexTextReferences(
+  byName: Map<string, Reference[]>,
+  source: string,
+  file: string,
+  symbols: ReadonlyArray<Symbol>,
+  imports: ReadonlyArray<Import>,
+): void {
+  const names = new Set<string>();
+  for (const symbol of symbols) {
+    if (isIdentifierName(symbol.name)) names.add(symbol.name);
+  }
+  for (const imp of imports) {
+    if (isIdentifierName(imp.local)) names.add(imp.local);
+  }
+  if (names.size === 0) return;
+
+  const declarationRanges = symbols.map((s) => ({
+    line: s.line,
+    start: Math.max(0, s.col - 20),
+    end: s.col + s.name.length,
+  }));
+  const importPositions = new Set(
+    imports.map((imp) => positionKey(imp.line, imp.col)),
+  );
+
+  const lines = source.split('\n');
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx] ?? '';
+    for (const token of scanIdentifierTokens(line)) {
+      if (!names.has(token.text)) continue;
+      const lineNo = lineIdx + 1;
+      const key = positionKey(lineNo, token.col);
+      if (
+        isWithinDeclarationRange(lineNo, token.col, declarationRanges) ||
+        isDeclarationIdentifier(line, token.col, token.text, symbols) ||
+        importPositions.has(key)
+      ) {
+        continue;
+      }
+      const next = line.slice(token.col + token.text.length).trimStart();
+      pushRef(byName, token.text, {
+        file,
+        line: lineNo,
+        col: token.col,
+        kind: next.startsWith('(') ? 'call' : 'reference',
+      });
+    }
+  }
+}
+
+function extractTsLikeImports(source: string): Import[] {
+  const imports: Import[] = [];
+  const exportAllRe = /\bexport\s+\*\s+from\s+['"]([^'"]+)['"]/g;
+  let exportAllMatch: RegExpExecArray | null;
+  while ((exportAllMatch = exportAllRe.exec(source)) !== null) {
+    const from = exportAllMatch[1] ?? '';
+    const pos = offsetToLineCol(source, exportAllMatch.index);
+    imports.push({ local: '*', from, line: pos.line, col: pos.col, exportAll: true });
+  }
+
+  const namedImportRe = /\b(?:import|export)\s+(?:type\s+)?\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"]/g;
+  let namedMatch: RegExpExecArray | null;
+  while ((namedMatch = namedImportRe.exec(source)) !== null) {
+    const body = namedMatch[1] ?? '';
+    const from = namedMatch[2] ?? '';
+    const bodyOffset = namedMatch.index + (namedMatch[0].indexOf(body));
+    const specifierRe = /([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?/g;
+    let specifier: RegExpExecArray | null;
+    while ((specifier = specifierRe.exec(body)) !== null) {
+      const imported = specifier[1];
+      const local = specifier[2] ?? imported;
+      if (local && imported && isIdentifierName(local) && isIdentifierName(imported)) {
+        const localOffset = bodyOffset + specifier.index + specifier[0].lastIndexOf(local);
+        const pos = offsetToLineCol(source, localOffset);
+        imports.push({ local, imported, from, line: pos.line, col: pos.col });
+      }
+    }
+  }
+
+  const lines = source.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    if (/^\s*import\s+(?:type\s+)?\{/.test(line)) continue;
+
+    const defaultImport = line.match(/^\s*import\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/);
+    if (defaultImport) {
+      imports.push({
+        local: defaultImport[1] ?? '',
+        from: defaultImport[2] ?? '',
+        line: i + 1,
+        col: line.indexOf(defaultImport[1] ?? ''),
+      });
+      continue;
+    }
+
+    const namespaceImport = line.match(/^\s*import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/);
+    if (namespaceImport) {
+      imports.push({
+        local: namespaceImport[1] ?? '',
+        from: namespaceImport[2] ?? '',
+        line: i + 1,
+        col: line.indexOf(namespaceImport[1] ?? ''),
+        namespace: true,
+      });
+    }
+  }
+  return imports.filter((imp) => imp.local.length > 0 && imp.col >= 0);
+}
+
+function extractPythonImports(source: string): Import[] {
+  const imports: Import[] = [];
+  const lines = source.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const fromImport = line.match(/^\s*from\s+([A-Za-z_][\w.]*)\s+import\s+(.+)$/);
+    if (fromImport) {
+      const from = fromImport[1] ?? '';
+      for (const part of (fromImport[2] ?? '').split(',')) {
+        const raw = part.trim();
+        const local = raw.split(/\s+as\s+/i).pop()?.trim();
+        if (local && isIdentifierName(local)) {
+          imports.push({ local, from, line: i + 1, col: line.indexOf(local) });
+        }
+      }
+      continue;
+    }
+
+    const importLine = line.match(/^\s*import\s+(.+)$/);
+    if (importLine) {
+      for (const part of (importLine[1] ?? '').split(',')) {
+        const raw = part.trim();
+        const local = raw.split(/\s+as\s+/i).pop()?.trim() ?? raw.split('.')[0] ?? '';
+        if (local && isIdentifierName(local)) {
+          imports.push({ local, from: raw, line: i + 1, col: line.indexOf(local) });
+        }
+      }
+    }
+  }
+  return imports.filter((imp) => imp.local.length > 0 && imp.col >= 0);
+}
+
+function extractGoImports(source: string): Import[] {
+  const imports: Import[] = [];
+  const lines = source.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const aliasImport = line.match(/^\s*([A-Za-z_]\w*)\s+"([^"]+)"/);
+    if (aliasImport) {
+      imports.push({ local: aliasImport[1] ?? '', from: aliasImport[2] ?? '', line: i + 1, col: line.indexOf(aliasImport[1] ?? '') });
+      continue;
+    }
+    const plainImport = line.match(/^\s*import\s+"([^"]+)"/) ?? line.match(/^\s*"([^"]+)"/);
+    if (plainImport) {
+      const from = plainImport[1] ?? '';
+      const local = from.split('/').pop()?.replace(/[^A-Za-z0-9_]/g, '') ?? '';
+      if (isIdentifierName(local)) imports.push({ local, from, line: i + 1, col: line.indexOf(from) });
+    }
+  }
+  return imports.filter((imp) => imp.local.length > 0 && imp.col >= 0);
+}
+
+function extractRustImports(source: string): Import[] {
+  const imports: Import[] = [];
+  const lines = source.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const useLine = line.match(/^\s*use\s+(.+);/);
+    if (!useLine) continue;
+    const from = useLine[1] ?? '';
+    for (const token of scanIdentifierTokens(from)) {
+      imports.push({ local: token.text, from, line: i + 1, col: line.indexOf(token.text) });
+    }
+  }
+  return imports.filter((imp) => imp.local.length > 0 && imp.col >= 0);
+}
+
+function extractBashImports(_source: string): Import[] {
+  return [];
+}
+
+function scanIdentifierTokens(line: string): Array<{ text: string; col: number }> {
+  const tokens: Array<{ text: string; col: number }> = [];
+  const re = /[A-Za-z_$][\w$]*/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(line)) !== null) {
+    const text = match[0];
+    const col = match.index;
+    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) continue;
+    tokens.push({ text, col });
+  }
+  return tokens;
+}
+
+function isIdentifierName(name: string): boolean {
+  return /^[A-Za-z_$][\w$]*$/.test(name);
+}
+
+function isLikelyInsideString(line: string, col: number): boolean {
+  const before = line.slice(0, col);
+  const singleQuotes = countUnescaped(before, "'");
+  const doubleQuotes = countUnescaped(before, '"');
+  const backticks = countUnescaped(before, '`');
+  return singleQuotes % 2 === 1 || doubleQuotes % 2 === 1 || backticks % 2 === 1;
+}
+
+function isAfterLineComment(line: string, col: number): boolean {
+  const before = line.slice(0, col);
+  const slash = before.indexOf('//');
+  const hash = before.indexOf('#');
+  return slash >= 0 || hash >= 0;
+}
+
+function countUnescaped(text: string, char: string): number {
+  let count = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === char && text[i - 1] !== '\\') count += 1;
+  }
+  return count;
+}
+
+function offsetToLineCol(source: string, offset: number): { line: number; col: number } {
+  if (offset < 0) return { line: 0, col: -1 };
+  const before = source.slice(0, offset);
+  const lines = before.split('\n');
+  return { line: lines.length, col: lines.at(-1)?.length ?? 0 };
+}
+
+function isWithinDeclarationRange(
+  line: number,
+  col: number,
+  ranges: ReadonlyArray<{ line: number; start: number; end: number }>,
+): boolean {
+  return ranges.some((range) => range.line === line && col >= range.start && col <= range.end);
+}
+
+function isDeclarationIdentifier(line: string, col: number, text: string, symbols: ReadonlyArray<Symbol>): boolean {
+  if (!symbols.some((symbol) => symbol.name === text)) return false;
+  const before = line.slice(0, col);
+  return /\b(function|class|interface|type|enum|const|let|var)\s+$/.test(before);
+}
+
+function positionKey(line: number, col: number): string {
+  return `${line}:${col}`;
 }

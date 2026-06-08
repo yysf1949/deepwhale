@@ -40,6 +40,22 @@ class CollectingWritable extends Writable {
   }
 }
 
+class EagerReadable extends Readable {
+  private chunks: Buffer[];
+
+  constructor(chunks: string[]) {
+    super();
+    this.chunks = chunks.map((chunk) => Buffer.from(chunk));
+  }
+
+  override _read(): void {
+    for (const chunk of this.chunks.splice(0)) {
+      this.push(chunk);
+    }
+    this.push(null);
+  }
+}
+
 function makeMockClient(): LLMClient {
   return {
     model: 'mock-model' as ModelId,
@@ -137,6 +153,43 @@ describe('REPL /verify (D-11-4 2026-06-04)', () => {
       expect(verifyEvent.summary).toMatch(/4\/4 checks passed/);
     }
   }, 60_000); // 60s timeout, 4 个简单 check < 1s
+
+  it('does not drop an eager first slash command before handlers attach', async () => {
+    const out = new CollectingWritable();
+    const err = new CollectingWritable();
+    const sessionFile = join(
+      tmpdir(),
+      `dw-repl-eager-verify-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jsonl`,
+    );
+    const tmp = join(
+      tmpdir(),
+      `dw-repl-eager-pass-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.js`,
+    );
+    writeFileSync(tmp, "process.stdout.write('ok'); process.exit(0);");
+    const passChecks: VerifyCheck[] = [
+      {
+        name: 'step1',
+        command: `node ${tmp}`,
+        args: ['node', tmp],
+      },
+    ];
+
+    const code = await Promise.race([
+      startRepl({
+        client: makeMockClient(),
+        input: new EagerReadable(['/verify\n', '/exit\n']),
+        output: out,
+        errorOutput: err,
+        exit: (exitCode) => exitCode as never,
+        sessionPath: sessionFile,
+        verifyChecks: passChecks,
+      }),
+      new Promise<number>((resolve) => setTimeout(() => resolve(-1), 10_000)),
+    ]);
+
+    expect(code).toBe(0);
+    expect(out.text()).toMatch(/deepwhale verify/);
+  }, 10_000);
 
   // Sprint 1c-revive-2-D-11-4 review P1 修复 (2026-06-04): 无 LLM key 时 REPL 不
   // 阻塞, /verify 路径不依赖 client 创成功. 之前 146 行抢创 createDefaultClient()

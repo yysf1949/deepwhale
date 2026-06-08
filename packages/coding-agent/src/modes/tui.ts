@@ -48,10 +48,8 @@ import { stdin, stdout, stderr } from 'node:process';
 import type { ChatMessage, LLMClient } from '@deepwhale/llm';
 import { SessionReader, SessionWriter, type SessionEvent } from '@deepwhale/core';
 import {
-  tuiHistoryPath,
   tuiHistoryLoad,
   tuiHistoryAppend,
-  TUI_HISTORY_MAX,
 } from '../util/tui-history.js';
 import {
   isToolLoopError,

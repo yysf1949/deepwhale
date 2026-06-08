@@ -44,7 +44,7 @@ describe('youtube_content', () => {
   });
 
   it('rejects unknown action', async () => {
-    const r = await tool.execute({ action: 'wat' as any });
+    const r = await tool.execute({ action: 'wat' });
     expect(r.success).toBe(false);
   });
 

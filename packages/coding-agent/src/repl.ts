@@ -27,29 +27,23 @@
  *     - repl-step-summary.ts      tool step 摘要 (D-29.2)
  */
 
-import { createInterface, type Interface as RLInterface } from 'node:readline';
-import { stdin, stdout, stderr } from 'node:process';
+import { stdout, stderr } from 'node:process';
 import { t } from '@deepwhale/core';
 import { ChatMessage, type LLMClient } from '@deepwhale/llm';
-import { loadSession, type AgentCompactionConfig } from './agent/index.js';
-import { createDefaultClient, type Provider } from './llm-factory.js';
-import { resolveSandboxRunnerFromEnv } from './sandbox/env-gate.js';
-import { staticToolPolicy } from './policy/static-rules.js';
-import { createReplConfirm } from './repl/repl-confirm.js'; // D-15: REPL y/N confirm 工厂
+import { type AgentCompactionConfig } from './agent/index.js';
+import { type Provider } from './llm-factory.js';
 export { createReplConfirm } from './repl/repl-confirm.js'; // Sprint 1c-revive-2-D-24.2: re-export for tui-ink
 import { createSignalCoordinator } from './repl/repl-signal-coordinator.js'; // D-29.1.1: SIGINT + turn AbortController 抽
-import { formatUsageStatus, appendUsageStatus, type UsageEmaState } from './repl/repl-session.js'; // D-29.1.2: EMA state + usage status 抽
 export { formatUsageStatus, appendUsageStatus, type UsageEmaState } from './repl/repl-session.js'; // D-29.1.2: re-export 保公共 API 1:1
-import { dispatchSlashBuiltin, type SlashContext } from './repl/repl-command-router.js'; // D-29.1.3: slash builtin 派发抽 (1ceef94 + D-19.6.1 guard)
+import { dispatchSlashBuiltin } from './repl/repl-command-router.js'; // D-29.1.3: slash builtin 派发抽 (1ceef94 + D-19.6.1 guard)
 import { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: agent turn 主体抽 (persist user + runToolLoop + catch 4-branch + 持久化)
 export { runAgentTurn } from './repl/repl-agent-turn.js'; // D-29.2: re-export 保 test/modes-followup.test.ts:18 import path
 import { formatError } from './repl/repl-format-error.js'; // D-29.2: LLM 错误 → i18n 文案映射 (runOneTurn + runAgentTurn 复用)
-import { createFinish, type ReplFinishDeps } from './repl/repl-finish.js'; // D-29.3.1: finish 抽工厂, 共享 exiting/exitTimer state (close handler + line handler + prompt 共读)
+import { createFinish } from './repl/repl-finish.js'; // D-29.3.1: finish 抽工厂, 共享 exiting/exitTimer state (close handler + line handler + prompt 共读)
 import { createLineHandler } from './repl/repl-line-handler.js'; // D-29.3.2: 抽 line handler 工厂 (D-19.5 P1 + 6afccc8 + D-19.6.1 + 1ceef94 + no-unsafe-finally 5 红线 1:1 保)
 import { createCloseHandler } from './repl/repl-close-handler.js'; // D-29.3.3: 抽 close handler 工厂 (D-19.5 P2-dismiss + D-19.6 P1 30s 兜底 1:1 保)
 import { createReplBootstrap } from './repl/repl-bootstrap.js'; // D-29.3.4: 抽 preamble (lazy client + sandbox + confirm + greeting + session + compaction + rl setup) 工厂
 import type { ReplState } from './repl/repl-state.js'; // D-29.3.2: 5 字段 mutable state (finish + line + close + prompt 共享)
-import type { ToolPolicy } from './policy/types.js';
 
 const VERSION = '0.1.0';
 
@@ -271,6 +265,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<number> {
 
     // 第一个 prompt
     prompt();
+    boot.startInputFlow();
   });
 }
 

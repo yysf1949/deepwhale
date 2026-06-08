@@ -32,6 +32,7 @@ coverage/
 sessions/
 *.session.jsonl
 .cache/
+.gate-targets/
 
 # npm auth token — local only, never commit
 .npmrc

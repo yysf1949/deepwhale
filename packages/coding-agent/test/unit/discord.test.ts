@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { DiscordChannel, type DiscordConfig, type DiscordFetcher, type DiscordWebSocketFactory, type DiscordSocket } from '../../src/channel/discord.js';
+import { DiscordChannel, type DiscordFetcher, type DiscordWebSocketFactory, type DiscordSocket } from '../../src/channel/discord.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

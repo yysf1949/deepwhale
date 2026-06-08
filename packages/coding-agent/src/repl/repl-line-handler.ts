@@ -154,6 +154,27 @@ export function createLineHandler(deps: ReplLineDeps): (rawLine: string) => Prom
         return all.sort((a, b) => b.createdAt - a.createdAt)
       },
     };
+    if (line === '/verify') {
+      deps.state.turnInFlight = true;
+      try {
+        await deps.dispatchSlashBuiltinFn(line, {
+          ...slashCtx,
+          prompt: () => undefined,
+        });
+      } finally {
+        deps.state.turnInFlight = false;
+        if (deps.state.pendingExit) {
+          deps.state.pendingExit = false;
+          void deps.finish(0);
+        } else if (deps.state.lineQueue.length > 0 && !deps.state.exiting) {
+          const next = deps.state.lineQueue.shift()!;
+          setImmediate(() => deps.rl.emit('line', next));
+        } else {
+          deps.prompt();
+        }
+      }
+      return;
+    }
     if ((await deps.dispatchSlashBuiltinFn(line, slashCtx)).handled) return;
 
     // === Sprint 1c-revive-3-D-19.5 (2026-06-05): P1 turn guard — 排队 turnInFlight 期间 line ===

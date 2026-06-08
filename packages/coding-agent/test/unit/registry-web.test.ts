@@ -13,14 +13,15 @@ import { createDefaultRegistry } from '../../src/tools/registry.js';
 
 describe('tool registry (web tools, D-30.1γ.4)', () => {
   it('includes 3 web tools', () => {
-    const registry = createDefaultRegistry();
+    const registry = createDefaultRegistry({ profile: 'web' });
     expect(registry.get('web_search')).toBeDefined();
     expect(registry.get('web_extract')).toBeDefined();
     expect(registry.get('browser_navigate')).toBeDefined();
   });
 
-  it('registry total size = 6 + 3 + 5 + 1 + 2 + 6 + 4 = 41 (D-31.4.4 follow-up)', () => {
-    const registry = createDefaultRegistry();
-    expect(registry.size()).toBe(41);
+  it('web profile only exposes web tools', () => {
+    const registry = createDefaultRegistry({ profile: 'web' });
+    expect(registry.size()).toBe(3);
+    expect(registry.get('bash')).toBeUndefined();
   });
 });

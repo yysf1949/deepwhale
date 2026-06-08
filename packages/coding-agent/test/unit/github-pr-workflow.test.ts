@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { GitHubPrWorkflowTool } from '../../src/tools/github-pr-workflow.js';
 
 describe('github_pr_workflow', () => {
   let tool: GitHubPrWorkflowTool;
   beforeEach(() => {
-    tool = new GitHubPrWorkflowTool({ runner: async (cmd) => 'https://github.com/o/r/pull/42\n' });
+    tool = new GitHubPrWorkflowTool({ runner: async () => 'https://github.com/o/r/pull/42\n' });
   });
 
   it('createPR invokes gh pr create and parses prNumber', async () => {
@@ -31,7 +31,7 @@ describe('github_pr_workflow', () => {
   });
 
   it('rejects unknown action', async () => {
-    const r = await tool.execute({ action: 'wat' as any, owner: 'o', repo: 'r' });
+    const r = await tool.execute({ action: 'wat', owner: 'o', repo: 'r' });
     expect(r.success).toBe(false);
   });
 });

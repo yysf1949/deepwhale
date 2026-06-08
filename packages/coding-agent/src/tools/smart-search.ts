@@ -18,10 +18,11 @@ import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { buildSymbolGraph, findReferences } from '@deepwhale/code-intel';
 
 const execFile = promisify(execFileCb);
+const REMOTE_SEARCH_TIMEOUT_MS = 2_000;
 
 export class SmartSearchTool implements Tool {
   readonly name = 'smart_search' as ToolName;
-  readonly description = 'Smart code search with symbol-awareness. 3 actions: local (code-intel findReferences), remote (gh search code), all (try local first). Low risk (read-only).';
+  readonly description = 'Heuristic code search with symbol-aware local matches and optional gh remote search; local results are not IDE-grade/type-aware. 3 actions: local / remote / all. Low risk (read-only).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
 
   readonly schema: ToolInputSchema = {
@@ -104,7 +105,7 @@ async function remoteSearch(query: string, maxResults: number): Promise<SearchRe
       'search', 'code', query,
       '--limit', String(maxResults),
       '--json', 'path,repository,textMatches',
-    ], { timeout: 15_000 });
+    ], { timeout: REMOTE_SEARCH_TIMEOUT_MS });
     const parsed = JSON.parse(stdout) as Array<{ path: string; repository: { nameWithOwner: string }; textMatches?: Array<{ fragment: string; matches: Array<{ line: number; col: number }> }> }>;
     for (const item of parsed) {
       const firstMatch = item.textMatches?.[0];

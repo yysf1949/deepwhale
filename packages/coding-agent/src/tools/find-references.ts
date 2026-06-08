@@ -15,7 +15,7 @@ import { buildSymbolGraph, findReferences, type Reference } from '@deepwhale/cod
 
 export class FindReferencesTool implements Tool {
   readonly name = 'find_references' as ToolName;
-  readonly description = 'Find all references to a symbol across files in a repo. 2 modes: references (full list) / count (just number). Low risk (read-only walk).';
+  readonly description = 'Heuristic reference search across a repo. Uses AST declarations/imports plus textual identifier matches; no type analysis or IDE-grade rename safety. 2 modes: references / count. Low risk (read-only walk).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
 
   readonly schema: ToolInputSchema = {

@@ -69,7 +69,7 @@ export type LanguageId = keyof typeof LANG_WASM;
  */
 export function getLanguageForExtension(filePath: string): LanguageId | null {
   // strip querystrings, drop any dirs
-  const base = filePath.split('?')[0]?.split('#')[0] ?? filePath;
+  const base = stripUrlSuffix(filePath);
   const slashIdx = Math.max(base.lastIndexOf('/'), base.lastIndexOf('\\'));
   const filename = slashIdx >= 0 ? base.slice(slashIdx + 1) : base;
   const dotIdx = filename.lastIndexOf('.');
@@ -77,6 +77,15 @@ export function getLanguageForExtension(filePath: string): LanguageId | null {
   const ext = filename.slice(dotIdx + 1).toLowerCase();
   const lang = EXT_TO_LANG[ext];
   return (lang ?? null) as LanguageId | null;
+}
+
+function stripUrlSuffix(filePath: string): string {
+  if (filePath.startsWith('\\\\?\\')) return filePath;
+  const queryIdx = filePath.indexOf('?');
+  const hashIdx = filePath.indexOf('#');
+  const candidates = [queryIdx, hashIdx].filter((idx) => idx >= 0);
+  if (candidates.length === 0) return filePath;
+  return filePath.slice(0, Math.min(...candidates));
 }
 
 /**

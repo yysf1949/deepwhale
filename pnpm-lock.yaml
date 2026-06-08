@@ -68,14 +68,17 @@ importers:
 
   packages/coding-agent:
     dependencies:
+      '@deepwhale/code-intel':
+        specifier: ^2.2.0
+        version: link:../code-intel
       '@deepwhale/core':
-        specifier: ^1.0.0
+        specifier: ^2.2.0
         version: link:../core
       '@deepwhale/edit-engine':
-        specifier: ^1.0.0
+        specifier: ^2.2.0
         version: link:../edit-engine
       '@deepwhale/llm':
-        specifier: ^1.0.0
+        specifier: ^2.2.0
         version: link:../llm
       sql.js-fts5:
         specifier: ^1.4.0
@@ -93,7 +96,7 @@ importers:
   packages/edit-engine:
     dependencies:
       '@deepwhale/core':
-        specifier: ^1.0.0
+        specifier: ^2.2.0
         version: link:../core
 
   packages/llm:
@@ -102,22 +105,24 @@ importers:
         specifier: ^0.40.1
         version: 0.40.1
       '@deepwhale/core':
-        specifier: ^1.0.0
+        specifier: ^2.2.0
         version: link:../core
       smol-toml:
         specifier: ^1.6.1
         version: 1.6.1
 
+  packages/mcp-servers/gh-search: {}
+
   packages/tui-ink:
     dependencies:
       '@deepwhale/coding-agent':
-        specifier: ^1.0.0
+        specifier: ^2.2.0
         version: link:../coding-agent
       '@deepwhale/core':
-        specifier: ^1.0.0
+        specifier: ^2.2.0
         version: link:../core
       '@deepwhale/llm':
-        specifier: ^1.0.0
+        specifier: ^2.2.0
         version: link:../llm
       '@nanostores/react':
         specifier: ^1.1.0

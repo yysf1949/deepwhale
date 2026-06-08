@@ -9,7 +9,7 @@
  */
 
 import { promises as fs } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join } from 'node:path'
 
 export class MemoryStore {
   constructor(private readonly rootDir: string) {}

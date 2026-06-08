@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { extractSymbols, type Symbol } from '../../src/symbols.js';
+import { extractSymbols } from '../../src/symbols.js';
 import { parseSource, ensureInit } from '../../src/parser.js';
 
 describe('symbols (D-32.1)', () => {

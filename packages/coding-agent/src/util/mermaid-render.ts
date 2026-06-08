@@ -17,7 +17,7 @@ export interface MermaidNode {
 
 export type MermaidEdge = readonly [string, string] | readonly [string, string, string];
 
-const SHAPE_RE = /^(\w+)\s*([\[{])\s*([^\]}{]+?)\s*([\]}])$/;
+const SHAPE_RE = /^(\w+)\s*(\[|\{)\s*([^}\]{]+?)\s*(\]|\})$/;
 
 function parseNode(token: string): MermaidNode | null {
   const t = token.trim();

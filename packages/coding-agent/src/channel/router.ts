@@ -43,7 +43,6 @@ export class ChannelRouter {
         last = await h(msg);
       } catch (e) {
         // Plan: 错误吞掉不中断, 沿用 plan 拍板 (跟 telegram 内部错误处理 1:1).
-        // eslint-disable-next-line no-console
         console.warn(
           `[channel-router] handler error: ${e instanceof Error ? e.message : String(e)}`,
         );

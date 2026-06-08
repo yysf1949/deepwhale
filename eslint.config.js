@@ -11,6 +11,7 @@ export default [
       '**/dist/**',
       '**/build/**',
       '**/coverage/**',
+      '**/.gate-targets/**',
       '**/*.tsbuildinfo',
       'vitest.config.ts',
     ],

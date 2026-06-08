@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { buildSymbolGraph, findReferences, buildCallGraph } from '../../src/symbol-graph.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -43,5 +45,290 @@ describe('symbol-graph (D-32.2.1)', () => {
     expect(callGraph.edges).toBeDefined();
     expect(callGraph.byCaller).toBeDefined();
     expect(callGraph.byCallee).toBeDefined();
+  });
+
+  it('indexes imports and identifier usages as heuristic references', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-refs-'));
+    try {
+      await writeFile(resolve(dir, 'math.ts'), 'export function add(a: number, b: number) {\n  return a + b;\n}\n');
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        "import { add } from './math.js';\n\nexport function run() {\n  return add(1, 2);\n}\n",
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'add');
+
+      expect(refs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'math.ts', kind: 'declaration' }),
+          expect.objectContaining({ file: 'main.ts', kind: 'import' }),
+          expect.objectContaining({ file: 'main.ts', kind: 'call', line: 4 }),
+        ]),
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('buildCallGraph reads files from the graph repo root, not process cwd', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        'function callee() {\n  return 1;\n}\n\nfunction caller() {\n  return callee();\n}\n',
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+
+      expect(callGraph.edges).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            caller: 'main.ts:caller',
+            callee: 'main.ts:callee',
+            file: 'main.ts',
+            line: 6,
+          }),
+        ]),
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('buildCallGraph only records call-expression-like matches, not arbitrary name mentions', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-precision-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          'function callee() {',
+          '  return 1;',
+          '}',
+          '',
+          'function caller() {',
+          '  const calleeValue = 1;',
+          "  const text = 'callee';",
+          '  // callee is mentioned but not called',
+          '  return calleeValue;',
+          '}',
+          '',
+          'function realCaller() {',
+          '  return callee();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+      const calleeEdges = callGraph.edges.filter((edge) => edge.callee === 'main.ts:callee');
+
+      expect(calleeEdges).toEqual([
+        expect.objectContaining({
+          caller: 'main.ts:realCaller',
+          callee: 'main.ts:callee',
+          line: 13,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('buildCallGraph prefers relative import targets over same-name symbols in unrelated files', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-imports-'));
+    try {
+      await writeFile(resolve(dir, 'a.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(resolve(dir, 'b.ts'), 'export function target() {\n  return 2;\n}\n');
+      await writeFile(
+        resolve(dir, 'caller.ts'),
+        "import { target } from './a.js';\n\nexport function run() {\n  return target();\n}\n",
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+      const targetEdges = callGraph.edges.filter((edge) => edge.caller === 'caller.ts:run');
+
+      expect(targetEdges).toEqual([
+        expect.objectContaining({
+          caller: 'caller.ts:run',
+          callee: 'a.ts:target',
+          line: 4,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves multiline aliased named imports to their exported call target', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-alias-imports-'));
+    try {
+      await writeFile(resolve(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(resolve(dir, 'other.ts'), 'export function target() {\n  return 2;\n}\n');
+      await writeFile(
+        resolve(dir, 'consumer.ts'),
+        [
+          'import {',
+          '  target as chosen,',
+          "} from './provider.js';",
+          '',
+          'export function run() {',
+          '  return chosen();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'target');
+      const chosenRefs = findReferences(g, 'chosen');
+      const callGraph = await buildCallGraph(g);
+
+      expect(refs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'provider.ts', kind: 'declaration' }),
+          expect.objectContaining({ file: 'consumer.ts', kind: 'import', line: 2 }),
+        ]),
+      );
+      expect(chosenRefs).toEqual(
+        expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', kind: 'call', line: 6 })]),
+      );
+      expect(refs).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ file: 'provider.ts', kind: 'call', line: 1 })]),
+      );
+      expect(callGraph.edges.filter((edge) => edge.caller === 'consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:target',
+          line: 6,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves calls imported through TypeScript barrel re-exports to the original file', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-reexports-'));
+    try {
+      await writeFile(resolve(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(resolve(dir, 'index.ts'), "export { target } from './provider.js';\n");
+      await writeFile(resolve(dir, 'other.ts'), 'export function target() {\n  return 2;\n}\n');
+      await writeFile(
+        resolve(dir, 'consumer.ts'),
+        "import { target } from './index.js';\n\nexport function run() {\n  return target();\n}\n",
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'target');
+      const callGraph = await buildCallGraph(g);
+
+      expect(refs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'provider.ts', kind: 'declaration' }),
+          expect.objectContaining({ file: 'index.ts', kind: 'import', line: 1 }),
+          expect.objectContaining({ file: 'consumer.ts', kind: 'import', line: 1 }),
+        ]),
+      );
+      expect(callGraph.edges.filter((edge) => edge.caller === 'consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:target',
+          line: 4,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves calls imported through TypeScript export-star barrels to the original file', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-export-star-'));
+    try {
+      await writeFile(resolve(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(resolve(dir, 'index.ts'), "export * from './provider.js';\n");
+      await writeFile(resolve(dir, 'other.ts'), 'export function target() {\n  return 2;\n}\n');
+      await writeFile(
+        resolve(dir, 'consumer.ts'),
+        "import { target } from './index.js';\n\nexport function run() {\n  return target();\n}\n",
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+
+      expect(callGraph.edges.filter((edge) => edge.caller === 'consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:target',
+          line: 4,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves TypeScript tsconfig path aliases to their call target', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-tsconfig-paths-'));
+    try {
+      await writeFile(
+        resolve(dir, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            baseUrl: '.',
+            paths: {
+              '@lib/*': ['src/lib/*'],
+            },
+          },
+        }),
+      );
+      await mkdir(resolve(dir, 'src'), { recursive: true });
+      await mkdir(resolve(dir, 'src/lib'), { recursive: true });
+      await writeFile(resolve(dir, 'src/lib/provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(resolve(dir, 'src/other.ts'), 'export function target() {\n  return 2;\n}\n');
+      await writeFile(
+        resolve(dir, 'src/consumer.ts'),
+        "import { target } from '@lib/provider';\n\nexport function run() {\n  return target();\n}\n",
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+
+      expect(callGraph.edges.filter((edge) => edge.caller === 'src/consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'src/consumer.ts:run',
+          callee: 'src/lib/provider.ts:target',
+          line: 4,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves TypeScript namespace import member calls to the imported module symbol', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-namespace-imports-'));
+    try {
+      await writeFile(resolve(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(resolve(dir, 'other.ts'), 'export function target() {\n  return 2;\n}\n');
+      await writeFile(
+        resolve(dir, 'consumer.ts'),
+        "import * as api from './provider.js';\n\nexport function run() {\n  return api.target();\n}\n",
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+
+      expect(callGraph.edges.filter((edge) => edge.caller === 'consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:target',
+          line: 4,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

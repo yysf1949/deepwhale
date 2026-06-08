@@ -4,6 +4,7 @@ import {
   getWasmPathForLanguage,
   listSupportedLanguages,
   displayName,
+  type LanguageId,
 } from '../../src/languages.js';
 
 describe('languages (D-32.1)', () => {
@@ -55,6 +56,10 @@ describe('languages (D-32.1)', () => {
     expect(getLanguageForExtension('C:\\abs\\path\\foo.ts')).toBe('typescript');
   });
 
+  it('handles Windows extended-length paths without treating the prefix as a query', () => {
+    expect(getLanguageForExtension('\\\\?\\C:\\abs\\path\\foo.ts')).toBe('typescript');
+  });
+
   it('resolves wasm path for each language', () => {
     const langs: Array<'typescript' | 'tsx' | 'javascript' | 'python' | 'go' | 'bash' | 'rust'> =
       ['typescript', 'tsx', 'javascript', 'python', 'go', 'bash', 'rust'];
@@ -66,7 +71,7 @@ describe('languages (D-32.1)', () => {
   });
 
   it('throws for unknown language', () => {
-    expect(() => getWasmPathForLanguage('cobol' as any)).toThrow(/unsupported/);
+    expect(() => getWasmPathForLanguage('cobol' as unknown as LanguageId)).toThrow(/unsupported/);
   });
 
   it('lists all 7 supported languages (typescript + tsx + 5 others)', () => {

@@ -8,6 +8,10 @@ describe('kanban_orchestrator', () => {
   let dir = '';
   let tool: KanbanOrchestratorTool;
 
+  function rawCards(meta: unknown): Array<{ id: string }> {
+    return JSON.parse((meta as { raw: string }).raw) as Array<{ id: string }>;
+  }
+
   beforeEach(async () => {
     dir = await fs.mkdtemp(join(tmpdir(), 'kanban-'));
     tool = new KanbanOrchestratorTool({ boardDir: dir });
@@ -24,7 +28,7 @@ describe('kanban_orchestrator', () => {
   it('moveCard transitions todo → in_progress', async () => {
     await tool.execute({ action: 'addCard', title: 'x', lane: 'todo' });
     const list1 = await tool.execute({ action: 'list' });
-    const cardId = JSON.parse((list1.meta as any).raw)[0].id;
+    const cardId = rawCards(list1.meta)[0]!.id;
     const r = await tool.execute({ action: 'moveCard', cardId, lane: 'in_progress' });
     expect(r.success).toBe(true);
   });
@@ -34,7 +38,7 @@ describe('kanban_orchestrator', () => {
     const t = new KanbanOrchestratorTool({ boardDir: dir, subTaskRunner: runner });
     await t.execute({ action: 'addCard', title: 'a', lane: 'todo' });
     const list = await t.execute({ action: 'list' });
-    const cardId = JSON.parse((list.meta as any).raw)[0].id;
+    const cardId = rawCards(list.meta)[0]!.id;
     const r = await t.execute({ action: 'delegate', cardId, prompt: 'do it' });
     expect(r.success).toBe(true);
     expect(r.content).toContain('do it');
@@ -47,7 +51,7 @@ describe('kanban_orchestrator', () => {
   });
 
   it('rejects invalid lane', async () => {
-    const r = await tool.execute({ action: 'addCard', title: 'x', lane: 'wat' as any });
+    const r = await tool.execute({ action: 'addCard', title: 'x', lane: 'wat' });
     expect(r.success).toBe(false);
   });
 });

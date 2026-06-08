@@ -9,14 +9,15 @@
  * 0 业务改业务, 5 红线 0 触碰. risk: medium (跨文件 write).
  */
 
-import { readFile, writeFile, stat, readdir } from 'node:fs/promises';
-import { resolve, join, relative, sep } from 'node:path';
+import { readFile, writeFile, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import { buildSymbolGraph, findReferences, type Reference } from '@deepwhale/code-intel';
 
 export class RenameSymbolTool implements Tool {
   readonly name = 'rename_symbol' as ToolName;
-  readonly description = 'Rename a symbol across all files in a repo. Default dry-run (preview modified content). Pass apply=true to write. Medium risk (cross-file write).';
+  readonly description = 'Heuristic symbol rename across a repo. Default dry-run preview; pass apply=true to write. Uses code-intel references where available, not IDE-grade type analysis. Medium risk (cross-file write).';
   readonly risk: 'low' | 'medium' | 'high' = 'medium';
 
   readonly schema: ToolInputSchema = {
@@ -49,24 +50,18 @@ export class RenameSymbolTool implements Tool {
       if (!s.isDirectory()) {
         return { success: false, content: '', error: `not-a-directory: ${repoPath}` };
       }
-      // Walk all files in the repo, find ones containing `\boldName\b` anywhere
-      // (declarations, imports, calls, strings). 走全 file walk, 不用
-      // buildSymbolGraph.findReferences 因为 它 只 找 declarations (extractImports
-      // 是 stub, 漏 import statement).
-      const allFiles: string[] = [];
-      await walkRepo(repoPath, repoPath, 0, 6, allFiles);
-      const wordBoundary = new RegExp(`\\b${escapeRegExp(oldName)}\\b`, 'g');
+      const graph = await buildSymbolGraph(repoPath);
+      const refs = findReferences(graph, oldName);
+      const refsByFile = groupReferencesByFile(refs);
       const fileChanges: Array<{ file: string; replacements: number; preview: string }> = [];
-      for (const file of allFiles) {
-        const original = await readFile(file, 'utf8');
-        const matches = original.match(wordBoundary);
-        if (!matches || matches.length === 0) continue;
-        const rewritten = original.replace(wordBoundary, newName);
-        if (rewritten !== original) {
-          const relPath = relative(repoPath, file).split(sep).join('/');
-          fileChanges.push({ file: relPath, replacements: matches.length, preview: diffPreview(original, rewritten) });
+      for (const [file, fileRefs] of refsByFile) {
+        const fullPath = resolve(repoPath, file);
+        const original = await readFile(fullPath, 'utf8');
+        const { rewritten, replacements } = rewriteReferences(original, fileRefs, oldName, newName);
+        if (replacements > 0 && rewritten !== original) {
+          fileChanges.push({ file, replacements, preview: diffPreview(original, rewritten) });
           if (apply) {
-            await writeFile(file, rewritten, 'utf8');
+            await writeFile(fullPath, rewritten, 'utf8');
           }
         }
       }
@@ -89,35 +84,6 @@ export class RenameSymbolTool implements Tool {
   }
 }
 
-const RENAME_IGNORES: ReadonlySet<string> = new Set([
-  'node_modules', '.git', 'dist', 'build', '.next', 'out', '.turbo', 'coverage', '.deepwhale',
-]);
-
-async function walkRepo(root: string, dir: string, depth: number, maxDepth: number, out: string[]): Promise<void> {
-  if (depth > maxDepth) return;
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const e of entries) {
-    if (RENAME_IGNORES.has(e.name)) continue;
-    if (e.name.startsWith('.')) continue;
-    if (e.isSymbolicLink()) continue;
-    const full = join(dir, e.name);
-    if (e.isDirectory()) {
-      await walkRepo(root, full, depth + 1, maxDepth, out);
-    } else if (e.isFile()) {
-      out.push(full);
-    }
-  }
-}
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function diffPreview(original: string, rewritten: string): string {
   // Trivial diff: just return first 5 changed lines context
   const oLines = original.split('\n');
@@ -130,6 +96,115 @@ function diffPreview(original: string, rewritten: string): string {
     }
   }
   return out.length === 0 ? '(no visible diff)' : out.join('\n');
+}
+
+function groupReferencesByFile(refs: ReadonlyArray<Reference>): Map<string, Reference[]> {
+  const out = new Map<string, Reference[]>();
+  for (const ref of refs) {
+    const arr = out.get(ref.file) ?? [];
+    arr.push(ref);
+    out.set(ref.file, arr);
+  }
+  return out;
+}
+
+function rewriteReferences(
+  source: string,
+  refs: ReadonlyArray<Reference>,
+  oldName: string,
+  newName: string,
+): { rewritten: string; replacements: number } {
+  const lineStarts = computeLineStarts(source);
+  const replacementOffsets = new Set<number>();
+
+  for (const ref of refs) {
+    const lineStart = lineStarts[ref.line - 1];
+    if (lineStart === undefined) continue;
+    const lineEnd = findLineEnd(source, lineStart);
+    const rawLine = source.slice(lineStart, lineEnd);
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+    const col = resolveReplacementColumn(line, ref, oldName);
+    if (col === null) continue;
+    const offset = lineStart + col;
+    if (source.slice(offset, offset + oldName.length) === oldName) {
+      replacementOffsets.add(offset);
+    }
+  }
+
+  const offsets = [...replacementOffsets].sort((a, b) => b - a);
+  let rewritten = source;
+  for (const offset of offsets) {
+    rewritten = rewritten.slice(0, offset) + newName + rewritten.slice(offset + oldName.length);
+  }
+  return { rewritten, replacements: offsets.length };
+}
+
+function resolveReplacementColumn(line: string, ref: Reference, oldName: string): number | null {
+  if (isTokenAt(line, ref.col, oldName)) {
+    return ref.col;
+  }
+
+  const candidates = scanIdentifierTokens(line).filter((token) => token.text === oldName);
+  if (candidates.length === 0) return null;
+  return candidates.find((token) => token.col >= ref.col)?.col ?? candidates[0]?.col ?? null;
+}
+
+function isTokenAt(line: string, col: number, oldName: string): boolean {
+  if (line.slice(col, col + oldName.length) !== oldName) return false;
+  if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) return false;
+  const before = col > 0 ? line[col - 1] : '';
+  const after = line[col + oldName.length] ?? '';
+  return !isIdentifierChar(before) && !isIdentifierChar(after);
+}
+
+function scanIdentifierTokens(line: string): Array<{ text: string; col: number }> {
+  const tokens: Array<{ text: string; col: number }> = [];
+  const re = /[A-Za-z_$][\w$]*/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(line)) !== null) {
+    const col = match.index;
+    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) continue;
+    tokens.push({ text: match[0], col });
+  }
+  return tokens;
+}
+
+function computeLineStarts(source: string): number[] {
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === '\n') starts.push(i + 1);
+  }
+  return starts;
+}
+
+function findLineEnd(source: string, lineStart: number): number {
+  const nextNewline = source.indexOf('\n', lineStart);
+  return nextNewline === -1 ? source.length : nextNewline;
+}
+
+function isLikelyInsideString(line: string, col: number): boolean {
+  const before = line.slice(0, col);
+  const singleQuotes = countUnescaped(before, "'");
+  const doubleQuotes = countUnescaped(before, '"');
+  const backticks = countUnescaped(before, '`');
+  return singleQuotes % 2 === 1 || doubleQuotes % 2 === 1 || backticks % 2 === 1;
+}
+
+function isAfterLineComment(line: string, col: number): boolean {
+  const before = line.slice(0, col);
+  return before.indexOf('//') >= 0 || before.indexOf('#') >= 0;
+}
+
+function countUnescaped(text: string, char: string): number {
+  let count = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === char && text[i - 1] !== '\\') count += 1;
+  }
+  return count;
+}
+
+function isIdentifierChar(char: string | undefined): boolean {
+  return typeof char === 'string' && /[A-Za-z0-9_$]/.test(char);
 }
 
 export const renameSymbolTool = new RenameSymbolTool();

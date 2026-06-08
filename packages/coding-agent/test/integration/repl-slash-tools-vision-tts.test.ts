@@ -15,7 +15,7 @@ describe('repl slash /tools (with vision + tts, D-30.4.7; +6 D-31.1.7; +4 D-31.2
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
     const errStream = { write: vi.fn(), isTTY: true } as unknown as NodeJS.WritableStream;
-    const registry = createDefaultRegistry();
+    const registry = createDefaultRegistry({ profile: 'all' });
     const tools = registry.list().map((t) => ({ name: t.name, description: t.description }));
     const result = await dispatchSlashBuiltin('/tools', {
       out: outStream,

@@ -26,7 +26,6 @@ import {
   APIKeyMissingError,
   isLLMError,
   LLMAuthError,
-  LLMClient,
   LLMNetworkError,
   LLMRateLimitError,
   LLMStreamError,

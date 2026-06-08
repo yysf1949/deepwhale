@@ -53,10 +53,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@deepwhale/code-intel": "^2.0.0",
-    "@deepwhale/core": "^1.0.0",
-    "@deepwhale/edit-engine": "^1.0.0",
-    "@deepwhale/llm": "^1.0.0",
+    "@deepwhale/code-intel": "^2.2.0",
+    "@deepwhale/core": "^2.2.0",
+    "@deepwhale/edit-engine": "^2.2.0",
+    "@deepwhale/llm": "^2.2.0",
     "sql.js-fts5": "^1.4.0",
     "youtube-transcript": "^1.2.1"
   },

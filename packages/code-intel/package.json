@@ -54,6 +54,7 @@
   },
   "scripts": {
     "build": "tsc -b",
+    "gate1:current": "tsx scripts/gate1-current-workspace.mjs",
     "dev": "tsc -b --watch",
     "clean": "rm -rf dist .tsbuildinfo"
   }

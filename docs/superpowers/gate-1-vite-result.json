@@ -1,0 +1,43 @@
+{
+  "passed": true,
+  "failureReasons": [],
+  "repoPath": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\vite",
+  "metrics": {
+    "loc": 86216,
+    "supportedFiles": 1395,
+    "filesIndexed": 1395,
+    "symbolsIndexed": 7427,
+    "referencesIndexed": 30821,
+    "callEdges": 32830,
+    "elapsedMs": 3534,
+    "graphBuildMs": 2295,
+    "callGraphMs": 890,
+    "minLoc": 50000,
+    "preferredLoc": 100000,
+    "timeboxMs": 1200000
+  },
+  "evidence": {
+    "callChain": [
+      {
+        "caller": "packages/vite/src/node/server/index.ts:createServer",
+        "callee": "packages/vite/src/node/server/index.ts:_createServer",
+        "line": 476,
+        "file": "packages/vite/src/node/server/index.ts"
+      }
+    ],
+    "entry": {
+      "file": "packages/vite/src/node/server/index.ts",
+      "symbol": "createServer",
+      "line": 473,
+      "col": 7,
+      "kind": "declaration"
+    },
+    "modificationPoint": {
+      "file": "packages/vite/src/node/server/index.ts",
+      "symbol": "_createServer",
+      "line": 479,
+      "col": 7,
+      "kind": "declaration"
+    }
+  }
+}

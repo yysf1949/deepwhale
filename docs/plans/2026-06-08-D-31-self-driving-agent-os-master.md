@@ -106,7 +106,7 @@
 ### Task 7: registry 装 6 新工具 (D-31.1.7)
 **Files**:
 - Modify: `packages/coding-agent/src/tools/registry.ts`
-- Test: `packages/coding-agent/test/unit/registry-count-23.test.ts`
+- Test: `packages/coding-agent/test/unit/registry-profile-engineering.test.ts`
 
 **实现**: `createDefaultRegistry` 加 6 import + 6 register, 17 → 23 tools
 
@@ -212,7 +212,7 @@
 ### Task 5: registry 装 4 工具 (D-31.3.5)
 **Files**:
 - Modify: `packages/coding-agent/src/tools/registry.ts`
-- Test: `packages/coding-agent/test/unit/registry-count-27.test.ts`
+- Test: `packages/coding-agent/test/unit/registry-profile-productivity.test.ts`
 
 **实现**: 27 → 31 tools
 
@@ -283,7 +283,7 @@
 ### Task 4: registry 装 2 工具 + obsidian skill (D-31.4.4)
 **Files**:
 - Modify: `packages/coding-agent/src/tools/registry.ts`
-- Test: `packages/coding-agent/test/unit/registry-count-33.test.ts`
+- Test: `packages/coding-agent/test/unit/registry-profile-media.test.ts`
 
 **实现**: 31 → 33 tools (spotify + youtube-content)
 

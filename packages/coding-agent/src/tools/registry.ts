@@ -34,12 +34,12 @@ import { TextToSpeechTool } from './text-to-speech.js'; // D-30.4.2: text stub -
 import { GitHubPrWorkflowTool } from './github-pr-workflow.js'; // D-31.1.1
 import { GitHubIssuesTool } from './github-issues.js'; // D-31.1.2
 import { GitHubCodeReviewTool } from './github-code-review.js'; // D-31.1.3
-import { KanbanOrchestratorTool, kanbanOrchestrator } from './kanban-orchestrator.js'; // D-31.1.4
+import { kanbanOrchestrator } from './kanban-orchestrator.js'; // D-31.1.4
 import { CloudflarePagesDeployTool } from './cloudflare-pages-deploy.js'; // D-31.1.5
-import { WebhookSubscriptionsTool, webhookSubscriptions } from './webhook-subscriptions.js'; // D-31.1.6
+import { webhookSubscriptions } from './webhook-subscriptions.js'; // D-31.1.6
 import { ArxivTool } from './arxiv.js'; // D-31.2.1 (2026-06-08): arxiv paper search
 import { BlogwatcherTool } from './blogwatcher.js'; // D-31.2.2: RSS/Atom 订阅
-import { LlmWikiTool, llmWiki } from './llm-wiki.js'; // D-31.2.3: Karpathy LLM Wiki
+import { llmWiki } from './llm-wiki.js'; // D-31.2.3: Karpathy LLM Wiki
 import { PolymarketTool } from './polymarket.js'; // D-31.2.4: prediction market
 import { NotionTool } from './notion.js'; // D-31.3.1 (2026-06-08): notion REST
 import { LinearTool } from './linear.js'; // D-31.3.2: linear GraphQL
@@ -92,10 +92,24 @@ export class ToolRegistry {
   }
 }
 
+export type ToolRegistryProfile =
+  | 'default'
+  | 'core'
+  | 'coding'
+  | 'code-intel'
+  | 'web'
+  | 'engineering'
+  | 'research'
+  | 'productivity'
+  | 'media'
+  | 'all';
+
 /** Sprint 1c-revive-3-D-12 review P1 修复: 显式注入 sandboxRunner. */
 export interface CreateDefaultRegistryOptions {
   /** 注入 BashTool 的 SandboxRunner. 不传 = LocalSandboxRunner (v1.0 行为). */
   readonly sandboxRunner?: SandboxRunner;
+  /** Tool exposure profile. Default intentionally exposes only coding + code-intel essentials. */
+  readonly profile?: ToolRegistryProfile;
 }
 
 /**
@@ -109,72 +123,106 @@ export interface CreateDefaultRegistryOptions {
 export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}): ToolRegistry {
   const reg = new ToolRegistry();
   const runner = options.sandboxRunner ?? new LocalSandboxRunner();
-  reg.register(new ReadFileTool());
-  reg.register(new WriteFileTool());
-  reg.register(new EditFileTool());
-  reg.register(new BashTool(runner));
-  reg.register(new FindTool());
-  reg.register(new GrepTool());
-  // D-30.1γ.4 (2026-06-07): 装 3 web tools. 跟 6 工具同形态 (read-only, low risk).
-  reg.register(new WebSearchTool());
-  reg.register(new WebExtractTool());
-  reg.register(new BrowserNavigateTool());
-  // D-30.2 (2026-06-07): 装 5 新工具 — patch (medium) + search_files (low) + execute_code
-  // (medium) + todo (low) + plan (low). 跟 9 工具 1:1 同形态 (先 register).
-  reg.register(new PatchTool());
-  reg.register(new SearchFilesTool());
-  reg.register(new ExecuteCodeTool());
-  reg.register(new TodoTool());
-  reg.register(new PlanTool());
-  // D-30.3.1 (2026-06-07): 装 delegate_task (medium) — subagent 并行 max 5.
-  reg.register(new DelegateTaskTool());
-  // D-30.4.1 (2026-06-07): 装 vision_analyze (medium) — 本地 base64 + URL.
-  reg.register(new VisionAnalyzeTool());
-  // D-30.4.2 (2026-06-07): 装 text_to_speech (medium) — 写 text stub 到 ~/.deepwhale/tts/.
-  reg.register(new TextToSpeechTool());
-  // D-31.1 (2026-06-08): 装 6 engineering automation 工具 — 17 → 23.
-  reg.register(new GitHubPrWorkflowTool());
-  reg.register(new GitHubIssuesTool());
-  reg.register(new GitHubCodeReviewTool());
-  // D-31.1.4/6: kanban / webhooks need boardDir / subsDir — reuse the pre-constructed
-  //   default instances (same `~/.deepwhale/...` paths the tools export).
-  reg.register(kanbanOrchestrator);
-  reg.register(new CloudflarePagesDeployTool());
-  reg.register(webhookSubscriptions);
-  // D-31.2 (2026-06-08): 装 4 research 工具 — 23 → 27.
-  //   arxiv / blogwatcher / llm_wiki / polymarket 全 low risk (read-only or local IO).
-  reg.register(new ArxivTool());
-  reg.register(new BlogwatcherTool({ rootDir: process.env.HOME || process.env.USERPROFILE || '.' }));
-  // D-31.2.3/2/4: llm_wiki / blogwatcher / polymarket reuse pre-constructed default
-  //   instances (same `~/.deepwhale/...` paths the tools export).
-  reg.register(llmWiki);
-  reg.register(new PolymarketTool());
-  // D-31.3 (2026-06-08): 装 4 productivity 工具 — 27 → 31.
-  //   notion / linear / airtable medium risk (write remote), ocr_and_documents low (read-only).
-  reg.register(new NotionTool());
-  reg.register(new LinearTool());
-  reg.register(new AirtableTool());
-  reg.register(new OcrAndDocumentsTool());
-  // D-31.4 (2026-06-08): 装 2 media 工具 — 31 → 33. (obsidian-bridge 是 skill
-  // 不进 registry, 走 skill-loader)
-  reg.register(new SpotifyTool());
-  reg.register(new YoutubeContentTool());
-  // D-32.1 (2026-06-08): 装 4 code-intel 工具 — 33 → 37. All low risk (read-only
-  //   file walking / AST parsing via web-tree-sitter WASM, 0 native build).
-  reg.register(new ParseFileTool());
-  reg.register(new GetSymbolsTool());
-  reg.register(new AnalyzeRepoTool());
-  reg.register(new FindDefinitionTool());
-  // D-32.2.2 (2026-06-08): 装 find_references — 37 → 38. 走 @deepwhale/code-intel
-  //   buildSymbolGraph + findReferences, 跨文件 search (references / count 2 mode).
-  reg.register(new FindReferencesTool());
-  // D-32.2.3 + D-32.2.4 (2026-06-08): 装 call_graph + rename_symbol — 38 → 40.
-  //   call_graph: 跨文件 call chain (for-symbol / for-file / for-repo).
-  //   rename_symbol: 跨文件 rename (dry-run by default, apply=true to write).
-  reg.register(new CallGraphTool());
-  reg.register(new RenameSymbolTool());
-  // D-32.3.1 (2026-06-08): 装 smart_search — 40 → 41. 走 code-intel + gh CLI remote
-  //   (gh code search 公开 GitHub repo). 3 action: local / remote / all.
-  reg.register(new SmartSearchTool());
+  const profile = options.profile ?? 'default';
+
+  const registerCore = (): void => {
+    reg.register(new ReadFileTool());
+    reg.register(new WriteFileTool());
+    reg.register(new EditFileTool());
+    reg.register(new BashTool(runner));
+    reg.register(new FindTool());
+    reg.register(new GrepTool());
+  };
+
+  const registerCoding = (): void => {
+    registerCore();
+    reg.register(new PatchTool());
+    reg.register(new SearchFilesTool());
+    reg.register(new ExecuteCodeTool());
+    reg.register(new TodoTool());
+    reg.register(new PlanTool());
+  };
+
+  const registerWeb = (): void => {
+    reg.register(new WebSearchTool());
+    reg.register(new WebExtractTool());
+    reg.register(new BrowserNavigateTool());
+  };
+
+  const registerEngineering = (): void => {
+    reg.register(new GitHubPrWorkflowTool());
+    reg.register(new GitHubIssuesTool());
+    reg.register(new GitHubCodeReviewTool());
+    reg.register(kanbanOrchestrator);
+    reg.register(new CloudflarePagesDeployTool());
+    reg.register(webhookSubscriptions);
+  };
+
+  const registerResearch = (): void => {
+    reg.register(new ArxivTool());
+    reg.register(new BlogwatcherTool({ rootDir: process.env.HOME || process.env.USERPROFILE || '.' }));
+    reg.register(llmWiki);
+    reg.register(new PolymarketTool());
+  };
+
+  const registerProductivity = (): void => {
+    reg.register(new NotionTool());
+    reg.register(new LinearTool());
+    reg.register(new AirtableTool());
+    reg.register(new OcrAndDocumentsTool());
+  };
+
+  const registerMedia = (): void => {
+    reg.register(new SpotifyTool());
+    reg.register(new YoutubeContentTool());
+  };
+
+  const registerCodeIntel = (): void => {
+    reg.register(new ParseFileTool());
+    reg.register(new GetSymbolsTool());
+    reg.register(new AnalyzeRepoTool());
+    reg.register(new FindDefinitionTool());
+    reg.register(new FindReferencesTool());
+    reg.register(new CallGraphTool());
+    reg.register(new RenameSymbolTool());
+    reg.register(new SmartSearchTool());
+  };
+
+  const registerLegacyExpansionOnlyInAll = (): void => {
+    reg.register(new DelegateTaskTool());
+    reg.register(new VisionAnalyzeTool());
+    reg.register(new TextToSpeechTool());
+  };
+
+  if (profile === 'default') {
+    registerCoding();
+    registerCodeIntel();
+  } else if (profile === 'core') {
+    registerCore();
+  } else if (profile === 'coding') {
+    registerCoding();
+  } else if (profile === 'code-intel') {
+    registerCodeIntel();
+  } else if (profile === 'web') {
+    registerWeb();
+  } else if (profile === 'engineering') {
+    registerEngineering();
+  } else if (profile === 'research') {
+    registerResearch();
+  } else if (profile === 'productivity') {
+    registerProductivity();
+  } else if (profile === 'media') {
+    registerMedia();
+  } else {
+    registerCoding();
+    registerWeb();
+    registerLegacyExpansionOnlyInAll();
+    registerEngineering();
+    registerResearch();
+    registerProductivity();
+    registerMedia();
+    registerCodeIntel();
+  }
+
   return reg;
 }

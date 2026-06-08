@@ -15,8 +15,10 @@ import React from 'react'
 import { TodoList } from '../src/components/TodoList.js'
 import { $todos, setTodos, type TodoUiItem } from '../src/store/ui.js'
 
+const ANSI_RE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
+
 function stripAnsi(s: string): string {
-  return s.replace(/\x1b\[[0-9;]*m/g, '')
+  return s.replace(ANSI_RE, '')
 }
 
 describe('TodoList (D-30.2.6)', () => {

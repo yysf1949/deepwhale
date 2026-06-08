@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { GitHubIssuesTool } from '../../src/tools/github-issues.js';
 
 describe('github_issues', () => {
@@ -33,7 +33,7 @@ describe('github_issues', () => {
   });
 
   it('rejects unknown action', async () => {
-    const r = await tool.execute({ action: 'wat' as any, owner: 'o', repo: 'r' });
+    const r = await tool.execute({ action: 'wat', owner: 'o', repo: 'r' });
     expect(r.success).toBe(false);
   });
 });

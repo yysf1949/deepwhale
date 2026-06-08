@@ -32,6 +32,8 @@ import {
 import { resolveTuiTheme, THEMES } from '../../src/theme/index.js'
 import type { TuiInkOptions } from '../../src/types.js'
 
+const ANSI_RE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
+
 // ---- Test 1: useRunToolLoop 在 React 容器内跑通, 3 参签名真接 (D-25 B3 F7 P0.5) ----
 describe('useRunToolLoop 集成 (D-25 B3)', () => {
   let registry: ToolRegistry
@@ -179,7 +181,7 @@ describe('useRunToolLoop 集成 (D-25 B3)', () => {
     // 测不强求 'echo:' raw, 验 '非空 + 含 echo 字符' 即可
     expect(assistantText.length).toBeGreaterThan(0)
     // 去掉 ANSI escape 再匹配
-    const stripped = assistantText.replace(/\x1b\[[0-9;]*m/g, '')
+    const stripped = assistantText.replace(ANSI_RE, '')
     expect(stripped).toContain('echo')
   })
 })

@@ -39,3 +39,19 @@ export {
   type Import,
   type Reference,
 } from './symbol-graph.js';
+
+// Stabilization Gate-1 runner: machine-verifiable large-repo Code Intel gate.
+export {
+  runGate1,
+  readGate1Scenario,
+  parseGate1Args,
+  loadGate1CliConfig,
+  formatGate1Markdown,
+  type Gate1Options,
+  type Gate1CliConfig,
+  type Gate1ParsedArgs,
+  type Gate1Metrics,
+  type Gate1Evidence,
+  type Gate1SymbolEvidence,
+  type Gate1Result,
+} from './gate1.js';

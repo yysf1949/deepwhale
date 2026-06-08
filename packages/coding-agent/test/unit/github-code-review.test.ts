@@ -28,7 +28,7 @@ describe('github_code_review', () => {
   });
 
   it('rejects unknown verdict', async () => {
-    const r = await tool.execute({ action: 'submitReview', owner: 'o', repo: 'r', prNumber: 1, verdict: 'wat' as any });
+    const r = await tool.execute({ action: 'submitReview', owner: 'o', repo: 'r', prNumber: 1, verdict: 'wat' });
     expect(r.success).toBe(false);
   });
 });

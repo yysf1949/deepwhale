@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { TelegramChannel, type TelegramConfig, type TelegramFetcher } from '../../src/channel/telegram.js';
+import { TelegramChannel, type TelegramFetcher } from '../../src/channel/telegram.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -38,7 +38,7 @@ describe('TelegramChannel (D-30.4.3)', () => {
     //  - getUpdates #2: empty → stop()
     const replies: Array<{ chatId: number; reply: string }> = [];
     let poll = 0;
-    const fetcher: TelegramFetcher = async (url) => {
+    const fetcher: TelegramFetcher = async (_url) => {
       poll++;
       if (poll === 1) {
         return jsonResponse({

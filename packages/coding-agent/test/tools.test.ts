@@ -11,10 +11,10 @@ import { promises as fs, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-describe('Sprint 0.2: 6 tools (v1.0 MVP) + D-30.1γ.4 (3 web tools) + D-30.2 (5 new tools) + D-30.3 (1 subagent) + D-30.4 (2 vision/tts) + D-31.1 (6 engineering tools) + D-31.2 (4 research tools)', () => {
+describe('Sprint 0.2: 6 tools (v1.0 MVP) + explicit opt-in expansion profiles', () => {
   describe('ToolRegistry', () => {
-    it('createDefaultRegistry registers 6 + 3 + 5 + 1 + 2 + 6 + 4 = 41 tools', () => {
-      const reg = createDefaultRegistry();
+    it('createDefaultRegistry({ profile: all }) registers the complete 41-tool surface', () => {
+      const reg = createDefaultRegistry({ profile: 'all' });
       expect(reg.size()).toBe(41);
       expect(reg.get('read_file')?.name).toBe('read_file');
       expect(reg.get('write_file')?.name).toBe('write_file');

@@ -1,8 +1,8 @@
 {
   "name": "deepwhale",
-  "version": "0.1.0",
+  "version": "2.2.0",
   "private": true,
-  "description": "DeepSeek-first AI coding client. Hypothesis-driven roadmap, 4-package monorepo.",
+  "description": "DeepSeek-first AI coding client. Hypothesis-driven roadmap, workspace monorepo.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "engines": {
@@ -14,6 +14,7 @@
     "dev": "pnpm -r --parallel dev",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -b",
+    "gate1:current": "pnpm -F @deepwhale/code-intel gate1:current",
     "pretest": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -33,10 +34,5 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
   }
 }

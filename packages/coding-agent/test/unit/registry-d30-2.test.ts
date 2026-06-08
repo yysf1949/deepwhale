@@ -21,18 +21,18 @@ describe('tool registry (D-30.2.8 — 5 new tools, D-30.3.5 — 1 subagent, D-30
   });
 
   it('includes delegate_task (D-30.3.5)', () => {
-    const registry = createDefaultRegistry();
+    const registry = createDefaultRegistry({ profile: 'all' });
     expect(registry.get('delegate_task')).toBeDefined();
   });
 
   it('includes vision_analyze + text_to_speech (D-30.4.6)', () => {
-    const registry = createDefaultRegistry();
+    const registry = createDefaultRegistry({ profile: 'all' });
     expect(registry.get('vision_analyze')).toBeDefined();
     expect(registry.get('text_to_speech')).toBeDefined();
   });
 
-  it('registry total size = 15 + 2 + 6 + 4 = 41 (D-31.4.4 follow-up)', () => {
-    const registry = createDefaultRegistry();
+  it('all profile total size = 41 (explicit opt-in)', () => {
+    const registry = createDefaultRegistry({ profile: 'all' });
     expect(registry.size()).toBe(41);
   });
 
@@ -46,12 +46,12 @@ describe('tool registry (D-30.2.8 — 5 new tools, D-30.3.5 — 1 subagent, D-30
   });
 
   it('delegate_task has risk=medium', () => {
-    const registry = createDefaultRegistry();
+    const registry = createDefaultRegistry({ profile: 'all' });
     expect(registry.get('delegate_task')?.risk).toBe('medium');
   });
 
   it('vision_analyze + text_to_speech have risk=medium (D-30.4.6)', () => {
-    const registry = createDefaultRegistry();
+    const registry = createDefaultRegistry({ profile: 'all' });
     expect(registry.get('vision_analyze')?.risk).toBe('medium');
     expect(registry.get('text_to_speech')?.risk).toBe('medium');
   });

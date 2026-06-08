@@ -25,8 +25,21 @@ import { readSessionEvents, setLocale } from '@deepwhale/core';
 import type { LLMClient, ChatResult, ChatChunk, ModelId } from '@deepwhale/llm';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 
+async function waitFor(
+  predicate: () => boolean,
+  message: string,
+  timeoutMs = 2_000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error(message);
+}
+
 // mock client: stream() 永不 resolve, turnInFlight 一直 true.
-function makeHangingClient(): LLMClient {
+function makeHangingClient(onStreamStarted: () => void): LLMClient {
   return {
     model: 'mock-d196-p2-hang' as ModelId,
     async chat(): Promise<ChatResult> {
@@ -36,6 +49,7 @@ function makeHangingClient(): LLMClient {
       _messages: ReadonlyArray<unknown>,
       _opts: { onChunk?: (chunk: ChatChunk) => void },
     ): Promise<ChatResult> {
+      onStreamStarted();
       // 永远不 resolve -- turnInFlight 一直为 true
       await new Promise<never>(() => {});
       // unreachable, 但 TS 要 return
@@ -75,7 +89,10 @@ describe('REPL turn-guard builtin deny (D-19.6 P2)', () => {
       },
     });
 
-    const client = makeHangingClient();
+    let streamStarted = false;
+    const client = makeHangingClient(() => {
+      streamStarted = true;
+    });
 
     let exitCode = 0;
     // 注 (D-19.6): exitCode 占位给 startRepl 退出码用, 避免默认 process.exit 杀测试进程.
@@ -92,15 +109,21 @@ describe('REPL turn-guard builtin deny (D-19.6 P2)', () => {
           return undefined as never;
         },
       });
-      await new Promise((r) => setImmediate(r));
+      await waitFor(
+        () => Buffer.concat(outChunks).toString().includes('deepwhale> '),
+        'REPL prompt did not render before test input',
+      );
       // 触发一个长跑 turn (mock 永不 resolve, turnInFlight 保持 true)
       input.write('please do the long thing\n');
       // 等 turn 真进入 in-flight 状态 (readline 派发 + stream() 进入 await)
-      await new Promise((r) => setTimeout(r, 100));
+      await waitFor(() => streamStarted, 'mock stream did not start');
       // turn 正在跑时, 立刻 /verify -- 期望 deny
       input.write('/verify\n');
       // 等 P2 守卫处理 /verify
-      await new Promise((r) => setTimeout(r, 200));
+      await waitFor(
+        () => Buffer.concat(outChunks).toString().includes('turn 正在运行'),
+        'turn-in-flight deny message did not render',
+      );
 
       // 验收 1: stdout 出现 deny 提示 (i18n cli.turn_in_flight_deny: "turn running, wait for finish")
       const outStr = Buffer.concat(outChunks).toString();

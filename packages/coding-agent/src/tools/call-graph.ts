@@ -16,7 +16,7 @@ import { buildSymbolGraph, buildCallGraph } from '@deepwhale/code-intel';
 
 export class CallGraphTool implements Tool {
   readonly name = 'call_graph' as ToolName;
-  readonly description = 'Build a call graph (caller → callee edges) for a repo. 3 sub-actions: for-symbol / for-file / for-repo. Low risk (read-only walk).';
+  readonly description = 'Build a heuristic call graph for a repo using AST symbols plus textual call matches; no type analysis or dynamic dispatch resolution. 3 sub-actions: for-symbol / for-file / for-repo. Low risk (read-only walk).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
 
   readonly schema: ToolInputSchema = {

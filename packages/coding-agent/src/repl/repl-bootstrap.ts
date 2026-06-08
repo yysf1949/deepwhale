@@ -32,6 +32,7 @@
 
 import { createInterface, type Interface as RLInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
+import { PassThrough } from 'node:stream';
 import { t, CompactionState, type ChatMessage } from '@deepwhale/core';
 import { SessionReader, SessionWriter } from '@deepwhale/core';
 import type { LLMClient } from '@deepwhale/llm';
@@ -59,6 +60,7 @@ export interface ReplBootstrapResult {
   emaState: UsageEmaState;
   compactionConfig: AgentCompactionConfig | null;
   rl: RLInterface;
+  startInputFlow: () => void;
   sessionPath: string | undefined;
   // version 透传 (greeting 用)
   version: string;
@@ -192,11 +194,17 @@ export async function createReplBootstrap(deps: ReplBootstrapDeps): Promise<Repl
   }
 
   // === rl setup ===
+  const inputGate = new PassThrough();
+  const sourceInput = options.input ?? stdin;
   const rl: RLInterface = createInterface({
-    input: options.input ?? stdin,
+    input: inputGate,
     terminal: false,
     output: options.output ?? stdout,
   });
+  const startInputFlow = (): void => {
+    sourceInput.pipe(inputGate);
+    sourceInput.resume();
+  };
 
   return {
     clientFromOptions,
@@ -211,6 +219,7 @@ export async function createReplBootstrap(deps: ReplBootstrapDeps): Promise<Repl
     emaState,
     compactionConfig,
     rl,
+    startInputFlow,
     sessionPath,
     version,
   };

@@ -7,6 +7,10 @@ import { WebhookSubscriptionsTool } from '../../src/tools/webhook-subscriptions.
 describe('webhook_subscriptions', () => {
   let dir = '';
   let tool: WebhookSubscriptionsTool;
+
+  function rawSubscriptions(meta: unknown): Array<{ id: string }> {
+    return JSON.parse((meta as { raw: string }).raw) as Array<{ id: string }>;
+  }
   beforeEach(async () => {
     dir = await fs.mkdtemp(join(tmpdir(), 'wh-'));
     tool = new WebhookSubscriptionsTool({ subsDir: dir });
@@ -30,7 +34,7 @@ describe('webhook_subscriptions', () => {
   it('remove deletes the sub', async () => {
     await tool.execute({ action: 'add', url: 'https://a.com/wh', event: '*' });
     const list1 = await tool.execute({ action: 'list' });
-    const subId = JSON.parse((list1.meta as any).raw)[0].id;
+    const subId = rawSubscriptions(list1.meta)[0]!.id;
     const r = await tool.execute({ action: 'remove', subId });
     expect(r.success).toBe(true);
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { RenameSymbolTool } from '../../src/tools/rename-symbol.js';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
@@ -64,5 +64,27 @@ describe('rename_symbol (D-32.2.4)', () => {
     // Actually `foo` is followed by `B` which is alphanumeric, so `\bfoo\b` won't match.
     // Therefore fooBar stays.
     expect(readFileSync(join(tmpDir, 'c.ts'), 'utf8')).toContain('fooBar');
+  });
+
+  it('does not rewrite strings or comments during reference-limited rename', async () => {
+    writeFileSync(
+      join(tmpDir, 'c.ts'),
+      [
+        'import { foo } from "./a";',
+        '// foo should stay in this comment',
+        'const label = "foo should stay in this string";',
+        'export function callFoo() { return foo(); }',
+        '',
+      ].join('\n'),
+    );
+
+    const r = await tool.execute({ oldName: 'foo', newName: 'baz', path: tmpDir, apply: true });
+
+    expect(r.success).toBe(true);
+    const content = readFileSync(join(tmpDir, 'c.ts'), 'utf8');
+    expect(content).toContain('import { baz } from "./a";');
+    expect(content).toContain('// foo should stay in this comment');
+    expect(content).toContain('"foo should stay in this string"');
+    expect(content).toContain('return baz();');
   });
 });
