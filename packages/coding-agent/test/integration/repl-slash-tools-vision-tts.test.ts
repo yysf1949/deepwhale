@@ -29,6 +29,6 @@ describe('repl slash /tools (with vision + tts, D-30.4.7; +6 D-31.1.7; +4 D-31.2
     const outText = out.mock.calls.map((c) => c[0]).join('');
     expect(outText).toContain('vision_analyze');
     expect(outText).toContain('text_to_speech');
-    expect(outText).toMatch(/40 tools/);
+    expect(outText).toMatch(/41 tools/);
   });
 });

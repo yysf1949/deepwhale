@@ -54,6 +54,7 @@ import { FindDefinitionTool } from './find-definition.js'; // D-32.1.4: single-f
 import { FindReferencesTool } from './find-references.js'; // D-32.2.2: cross-file find references
 import { CallGraphTool } from './call-graph.js'; // D-32.2.3: cross-file call chain
 import { RenameSymbolTool } from './rename-symbol.js'; // D-32.2.4: cross-file rename (word-boundary)
+import { SmartSearchTool } from './smart-search.js'; // D-32.3.1: symbol-aware + gh CLI remote search
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -172,5 +173,8 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   //   rename_symbol: 跨文件 rename (dry-run by default, apply=true to write).
   reg.register(new CallGraphTool());
   reg.register(new RenameSymbolTool());
+  // D-32.3.1 (2026-06-08): 装 smart_search — 40 → 41. 走 code-intel + gh CLI remote
+  //   (gh code search 公开 GitHub repo). 3 action: local / remote / all.
+  reg.register(new SmartSearchTool());
   return reg;
 }
