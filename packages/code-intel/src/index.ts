@@ -26,3 +26,16 @@ export {
   type Symbol,
   type SymbolKind,
 } from './symbols.js';
+
+// D-32.2.1 (2026-06-08): symbol-graph 跨文件 reference infra
+export {
+  buildSymbolGraph,
+  findReferences,
+  buildCallGraph,
+  type SymbolGraph,
+  type CallGraph,
+  type CallEdge,
+  type FileSymbols,
+  type Import,
+  type Reference,
+} from './symbol-graph.js';
