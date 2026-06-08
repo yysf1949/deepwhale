@@ -51,6 +51,7 @@ import { ParseFileTool } from './parse-file.js'; // D-32.1.1 (2026-06-08): parse
 import { GetSymbolsTool } from './get-symbols.js'; // D-32.1.2: extract symbols from file
 import { AnalyzeRepoTool } from './analyze-repo.js'; // D-32.1.3: walk repo + lang stats
 import { FindDefinitionTool } from './find-definition.js'; // D-32.1.4: single-file symbol search
+import { FindReferencesTool } from './find-references.js'; // D-32.2.2: cross-file find references
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -161,5 +162,8 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   reg.register(new GetSymbolsTool());
   reg.register(new AnalyzeRepoTool());
   reg.register(new FindDefinitionTool());
+  // D-32.2.2 (2026-06-08): 装 find_references — 37 → 38. 走 @deepwhale/code-intel
+  //   buildSymbolGraph + findReferences, 跨文件 search (references / count 2 mode).
+  reg.register(new FindReferencesTool());
   return reg;
 }
