@@ -2,7 +2,7 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
-> **当前分支状态（2026-06-09, `release/v2.0`）**：D-33.5 v3.0 execute review 收口（PR #3-#7 待 merge，PR #8 stage-5 待 push）。默认 registry 仍只暴露 coding + Code Intel essentials (19 tools)。v3.0 新增 Reviewer role (verification-only) · Compaction hook contract · Computer Use compat layer (provider-delegation only) · Gate-2 long-horizon harness (35-step fixture pass, retries=1, drift=false)。Browser enhancement (Task 5.3) 显式 skip — 需 Stage 3 browser/* 合并后做独立 sub-sprint。
+> **当前分支状态（2026-06-09, `release/v2.0`）**：D-33.6 v4.0 research and Agent OS 收口（PR #3-#7 待 merge，PR #8 stage-5 v3.0 收口, PR #9 stage-6 v4.0 收口待 push）。默认 registry 仍只暴露 coding + Code Intel essentials (19 tools)。v4.0 新增 Researcher role (read-only, cannot write/run) · Cross-Session TaskGraph (append-only JSONL, retry counters, crash recovery) · Persistent Memory (user/project/session 3 scope, hand-edit precedence) · Channel opt-in registry (channel.* opt-in only)。Desktop shell (Task 6.4) 显式 skip — master plan 要求 Gate-2 真 task pass + user 显式批准。
 
 [![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 > 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
