@@ -203,12 +203,11 @@ function argsReferenceOutsideWorkspace(args: unknown, workspaceNorm: string): bo
   // off-target writes.
   const visit = (s: string): boolean => {
     if (s.length < 3) return false;
-    const norm = s.replace(/\\/g, '/').toLowerCase();
-    // Only flag if it looks like a real path (contains a slash or starts with drive letter)
-    const looksLikePath = /^[a-z]:[\\/]|^\//i.test(s);
-    if (!looksLikePath) return false;
-    if (norm.includes(workspaceNorm)) return false;
-    return true;
+    for (const path of extractAbsolutePathTokens(s)) {
+      const norm = path.replace(/\\/g, '/').toLowerCase();
+      if (!norm.startsWith(workspaceNorm)) return true;
+    }
+    return false;
   };
   if (typeof args === 'string') return visit(args);
   if (Array.isArray(args)) return args.some((v) => (typeof v === 'string' ? visit(v) : false));
@@ -218,6 +217,23 @@ function argsReferenceOutsideWorkspace(args: unknown, workspaceNorm: string): bo
     }
   }
   return false;
+}
+
+function extractAbsolutePathTokens(value: string): string[] {
+  const tokens: string[] = [];
+  const windowsDrivePath = /(^|[^\w+.-])([a-zA-Z]:[\\/][^\s"'`<>|]*)/g;
+  const posixAbsolutePath = /(^|[\s"'`(=])\/(?!\/)[^\s"'`<>|]*/g;
+  for (const match of value.matchAll(windowsDrivePath)) {
+    tokens.push(trimPathToken(match[2] ?? ''));
+  }
+  for (const match of value.matchAll(posixAbsolutePath)) {
+    tokens.push(trimPathToken(match[0].trimStart()));
+  }
+  return tokens.filter((token) => token.length > 0);
+}
+
+function trimPathToken(token: string): string {
+  return token.replace(/[),.;\]]+$/g, '');
 }
 
 function argsReferenceWorkspace(
