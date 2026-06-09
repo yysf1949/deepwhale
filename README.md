@@ -2,15 +2,16 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
-> **当前分支状态（2026-06-09, `feature/d36-gate2-live` Gate-2 LIVE 已过 ✅）**: D-37 完成一次真实 Gate-2 LIVE pass。Runner 用 `deepseek-v4-flash` (model: `deepseek-chat`, baseUrl: `https://api.deepseek.com/v1`, via DEEPSEEK key in `D:\App\openClaw\projects\deepwhale\.env`,gitignored) 跑 fixture task: fix 3 bugs in `C:\Users\.../Temp\gate2-fixture-workspace\src\calc.ts` (subtract/power/squareRoot)。Report 真实数据:
-> - `source=live-llm passed_live=true passed_mock=false finalResult=pass reviewStatus=approve`
-> - `toolCalls=42 retries=0 taskgraphNodes=40 durationMs=72120`
-> - 工具 used: bash, read_file, patch, write_file, find, execute_code
-> - pnpm test 绿,fail 0
-> - Honest notes: `goalDriftDetected=true` 是 heuristic false positive (token-overlap 对 shell args 误判),不影响 review approve 和 pass
-> - 真实证据: `docs/superpowers/gate-2-long-horizon-live.{json,md}` (新) + `docs/superpowers/gate2-live-trace.json` (94 steps 完整 transcript)
-> - **可进入下一轮决策** (Browser enhancement / Desktop shell / Cross-session memory 集成 / 长期 roadmap)。**未解锁**任何默认新能力。
-> - D-36 runner dual-path (`--mock` 严格 `passed_live=false` / `--llm-config` 真 HTTP call) 全保留,12/12 unit tests + 2 integration tests pass。
+> **当前分支状态（2026-06-09, `feature/d36-gate2-live` D-38 evidence hardening, Gate-2 LIVE not passed)**: D-38 把 passedLive 规则从"软判定"升级为"硬 fail"6 条件 (source=live-llm, review=approve, finalResult=pass, liveError absent, toolCalls∈[30,50], goalDriftDetected=false)。D-37 的 LIVE run (`proc_ffb3c705524d`, 42 calls, review=approve) 在新规则下被 downgraded:实际再跑 D-38 runner,**`passed_live=false`**,三个硬 fail 同时触发:
+> 1. `toolCalls=54 > 50` (max 触顶,LLM 没收敛)
+> 2. `finalResult=limit` (not `'pass'`)
+> 3. `goalDriftDetected=true` (heuristic 误判 — shell arg token 不含 goal words,但仍按硬 fail 规则)
+>
+> 实际 LLM 行为: DeepSeek v4-flash 调了 54 tool calls (bash/read_file/patch/write_file/find/execute_code),**所有 3 个 bug 正确 fix** (subtract/power/squareRoot),workspace `pnpm test` 返 `fail 0`,但 runner 自己 maxSteps 触顶且 drift heuristic 误报 → D-38 strict rules 不放过。**诚实结论**: evidence 已 produce (3 个文件:`gate-2-long-horizon-live.{json,md}` + `gate2-live-trace.json` 完整 94 steps transcript),**passed_live 硬 fail** by D-38 rules。要 unlock 真 pass 需要:(a) 改进 drift detector 看 assistant content 而不是 tool summary tokens,或 (b) 设计一个真正需要 30-50 calls 的子任务,或 (c) 提 `maxSteps` 让 LLM 自然 stop 报 `'pass'`。
+>
+> **未解锁任何新能力**。Browser enhancement / Desktop shell / Channel default tools 仍 off, default registry 19 tools 冻结。Runner dual-path (`--mock`/`--llm-config` 互斥) 全保留。
+>
+> 验证: 23/23 gate2-runner-core unit tests pass (12 旧 + 11 新 D-38 strict rules + readTaskConfig reviewGates round-trip),`pnpm typecheck/lint` exit 0,`pnpm test` 1 fail (verify-runner D-11 pre-existing)。5 红线 0 改。`git diff --check` clean。
 
 [![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 > 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)

@@ -1,18 +1,18 @@
 {
   "source": "live-llm",
-  "passed_live": true,
+  "passed_live": false,
   "passed_mock": false,
-  "toolCalls": 42,
+  "toolCalls": 54,
   "retries": 0,
   "goalDriftDetected": true,
   "reviewStatus": "approve",
-  "taskgraphNodes": 40,
+  "taskgraphNodes": 46,
   "fixture": {
     "goal": "Fix the bugs in the workspace's src/calc.ts. There are 3 bugs (subtract, power, squareRoot). Run the test suite with `pnpm test` to see the failures, edit the source file using the patch tool, then run the tests again to verify all 6 tests pass. The test file is correct; only edit src/calc.ts. Use the patch tool to edit files. Aim for 5-15 tool calls.",
     "workspacePath": "C:/Users/butterfly443/AppData/Local/Temp/gate2-fixture-workspace"
   },
-  "finalResult": "pass",
-  "startedAt": "2026-06-09T10:23:40.979Z",
-  "finishedAt": "2026-06-09T10:24:53.099Z",
-  "durationMs": 72120
+  "finalResult": "limit",
+  "startedAt": "2026-06-09T11:35:03.654Z",
+  "finishedAt": "2026-06-09T11:36:23.569Z",
+  "durationMs": 79915
 }
