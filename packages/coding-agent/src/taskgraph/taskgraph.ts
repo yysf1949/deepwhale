@@ -115,7 +115,9 @@ export class TaskGraphStore {
   }
 }
 
-export interface CreateTaskGraphStoreOptions extends TaskGraphOptions {}
+export interface CreateTaskGraphStoreOptions {
+  readonly root: string;
+}
 
 export async function createTaskGraphStore(opts: CreateTaskGraphStoreOptions): Promise<TaskGraphStore> {
   const store = new TaskGraphStore(opts);
