@@ -288,6 +288,30 @@ function extractBashCommand(args: unknown): string | undefined {
   return undefined;
 }
 
+export function sanitizeTraceForPersistence(value: unknown): unknown {
+  if (typeof value === 'string') return redactTraceString(value);
+  if (Array.isArray(value)) return value.map((item) => sanitizeTraceForPersistence(item));
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      if (key === 'reasoning_content') continue;
+      out[key] = sanitizeTraceForPersistence(child);
+    }
+    return out;
+  }
+  return value;
+}
+
+function redactTraceString(value: string): string {
+  return value
+    .replace(/[a-zA-Z]:[\\/][^\s"'`<>|]*?gate2-fixt-[^\\/\s"'`<>|]*/gi, '<materialized-gate2-fixture-workspace>')
+    .replace(/\/[^\s"'`<>|]*?gate2-fixt-[^/\s"'`<>|]*/g, '<materialized-gate2-fixture-workspace>')
+    .replace(/[a-zA-Z]:[\\/][^\s"'`<>|]*?dw-exec-[^\\/\s"'`<>|]*/gi, '<temp-exec-workspace>')
+    .replace(/\/[^\s"'`<>|]*?dw-exec-[^/\s"'`<>|]*/g, '<temp-exec-workspace>')
+    .replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, '<redacted-secret>')
+    .replace(/\bapi_key\s*=\s*<redacted-secret>/gi, 'api_key=<redacted-secret>');
+}
+
 // ============================================================================
 // Task messages + tool summarization + TaskGraph adapter
 // ============================================================================
@@ -525,9 +549,9 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
       tracePath,
       JSON.stringify(
         {
-          messages: result?.messages ?? [],
-          steps: result?.steps ?? [],
-          review: result?.review,
+          messages: sanitizeTraceForPersistence(result?.messages ?? []),
+          steps: sanitizeTraceForPersistence(result?.steps ?? []),
+          review: sanitizeTraceForPersistence(result?.review),
         },
         null,
         2,

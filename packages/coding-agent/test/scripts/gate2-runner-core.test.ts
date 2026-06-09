@@ -488,6 +488,60 @@ describe('gate2-runner-core: readTaskConfig reads reviewGates', () => {
   });
 });
 
+describe('gate2-runner-live: trace persistence redaction (D-54)', () => {
+  it('redacts private reasoning, temp paths, and API-key-like strings', async () => {
+    const { sanitizeTraceForPersistence } = await import('../../scripts/gate2-runner-live.js');
+    const rawTrace = {
+      messages: [
+        {
+          role: 'assistant',
+          content: 'working in C:\\Users\\BUTTER~1\\AppData\\Local\\Temp\\gate2-fixt-6fq37h',
+          reasoning_content: 'private chain of thought',
+        },
+      ],
+      steps: [
+        {
+          kind: 'tool',
+          tool_call: {
+            name: 'execute_code',
+            args: {
+              code: "const key = 'sk-proj-1234567890abcdef1234567890abcdef';",
+              cwd: 'C:\\Users\\BUTTER~1\\AppData\\Local\\Temp\\dw-exec-B2dPca',
+            },
+          },
+          result: {
+            success: true,
+            content: 'wrote C:/Users/BUTTER~1/AppData/Local/Temp/gate2-fixt-6fq37h/docs/API.md',
+          },
+        },
+      ],
+      review: {
+        details: [
+          {
+            stdout: 'workspace C:\\Users\\BUTTER~1\\AppData\\Local\\Temp\\gate2-fixt-6fq37h',
+            stderr: 'token api_key=sk-test-abcdef1234567890abcdef',
+          },
+        ],
+      },
+    };
+
+    const sanitized = sanitizeTraceForPersistence(rawTrace);
+    const serialized = JSON.stringify(sanitized);
+    expect(serialized).not.toContain('reasoning_content');
+    expect(serialized).not.toContain('private chain of thought');
+    expect(serialized).not.toContain('C:\\Users\\BUTTER');
+    expect(serialized).not.toContain('C:/Users/BUTTER');
+    expect(serialized).not.toContain('gate2-fixt-6fq37h');
+    expect(serialized).not.toContain('dw-exec-B2dPca');
+    expect(serialized).not.toContain('sk-proj-1234567890abcdef1234567890abcdef');
+    expect(serialized).not.toContain('sk-test-abcdef1234567890abcdef');
+    expect(serialized).toContain('<materialized-gate2-fixture-workspace>');
+    expect(serialized).toContain('<materialized-gate2-fixture-workspace>/docs/API.md');
+    expect(serialized).toContain('<temp-exec-workspace>');
+    expect(serialized).toContain('<redacted-secret>');
+  });
+});
+
 // ============================================================================
 // D-40 Drift detector: weighted (>= 2 of 4 signals) + outside-workspace hard fail
 // ============================================================================
