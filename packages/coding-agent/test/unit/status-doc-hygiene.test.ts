@@ -79,4 +79,19 @@ describe('status documentation hygiene (D-56)', () => {
       'v1-v4 are capability milestones, not a production-complete claim.',
     );
   });
+
+  it('keeps the current sprint and next-work pointers aligned after D60/D61', () => {
+    for (const path of DOCS) {
+      const block = currentStatusBlock(readRepoFile(path));
+
+      expect(block).toContain('Current sprint: D62 status/doc hygiene after D61');
+      expect(block).toContain('D60 rename scanner truthfulness');
+      expect(block).toContain('D61 Gate-2 drift prompt hardening');
+      expect(block).toContain('Next implementation slice: D63 Code Intel heuristic metadata');
+      expect(block).not.toMatch(/Current sprint: D56/i);
+      expect(block).not.toMatch(/Next (Work|Roadmap Work|Decisions Needed)[\s\S]*D57:/);
+      expect(block).not.toMatch(/Next (Work|Roadmap Work|Decisions Needed)[\s\S]*D58:/);
+      expect(block).not.toMatch(/Next (Work|Roadmap Work|Decisions Needed)[\s\S]*D59:/);
+    }
+  });
 });

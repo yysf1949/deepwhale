@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D56 status/doc hygiene
+- Current sprint: D62 status/doc hygiene after D61
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -25,6 +25,12 @@
 - Gate-2 toolCalls=31.
 - Gate-2 report: docs/superpowers/gate-2-long-horizon-live.json.
 - Gate-2 interpretation: a default-profile live fixture pass, not a blanket v1-v4 completion proof.
+
+### Completed Stabilization Slices
+
+- D60 rename scanner truthfulness: rename_symbol scanner behavior is more honest around comments, strings, block comments, and TS private identifiers.
+- D61 Gate-2 drift prompt hardening: nested tool args are checked for outside-workspace paths and the live task prompt supports task-directed verification.
+- D62 status/doc hygiene after D61: public current-status blocks are aligned to current evidence and stale D56-D59 next-work pointers are removed.
 
 ### Milestone Status
 
@@ -49,10 +55,10 @@
 
 ### Next Roadmap Work
 
-1. D56: align public status and remove first-screen status ambiguity.
-2. D57: reconcile registry profiles with the stabilization profile policy.
-3. D58: harden Code Intel reference, import, call graph, and rename truthfulness.
-4. D59: produce preferred 100K Gate-1 evidence or a stronger blocker.
+1. D62: finish status/doc hygiene after D61 and keep current-status tests strict.
+2. Next implementation slice: D63 Code Intel heuristic metadata.
+3. D64: isolate opt-in registry profile loading without expanding the default profile.
+4. D65: produce preferred 100K Gate-1 evidence or keep the blocker machine-readable.
 5. Re-score v1-v4 only from current tests and gate artifacts.
 6. Plan v5 and v6 after v1-v4 status is evidence-backed.
 

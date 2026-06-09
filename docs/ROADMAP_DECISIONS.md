@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Decision mode: stabilization first, expansion later
-- Current sprint: D56 status/doc hygiene
+- Current sprint: D62 status/doc hygiene after D61
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -36,6 +36,12 @@
 - Gate-2 interpretation: default-profile invoice fixture passed the live runner conditions.
 - Gate-2 limit: it does not unlock Browser, Desktop, Channel, media, or productivity defaults.
 
+### Completed Stabilization Slices
+
+- D60 rename scanner truthfulness: keep rename_symbol scanner claims conservative and tested around comments, strings, block comments, and TS private identifiers.
+- D61 Gate-2 drift prompt hardening: inspect nested tool args for outside-workspace paths and keep Gate-2 live prompts aligned with task-directed verification.
+- D62 status/doc hygiene after D61: keep public current-status blocks synchronized with the latest evidence.
+
 ### Decision Hygiene
 
 - If an old decision below conflicts with this block, prefer this block.
@@ -50,11 +56,12 @@
 
 ### Next Decisions Needed
 
-1. D57: normalize registry profiles or document aliases without default expansion.
-2. D58: decide the next Code Intel truthfulness target by failing tests.
-3. D59: decide how to obtain a local 100K+ Gate-1 target.
-4. Re-score v1-v4 after D57-D59 evidence.
-5. Draft v5 and v6 only after v1-v4 gaps are evidence-backed.
+1. D62: finish status/doc hygiene after D61 and keep tests guarding stale next-work pointers.
+2. Next implementation slice: D63 Code Intel heuristic metadata.
+3. D64: decide whether to split registry profile loading into opt-in modules.
+4. D65: decide how to obtain or explicitly block local 100K+ Gate-1 evidence.
+5. Re-score v1-v4 after D63-D65 evidence.
+6. Draft v5 and v6 only after v1-v4 gaps are evidence-backed.
 
 ### Repository Scope
 
