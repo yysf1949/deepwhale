@@ -48,6 +48,11 @@ export interface Gate1Metrics {
   timeboxMs: number;
 }
 
+export interface Gate1LocStats {
+  loc: number;
+  files: number;
+}
+
 export interface Gate1Evidence {
   entry?: Gate1SymbolEvidence;
   callChain: CallEdge[];
@@ -232,7 +237,7 @@ export async function loadGate1CliConfig(args: string[], cwd = process.cwd()): P
   return config;
 }
 
-async function countSupportedLoc(repoPath: string, maxDepth = 8): Promise<{ loc: number; files: number }> {
+export async function countSupportedLoc(repoPath: string, maxDepth = 8): Promise<Gate1LocStats> {
   const abs = resolve(repoPath);
   const s = await stat(abs);
   if (!s.isDirectory()) throw new Error(`not-a-directory: ${abs}`);

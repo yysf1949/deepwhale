@@ -24,6 +24,8 @@
 >
 > **状态**: Gate-2 LIVE default-profile **passed_live=true** 严格 6 条件全过。**未解锁任何新能力**。Browser / Desktop / Channel / media / productivity 仍 off, default registry 19 tools 冻结。**下一步优先 D47: 100K+ Gate-1 preferred evidence**。
 
+> **D47 Gate-1 preferred status (2026-06-10)**: local target inventory found only `.gate-targets/vite` at 86,216 supported LOC. Vite remains a valid `minimum-50k` Gate-1 pass, but `preferred-100k` evidence is blocked until a local 100K+ target is provided or prepared. See `docs/superpowers/gate-1-preferred-targets.{json,md}`.
+
 [![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 > 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
 [![Status](https://img.shields.io/badge/status-Phase%201-yellow)]()

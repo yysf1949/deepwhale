@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-06-09T16:27:02.438Z",
+  "targetsRoot": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets",
+  "minimumLoc": 50000,
+  "preferredLoc": 100000,
+  "status": "minimum-only",
+  "targets": [
+    {
+      "name": "vite",
+      "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\vite",
+      "loc": 86216,
+      "supportedFiles": 1395,
+      "locQualification": "minimum-50k"
+    }
+  ],
+  "preferredTargets": [],
+  "minimumTargets": [
+    {
+      "name": "vite",
+      "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\vite",
+      "loc": 86216,
+      "supportedFiles": 1395,
+      "locQualification": "minimum-50k"
+    }
+  ],
+  "bestAvailable": {
+    "name": "vite",
+    "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\vite",
+    "loc": 86216,
+    "supportedFiles": 1395,
+    "locQualification": "minimum-50k"
+  },
+  "blocker": "no local 100K+ target found for preferred Gate-1 evidence; best local target is vite with 86216 LOC, below preferred 100000"
+}

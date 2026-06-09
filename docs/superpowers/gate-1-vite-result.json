@@ -10,9 +10,9 @@
     "symbolsIndexed": 7427,
     "referencesIndexed": 30821,
     "callEdges": 32165,
-    "elapsedMs": 1827,
-    "graphBuildMs": 1228,
-    "callGraphMs": 333,
+    "elapsedMs": 2406,
+    "graphBuildMs": 1592,
+    "callGraphMs": 568,
     "minLoc": 50000,
     "preferredLoc": 100000,
     "timeboxMs": 1200000

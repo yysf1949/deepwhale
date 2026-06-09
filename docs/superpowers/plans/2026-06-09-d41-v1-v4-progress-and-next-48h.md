@@ -43,6 +43,11 @@
   - `passed_live=true`, `toolCalls=31`, `reviewStatus=approve`, `finalResult=pass`, `goalDriftDetected=false`, and no `liveError`.
   - This proves the frozen default coding + Code Intel tool surface can pass the invoice fixture under the strict six Gate-2 conditions.
   - It still does not prove v1-v4 production completeness or unlock Browser, Desktop, Channel, media, productivity, or marketplace defaults.
+- D47 Gate-1 preferred target inventory:
+  - `docs/superpowers/gate-1-preferred-targets.json` records `status: "minimum-only"`.
+  - The only local `.gate-targets` directory is `vite`, with 86,216 supported LOC and `locQualification: "minimum-50k"`.
+  - Preferred `100K+` Gate-1 evidence remains blocked by missing local target; do not upgrade Code Intel maturity based on the Vite run alone.
+  - Fresh Vite Gate-1 evidence remains `passed=true` and `locQualification: "minimum-50k"`.
 
 ## Progress Numbers
 
@@ -50,14 +55,14 @@ These are implementation-readiness estimates, not marketing release labels.
 
 | Scope | Current | Evidence | Main gap |
 | --- | ---: | --- | --- |
-| Gate-0 stabilization | 87% | default registry frozen, D46 default-profile Gate-2 evidence produced; D41/D45 fresh `pnpm typecheck` / `pnpm lint` / `pnpm test` passed | keep verification fresh after each stabilization slice |
+| Gate-0 stabilization | 88% | default registry frozen, D46 default-profile Gate-2 evidence produced; D47 target inventory makes Gate-1 preferred blocker explicit | keep verification fresh after each stabilization slice |
 | v1.0 coding core | 85% | CLI/TUI/tools/session/policy/sandbox exist | release docs/version story and ongoing verify-runner regression coverage |
-| v1.5 Code Intel foundation | 73% | import/reference graph, heuristic call graph, conservative rename tests, Gate-1 LOC qualification in JSON/MD evidence | real 100K preferred Gate-1 proof and deeper rename binding remain |
+| v1.5 Code Intel foundation | 74% | import/reference graph, heuristic call graph, conservative rename tests, Gate-1 LOC qualification, D47 preferred-target inventory | real 100K preferred Gate-1 proof is blocked by missing local target; deeper rename binding remains |
 | v2.0 Observe/Browser foundation | 45% | browser observation/planner/runtime MVP and Gate-1.5 harness exist | real 20-task browser decision gate not run |
 | v2.5 Planning | 40% | TaskDag, planner boundary, plan cache exist | planner is still simple decomposition, weak integration |
 | v3.0 Execute/Review | 52% | reviewer, compaction hook, Computer compat, Gate-2 live runner passed D46 invoice fixture on default profile | Gate-2 fixture is still artificial and does not prove production long-horizon maturity |
 | v4.0 Agent OS | 30% | researcher, taskgraph, persistent memory, channel opt-in stubs exist | multi-role orchestration, desktop, marketplace, real persistence maturity missing |
-| v1-v4 aggregate | 58% | many modules and tests exist; D46 closes default-profile Gate-2 evidence caveat | much is MVP/heuristic; gates and docs are ahead of product maturity |
+| v1-v4 aggregate | 59% | many modules and tests exist; D46 closes default-profile Gate-2 evidence caveat; D47 makes Gate-1 preferred blocker machine-readable | much is MVP/heuristic; gates and docs are ahead of product maturity |
 
 ## Non-Negotiables
 
