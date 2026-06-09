@@ -2,9 +2,7 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
-> **当前分支状态（2026-06-09, `release/v2.0`, HEAD `afbbe06`）**：stabilization + Gate sprint 完. 默认 registry 只暴露 coding + Code Intel essentials (19 tools), Browser / media / productivity / research / engineering 工具保留为显式 profile opt-in. Gate-1 Vite 86K LOC 已 pass, 当前 workspace 仍 < 50K LOC 故 `pnpm gate1:current` 报 `loc-below-minimum` (acceptable). 41 tools 装在 `all` profile, 默认 0 暴露.
-
-> **v1.0 capability checklist (D-33.1 收口)**: normalized tool result contracts ✓ · linear session contract locked ✓ · prefix-cache provider contracts locked ✓ · TUI core workflows locked ✓ · 6 packages v1.0.x ready (PR pending — see `feature/d33.1-stage-1-v1-release` branch).
+> **当前分支状态（2026-06-09, `release/v2.0`）**：D-33.3 v2.0 closure 收口（PR #3-#6 待 merge）。默认 registry 仍只暴露 coding + Code Intel essentials (19 tools)。v2.0 新增 memory ranking / semantic search lexical fallback / browser foundation (opt-in, no live automation) / MCP runtime (manifest only) / Gate-1.5 viability harness (fixture-based)，全部保持默认 profile 之外。Code Intel 当前为 heuristic；Gate-1 Vite 86K LOC 已 pass，`pnpm gate1:current` 在当前 workspace (< 50K LOC) 报 `loc-below-minimum` 是 acceptable。
 
 [![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 > 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)

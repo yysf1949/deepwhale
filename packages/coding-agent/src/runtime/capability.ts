@@ -27,7 +27,8 @@ export type CapabilitySource =
   | 'browser'
   | 'computer'
   | 'skill'
-  | 'channel';
+  | 'channel'
+  | 'extension';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 
@@ -35,7 +36,14 @@ export interface Capability {
   readonly id: string;
   readonly source: CapabilitySource;
   readonly riskLevel: RiskLevel;
-  readonly profiles: ReadonlyArray<ToolRegistryProfile>;
+  /**
+   * Profile tags this capability is exposed under.
+   * Subset of ToolRegistryProfile ('default' | 'core' | ... | 'all') PLUS
+   * capability-only profiles (e.g. 'mcp', 'browser', 'computer', 'channel').
+   * Modeled as a string array so MCP/Browser/etc. capabilities can be added
+   * without widening ToolRegistryProfile.
+   */
+  readonly profiles: ReadonlyArray<ToolRegistryProfile | 'mcp' | 'browser' | 'computer' | 'channel'>;
   readonly description?: string;
   readonly sideEffects?: ReadonlyArray<string>;
 }

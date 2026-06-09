@@ -17,7 +17,7 @@ export interface RegisterCapabilityInput {
   id: string;
   source: CapabilitySource;
   riskLevel: RiskLevel;
-  profiles: ReadonlyArray<ToolRegistryProfile>;
+  profiles: ReadonlyArray<Capability['profiles'][number]>;
   description?: string;
   sideEffects?: ReadonlyArray<string>;
 }
@@ -36,11 +36,11 @@ export class CapabilityRegistry {
     return this.capabilities.get(id);
   }
 
-  list(filter?: { profiles?: ReadonlyArray<ToolRegistryProfile> }): ReadonlyArray<Capability> {
+  list(filter?: { profiles?: ReadonlyArray<ToolRegistryProfile | 'mcp' | 'browser' | 'computer' | 'channel'> }): ReadonlyArray<Capability> {
     const all = Array.from(this.capabilities.values());
     if (!filter?.profiles) return all;
-    const wanted = new Set<ToolRegistryProfile>(filter.profiles);
-    return all.filter((c) => c.profiles.some((p) => wanted.has(p)));
+    const wanted = new Set<ToolRegistryProfile | 'mcp' | 'browser' | 'computer' | 'channel'>(filter.profiles);
+    return all.filter((c) => c.profiles.some((p) => wanted.has(p as ToolRegistryProfile | 'mcp' | 'browser' | 'computer' | 'channel')));
   }
 
   size(): number {
@@ -51,3 +51,6 @@ export class CapabilityRegistry {
 export function createCapabilityRegistry(): CapabilityRegistry {
   return new CapabilityRegistry();
 }
+
+// Re-export types so callers (e.g. mcp/runtime.ts) can import Capability from one place.
+export type { Capability, CapabilitySource, RiskLevel } from './capability.js';
