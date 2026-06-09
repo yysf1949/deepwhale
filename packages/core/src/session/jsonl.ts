@@ -352,3 +352,26 @@ export async function readSessionEvents(path: string): Promise<ReadonlyArray<Ses
   }
   return events;
 }
+
+/**
+ * D-33.1.2: append 一条 event 的便捷工厂 — 内部用 SessionWriter 串行化 append + close.
+ *
+ * 拍板: 跟 readSessionEvents 配对, 给 v1.0 linear session contract 测试 + caller
+ * 1 个 0 持有 writer 句柄的简单入口. 内部走 SessionWriter.open → append → close,
+ * 错误冒泡给 caller (跟 readSessionEvents 一致).
+ *
+ * ts 不传时, 内部用 Date.now() 拍 — caller 注入 ts 仅在测试场景下需要 (时序可控).
+ */
+export async function appendSessionEvent(
+  path: string,
+  event: Omit<SessionEvent, 'ts'> & { ts?: number },
+): Promise<void> {
+  const writer = new SessionWriter(path);
+  await writer.open();
+  try {
+    const ts = event.ts ?? Date.now();
+    await writer.append({ ...event, ts } as SessionEvent);
+  } finally {
+    await writer.close();
+  }
+}

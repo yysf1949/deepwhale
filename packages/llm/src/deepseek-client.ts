@@ -305,7 +305,8 @@ export class DeepSeekClient implements LLMClient {
   ): Record<string, unknown> {
     return {
       model: this.model,
-      messages: messages.map(toWireMessage),
+      // D-33.1.3: 走公开的 serializeDeepSeekMessagesForTest (跟单测同一份代码, 防 wire shape 漂移)
+      ...serializeDeepSeekMessagesForTest(messages),
       stream,
       // P1 fix (2026-06-03): OAI/DeepSeek 在 stream=true 时, 必须在 body 里
       // 显式带 stream_options.include_usage=true, 服务端才在最后一个 chunk
@@ -490,7 +491,18 @@ function loadDefaultPricing(): PricingConfig | undefined {
  *   - 空字符串 reasoning_content (thinking 关): 仍然序列化为 "" 字段, 跟
  *     DeepSeek 服务端 round-trip 一致 (不依赖"字段缺失"判断). 拍板: thinking
  *     关时省掉字段 (omitempty 风格, 减少 wire 噪音), 见下行 guard.
+ *
+ * D-33.1.3: `serializeDeepSeekMessagesForTest` 导出此函数给单测覆盖 (consumer =
+ * provider-cache-contract.test.ts), 让 prefix-cache 4 机制 (content="" 永久,
+ * reasoning 不打 wire, tool_call 包装, canonical schema) 有零依赖单测覆盖,
+ * 不再需要起 mock fetch 验 wire payload.
  */
+export function serializeDeepSeekMessagesForTest(
+  messages: ReadonlyArray<ChatMessage>,
+): { messages: ReadonlyArray<Record<string, unknown>> } {
+  return { messages: messages.map(toWireMessage) };
+}
+
 function toWireMessage(m: ChatMessage): Record<string, unknown> {
   if (m.role === 'tool') {
     return {
