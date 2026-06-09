@@ -144,7 +144,7 @@ export function validateRunSpec(spec: RunSpec): { ok: true } | { ok: false; reas
 /** Read LLM config from JSON. Throws if apiKey is empty. */
 export async function readLLMConfig(path: string): Promise<LLMConfig> {
   const raw = await readFile(path, 'utf8');
-  const parsed = JSON.parse(raw) as Partial<LLMConfig>;
+  const parsed = parseJsonWithOptionalBom(raw) as Partial<LLMConfig>;
   if (!parsed.apiKey || parsed.apiKey.length === 0) {
     throw new Error(`llm-config at ${path} has empty or missing apiKey; refusing to fall back to mock`);
   }
@@ -158,7 +158,7 @@ export async function readLLMConfig(path: string): Promise<LLMConfig> {
 /** Read task config from JSON. */
 export async function readTaskConfig(path: string): Promise<TaskConfig> {
   const raw = await readFile(path, 'utf8');
-  const parsed = JSON.parse(raw) as Partial<TaskConfig>;
+  const parsed = parseJsonWithOptionalBom(raw) as Partial<TaskConfig>;
   if (!parsed.goal || parsed.goal.length === 0) {
     throw new Error(`task-config at ${path} has empty or missing goal`);
   }
@@ -174,6 +174,10 @@ export async function readTaskConfig(path: string): Promise<TaskConfig> {
     ...(parsed.reviewGates !== undefined ? { reviewGates: parsed.reviewGates } : {}),
     registryProfile: readRegistryProfile((parsed as { registryProfile?: unknown }).registryProfile),
   };
+}
+
+function parseJsonWithOptionalBom(raw: string): unknown {
+  return JSON.parse(raw.replace(/^\uFEFF/, ''));
 }
 
 const VALID_REGISTRY_PROFILES: ReadonlySet<ToolRegistryProfile> = new Set([

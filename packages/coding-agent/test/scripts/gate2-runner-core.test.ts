@@ -117,6 +117,23 @@ describe('gate2-runner-core: readLLMConfig refuses to fall back to mock', () => 
       await rm(tmp, { recursive: true, force: true });
     }
   });
+
+  it('reads a valid config when the JSON file has a UTF-8 BOM', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'g2-'));
+    try {
+      const cfgPath = join(tmp, 'llm.json');
+      await writeFile(
+        cfgPath,
+        `\uFEFF${JSON.stringify({ apiKey: 'sk-test', model: 'deepseek-v4-flash' })}`,
+        'utf8',
+      );
+      const cfg = await readLLMConfig(cfgPath);
+      expect(cfg.apiKey).toBe('sk-test');
+      expect(cfg.model).toBe('deepseek-v4-flash');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('gate2-runner-core: writeReport produces machine-readable JSON and honest MD', () => {
