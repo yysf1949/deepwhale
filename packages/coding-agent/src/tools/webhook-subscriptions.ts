@@ -15,6 +15,7 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import { deepwhaleRoot } from '../util/deepwhale-paths.js';
 
 export interface Subscription {
   id: string;
@@ -100,5 +101,5 @@ export class WebhookSubscriptionsTool implements Tool {
 }
 
 export const webhookSubscriptions = new WebhookSubscriptionsTool({
-  subsDir: join(process.env.HOME || process.env.USERPROFILE || '.', '.deepwhale', 'webhooks'),
+  subsDir: join(deepwhaleRoot(), 'webhooks'),
 });

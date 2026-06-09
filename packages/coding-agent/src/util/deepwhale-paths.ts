@@ -19,6 +19,14 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+function isUsableHomePath(value: string | undefined): value is string {
+  if (value === undefined) return false
+  const trimmed = value.trim()
+  if (trimmed.length === 0) return false
+  const lower = trimmed.toLowerCase()
+  return lower !== 'undefined' && lower !== 'null'
+}
+
 /**
  * D-30.1δ.1: 解析 deepwhale root, 3 路径优先级 (跟 tui-history 1:1):
  *   1. homeOverride 显式入参 (测试 / 业务透传)
@@ -26,14 +34,15 @@ import { join } from 'node:path'
  *   3. USERPROFILE (Windows 原生) > HOME (Unix + 测试 mock) > homedir() 兜底
  */
 export function resolveDeepwhaleHome(homeOverride?: string): string {
-  if (homeOverride && homeOverride.length > 0) return homeOverride
+  if (isUsableHomePath(homeOverride)) return homeOverride
   const env = process.env['DEEPWHALE_HOME']
-  if (env && env.length > 0) return env
+  if (isUsableHomePath(env)) return env
   const windowsHome = process.env['USERPROFILE']
-  if (windowsHome && windowsHome.length > 0) return windowsHome
+  if (isUsableHomePath(windowsHome)) return windowsHome
   const unixHome = process.env['HOME']
-  if (unixHome && unixHome.length > 0) return unixHome
-  return homedir()
+  if (isUsableHomePath(unixHome)) return unixHome
+  const osHome = homedir()
+  return isUsableHomePath(osHome) ? osHome : process.cwd()
 }
 
 /** ~/.deepwhale/ root. */

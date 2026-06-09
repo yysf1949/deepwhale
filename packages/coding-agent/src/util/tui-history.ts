@@ -23,8 +23,8 @@
  */
 
 import { existsSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
+import { resolveDeepwhaleHome } from './deepwhale-paths.js'
 
 export const TUI_HISTORY_MAX = 1000
 
@@ -35,16 +35,7 @@ export const TUI_HISTORY_MAX = 1000
  *   3. HOME > USERPROFILE (Windows) > homedir() 兜底
  */
 function resolveTuiHome(homeOverride?: string): string {
-  if (homeOverride && homeOverride.length > 0) return homeOverride
-  const env = process.env['DEEPWHALE_HOME']
-  if (env && env.length > 0) return env
-  // Windows 上 Node 的 homedir() 走 USERPROFILE, 但 env test 经常只设 HOME.
-  // 显式查两个, USERPROFILE 优先 (Windows 原生), 然后 HOME (Unix 原生 + 测试 mock).
-  const windowsHome = process.env['USERPROFILE']
-  if (windowsHome && windowsHome.length > 0) return windowsHome
-  const unixHome = process.env['HOME']
-  if (unixHome && unixHome.length > 0) return unixHome
-  return homedir()
+  return resolveDeepwhaleHome(homeOverride)
 }
 
 /**

@@ -94,4 +94,15 @@ describe('deepwhale-paths (D-30.1δ.1)', () => {
     expect(root.replaceAll('\\', '/')).not.toContain('/undefined/');
     expect(root.replaceAll('\\', '/')).not.toContain('undefined/.deepwhale');
   });
+
+  it('rejects literal undefined/null env home values (D-55)', () => {
+    process.env.HOME = 'undefined';
+    process.env.USERPROFILE = 'null';
+    process.env.DEEPWHALE_HOME = 'undefined';
+    const root = deepwhaleRoot().replaceAll('\\', '/');
+    expect(root).not.toContain('/undefined/');
+    expect(root).not.toContain('/null/');
+    expect(root).not.toContain('undefined/.deepwhale');
+    expect(root).toContain('/.deepwhale');
+  });
 });

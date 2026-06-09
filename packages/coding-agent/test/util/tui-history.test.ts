@@ -153,4 +153,15 @@ describe('tui-history util (D-25 B4)', () => {
     expect(path).not.toContain('/undefined/');
     expect(path).not.toContain('undefined/.deepwhale');
   })
+
+  it('regression: tuiHistoryPath rejects literal undefined/null env home values (D-55)', () => {
+    process.env.HOME = 'undefined'
+    process.env.USERPROFILE = 'null'
+    process.env.DEEPWHALE_HOME = 'undefined'
+    const path = tuiHistoryPath().replaceAll('\\', '/')
+    expect(path).not.toContain('/undefined/')
+    expect(path).not.toContain('/null/')
+    expect(path).not.toContain('undefined/.deepwhale')
+    expect(path).toContain('/.deepwhale')
+  })
 })

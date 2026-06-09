@@ -55,6 +55,7 @@ import { FindReferencesTool } from './find-references.js'; // D-32.2.2: cross-fi
 import { CallGraphTool } from './call-graph.js'; // D-32.2.3: cross-file call chain
 import { RenameSymbolTool } from './rename-symbol.js'; // D-32.2.4: cross-file rename (word-boundary)
 import { SmartSearchTool } from './smart-search.js'; // D-32.3.1: symbol-aware + gh CLI remote search
+import { deepwhaleRoot } from '../util/deepwhale-paths.js';
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -164,7 +165,7 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
 
   const registerResearch = (): void => {
     reg.register(new ArxivTool());
-    reg.register(new BlogwatcherTool({ rootDir: process.env.HOME || process.env.USERPROFILE || '.' }));
+    reg.register(new BlogwatcherTool({ rootDir: deepwhaleRoot() }));
     reg.register(llmWiki);
     reg.register(new PolymarketTool());
   };
