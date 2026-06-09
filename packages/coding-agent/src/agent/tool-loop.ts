@@ -528,3 +528,137 @@ async function runStreamStep(
     throw err;
   }
 }
+
+// ============================================================================
+// v2.5 runTaskLoop — Executor role with pre-decomposed tasks
+// ============================================================================
+
+/**
+ * v2.5 runTaskLoop — Executor that runs a pre-decomposed list of tasks
+ * in dependency order. The Planner (separate role) decomposes goals; the
+ * Executor (this function) runs them.
+ *
+ * Contract (D-33.4.2):
+ *   - Tasks are NOT decomposed here. Calling `runTaskLoop` is the Executor.
+ *   - If a task has no `tool` field, it is recorded as skipped (success=true,
+ *     summary='no-tool-attached'). This is a deliberate "executor cannot
+ *     decompose" boundary — the Planner must have attached a tool.
+ *   - Stops on first failure (any tool returning success=false).
+ *   - Tasks whose dependencies failed/skipped are themselves skipped.
+ *
+ * v1.0 contract (runToolLoop) is NOT modified — this is a NEW export.
+ */
+export interface RunTaskLoopTask {
+  id: string;
+  goal: string;
+  dependsOn: ReadonlyArray<string>;
+  tool?: { name: string; input: Record<string, unknown> };
+}
+
+export interface RunTaskLoopOptions {
+  tasks: ReadonlyArray<RunTaskLoopTask>;
+  registry: ToolRegistry;
+  signal?: AbortSignal;
+}
+
+export interface RunTaskLoopResult {
+  results: Array<{
+    taskId: string;
+    success: boolean;
+    summary?: string;
+    error?: string;
+  }>;
+}
+
+export async function runTaskLoop(options: RunTaskLoopOptions): Promise<RunTaskLoopResult> {
+  const { tasks, registry, signal } = options;
+  const results: RunTaskLoopResult['results'] = [];
+  const status = new Map<string, 'pending' | 'running' | 'done' | 'failed' | 'skipped'>();
+  for (const t of tasks) status.set(t.id, 'pending');
+
+  // Process ready tasks in id order, repeatedly, until all done or a failure blocks progress.
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const task of tasks) {
+      if (status.get(task.id) !== 'pending') continue;
+      // Check if all dependencies are done.
+      const allDepsDone = task.dependsOn.every((d) => status.get(d) === 'done');
+      if (!allDepsDone) {
+        // If any dep is failed or skipped, this task is blocked → skip.
+        const anyBlocked = task.dependsOn.some(
+          (d) => status.get(d) === 'failed' || status.get(d) === 'skipped',
+        );
+        if (anyBlocked) {
+          status.set(task.id, 'skipped');
+          results.push({
+            taskId: task.id,
+            success: false,
+            summary: 'skipped: dependency failed or skipped',
+          });
+          progressed = true;
+        }
+        continue;
+      }
+
+      if (signal?.aborted) {
+        status.set(task.id, 'failed');
+        results.push({ taskId: task.id, success: false, error: 'aborted' });
+        return { results };
+      }
+
+      status.set(task.id, 'running');
+
+      if (!task.tool) {
+        // Executor cannot decompose — Planner must attach a tool.
+        status.set(task.id, 'done');
+        results.push({ taskId: task.id, success: true, summary: 'no-tool-attached' });
+        progressed = true;
+        continue;
+      }
+
+      const tool = registry.get(task.tool.name);
+      if (!tool) {
+        status.set(task.id, 'failed');
+        results.push({
+          taskId: task.id,
+          success: false,
+          error: `tool-not-found: '${task.tool.name}'`,
+        });
+        return { results };
+      }
+
+      let toolResult;
+      try {
+        toolResult = await tool.execute(task.tool.input);
+      } catch (err) {
+        toolResult = {
+          success: false,
+          content: '',
+          error: `tool-threw: ${err instanceof Error ? err.message : String(err)}`,
+        } as ToolResult;
+      }
+
+      if (toolResult.success) {
+        status.set(task.id, 'done');
+        results.push({
+          taskId: task.id,
+          success: true,
+          summary: toolResult.content.slice(0, 200),
+        });
+        progressed = true;
+      } else {
+        status.set(task.id, 'failed');
+        results.push({
+          taskId: task.id,
+          success: false,
+          error: toolResult.error ?? 'tool failed',
+        });
+        // Stop on first failure.
+        return { results };
+      }
+    }
+  }
+
+  return { results };
+}

@@ -97,6 +97,8 @@ pnpm dev
 - 远程容器 / Cloud sandbox
 - Desktop / Web UI (v4.0)
 
+> **v2.5 capability checklist (D-33.4 收口)**: task DAG state machine ✓ · Planner/Executor boundary (planner can decompose, executor can run, neither can do the other's job) ✓ · plan cache with stable keys ✓ · v2.5 release gate green. **Default registry unchanged**. `--mode=single` still runs the v1.0 Executor loop (no breaking change). New `runTaskLoop` is opt-in (callers must explicitly pass `tasks`). 5 红线 0 改. test count: 1046 → 1052 pass (+6 new tests).
+
 **Accept risks** (跟 README L459-466 一致):
 - 真 LLM cache 命中验证留 sprint 2 (D-20.2 P1 拍板)
 - 偶发 verify-runner.test.ts 1 it fail (跨 test 状态污染, 单跑 pass, 留 sprint 调查) — **D-20.6.6 (2026-06-06) 复现**: `signal 触发时 kill 当前 child, status=aborted` race (s1 50ms 内未跑完), 全量偶发 1/521 fail, focused 16/16 pass
