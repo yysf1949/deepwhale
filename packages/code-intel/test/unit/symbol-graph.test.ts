@@ -136,6 +136,195 @@ describe('symbol-graph (D-32.2.1)', () => {
     }
   });
 
+  it('does not index block-comment identifier mentions as references', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-block-comment-refs-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          'function target() {',
+          '  return 1;',
+          '}',
+          '',
+          'function run() {',
+          '  /* target();',
+          '     target is mentioned here too',
+          '  */',
+          '  return 0;',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'target');
+
+      expect(refs).toEqual([
+        expect.objectContaining({ file: 'main.ts', kind: 'declaration', line: 1 }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not build call graph edges from block-comment call expressions', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-block-comment-calls-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          'function target() {',
+          '  return 1;',
+          '}',
+          '',
+          'function run() {',
+          '  /*',
+          '   * target();',
+          '   */',
+          '  return 0;',
+          '}',
+          '',
+          'function realRun() {',
+          '  return target();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+      const targetEdges = callGraph.edges.filter((edge) => edge.callee === 'main.ts:target');
+
+      expect(targetEdges).toEqual([
+        expect.objectContaining({
+          caller: 'main.ts:realRun',
+          callee: 'main.ts:target',
+          line: 13,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not index block-comment imports as references', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-block-comment-imports-'));
+    try {
+      await writeFile(resolve(dir, 'target.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          "/* import { target } from './target.js'; */",
+          '',
+          'export function run() {',
+          '  return 0;',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'target');
+
+      expect(refs).toEqual([
+        expect.objectContaining({ file: 'target.ts', kind: 'declaration', line: 1 }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not index string-literal imports as references', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-string-imports-'));
+    try {
+      await writeFile(resolve(dir, 'target.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          "const text = \"import { target } from './target.js';\";",
+          '',
+          'export function run() {',
+          '  return text;',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'target');
+
+      expect(refs).toEqual([
+        expect.objectContaining({ file: 'target.ts', kind: 'declaration', line: 1 }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not let block-comment imports suppress same-file call edges', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-block-comment-import-callgraph-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          "/* import { target } from '@missing/package'; */",
+          '',
+          'function target() {',
+          '  return 1;',
+          '}',
+          '',
+          'function run() {',
+          '  return target();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+
+      expect(callGraph.edges).toEqual([
+        expect.objectContaining({
+          caller: 'main.ts:run',
+          callee: 'main.ts:target',
+          line: 8,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not treat TypeScript private fields as line comments before real calls', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-private-field-block-comment-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          'function target() {',
+          '  return 1;',
+          '}',
+          '',
+          'class Runner {',
+          '  #state = 0;',
+          '  run() {',
+          '    this.#state /* target(); */; return target();',
+          '  }',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+      const targetEdges = callGraph.edges.filter((edge) => edge.callee === 'main.ts:target');
+
+      expect(targetEdges).toEqual([
+        expect.objectContaining({
+          caller: 'main.ts:Runner.run',
+          callee: 'main.ts:target',
+          line: 8,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('buildCallGraph prefers relative import targets over same-name symbols in unrelated files', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-imports-'));
     try {

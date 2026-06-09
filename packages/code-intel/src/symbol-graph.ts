@@ -87,6 +87,16 @@ export interface CallGraph {
   byCallee: Map<string, CallEdge[]>;
 }
 
+interface LexicalScanState {
+  inBlockComment: boolean;
+}
+
+interface LexicalScanOptions {
+  readonly blockComments: boolean;
+  readonly slashLineComments: boolean;
+  readonly hashLineComments: boolean;
+}
+
 // ── buildSymbolGraph ──────────────────────────────────────────────────────
 
 export async function buildSymbolGraph(repoPath: string, options: { maxDepth?: number } = {}): Promise<SymbolGraph> {
@@ -135,7 +145,7 @@ export async function buildSymbolGraph(repoPath: string, options: { maxDepth?: n
           });
         }
       }
-      indexTextReferences(byName, parsed.source, rel, symbols, imports);
+      indexTextReferences(byName, parsed.source, rel, symbols, imports, lang as LanguageId);
     } catch {
       // skip files that fail to parse
     }
@@ -180,9 +190,12 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
       const endLine = (sym as unknown as { endLine?: number }).endLine ?? start + 50;
       const end = Math.min(lines.length, endLine);
       const importTargets = buildImportTargetMap(filePath, fileSym, graph);
+      const lexicalState: LexicalScanState = { inBlockComment: false };
+      const lexicalOptions = lexicalOptionsForLanguage(fileSym.language);
       for (let ln = start; ln < end; ln++) {
         const line = lines[ln] ?? '';
-        for (const call of scanCallExpressions(line)) {
+        const scanLine = maskComments(line, lexicalState, lexicalOptions);
+        for (const call of scanCallExpressions(scanLine, lexicalOptions)) {
           const namespaceTarget = call.qualifier
             ? resolveNamespaceMemberTarget(filePath, fileSym, call.qualifier, call.name, graph)
             : undefined;
@@ -225,7 +238,7 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
 
 function extractImports(source: string, lang: LanguageId): Import[] {
   if (lang === 'typescript' || lang === 'tsx' || lang === 'javascript') {
-    return extractTsLikeImports(source);
+    return extractTsLikeImports(source, lexicalOptionsForLanguage(lang));
   }
   if (lang === 'python') {
     return extractPythonImports(source);
@@ -280,7 +293,7 @@ function pushEdge(map: Map<string, CallEdge[]>, key: string, edge: CallEdge): vo
   map.set(key, arr);
 }
 
-function scanCallExpressions(line: string): Array<{ name: string; qualifier?: string }> {
+function scanCallExpressions(line: string, options: LexicalScanOptions): Array<{ name: string; qualifier?: string }> {
   const calls: Array<{ name: string; qualifier?: string }> = [];
   const re = /(?:(\b[A-Za-z_$][\w$]*)\s*\.\s*)?(\b[A-Za-z_$][\w$]*)\b\s*\(/g;
   let match: RegExpExecArray | null;
@@ -289,7 +302,7 @@ function scanCallExpressions(line: string): Array<{ name: string; qualifier?: st
     const name = match[2];
     if (!name) continue;
     const col = match.index;
-    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) continue;
+    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col, options)) continue;
     const call: { name: string; qualifier?: string } = { name };
     if (qualifier) call.qualifier = qualifier;
     calls.push(call);
@@ -521,6 +534,7 @@ function indexTextReferences(
   file: string,
   symbols: ReadonlyArray<Symbol>,
   imports: ReadonlyArray<Import>,
+  lang: LanguageId,
 ): void {
   const names = new Set<string>();
   for (const symbol of symbols) {
@@ -541,20 +555,23 @@ function indexTextReferences(
   );
 
   const lines = source.split('\n');
+  const lexicalState: LexicalScanState = { inBlockComment: false };
+  const lexicalOptions = lexicalOptionsForLanguage(lang);
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? '';
-    for (const token of scanIdentifierTokens(line)) {
+    const scanLine = maskComments(line, lexicalState, lexicalOptions);
+    for (const token of scanIdentifierTokens(scanLine, lexicalOptions)) {
       if (!names.has(token.text)) continue;
       const lineNo = lineIdx + 1;
       const key = positionKey(lineNo, token.col);
       if (
         isWithinDeclarationRange(lineNo, token.col, declarationRanges) ||
-        isDeclarationIdentifier(line, token.col, token.text, symbols) ||
+        isDeclarationIdentifier(scanLine, token.col, token.text, symbols) ||
         importPositions.has(key)
       ) {
         continue;
       }
-      const next = line.slice(token.col + token.text.length).trimStart();
+      const next = scanLine.slice(token.col + token.text.length).trimStart();
       pushRef(byName, token.text, {
         file,
         line: lineNo,
@@ -565,19 +582,22 @@ function indexTextReferences(
   }
 }
 
-function extractTsLikeImports(source: string): Import[] {
+function extractTsLikeImports(source: string, lexicalOptions: LexicalScanOptions): Import[] {
+  const sourceForImports = maskSourceComments(source, lexicalOptions);
   const imports: Import[] = [];
   const exportAllRe = /\bexport\s+\*\s+from\s+['"]([^'"]+)['"]/g;
   let exportAllMatch: RegExpExecArray | null;
-  while ((exportAllMatch = exportAllRe.exec(source)) !== null) {
+  while ((exportAllMatch = exportAllRe.exec(sourceForImports)) !== null) {
+    if (isOffsetInsideString(sourceForImports, exportAllMatch.index)) continue;
     const from = exportAllMatch[1] ?? '';
-    const pos = offsetToLineCol(source, exportAllMatch.index);
+    const pos = offsetToLineCol(sourceForImports, exportAllMatch.index);
     imports.push({ local: '*', from, line: pos.line, col: pos.col, exportAll: true });
   }
 
   const namedImportRe = /\b(?:import|export)\s+(?:type\s+)?\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"]/g;
   let namedMatch: RegExpExecArray | null;
-  while ((namedMatch = namedImportRe.exec(source)) !== null) {
+  while ((namedMatch = namedImportRe.exec(sourceForImports)) !== null) {
+    if (isOffsetInsideString(sourceForImports, namedMatch.index)) continue;
     const body = namedMatch[1] ?? '';
     const from = namedMatch[2] ?? '';
     const bodyOffset = namedMatch.index + (namedMatch[0].indexOf(body));
@@ -588,13 +608,13 @@ function extractTsLikeImports(source: string): Import[] {
       const local = specifier[2] ?? imported;
       if (local && imported && isIdentifierName(local) && isIdentifierName(imported)) {
         const localOffset = bodyOffset + specifier.index + specifier[0].lastIndexOf(local);
-        const pos = offsetToLineCol(source, localOffset);
+        const pos = offsetToLineCol(sourceForImports, localOffset);
         imports.push({ local, imported, from, line: pos.line, col: pos.col });
       }
     }
   }
 
-  const lines = source.split('\n');
+  const lines = sourceForImports.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
     if (/^\s*import\s+(?:type\s+)?\{/.test(line)) continue;
@@ -684,7 +704,7 @@ function extractRustImports(source: string): Import[] {
     const useLine = line.match(/^\s*use\s+(.+);/);
     if (!useLine) continue;
     const from = useLine[1] ?? '';
-    for (const token of scanIdentifierTokens(from)) {
+    for (const token of scanIdentifierTokens(from, lexicalOptionsForLanguage('rust'))) {
       imports.push({ local: token.text, from, line: i + 1, col: line.indexOf(token.text) });
     }
   }
@@ -695,17 +715,90 @@ function extractBashImports(_source: string): Import[] {
   return [];
 }
 
-function scanIdentifierTokens(line: string): Array<{ text: string; col: number }> {
+function scanIdentifierTokens(line: string, options: LexicalScanOptions): Array<{ text: string; col: number }> {
   const tokens: Array<{ text: string; col: number }> = [];
   const re = /[A-Za-z_$][\w$]*/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(line)) !== null) {
     const text = match[0];
     const col = match.index;
-    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) continue;
+    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col, options)) continue;
     tokens.push({ text, col });
   }
   return tokens;
+}
+
+function maskSourceComments(source: string, options: LexicalScanOptions): string {
+  const state: LexicalScanState = { inBlockComment: false };
+  return source
+    .split('\n')
+    .map((line) => maskComments(line, state, options))
+    .join('\n');
+}
+
+function maskComments(line: string, state: LexicalScanState, options: LexicalScanOptions): string {
+  const chars = line.split('');
+  let i = 0;
+  while (options.blockComments && i < chars.length) {
+    if (state.inBlockComment) {
+      const end = line.indexOf('*/', i);
+      const until = end >= 0 ? end + 2 : chars.length;
+      for (let j = i; j < until; j++) chars[j] = ' ';
+      state.inBlockComment = end < 0;
+      i = until;
+      continue;
+    }
+
+    const start = line.indexOf('/*', i);
+    if (start < 0) break;
+    if (isLikelyInsideString(line, start) || isAfterLineComment(chars.join(''), start, options)) {
+      i = start + 2;
+      continue;
+    }
+
+    const end = line.indexOf('*/', start + 2);
+    const until = end >= 0 ? end + 2 : chars.length;
+    for (let j = start; j < until; j++) chars[j] = ' ';
+    state.inBlockComment = end < 0;
+    i = until;
+  }
+  maskLineComment(chars, chars.join(''), options);
+  return chars.join('');
+}
+
+function maskLineComment(chars: string[], line: string, options: LexicalScanOptions): void {
+  const commentStart = lineCommentStart(line, options);
+  if (commentStart < 0) return;
+  for (let i = commentStart; i < chars.length; i++) chars[i] = ' ';
+}
+
+function lineCommentStart(line: string, options: LexicalScanOptions): number {
+  const starts: number[] = [];
+  if (options.slashLineComments) {
+    const slash = firstCommentTokenOutsideString(line, '//');
+    if (slash >= 0) starts.push(slash);
+  }
+  if (options.hashLineComments) {
+    const hash = firstCommentTokenOutsideString(line, '#');
+    if (hash >= 0) starts.push(hash);
+  }
+  return starts.length > 0 ? Math.min(...starts) : -1;
+}
+
+function firstCommentTokenOutsideString(line: string, token: string): number {
+  let index = line.indexOf(token);
+  while (index >= 0) {
+    if (!isLikelyInsideString(line, index)) return index;
+    index = line.indexOf(token, index + token.length);
+  }
+  return -1;
+}
+
+function lexicalOptionsForLanguage(lang: LanguageId | string): LexicalScanOptions {
+  if (lang === 'python' || lang === 'bash') {
+    return { blockComments: false, slashLineComments: false, hashLineComments: true };
+  }
+  return { blockComments: true, slashLineComments: true, hashLineComments: false };
 }
 
 function isIdentifierName(name: string): boolean {
@@ -720,11 +813,15 @@ function isLikelyInsideString(line: string, col: number): boolean {
   return singleQuotes % 2 === 1 || doubleQuotes % 2 === 1 || backticks % 2 === 1;
 }
 
-function isAfterLineComment(line: string, col: number): boolean {
-  const before = line.slice(0, col);
-  const slash = before.indexOf('//');
-  const hash = before.indexOf('#');
-  return slash >= 0 || hash >= 0;
+function isOffsetInsideString(source: string, offset: number): boolean {
+  const before = source.slice(0, offset);
+  const lineStart = before.lastIndexOf('\n') + 1;
+  return isLikelyInsideString(source.slice(lineStart, offset), offset - lineStart);
+}
+
+function isAfterLineComment(line: string, col: number, options: LexicalScanOptions): boolean {
+  const start = lineCommentStart(line.slice(0, col), options);
+  return start >= 0;
 }
 
 function countUnescaped(text: string, char: string): number {
