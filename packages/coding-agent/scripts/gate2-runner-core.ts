@@ -1,0 +1,154 @@
+/**
+ * Gate-2 LIVE runner (D-36).
+ *
+ * Replaces the D-34 mock runner. Two paths:
+ *
+ *   --llm-config <path>     Real LLM path. Reads {apiKey, baseUrl, model}
+ *                           from a JSON file, creates a DeepSeekClient (or
+ *                           any OpenAI-compatible client), and invokes
+ *                           runToolLoopWithReview on a real 30-50 tool-call
+ *                           coding task. Source = "live-llm".
+ *
+ *   --mock                  Scripted mock path. Builds a synthetic
+ *                           transcript and validates it. Source = "mock".
+ *                           NEVER produces passed_live=true.
+ *
+ * Mutual exclusion: if both flags are present, the runner errors out.
+ * Missing both: also errors out.
+ *
+ * The runner is intentionally split into:
+ *   - `gate2-runner-core.ts` (pure logic, vitest-testable, exports buildLiveRunner, buildMockRunner)
+ *   - `gate2-runner.mjs` (CLI shim, reads args, calls core, writes JSON+MD)
+ */
+import { readFile } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+
+export type Gate2Source = 'live-llm' | 'mock';
+export type Gate2ResultKind = 'live' | 'mock-validated' | 'live-blocked';
+
+export interface LLMConfig {
+  readonly apiKey: string;
+  readonly baseUrl?: string;
+  readonly model?: string;
+}
+
+export interface TaskConfig {
+  readonly goal: string;
+  readonly workspacePath: string;
+  readonly maxSteps?: number;
+  readonly expectedFile?: string; // path relative to workspace
+}
+
+export interface RunSpec {
+  readonly source: Gate2Source;
+  readonly llmConfigPath?: string;
+  readonly taskConfigPath?: string;
+  readonly mock?: boolean;
+  readonly jsonOutPath: string;
+  readonly mdOutPath: string;
+}
+
+export interface Gate2Report {
+  readonly source: Gate2Source;
+  readonly passed_live: boolean;
+  readonly passed_mock: boolean;
+  readonly toolCalls: number;
+  readonly retries: number;
+  readonly goalDriftDetected: boolean;
+  readonly reviewStatus?: 'approve' | 'request_changes' | 'unavailable';
+  readonly taskgraphNodes?: number;
+  readonly planPath?: string;
+  readonly fixture?: { goal: string; workspacePath: string };
+  readonly finalResult?: 'pass' | 'fail' | 'limit' | 'error' | 'mock';
+  readonly liveError?: string;
+  readonly startedAt: string;
+  readonly finishedAt: string;
+  readonly durationMs: number;
+}
+
+/** Validation: mutual exclusion of --mock and --llm-config. */
+export function validateRunSpec(spec: RunSpec): { ok: true } | { ok: false; reason: string } {
+  if (spec.mock && spec.llmConfigPath) {
+    return { ok: false, reason: 'cannot combine --mock with --llm-config' };
+  }
+  if (!spec.mock && !spec.llmConfigPath) {
+    return { ok: false, reason: 'must provide either --mock or --llm-config' };
+  }
+  if (spec.mock && !spec.taskConfigPath && !spec.jsonOutPath) {
+    // mock still needs an output path; taskConfigPath is optional
+    return { ok: false, reason: 'must provide --json and --md' };
+  }
+  if (spec.llmConfigPath && !existsSync(spec.llmConfigPath)) {
+    return { ok: false, reason: `llm-config file not found: ${spec.llmConfigPath}` };
+  }
+  if (spec.taskConfigPath && !existsSync(spec.taskConfigPath)) {
+    return { ok: false, reason: `task-config file not found: ${spec.taskConfigPath}` };
+  }
+  return { ok: true };
+}
+
+/** Read LLM config from JSON. Throws if apiKey is empty. */
+export async function readLLMConfig(path: string): Promise<LLMConfig> {
+  const raw = await readFile(path, 'utf8');
+  const parsed = JSON.parse(raw) as Partial<LLMConfig>;
+  if (!parsed.apiKey || parsed.apiKey.length === 0) {
+    throw new Error(`llm-config at ${path} has empty or missing apiKey; refusing to fall back to mock`);
+  }
+  return {
+    apiKey: parsed.apiKey,
+    ...(parsed.baseUrl !== undefined ? { baseUrl: parsed.baseUrl } : {}),
+    ...(parsed.model !== undefined ? { model: parsed.model } : {}),
+  };
+}
+
+/** Read task config from JSON. */
+export async function readTaskConfig(path: string): Promise<TaskConfig> {
+  const raw = await readFile(path, 'utf8');
+  const parsed = JSON.parse(raw) as Partial<TaskConfig>;
+  if (!parsed.goal || parsed.goal.length === 0) {
+    throw new Error(`task-config at ${path} has empty or missing goal`);
+  }
+  if (!parsed.workspacePath || parsed.workspacePath.length === 0) {
+    throw new Error(`task-config at ${path} has empty or missing workspacePath`);
+  }
+  return {
+    goal: parsed.goal,
+    workspacePath: parsed.workspacePath,
+    ...(parsed.maxSteps !== undefined ? { maxSteps: parsed.maxSteps } : {}),
+    ...(parsed.expectedFile !== undefined ? { expectedFile: parsed.expectedFile } : {}),
+  };
+}
+
+/** Write report JSON + MD. */
+export async function writeReport(report: Gate2Report, jsonPath: string, mdPath: string): Promise<void> {
+  await mkdir(dirname(resolve(jsonPath)), { recursive: true });
+  await mkdir(dirname(resolve(mdPath)), { recursive: true });
+  await writeFile(resolve(jsonPath), JSON.stringify(report, null, 2) + '\n', 'utf8');
+  await writeFile(resolve(mdPath), renderMarkdown(report), 'utf8');
+}
+
+function renderMarkdown(r: Gate2Report): string {
+  const lines: string[] = [];
+  lines.push('# Gate-2 Run Report');
+  lines.push('');
+  lines.push(`- source: \`${r.source}\``);
+  lines.push(`- passed_live: \`${r.passed_live}\``);
+  lines.push(`- passed_mock: \`${r.passed_mock}\``);
+  lines.push(`- toolCalls: ${r.toolCalls}`);
+  lines.push(`- retries: ${r.retries}`);
+  lines.push(`- goalDriftDetected: ${r.goalDriftDetected}`);
+  if (r.reviewStatus !== undefined) lines.push(`- reviewStatus: \`${r.reviewStatus}\``);
+  if (r.taskgraphNodes !== undefined) lines.push(`- taskgraphNodes: ${r.taskgraphNodes}`);
+  if (r.fixture !== undefined) {
+    lines.push(`- goal: \`${r.fixture.goal}\``);
+    lines.push(`- workspace: \`${r.fixture.workspacePath}\``);
+  }
+  if (r.finalResult !== undefined) lines.push(`- finalResult: \`${r.finalResult}\``);
+  if (r.liveError !== undefined) lines.push(`- liveError: ${r.liveError}`);
+  lines.push(`- startedAt: ${r.startedAt}`);
+  lines.push(`- finishedAt: ${r.finishedAt}`);
+  lines.push(`- durationMs: ${r.durationMs}`);
+  return lines.join('\n') + '\n';
+}
