@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  evaluatePassedLive,
   readLLMConfig,
   readTaskConfig,
   validateRunSpec,
   writeReport,
   type Gate2Report,
+  type PassedLiveInput,
   type RunSpec,
 } from '../../scripts/gate2-runner-core.js';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -206,6 +208,122 @@ describe('gate2-runner-core: readTaskConfig', () => {
       const cfgPath = join(tmp, 'task.json');
       await writeFile(cfgPath, JSON.stringify({ goal: '', workspacePath: '/tmp' }), 'utf8');
       await expect(readTaskConfig(cfgPath)).rejects.toThrow(/empty or missing goal/);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+// ============================================================================
+// D-38 strict LIVE pass rules
+// ============================================================================
+
+/** Build a PassedLiveInput that satisfies every condition (the "happy path" baseline). */
+function makeLiveInput(overrides: Partial<PassedLiveInput> = {}): PassedLiveInput {
+  return {
+    source: 'live-llm',
+    reviewStatus: 'approve',
+    finalResult: 'pass',
+    liveError: undefined,
+    toolCalls: 42,
+    goalDriftDetected: false,
+    ...overrides,
+  };
+}
+
+describe('gate2-runner-core: D-38 strict LIVE pass rules', () => {
+  it('passes when review=approve + 42 calls + no drift + no liveError', () => {
+    expect(evaluatePassedLive(makeLiveInput())).toBe(true);
+  });
+
+  it('fails when goal drift is detected (hard fail, no heuristic override)', () => {
+    expect(evaluatePassedLive(makeLiveInput({ goalDriftDetected: true }))).toBe(false);
+  });
+
+  it('fails when toolCalls is below the 30-call minimum', () => {
+    expect(evaluatePassedLive(makeLiveInput({ toolCalls: 29 }))).toBe(false);
+    expect(evaluatePassedLive(makeLiveInput({ toolCalls: 5 }))).toBe(false);
+  });
+
+  it('fails when toolCalls is above the 50-call maximum', () => {
+    expect(evaluatePassedLive(makeLiveInput({ toolCalls: 51 }))).toBe(false);
+    expect(evaluatePassedLive(makeLiveInput({ toolCalls: 100 }))).toBe(false);
+  });
+
+  it('fails when review is request_changes', () => {
+    expect(evaluatePassedLive(makeLiveInput({ reviewStatus: 'request_changes' }))).toBe(false);
+  });
+
+  it('fails when review is unavailable (no gates defined)', () => {
+    expect(evaluatePassedLive(makeLiveInput({ reviewStatus: 'unavailable' }))).toBe(false);
+  });
+
+  it('fails when liveError is present', () => {
+    expect(evaluatePassedLive(makeLiveInput({ liveError: 'LLMAuthError: 401' }))).toBe(false);
+  });
+
+  it('fails when finalResult is not "pass" (fail/limit/error/mock)', () => {
+    expect(evaluatePassedLive(makeLiveInput({ finalResult: 'fail' }))).toBe(false);
+    expect(evaluatePassedLive(makeLiveInput({ finalResult: 'limit' }))).toBe(false);
+    expect(evaluatePassedLive(makeLiveInput({ finalResult: 'error' }))).toBe(false);
+    expect(evaluatePassedLive(makeLiveInput({ finalResult: 'mock' }))).toBe(false);
+  });
+
+  it('mock source NEVER produces passed_live=true', () => {
+    // Even with every other condition favorable, source='mock' is a hard fail.
+    expect(
+      evaluatePassedLive(
+        makeLiveInput({
+          source: 'mock',
+          reviewStatus: 'approve',
+          finalResult: 'pass',
+          toolCalls: 42,
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+// ============================================================================
+// readTaskConfig: reviewGates field must round-trip from JSON
+// ============================================================================
+
+describe('gate2-runner-core: readTaskConfig reads reviewGates', () => {
+  it('parses reviewGates when present', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'g2-'));
+    try {
+      const cfgPath = join(tmp, 'task.json');
+      await writeFile(
+        cfgPath,
+        JSON.stringify({
+          goal: 'fix',
+          workspacePath: '/tmp/ws',
+          maxSteps: 35,
+          reviewGates: ['pnpm test', 'pnpm lint'],
+        }),
+        'utf8',
+      );
+      const task = await readTaskConfig(cfgPath);
+      expect(task.reviewGates).toEqual(['pnpm test', 'pnpm lint']);
+      expect(task.goal).toBe('fix');
+      expect(task.workspacePath).toBe('/tmp/ws');
+      expect(task.maxSteps).toBe(35);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('omits reviewGates when not in the file', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'g2-'));
+    try {
+      const cfgPath = join(tmp, 'task.json');
+      await writeFile(
+        cfgPath,
+        JSON.stringify({ goal: 'fix', workspacePath: '/tmp/ws' }),
+        'utf8',
+      );
+      const task = await readTaskConfig(cfgPath);
+      expect(task.reviewGates).toBeUndefined();
     } finally {
       await rm(tmp, { recursive: true, force: true });
     }

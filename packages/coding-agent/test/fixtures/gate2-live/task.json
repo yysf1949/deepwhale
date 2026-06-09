@@ -1,6 +1,7 @@
 {
-  "goal": "Fix the bugs in /tmp/gate2-fixture-workspace/src/calc.ts. There are 3 bugs (subtract, power, squareRoot). Run the test suite with `node --test test/` to find them, edit the source file, then run the tests again to verify all 6 tests pass. The test file is correct; only edit src/calc.ts.",
-  "workspacePath": "/tmp/gate2-fixture-workspace",
-  "maxSteps": 40,
-  "expectedFile": "src/calc.ts"
+  "goal": "Fix the bugs in the workspace's src/calc.ts. There are 3 bugs (subtract, power, squareRoot). Run the test suite with `pnpm test` to see the failures, edit the source file using the patch tool, then run the tests again to verify all 6 tests pass. The test file is correct; only edit src/calc.ts. Use the patch tool to edit files. Aim for 5-15 tool calls.",
+  "workspacePath": "C:/Users/butterfly443/AppData/Local/Temp/gate2-fixture-workspace",
+  "maxSteps": 50,
+  "expectedFile": "src/calc.ts",
+  "reviewGates": ["pnpm test"]
 }

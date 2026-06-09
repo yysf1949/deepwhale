@@ -28,6 +28,10 @@ import { existsSync } from 'node:fs';
 export type Gate2Source = 'live-llm' | 'mock';
 export type Gate2ResultKind = 'live' | 'mock-validated' | 'live-blocked';
 
+/** Range constraints for the LIVE pass tool-call count (D-38 spec). */
+export const TOOL_CALLS_MIN = 30;
+export const TOOL_CALLS_MAX = 50;
+
 export interface LLMConfig {
   readonly apiKey: string;
   readonly baseUrl?: string;
@@ -50,6 +54,37 @@ export interface RunSpec {
   readonly mock?: boolean;
   readonly jsonOutPath: string;
   readonly mdOutPath: string;
+}
+
+/** Inputs to the strict LIVE pass rule. Pure, side-effect free. */
+export interface PassedLiveInput {
+  readonly source: Gate2Source;
+  readonly reviewStatus: 'approve' | 'request_changes' | 'unavailable' | undefined;
+  readonly finalResult: 'pass' | 'fail' | 'limit' | 'error' | 'mock' | undefined;
+  readonly liveError: string | undefined;
+  readonly toolCalls: number;
+  readonly goalDriftDetected: boolean;
+}
+
+/**
+ * D-38 strict pass rules for Gate-2 LIVE. ALL conditions must hold:
+ *   1. source === 'live-llm' (mock never claims live)
+ *   2. reviewStatus === 'approve'
+ *   3. finalResult === 'pass'
+ *   4. liveError is absent
+ *   5. toolCalls ∈ [TOOL_CALLS_MIN, TOOL_CALLS_MAX]
+ *   6. goalDriftDetected === false (HARD FAIL — no heuristic override)
+ *
+ * The mock path never calls this; it has its own source='mock' report.
+ */
+export function evaluatePassedLive(input: PassedLiveInput): boolean {
+  if (input.source !== 'live-llm') return false;
+  if (input.reviewStatus !== 'approve') return false;
+  if (input.finalResult !== 'pass') return false;
+  if (input.liveError !== undefined) return false;
+  if (input.toolCalls < TOOL_CALLS_MIN || input.toolCalls > TOOL_CALLS_MAX) return false;
+  if (input.goalDriftDetected) return false;
+  return true;
 }
 
 export interface Gate2Report {
@@ -120,6 +155,7 @@ export async function readTaskConfig(path: string): Promise<TaskConfig> {
     workspacePath: parsed.workspacePath,
     ...(parsed.maxSteps !== undefined ? { maxSteps: parsed.maxSteps } : {}),
     ...(parsed.expectedFile !== undefined ? { expectedFile: parsed.expectedFile } : {}),
+    ...(parsed.reviewGates !== undefined ? { reviewGates: parsed.reviewGates } : {}),
   };
 }
 

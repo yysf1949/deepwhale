@@ -12,6 +12,7 @@ import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import {
+  evaluatePassedLive,
   readLLMConfig,
   readTaskConfig,
   writeReport,
@@ -216,17 +217,22 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   const goalDriftDetected = detectGoalDrift(task.goal, toolSummaries);
   const nodeCount = recorder.nodeCount();
 
-  // The 30-50 tool-call range was a guidance for the task design (per the
-  // D-37 spec), not a hard pass/fail rule. A well-tuned LLM can complete a
-  // small task in fewer calls; the review gates are the canonical pass
-  // signal. We still record toolCalls in the report for transparency, but
-  // the LIVE pass condition is: the tool loop completed without error AND
-  // the review (if any) approved.
-  const passedLive = Boolean(
-    result &&
-      (reviewStatus === undefined || reviewStatus === 'approve') &&
-      finalResultKind !== 'error',
-  );
+  // D-38 strict pass rules (per user direction):
+  //   1. source MUST be 'live-llm'
+  //   2. passed_mock MUST be false (cross-check; mock never claims live)
+  //   3. reviewStatus MUST be 'approve'
+  //   4. finalResult MUST be 'pass'
+  //   5. liveError MUST be absent
+  //   6. toolCalls MUST be in [30, 50]
+  //   7. goalDriftDetected === false  (HARD FAIL, no heuristic override)
+  const passedLive = evaluatePassedLive({
+    source: 'live-llm',
+    reviewStatus,
+    finalResult: finalResultKind,
+    liveError,
+    toolCalls,
+    goalDriftDetected,
+  });
 
   const finishedAt = new Date();
   const report: Gate2Report = {
