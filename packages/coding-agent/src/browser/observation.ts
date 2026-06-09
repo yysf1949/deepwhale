@@ -16,6 +16,10 @@ export interface VisibleElement {
   text?: string;
   ariaLabel?: string;
   href?: string;
+  /** D-33.5.1: Human-readable label for visual grounding (text or aria-label). */
+  label: string;
+  /** D-33.5.1: Confidence 0..1 that the label is correct. */
+  confidence: number;
 }
 
 export interface Observation {
@@ -26,20 +30,32 @@ export interface Observation {
   actionHistory: BrowserActionRecord[];
 }
 
+function deriveLabel(el: { text?: string; ariaLabel?: string }): { label: string; confidence: number } {
+  if (el.text && el.text.length > 0) return { label: el.text, confidence: 0.9 };
+  if (el.ariaLabel && el.ariaLabel.length > 0) return { label: el.ariaLabel, confidence: 0.7 };
+  return { label: '', confidence: 0.3 };
+}
+
 function parseVisibleElements(html: string): VisibleElement[] {
   const out: VisibleElement[] = [];
   const buttonRe = /<button\b[^>]*>([\s\S]*?)<\/button>/gi;
   let m: RegExpExecArray | null;
   while ((m = buttonRe.exec(html)) !== null) {
-    out.push({ tag: 'button', text: m[1]!.replace(/<[^>]+>/g, '').trim() });
+    const text = m[1]!.replace(/<[^>]+>/g, '').trim();
+    const { label, confidence } = deriveLabel({ text });
+    out.push({ tag: 'button', text, label, confidence });
   }
   const inputRe = /<input\b[^>]*aria-label="([^"]*)"[^>]*\/?>/gi;
   while ((m = inputRe.exec(html)) !== null) {
-    out.push({ tag: 'input', ariaLabel: m[1]! });
+    const ariaLabel = m[1]!;
+    const { label, confidence } = deriveLabel({ ariaLabel });
+    out.push({ tag: 'input', ariaLabel, label, confidence });
   }
   const anchorRe = /<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
   while ((m = anchorRe.exec(html)) !== null) {
-    out.push({ tag: 'a', href: m[1]!, text: m[2]!.replace(/<[^>]+>/g, '').trim() });
+    const text = m[2]!.replace(/<[^>]+>/g, '').trim();
+    const { label, confidence } = deriveLabel({ text });
+    out.push({ tag: 'a', href: m[1]!, text, label, confidence });
   }
   return out;
 }
