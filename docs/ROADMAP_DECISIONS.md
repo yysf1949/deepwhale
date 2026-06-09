@@ -1,3 +1,73 @@
+# deepwhale Roadmap Decisions
+
+<!-- status:current:start -->
+## Current Status
+
+- Date: 2026-06-10
+- Branch: feature/d36-gate2-live
+- Package version line: 2.2.0
+- Decision mode: stabilization first, expansion later
+- Current sprint: D56 status/doc hygiene
+- Default registry: coding plus Code Intel essentials only
+- Non-coding tools: explicit opt-in only
+- Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
+- v1-v4 are capability milestones, not a production-complete claim.
+
+### Active Decisions
+
+- Freeze new non-coding default tools until stabilization gates are clean.
+- Keep Gate-1 and Gate-2 thresholds strict.
+- Keep mock evidence separate from live evidence.
+- Treat Code Intel as heuristic unless a test proves stronger semantics.
+- Treat module existence as foundation work, not production completion.
+- Treat package version 2.2.0 as a package line, not roadmap maturity proof.
+- Preserve unrelated untracked plan files.
+
+### Gate Evidence
+
+- Gate-1 minimum evidence: Vite target has 86,216 supported LOC.
+- Gate-1 preferred status: minimum-only.
+- Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
+- Gate-1 preferred evidence file: docs/superpowers/gate-1-preferred-targets.json.
+- Gate-2 live evidence: passed_live=true.
+- Gate-2 registryProfile=default.
+- Gate-2 toolCalls=31.
+- Gate-2 evidence file: docs/superpowers/gate-2-long-horizon-live.json.
+- Gate-2 interpretation: default-profile invoice fixture passed the live runner conditions.
+- Gate-2 limit: it does not unlock Browser, Desktop, Channel, media, or productivity defaults.
+
+### Decision Hygiene
+
+- If an old decision below conflicts with this block, prefer this block.
+- Older text is retained as historical context until a later cleanup sprint.
+- Future decisions must cite tests, reports, or current source files.
+- Do not use branch names, commit slogans, or package versions as completion evidence.
+- Do not use target inventory as proof of a Gate-1 scenario pass.
+- Do not describe minimum-50k Gate-1 evidence as preferred-100k evidence.
+- Do not describe default-profile Gate-2 evidence as v1-v4 completion.
+- Do not describe heuristic rename, references, or call graph as IDE-grade.
+- Keep default registry exposure narrow until the user explicitly changes the policy.
+
+### Next Decisions Needed
+
+1. D57: normalize registry profiles or document aliases without default expansion.
+2. D58: decide the next Code Intel truthfulness target by failing tests.
+3. D59: decide how to obtain a local 100K+ Gate-1 target.
+4. Re-score v1-v4 after D57-D59 evidence.
+5. Draft v5 and v6 only after v1-v4 gaps are evidence-backed.
+
+### Repository Scope
+
+- Worktree: D:\App\openClaw\projects\deepwhale.
+- Ignore D:\App\openClaw\projects\openclaw-github.
+- Current branch: feature/d36-gate2-live.
+- Keep generated state out of commits.
+- Keep this status block ASCII-only for automated checks.
+
+<!-- status:current:end -->
+
+## Historical Roadmap Decisions
+
 # 🐋 deepwhale ROADMAP 关键决策全景
 
 > **用途**：ROADMAP.md 的"决策速查版"——只列**结论 + 1 句理由 + 出处**，不重复论证细节。

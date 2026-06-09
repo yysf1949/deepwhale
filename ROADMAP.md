@@ -1,3 +1,89 @@
+# deepwhale Roadmap
+
+<!-- status:current:start -->
+## Current Status
+
+- Date: 2026-06-10
+- Branch: feature/d36-gate2-live
+- Package version line: 2.2.0
+- Roadmap mode: gate-driven stabilization
+- Current sprint: D56 status/doc hygiene
+- Current policy: freeze default non-coding expansion
+- Default registry: coding plus Code Intel essentials only
+- Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
+- v1-v4 are capability milestones, not a production-complete claim.
+
+### Gate Snapshot
+
+- Gate-1 minimum status: Vite target has 86,216 supported LOC.
+- Gate-1 minimum qualification: minimum-50k.
+- Gate-1 preferred status: minimum-only.
+- Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
+- Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json.
+- Gate-2 live evidence: passed_live=true.
+- Gate-2 registryProfile=default.
+- Gate-2 toolCalls=31.
+- Gate-2 report: docs/superpowers/gate-2-long-horizon-live.json.
+- Gate-2 interpretation: a default-profile live fixture pass, not a blanket v1-v4 completion proof.
+
+### Milestone Status
+
+| Milestone | Evidence-backed status | Main blocker |
+| --- | --- | --- |
+| v1.0 | Mostly implemented coding baseline | Public release/version hygiene remains noisy |
+| v1.5 | Code Intel foundation exists | Preferred 100K Gate-1 evidence remains blocked |
+| v2.0 | Browser, MCP, and memory foundations exist as opt-in/early pieces | Gate-1.5 evidence and full integration are not complete |
+| v2.5 | Planner, task DAG, and plan cache exist | Main-loop integration is limited |
+| v3.0 | Reviewer and Gate-2 live runner exist | Long-horizon proof must remain reproducible and scoped |
+| v4.0 | Researcher, TaskGraph, memory, and channel foundations exist | Agent OS orchestration, Desktop, and channels are not production-complete |
+
+### Gate Policy
+
+- Do not weaken Gate-1 minimum or preferred LOC thresholds.
+- Do not count target inventory as a Gate-1 pass.
+- Do not count minimum-50k evidence as preferred-100k evidence.
+- Do not count mock Gate-2 evidence as live evidence.
+- Do not unlock default Browser, Desktop, Channel, media, or productivity tools from Gate-2 alone.
+- Do not describe heuristic Code Intel as IDE-grade.
+- Do not claim v1-v4 completion from module existence alone.
+
+### Next Roadmap Work
+
+1. D56: align public status and remove first-screen status ambiguity.
+2. D57: reconcile registry profiles with the stabilization profile policy.
+3. D58: harden Code Intel reference, import, call graph, and rename truthfulness.
+4. D59: produce preferred 100K Gate-1 evidence or a stronger blocker.
+5. Re-score v1-v4 only from current tests and gate artifacts.
+6. Plan v5 and v6 after v1-v4 status is evidence-backed.
+
+### V5/V6 Planning Boundary
+
+- v5 should not start implementation until v1-v4 gate gaps are explicit.
+- v5 planning may cover production hardening, plugin governance, distribution, and observability.
+- v6 planning may cover collaborative multi-agent operations, enterprise controls, hosted service mode, and ecosystem scaling.
+- v5/v6 plans must inherit the same gate discipline: evidence first, no overclaiming.
+
+### Status Hygiene Rules
+
+- Prefer this block over older historical status text below.
+- Older roadmap text below is retained as history until a later cleanup sprint.
+- Any future release claim must cite a machine-readable report or a verified command output.
+- Package version 2.2.0 is the package line, not proof of roadmap v2.2 production maturity.
+- Existing modules in src/ are foundations unless the main runtime and tests prove integration.
+- This block is intentionally ASCII-only for automated checks.
+
+### Repository Scope
+
+- Worktree: D:\App\openClaw\projects\deepwhale.
+- Ignore D:\App\openClaw\projects\openclaw-github.
+- Preserve unrelated untracked plan files unless explicitly adopted.
+- Keep generated target directories and runtime state out of commits.
+- Current branch remains feature/d36-gate2-live.
+
+<!-- status:current:end -->
+
+## Historical Roadmap
+
 # 🗺 deepwhale ROADMAP
 
 > ## 🔒 ROADMAP LOCKED（2026-06-03 用户拍板）

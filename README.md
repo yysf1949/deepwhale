@@ -1,3 +1,95 @@
+# deepwhale
+
+<!-- status:current:start -->
+## Current Status
+
+- Date: 2026-06-10
+- Branch: feature/d36-gate2-live
+- Package version line: 2.2.0
+- Work mode: stabilization + Gate sprint
+- Default registry: 19 tools, limited to coding plus Code Intel essentials
+- Non-coding expansion: frozen by default
+- Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
+- v1-v4 are capability milestones, not a production-complete claim.
+
+### Gate Evidence
+
+- Gate-2 live evidence: passed_live=true
+- Gate-2 registryProfile=default
+- Gate-2 toolCalls=31
+- Gate-2 report: docs/superpowers/gate-2-long-horizon-live.json
+- Gate-2 interpretation: default-profile invoice fixture passed the strict live runner conditions.
+- Gate-2 limit: this does not prove v1-v4 production readiness.
+- Gate-2 limit: this does not unlock Browser, Desktop, Channel, media, or productivity defaults.
+- Gate-1 minimum evidence: Vite target has 86,216 supported LOC and remains a minimum-50k pass target.
+- Gate-1 preferred status: minimum-only
+- Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
+- Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json
+
+### Capability Progress
+
+| Milestone | Current evidence-backed status | Main gap |
+| --- | --- | --- |
+| v1.0 | Mostly implemented coding baseline | Release docs and version story still need cleanup |
+| v1.5 | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is still blocked |
+| v2.0 | Memory, Browser foundation, MCP surfaces exist as early/opt-in pieces | Gate-1.5 and real integration remain incomplete |
+| v2.5 | Planner/DAG/cache modules exist | Integration into the main agent loop is still limited |
+| v3.0 | Reviewer and Gate-2 harness exist; current Gate-2 live evidence passes | Long-horizon evidence must stay honest and reproducible |
+| v4.0 | Researcher, TaskGraph, memory, channel foundations exist | Agent OS, Desktop, channels, and production orchestration are not complete |
+
+### Current Policy
+
+- Keep the default tool surface narrow.
+- Do not add media, productivity, channel, Browser, Desktop, or marketplace tools to the default profile.
+- Do not weaken Gate-1 or Gate-2 thresholds.
+- Treat Code Intel rename, reference, and call graph behavior as heuristic unless tests prove stronger semantics.
+- Keep live Gate reports separate from mock reports.
+- Keep generated state and local target directories out of commits.
+- Preserve unrelated untracked plan files unless a task explicitly adopts them.
+
+### Next Work
+
+1. D56: status and documentation hygiene.
+2. D57: registry profile model cleanup.
+3. D58: Code Intel truthfulness and reference-safety hardening.
+4. D59: Gate-1 preferred 100K target evidence or a stronger machine-readable blocker.
+5. Continue v1-v4 completion only through verified gates.
+6. Plan v5/v6 after v1-v4 status is evidence-backed, not before.
+
+### Reading Guide
+
+- Current Gate-2 live evidence: docs/superpowers/gate-2-long-horizon-live.json
+- Current Gate-2 trace: docs/superpowers/gate2-live-trace.json
+- Current Gate-1 preferred inventory: docs/superpowers/gate-1-preferred-targets.json
+- V1 to V4 master plan: docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md
+- D56 plan: docs/superpowers/plans/2026-06-10-d56-status-doc-hygiene.md
+
+### Status Hygiene Rules
+
+- Public docs must say what evidence proves and what it does not prove.
+- A live pass can be cited only from a live report with source=live-llm.
+- A mock pass can never imply passed_live=true.
+- A target inventory can never imply a Gate-1 pass by itself.
+- A minimum-50k Gate-1 target can never be described as preferred-100k.
+- A module existing in src/ is not the same as production integration.
+- A registry profile existing is not the same as default exposure.
+- Package version 2.2.0 is a package line, not proof that roadmap v2.2 capabilities are production-complete.
+- v5/v6 planning is allowed, but v1-v4 completion remains the active gate-driven objective.
+- This block is intentionally ASCII-only so tools can parse it reliably.
+
+### Review Notes
+
+- If this block conflicts with older historical text below, prefer this block.
+- Older sections below are retained as history until they are cleaned in later documentation sprints.
+- The next agent should start from current files and machine-readable evidence, not from old ship slogans.
+- This repository path is D:\App\openClaw\projects\deepwhale.
+- Ignore D:\App\openClaw\projects\openclaw-github for this project.
+- Last status hygiene sprint: D56.
+
+<!-- status:current:end -->
+
+## Historical README
+
 # 🐋 deepwhale
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
