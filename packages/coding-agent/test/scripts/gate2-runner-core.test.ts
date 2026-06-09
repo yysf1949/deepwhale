@@ -542,6 +542,88 @@ describe('gate2-runner-live: trace persistence redaction (D-54)', () => {
   });
 });
 
+describe('gate2-runner-live: report truthfulness (D-59)', () => {
+  it('classifies a stopped loop as pass only when review approved', async () => {
+    const live = await import('../../scripts/gate2-runner-live.js') as unknown as {
+      determineLiveFinalResult: (input: {
+        liveError?: string;
+        steps?: ReadonlyArray<{ kind: string }>;
+        reviewStatus?: 'approve' | 'request_changes' | 'unavailable';
+      }) => 'pass' | 'fail' | 'limit' | 'error';
+    };
+
+    expect(live.determineLiveFinalResult({
+      steps: [{ kind: 'assistant' }],
+      reviewStatus: 'approve',
+    })).toBe('pass');
+    expect(live.determineLiveFinalResult({
+      steps: [{ kind: 'assistant' }],
+      reviewStatus: 'request_changes',
+    })).toBe('fail');
+    expect(live.determineLiveFinalResult({
+      steps: [{ kind: 'assistant' }],
+      reviewStatus: 'unavailable',
+    })).toBe('fail');
+  });
+
+  it('classifies limit, error, and empty loop results truthfully', async () => {
+    const live = await import('../../scripts/gate2-runner-live.js') as unknown as {
+      determineLiveFinalResult: (input: {
+        liveError?: string;
+        steps?: ReadonlyArray<{ kind: string }>;
+        reviewStatus?: 'approve' | 'request_changes' | 'unavailable';
+      }) => 'pass' | 'fail' | 'limit' | 'error';
+    };
+
+    expect(live.determineLiveFinalResult({
+      steps: [{ kind: 'tool' }, { kind: 'limit' }],
+      reviewStatus: 'approve',
+    })).toBe('limit');
+    expect(live.determineLiveFinalResult({
+      liveError: 'LLMNetworkError: failed',
+      steps: [{ kind: 'assistant' }],
+      reviewStatus: 'approve',
+    })).toBe('error');
+    expect(live.determineLiveFinalResult({
+      steps: [],
+      reviewStatus: 'approve',
+    })).toBe('fail');
+  });
+
+  it('restores GATE2_REVIEW_CWD after success and failure', async () => {
+    const live = await import('../../scripts/gate2-runner-live.js') as unknown as {
+      withGate2ReviewCwd: <T>(workspacePath: string, fn: () => Promise<T>) => Promise<T>;
+    };
+    const original = process.env['GATE2_REVIEW_CWD'];
+    process.env['GATE2_REVIEW_CWD'] = 'C:/previous';
+    try {
+      await expect(live.withGate2ReviewCwd('C:/workspace', async () => {
+        expect(process.env['GATE2_REVIEW_CWD']).toBe('C:/workspace');
+        return 'ok';
+      })).resolves.toBe('ok');
+      expect(process.env['GATE2_REVIEW_CWD']).toBe('C:/previous');
+
+      await expect(live.withGate2ReviewCwd('C:/workspace-2', async () => {
+        expect(process.env['GATE2_REVIEW_CWD']).toBe('C:/workspace-2');
+        throw new Error('boom');
+      })).rejects.toThrow(/boom/);
+      expect(process.env['GATE2_REVIEW_CWD']).toBe('C:/previous');
+
+      delete process.env['GATE2_REVIEW_CWD'];
+      await live.withGate2ReviewCwd('C:/workspace-3', async () => {
+        expect(process.env['GATE2_REVIEW_CWD']).toBe('C:/workspace-3');
+      });
+      expect(process.env['GATE2_REVIEW_CWD']).toBeUndefined();
+    } finally {
+      if (original === undefined) {
+        delete process.env['GATE2_REVIEW_CWD'];
+      } else {
+        process.env['GATE2_REVIEW_CWD'] = original;
+      }
+    }
+  });
+});
+
 // ============================================================================
 // D-40 Drift detector: weighted (>= 2 of 4 signals) + outside-workspace hard fail
 // ============================================================================

@@ -383,6 +383,33 @@ export interface RunLiveResult {
   readonly report: Gate2Report;
 }
 
+export function determineLiveFinalResult(input: {
+  readonly liveError?: string;
+  readonly steps?: ReadonlyArray<{ readonly kind: string }>;
+  readonly reviewStatus?: ReviewStatus | 'unavailable';
+}): 'pass' | 'fail' | 'limit' | 'error' {
+  if (input.liveError !== undefined) return 'error';
+  const steps = input.steps ?? [];
+  if (steps.length === 0) return 'fail';
+  const lastStep = steps[steps.length - 1]!;
+  if (lastStep.kind === 'limit') return 'limit';
+  return input.reviewStatus === 'approve' ? 'pass' : 'fail';
+}
+
+export async function withGate2ReviewCwd<T>(workspacePath: string, fn: () => Promise<T>): Promise<T> {
+  const previous = process.env['GATE2_REVIEW_CWD'];
+  process.env['GATE2_REVIEW_CWD'] = workspacePath;
+  try {
+    return await fn();
+  } finally {
+    if (previous === undefined) {
+      delete process.env['GATE2_REVIEW_CWD'];
+    } else {
+      process.env['GATE2_REVIEW_CWD'] = previous;
+    }
+  }
+}
+
 export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   const startedAt = new Date();
   if (!spec.llmConfigPath) throw new Error('runLive requires llmConfigPath');
@@ -413,7 +440,6 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   const taskgraphRoot = `${workspacePath}/.deepwhale/taskgraph`;
   await rm(taskgraphRoot, { recursive: true, force: true });
   const store = await createTaskGraphStore({ root: taskgraphRoot });
-  process.env['GATE2_REVIEW_CWD'] = workspacePath;
   const reviewer: Reviewer = createReviewer({ runCommand: runShellCommand });
   const recorder = makeTaskGraphRecorder(store, task.goal);
   const maxSteps = task.maxSteps ?? 50;
@@ -424,7 +450,6 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   let liveError: string | undefined;
   let reviewStatus: ReviewStatus | undefined;
   let result: Awaited<ReturnType<typeof runToolLoopWithReview>> | undefined;
-  let finalResultKind: 'pass' | 'fail' | 'limit' | 'error' = 'pass';
 
   let reviewGates: string[];
   if (task.reviewGates && task.reviewGates.length > 0) {
@@ -434,18 +459,19 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   }
   const registryProfile = task.registryProfile ?? 'default';
   try {
-    result = await runToolLoopWithReview({
-      client,
-      messages,
-      registry: createDefaultRegistry({ profile: registryProfile }),
-      maxSteps,
-      reviewer,
-      reviewGates,
-      taskGraph: recorder,
-    });
+    result = await withGate2ReviewCwd(workspacePath, () =>
+      runToolLoopWithReview({
+        client,
+        messages,
+        registry: createDefaultRegistry({ profile: registryProfile }),
+        maxSteps,
+        reviewer,
+        reviewGates,
+        taskGraph: recorder,
+      }),
+    );
   } catch (err) {
     liveError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    finalResultKind = 'error';
   }
 
   // Determine review status from result. If the tool loop returned a review
@@ -499,19 +525,11 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   });
   const nodeCount = recorder.nodeCount();
 
-  // Determine finalResultKind from the actual tool-loop outcome
-  if (finalResultKind !== 'error' && result) {
-    if (result.steps.length > 0) {
-      const lastStep = result.steps[result.steps.length - 1]!;
-      if (lastStep.kind === 'limit') {
-        finalResultKind = 'limit';
-      } else {
-        finalResultKind = 'pass';
-      }
-    } else {
-      finalResultKind = 'fail';
-    }
-  }
+  const finalResultKind = determineLiveFinalResult({
+    ...(liveError !== undefined ? { liveError } : {}),
+    steps: result?.steps ?? [],
+    reviewStatus: reviewStatus ?? 'unavailable',
+  });
 
   const passedLive = evaluatePassedLive({
     source: 'live-llm',
