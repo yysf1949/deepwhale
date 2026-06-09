@@ -16,7 +16,7 @@
  * shape, not a replacement for the operational runner.
  */
 
-import type { Gate1Result, Gate1SymbolEvidence } from './gate1.js';
+import type { Gate1LocQualification, Gate1Result, Gate1SymbolEvidence } from './gate1.js';
 
 export interface PlanGate1Shape {
   repoRoot: string;
@@ -26,6 +26,7 @@ export interface PlanGate1Shape {
   references: number;
   callEdges: number;
   elapsedMs: number;
+  locQualification: Gate1LocQualification;
   entry: Gate1SymbolEvidence;
   callChain: Gate1Result['evidence']['callChain'];
   modificationPoint: Gate1SymbolEvidence;
@@ -49,6 +50,7 @@ export function toPlanShape(result: Gate1Result): PlanGate1Shape {
     references: result.metrics.referencesIndexed,
     callEdges: result.metrics.callEdges,
     elapsedMs: result.metrics.elapsedMs,
+    locQualification: result.locQualification,
     entry,
     callChain: result.evidence.callChain,
     modificationPoint,

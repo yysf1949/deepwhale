@@ -2,7 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseGate1Args, readGate1Scenario, runGate1 } from '../../src/gate1.js';
+import { formatGate1Markdown, parseGate1Args, readGate1Scenario, runGate1 } from '../../src/gate1.js';
 
 describe('Gate-1 runner', () => {
   it('fails explicitly when the repository is below the formal LOC floor', async () => {
@@ -20,6 +20,7 @@ describe('Gate-1 runner', () => {
 
       expect(result.passed).toBe(false);
       expect(result.failureReasons).toContain('loc-below-minimum: 16 < 50000');
+      expect(result.locQualification).toBe('below-minimum');
       expect(result.metrics.loc).toBe(16);
       expect(result.evidence.entry?.file).toBe('src/registry.ts');
     } finally {
@@ -42,6 +43,7 @@ describe('Gate-1 runner', () => {
 
       expect(result.passed).toBe(true);
       expect(result.failureReasons).toEqual([]);
+      expect(result.locQualification).toBe('preferred-100k');
       expect(result.metrics.loc).toBe(16);
       expect(result.evidence.entry).toEqual(
         expect.objectContaining({ file: 'src/registry.ts', symbol: 'createDefaultRegistry' }),
@@ -57,6 +59,27 @@ describe('Gate-1 runner', () => {
       expect(result.evidence.modificationPoint).toEqual(
         expect.objectContaining({ file: 'src/registry.ts', symbol: 'createDefaultRegistry' }),
       );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('marks a minimum LOC pass that does not reach preferred maturity', async () => {
+    const dir = await makeFixtureRepo();
+    try {
+      const result = await runGate1({
+        repoPath: dir,
+        minLoc: 10,
+        preferredLoc: 100,
+        timeboxMs: 20 * 60 * 1000,
+        entrySymbol: 'createDefaultRegistry',
+        requiredCall: { callerSymbol: 'startApp', calleeSymbol: 'createDefaultRegistry' },
+        modificationPoint: { file: 'src/registry.ts', symbol: 'createDefaultRegistry' },
+      });
+
+      expect(result.passed).toBe(true);
+      expect(result.locQualification).toBe('minimum-50k');
+      expect(formatGate1Markdown(result)).toContain('LOC qualification: minimum-50k');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

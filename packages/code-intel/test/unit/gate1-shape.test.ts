@@ -9,6 +9,7 @@ describe('gate-1 evidence shape adapter (D-33.2.5)', () => {
       passed: true,
       failureReasons: [],
       repoPath: '/tmp/repo',
+      locQualification: 'minimum-50k',
       metrics: {
         loc: 50000,
         supportedFiles: 100,
@@ -45,6 +46,7 @@ describe('gate-1 evidence shape adapter (D-33.2.5)', () => {
       entry: { symbol: 'main' },
       callChain: [{ caller: 'src/main.ts:main', callee: 'src/util.ts:helper' }],
       modificationPoint: { symbol: 'helper' },
+      locQualification: 'minimum-50k',
       passed: true,
     });
   });
@@ -54,6 +56,7 @@ describe('gate-1 evidence shape adapter (D-33.2.5)', () => {
       passed: false,
       failureReasons: ['entry-not-found'],
       repoPath: '/tmp/repo',
+      locQualification: 'below-minimum',
       metrics: {
         loc: 100,
         supportedFiles: 1,

@@ -62,10 +62,13 @@ export interface Gate1SymbolEvidence {
   kind: Reference['kind'];
 }
 
+export type Gate1LocQualification = 'below-minimum' | 'minimum-50k' | 'preferred-100k';
+
 export interface Gate1Result {
   passed: boolean;
   failureReasons: string[];
   repoPath: string;
+  locQualification: Gate1LocQualification;
   metrics: Gate1Metrics;
   evidence: Gate1Evidence;
 }
@@ -147,6 +150,7 @@ export async function runGate1(options: Gate1Options): Promise<Gate1Result> {
     passed: failureReasons.length === 0,
     failureReasons,
     repoPath,
+    locQualification: qualifyLoc(metrics),
     metrics,
     evidence,
   };
@@ -349,6 +353,12 @@ function stripUtf8Bom(text: string): string {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
+function qualifyLoc(metrics: Gate1Metrics): Gate1LocQualification {
+  if (metrics.loc < metrics.minLoc) return 'below-minimum';
+  if (metrics.loc < metrics.preferredLoc) return 'minimum-50k';
+  return 'preferred-100k';
+}
+
 export function formatGate1Markdown(result: Gate1Result): string {
   const lines = [
     `# Gate-1 Result`,
@@ -359,6 +369,7 @@ export function formatGate1Markdown(result: Gate1Result): string {
     `## Metrics`,
     ``,
     `- LOC: ${result.metrics.loc} (minimum ${result.metrics.minLoc}, preferred ${result.metrics.preferredLoc})`,
+    `- LOC qualification: ${result.locQualification}`,
     `- Supported files: ${result.metrics.supportedFiles}`,
     `- Files indexed: ${result.metrics.filesIndexed}`,
     `- Symbols indexed: ${result.metrics.symbolsIndexed}`,

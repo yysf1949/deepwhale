@@ -26,6 +26,18 @@ export class RenameSymbolTool implements Tool {
       oldName: { type: 'string', description: 'current symbol name' },
       newName: { type: 'string', description: 'new symbol name' },
       path: { type: 'string', description: 'repo root path (default: current working directory)' },
+      targetFile: {
+        type: 'string',
+        description: 'optional declaration file to disambiguate same-name symbols (relative to repo root)',
+      },
+      targetLine: {
+        type: 'number',
+        description: 'optional declaration line to disambiguate same-name symbols',
+      },
+      targetScope: {
+        type: 'string',
+        description: 'optional declaration scope to disambiguate same-name symbols',
+      },
       apply: { type: 'boolean', description: 'if true, write changes to disk (default: false, dry-run preview)' },
       // 拍板 (D-33.2.2): default false. When true, ALSO rewrite occurrences in
       // comments and strings using a word-boundary regex across the whole
@@ -62,7 +74,11 @@ export class RenameSymbolTool implements Tool {
       }
       const graph = await buildSymbolGraph(repoPath);
       const refs = findReferences(graph, oldName);
-      const refsByFile = groupReferencesByFile(refs);
+      const selection = selectRenameReferences(refs, input);
+      if (!selection.ok) {
+        return { success: false, content: '', error: selection.error };
+      }
+      const refsByFile = groupReferencesByFile(selection.refs);
       const fileChanges: Array<{ file: string; replacements: number; preview: string; textualReplacements?: number }> = [];
       for (const [file, fileRefs] of refsByFile) {
         const fullPath = resolve(repoPath, file);
@@ -110,6 +126,7 @@ export class RenameSymbolTool implements Tool {
           files: fileChanges.length,
           changes: totalReplacements,
           dryRun: !apply,
+          ...(selection.targetFile ? { targetFile: selection.targetFile } : {}),
           ...(allowTextualFallback ? { allowTextualFallback: true } : {}),
         },
       };
@@ -141,6 +158,52 @@ function groupReferencesByFile(refs: ReadonlyArray<Reference>): Map<string, Refe
     out.set(ref.file, arr);
   }
   return out;
+}
+
+function selectRenameReferences(
+  refs: ReadonlyArray<Reference>,
+  input: Record<string, unknown>,
+): { ok: true; refs: ReadonlyArray<Reference>; targetFile?: string } | { ok: false; error: string } {
+  const declarations = refs.filter((ref) => ref.kind === 'declaration');
+  const targetFile = optionalNormalizedPath(input['targetFile']);
+  const targetLine = typeof input['targetLine'] === 'number' ? input['targetLine'] : undefined;
+  const targetScope = typeof input['targetScope'] === 'string' ? input['targetScope'] : undefined;
+  const hasSelector = targetFile !== undefined || targetLine !== undefined || targetScope !== undefined;
+
+  if (declarations.length > 1 && !hasSelector) {
+    return {
+      ok: false,
+      error: `ambiguous-symbol: ${declarations.length} declarations found; pass targetFile, targetLine, or targetScope`,
+    };
+  }
+
+  if (!hasSelector) return { ok: true, refs };
+
+  const matches = declarations.filter((ref) => {
+    if (targetFile !== undefined && ref.file !== targetFile) return false;
+    if (targetLine !== undefined && ref.line !== targetLine) return false;
+    if (targetScope !== undefined && ref.scope !== targetScope) return false;
+    return true;
+  });
+
+  if (matches.length !== 1) {
+    return {
+      ok: false,
+      error: `ambiguous-symbol: selector matched ${matches.length} declarations; expected exactly 1`,
+    };
+  }
+
+  const selected = matches[0]!;
+  return {
+    ok: true,
+    refs: refs.filter((ref) => ref.file === selected.file),
+    targetFile: selected.file,
+  };
+}
+
+function optionalNormalizedPath(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length === 0) return undefined;
+  return value.replace(/\\/g, '/');
 }
 
 function applyTextualFallback(

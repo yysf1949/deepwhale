@@ -6,6 +6,7 @@ Repo: D:\App\openClaw\projects\deepwhale\.gate-targets\vite
 ## Metrics
 
 - LOC: 86216 (minimum 50000, preferred 100000)
+- LOC qualification: minimum-50k (passes formal 50K minimum; does not meet preferred 100K maturity)
 - Supported files: 1395
 - Files indexed: 1395
 - Symbols indexed: 7427

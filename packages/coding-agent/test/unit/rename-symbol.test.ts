@@ -126,11 +126,31 @@ describe('rename_symbol conservative mode (D-33.2.2)', () => {
       apply: true,
     });
 
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/ambiguous-symbol/);
+    }
+    expect(readFileSync(join(tmpDir, 'a.ts'), 'utf8')).toContain('export function target()');
+    expect(readFileSync(join(tmpDir, 'b.ts'), 'utf8')).toContain('function target()');
+  });
+
+  it('renames only the selected declaration file when targetFile disambiguates same-name declarations', async () => {
+    const result = await tool.execute({
+      path: tmpDir,
+      oldName: 'target',
+      newName: 'renamedTarget',
+      targetFile: 'a.ts',
+      apply: true,
+    });
+
     expect(result.success).toBe(true);
     const aContent = readFileSync(join(tmpDir, 'a.ts'), 'utf8');
+    const bContent = readFileSync(join(tmpDir, 'b.ts'), 'utf8');
     // Identifier references in code ARE rewritten
     expect(aContent).toContain('export function renamedTarget()');
     expect(aContent).toContain('return renamedTarget()');
+    expect(bContent).toContain('function target()');
+    expect(bContent).not.toContain('renamedTarget');
     // But string and comment occurrences are NOT rewritten (conservative default)
     expect(aContent).toContain("'target'");
     expect(aContent).toContain('// target is documentation only');
