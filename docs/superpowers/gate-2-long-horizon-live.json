@@ -1,18 +1,18 @@
 {
   "source": "live-llm",
-  "passed_live": false,
+  "passed_live": true,
   "passed_mock": false,
-  "toolCalls": 15,
+  "toolCalls": 49,
   "retries": 0,
   "goalDriftDetected": false,
   "reviewStatus": "approve",
-  "taskgraphNodes": 13,
+  "taskgraphNodes": 41,
   "fixture": {
-    "goal": "Fix the 6 bugs in src/calc.ts so that the test suite passes. The bugs are: (1) subtract returns the sum instead of the difference, (2) multiply returns the sum, (3) divide returns the product, (4) power uses multiplication instead of exponentiation, (5) squareRoot returns the absolute value instead of the square root, (6) clamp returns max only and ignores value/min. Read the test file to understand the expected behaviour, then edit src/calc.ts so all 10 tests pass when you run pnpm test. Do NOT modify the test file or the package.json.",
-    "workspacePath": "C:\\Users\\BUTTER~1\\AppData\\Local\\Temp\\gate2-fixt-yLognt"
+    "goal": "Read test/invoice.test.ts and src/*.ts carefully. There are bugs in the invoice domain (src/types.ts, src/pricing.ts, src/tax.ts, src/format.ts, src/invoice.ts) that cause test failures. The bugs are NOT marked in source comments. You must read the tests and source together to identify them. After all tests pass, write a docs/API.md file in the workspace describing each public function (subtotal, applyDiscount, taxFor, formatInvoice, buildInvoice) with a one-line purpose and its signature. Then run the test suite one more time to confirm everything is still green.",
+    "workspacePath": "C:\\Users\\BUTTER~1\\AppData\\Local\\Temp\\gate2-fixt-8269s6"
   },
   "finalResult": "pass",
-  "startedAt": "2026-06-09T12:17:45.837Z",
-  "finishedAt": "2026-06-09T12:18:13.273Z",
-  "durationMs": 27436
+  "startedAt": "2026-06-09T13:04:25.108Z",
+  "finishedAt": "2026-06-09T13:07:07.628Z",
+  "durationMs": 162520
 }

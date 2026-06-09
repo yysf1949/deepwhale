@@ -1,7 +1,0 @@
-{
-  "goal": "Fix the 6 bugs in src/calc.ts so that the test suite passes. The bugs are: (1) subtract returns the sum instead of the difference, (2) multiply returns the sum, (3) divide returns the product, (4) power uses multiplication instead of exponentiation, (5) squareRoot returns the absolute value instead of the square root, (6) clamp returns max only and ignores value/min. Read the test file to understand the expected behaviour, then edit src/calc.ts so all 10 tests pass when you run pnpm test. Do NOT modify the test file or the package.json.",
-  "fixture": "gate2-live/fixture",
-  "maxSteps": 50,
-  "expectedFile": "src/calc.ts",
-  "reviewGates": ["pnpm test"]
-}

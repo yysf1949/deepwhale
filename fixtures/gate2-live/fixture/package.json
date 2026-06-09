@@ -1,0 +1,9 @@
+{
+  "name": "gate2-invoice-fixture",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/invoice.test.ts"
+  }
+}

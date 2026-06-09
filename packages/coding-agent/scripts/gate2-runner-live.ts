@@ -74,11 +74,16 @@ export async function materializeFixture(fixturePath: string): Promise<string> {
     // Try under this package's test/fixtures dir. We probe several candidate
     // roots to handle test runners whose cwd is the repo root (e.g. vitest
     // when run from the workspace root) or the package dir (e.g. tsx).
+    // D-40: also support a top-level `fixtures/` dir at the repo root, where
+    // shared long-horizon fixtures live so they don't get picked up by
+    // vitest's test-discovery walk.
     const candidates = [
       resolve(process.cwd(), 'test', 'fixtures', fixturePath),
       resolve(process.cwd(), 'packages', 'coding-agent', 'test', 'fixtures', fixturePath),
-      // Walk up the dir tree until we find a packages/coding-agent/test/fixtures match.
+      resolve(process.cwd(), 'fixtures', fixturePath),
+      // Walk up the dir tree looking for known fixture roots.
       ...walkUpFor('packages/coding-agent/test/fixtures', fixturePath),
+      ...walkUpFor('fixtures', fixturePath),
     ];
     const found = candidates.find((c) => existsSync(c));
     if (found) {
@@ -118,12 +123,19 @@ export interface DriftInput {
 }
 
 /**
- * D-39 multi-signal goal-drift detector. Returns true only if the agent is
- * doing clearly unrelated work. The D-37/D-38 legacy detector flagged
- * legitimate `bash ls <workspace>` / `read_file <expectedFile>` as drift
- * because tool-summary tokens never contain goal words.
+ * D-40 stricter multi-signal goal-drift detector.
  *
- * Signals (any positive => no drift):
+ * Returns true only if the agent is doing clearly unrelated work. The D-39
+ * detector treated ANY single positive signal as "not drift", which let
+ * drive-by `pnpm test` calls (signal 4) be enough to defeat drift detection
+ * even when the agent was clearly working on something off-topic.
+ *
+ * New rule: at least 2 of the 4 positive signals must be present for a
+ * workflow to be considered in-scope. This raises the bar so that an
+ * agent has to actually be working on the right files AND talk about
+ * the goal AND/OR run the review gate.
+ *
+ * Signals (counted; need >= 2 positive):
  *   1. WORKSPACE SCOPE: tool args reference a path inside workspacePath
  *      (or expectedFile / package.json / test dir).
  *   2. EXPECTED FILE TOUCH: tool args reference expectedFile.
@@ -134,18 +146,16 @@ export function detectGoalDrift(input: DriftInput): boolean {
   const workspaceNorm = input.workspacePath.replace(/\\/g, '/').toLowerCase();
   const expectedFile = input.expectedFile?.replace(/\\/g, '/').toLowerCase();
 
-  // Signal 1: workspace scope
-  const anyInWorkspace = input.toolCalls.some((tc) =>
-    argsReferenceWorkspace(tc.args, workspaceNorm, expectedFile),
-  );
-  if (anyInWorkspace) return false;
+  let positives = 0;
 
-  // Signal 2: expected file touch (only if not already caught by signal 1)
-  if (expectedFile) {
-    const anyTouchExpected = input.toolCalls.some((tc) =>
-      argsReferenceFile(tc.args, expectedFile),
-    );
-    if (anyTouchExpected) return false;
+  // Signal 1: workspace scope
+  if (input.toolCalls.some((tc) => argsReferenceWorkspace(tc.args, workspaceNorm, expectedFile))) {
+    positives++;
+  }
+
+  // Signal 2: expected file touch (only counted if expectedFile is set)
+  if (expectedFile && input.toolCalls.some((tc) => argsReferenceFile(tc.args, expectedFile))) {
+    positives++;
   }
 
   // Signal 3: assistant content
@@ -155,25 +165,63 @@ export function detectGoalDrift(input: DriftInput): boolean {
       .split(/\W+/)
       .filter((t) => t.length > 3),
   );
-  const anyContentMatch = input.assistantContent.some((msg) => {
-    const msgLower = msg.toLowerCase();
-    for (const kw of goalKeywords) {
-      if (kw.length > 3 && msgLower.includes(kw)) return true;
-    }
-    return false;
-  });
-  if (anyContentMatch) return false;
+  if (
+    input.assistantContent.some((msg) => {
+      const msgLower = msg.toLowerCase();
+      return goalKeywords.some((kw) => kw.length > 3 && msgLower.includes(kw));
+    })
+  ) {
+    positives++;
+  }
 
   // Signal 4: review gate was invoked
-  const anyReviewRan = input.toolCalls.some((tc) => {
-    if (tc.toolName !== 'bash') return false;
-    const cmd = extractBashCommand(tc.args);
-    if (cmd === undefined) return false;
-    return input.reviewCommands.some((gate) => cmd.includes(gate.split(' ')[0]!));
-  });
-  if (anyReviewRan) return false;
+  if (
+    input.toolCalls.some((tc) => {
+      if (tc.toolName !== 'bash') return false;
+      const cmd = extractBashCommand(tc.args);
+      if (cmd === undefined) return false;
+      return input.reviewCommands.some((gate) => {
+        const firstToken = gate.split(' ')[0]!;
+        return cmd.includes(firstToken) || cmd.includes(gate);
+      });
+    })
+  ) {
+    positives++;
+  }
 
-  return true;
+  // Hard-fail drift: writes to a path OUTSIDE the materialized workspace
+  // (e.g. trying to edit a different repo or write to /etc/passwd).
+  const outsideWorkspace = input.toolCalls.some((tc) =>
+    argsReferenceOutsideWorkspace(tc.args, workspaceNorm),
+  );
+  if (outsideWorkspace) return true;
+
+  // Need at least 2 of 4 positive signals to be considered in-scope.
+  return positives < 2;
+}
+
+function argsReferenceOutsideWorkspace(args: unknown, workspaceNorm: string): boolean {
+  // Heuristic: if a tool arg looks like an absolute path (C:/... or /...) and
+  // does NOT start with the workspace path, treat it as outside-workspace.
+  // The runner is not a sandbox; this is best-effort detection for obvious
+  // off-target writes.
+  const visit = (s: string): boolean => {
+    if (s.length < 3) return false;
+    const norm = s.replace(/\\/g, '/').toLowerCase();
+    // Only flag if it looks like a real path (contains a slash or starts with drive letter)
+    const looksLikePath = /^[a-z]:[\\/]|^\//i.test(s);
+    if (!looksLikePath) return false;
+    if (norm.includes(workspaceNorm)) return false;
+    return true;
+  };
+  if (typeof args === 'string') return visit(args);
+  if (Array.isArray(args)) return args.some((v) => (typeof v === 'string' ? visit(v) : false));
+  if (args && typeof args === 'object') {
+    for (const v of Object.values(args as Record<string, unknown>)) {
+      if (typeof v === 'string' && visit(v)) return true;
+    }
+  }
+  return false;
 }
 
 function argsReferenceWorkspace(
@@ -181,10 +229,14 @@ function argsReferenceWorkspace(
   workspaceNorm: string,
   expectedFile: string | undefined,
 ): boolean {
+  // workspaceNorm is the workspace path with `\` normalized to `/` and lowercased.
+  // We do the same normalization on every string we inspect, so the comparison
+  // works regardless of the platform separator the agent used.
+  const norm = (s: string): string => s.replace(/\\/g, '/').toLowerCase();
   if (typeof args === 'string') {
-    const lower = args.toLowerCase();
+    const lower = norm(args);
     if (lower.includes(workspaceNorm)) return true;
-    if (expectedFile && lower.includes(expectedFile)) return true;
+    if (expectedFile && lower.includes(norm(expectedFile))) return true;
     return false;
   }
   if (Array.isArray(args)) {
@@ -199,8 +251,11 @@ function argsReferenceWorkspace(
 }
 
 function argsReferenceFile(args: unknown, targetFileNorm: string): boolean {
+  // targetFileNorm is already normalized to `/` and lowercased. We do the
+  // same to each inspected string so the comparison works across separators.
+  const norm = (s: string): string => s.replace(/\\/g, '/').toLowerCase();
   if (typeof args === 'string') {
-    return args.toLowerCase().includes(targetFileNorm);
+    return norm(args).includes(targetFileNorm);
   }
   if (Array.isArray(args)) {
     return args.some((v) => argsReferenceFile(v, targetFileNorm));

@@ -364,75 +364,102 @@ describe('gate2-runner-core: readTaskConfig reads reviewGates', () => {
 });
 
 // ============================================================================
-// D-39 Drift detector: legit workflow vs unrelated workflow
+// D-40 Drift detector: weighted (>= 2 of 4 signals) + outside-workspace hard fail
 // ============================================================================
 
-describe('gate2-runner-live: detectGoalDrift (D-39 multi-signal)', () => {
-  it('legitimate calc.ts workflow is NOT drift', async () => {
+describe('gate2-runner-live: detectGoalDrift (D-40 stricter)', () => {
+  it('legitimate multi-file workflow (workspace + expectedFile + assistant) is NOT drift', async () => {
     const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
-    const goal = 'Fix the 3 bugs in src/calc.ts so the test suite passes';
+    const goal = 'Fix the bugs in src/pricing.ts so the test suite passes';
     const workspacePath = 'C:/tmp/gate2-fixt-abc';
     const drift = detectGoalDrift({
       goal,
-      expectedFile: 'src/calc.ts',
+      expectedFile: 'src/pricing.ts',
       workspacePath,
       toolCalls: [
-        { toolName: 'bash', args: { command: 'ls' } },
-        { toolName: 'read_file', args: { path: 'C:/tmp/gate2-fixt-abc/src/calc.ts' } },
-        { toolName: 'read_file', args: { path: 'C:/tmp/gate2-fixt-abc/test/calc.test.ts' } },
-        { toolName: 'bash', args: { command: 'pnpm test' } },
-        { toolName: 'patch', args: { file: 'src/calc.ts', old: '/* BUG */', new: '' } },
+        { toolName: 'bash', args: { command: 'ls C:/tmp/gate2-fixt-abc' } },
+        { toolName: 'read_file', args: { path: 'C:/tmp/gate2-fixt-abc/src/pricing.ts' } },
+        { toolName: 'read_file', args: { path: 'C:/tmp/gate2-fixt-abc/test/invoice.test.ts' } },
+        { toolName: 'patch', args: { file: 'C:/tmp/gate2-fixt-abc/src/pricing.ts', old: 'x', new: 'y' } },
+        { toolName: 'bash', args: { command: 'node --test test/invoice.test.ts' } },
       ],
       assistantContent: [
-        'I will fix the bugs in src/calc.ts by reading the test file first.',
+        'I will read the test file and fix the bugs in pricing.ts.',
       ],
-      reviewCommands: ['pnpm test'],
+      reviewCommands: ['node --test test/invoice.test.ts'],
     });
     expect(drift).toBe(false);
   });
 
-  it('unrelated file/task workflow IS drift', async () => {
+  it('only review-gate (pnpm test) + nothing else => DRIFT (D-40 stricter)', async () => {
     const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
-    const goal = 'Fix the 3 bugs in src/calc.ts so the test suite passes';
+    const goal = 'Fix the bugs in src/pricing.ts';
     const drift = detectGoalDrift({
       goal,
-      expectedFile: 'src/calc.ts',
-      workspacePath: 'C:/tmp/gate2-fixt-abc',
+      workspacePath: 'C:/tmp/abc',
       toolCalls: [
-        // None of these touch workspace or expectedFile; no assistant content;
-        // no review gate.
-        { toolName: 'bash', args: { command: 'echo hello' } },
-        { toolName: 'read_file', args: { path: 'C:/Users/butterfly443/Documents/notes.md' } },
-        { toolName: 'write_file', args: { path: 'C:/Users/butterfly443/random.txt' } },
+        // No workspace scope (ls /), no expectedFile touch, no assistant content mentioning goal.
+        { toolName: 'bash', args: { command: 'pnpm test' } },
       ],
-      assistantContent: ['I will check my personal notes first.'],
+      assistantContent: ['I will run a quick sanity check.'],
       reviewCommands: ['pnpm test'],
     });
     expect(drift).toBe(true);
   });
 
-  it('goal keywords in assistant content defeat drift', async () => {
+  it('touches a workspace file but assistant works on unrelated goal => DRIFT (D-40)', async () => {
     const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
-    const goal = 'Fix the bugs in src/calc.ts so the test suite passes';
+    const goal = 'Fix the bugs in src/pricing.ts so the invoice test suite passes';
     const drift = detectGoalDrift({
       goal,
+      // No expectedFile set, so signal 2 is N/A. The agent reads a non-goal
+      // file in the workspace and writes the README — only signal 1 is positive.
       workspacePath: 'C:/tmp/abc',
-      toolCalls: [{ toolName: 'bash', args: { command: 'ls' } }],
-      assistantContent: ['I need to look at the calc.ts file carefully.'],
-      reviewCommands: ['pnpm test'],
+      toolCalls: [
+        { toolName: 'read_file', args: { path: 'C:/tmp/abc/src/types.ts' } },
+        { toolName: 'write_file', args: { path: 'C:/tmp/abc/README.md' } },
+      ],
+      assistantContent: ['Let me update the README for documentation.'],
+      reviewCommands: ['node --test test/invoice.test.ts'],
     });
-    expect(drift).toBe(false);
+    expect(drift).toBe(true);
   });
 
-  it('running the review gate alone defeats drift', async () => {
+  it('writes to an external path outside materialized workspace => DRIFT (hard fail)', async () => {
     const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
-    const goal = 'Fix the bugs in src/calc.ts';
+    const goal = 'Fix the bugs in src/pricing.ts';
+    const workspacePath = 'C:/tmp/gate2-fixt-abc';
     const drift = detectGoalDrift({
       goal,
-      workspacePath: 'C:/tmp/abc',
-      toolCalls: [{ toolName: 'bash', args: { command: 'pnpm test' } }],
-      assistantContent: [],
-      reviewCommands: ['pnpm test'],
+      workspacePath,
+      toolCalls: [
+        // Has workspace scope + assistant content + review gate, but ALSO
+        // writes outside the workspace — hard-fail drift.
+        { toolName: 'bash', args: { command: 'ls C:/tmp/gate2-fixt-abc' } },
+        { toolName: 'write_file', args: { path: 'C:/Users/butterfly443/Documents/random.txt' } },
+        { toolName: 'bash', args: { command: 'node --test test/invoice.test.ts' } },
+      ],
+      assistantContent: ['I will fix the bugs and run tests.'],
+      reviewCommands: ['node --test test/invoice.test.ts'],
+    });
+    expect(drift).toBe(true);
+  });
+
+  it('final review approve + expected files changed + assistant content => NOT drift', async () => {
+    const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
+    const goal = 'Fix the bugs in src/pricing.ts so the invoice test suite passes';
+    const workspacePath = 'C:/tmp/gate2-fixt-abc';
+    const drift = detectGoalDrift({
+      goal,
+      expectedFile: 'src/pricing.ts',
+      workspacePath,
+      toolCalls: [
+        { toolName: 'patch', args: { file: 'C:/tmp/gate2-fixt-abc/src/pricing.ts', old: 'x', new: 'y' } },
+        { toolName: 'patch', args: { file: 'C:/tmp/gate2-fixt-abc/src/invoice.ts', old: 'a', new: 'b' } },
+        { toolName: 'bash', args: { command: 'node --test test/invoice.test.ts' } },
+      ],
+      assistantContent: ['All tests pass. Bugs in pricing.ts and invoice.ts fixed.'],
+      reviewCommands: ['node --test test/invoice.test.ts'],
     });
     expect(drift).toBe(false);
   });
@@ -442,17 +469,17 @@ describe('gate2-runner-live: detectGoalDrift (D-39 multi-signal)', () => {
 // D-39 materializeFixture
 // ============================================================================
 
-describe('gate2-runner-live: materializeFixture (D-39)', () => {
+describe('gate2-runner-live: materializeFixture (D-40 multi-fixture)', () => {
   it('copies a relative fixture path under <pkg>/test/fixtures to a fresh temp dir', async () => {
     const { materializeFixture } = await import('../../scripts/gate2-runner-live.js');
     const tmp = await materializeFixture('gate2-live/fixture');
     try {
-      // The fixture should now exist as a fresh temp dir with all files copied
       const { existsSync, statSync } = await import('node:fs');
       expect(existsSync(join(tmp, 'package.json'))).toBe(true);
-      expect(existsSync(join(tmp, 'src', 'calc.ts'))).toBe(true);
-      expect(existsSync(join(tmp, 'test', 'calc.test.ts'))).toBe(true);
-      expect(statSync(join(tmp, 'src', 'calc.ts')).isFile()).toBe(true);
+      expect(existsSync(join(tmp, 'src', 'pricing.ts'))).toBe(true);
+      expect(existsSync(join(tmp, 'src', 'invoice.ts'))).toBe(true);
+      expect(existsSync(join(tmp, 'test', 'invoice.test.ts'))).toBe(true);
+      expect(statSync(join(tmp, 'src', 'pricing.ts')).isFile()).toBe(true);
     } finally {
       await rm(tmp, { recursive: true, force: true });
     }

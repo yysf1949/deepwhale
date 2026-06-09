@@ -1,8 +1,0 @@
-{
-  "name": "gate2-fixture",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "test": "node --test test/calc.test.ts"
-  }
-}
