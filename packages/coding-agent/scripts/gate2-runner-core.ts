@@ -35,10 +35,12 @@ export interface LLMConfig {
 }
 
 export interface TaskConfig {
-  readonly goal: string;
-  readonly workspacePath: string;
-  readonly maxSteps?: number;
-  readonly expectedFile?: string; // path relative to workspace
+  goal: string;
+  workspacePath: string;
+  maxSteps?: number;
+  expectedFile?: string;
+  /** Review commands (default: ['pnpm test']). Each is run via the workspace's cwd. */
+  reviewGates?: ReadonlyArray<string>;
 }
 
 export interface RunSpec {

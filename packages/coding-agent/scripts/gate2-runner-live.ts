@@ -28,8 +28,11 @@ import { existsSync } from 'node:fs';
 import type { ChatMessage, LLMClient } from '@deepwhale/llm';
 
 function runShellCommand(command: string): Promise<{ command: string; exitCode: number; stdout: string; stderr: string }> {
+  // Pin the reviewer's cwd to the task workspace so that `pnpm typecheck`,
+  // `pnpm lint`, and `pnpm test` operate on the agent's working files, not
+  // the runner's host repo.
   return new Promise((resolve) => {
-    const child = spawn(command, { shell: true });
+    const child = spawn(command, { shell: true, cwd: process.env.GATE2_REVIEW_CWD });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
@@ -137,6 +140,8 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   const taskgraphRoot = `${task.workspacePath}/.deepwhale/taskgraph`;
   await rm(taskgraphRoot, { recursive: true, force: true });
   const store = await createTaskGraphStore({ root: taskgraphRoot });
+  // Pin reviewer cwd to the workspace so its gates run against the agent's work.
+  process.env['GATE2_REVIEW_CWD'] = task.workspacePath;
   const reviewer: Reviewer = createReviewer({ runCommand: runShellCommand });
   const recorder = makeTaskGraphRecorder(store, task.goal);
   const maxSteps = task.maxSteps ?? 35;
@@ -149,6 +154,16 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   let result: Awaited<ReturnType<typeof runToolLoopWithReview>> | undefined;
   let finalResultKind: 'pass' | 'fail' | 'limit' | 'error' = 'pass';
 
+  let reviewGates: string[];
+  if (task.reviewGates && task.reviewGates.length > 0) {
+    reviewGates = task.reviewGates;
+  } else {
+    // Default: just run the test suite. pnpm typecheck / pnpm lint require
+    // a fully-configured project (tsconfig, eslint config, etc.) which a
+    // minimal fixture workspace doesn't have. Override via task.reviewGates
+    // for production projects.
+    reviewGates = ['pnpm test'];
+  }
   try {
     result = await runToolLoopWithReview({
       client,
@@ -156,7 +171,7 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
       registry: createDefaultRegistry({ profile: 'all' }),
       maxSteps,
       reviewer,
-      reviewGates: ['pnpm typecheck', 'pnpm lint', 'pnpm test'],
+      reviewGates,
       taskGraph: recorder,
     });
   } catch (err) {
