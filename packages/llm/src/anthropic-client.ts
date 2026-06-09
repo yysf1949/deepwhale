@@ -251,6 +251,32 @@ function mapSdkError(e: unknown): Error {
   return new LLMUnknownError(`Anthropic SDK: ${String(e)}`);
 }
 
+/**
+ * D-33.1.3: 公开 `serializeAnthropicMessagesForTest` 给单测覆盖 (跟 DeepSeekClient
+ * 同形态). 跟 chat() / stream() 内部走同一份 `toAnthropicMessages`, 防 wire shape
+ * 漂移. 返回简化形 { system, messages, tools }, 给单测 assert system 抽取 +
+ * tool_result 合并 + tool_use 包装 4 个机制.
+ */
+export function serializeAnthropicMessagesForTest(
+  messages: ReadonlyArray<ChatMessage>,
+  tools?: ReadonlyArray<LLMToolSchema>,
+): {
+  system: string | undefined;
+  messages: ReadonlyArray<{ role: 'user' | 'assistant'; content: unknown }>;
+  tools: ReadonlyArray<{ name: string; description: string; input_schema: unknown }> | undefined;
+} {
+  const out = toAnthropicMessages(messages as ChatMessage[], tools);
+  return {
+    system: out.system,
+    messages: out.messages.map((m) => ({ role: m.role, content: m.content })),
+    tools: out.tools?.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.input_schema,
+    })),
+  };
+}
+
 /** 拆分 system / 非 system messages (Anthropic 协议 system 是顶层字段). */
 function toAnthropicMessages(
   messages: ChatMessage[],
