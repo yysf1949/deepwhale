@@ -263,7 +263,9 @@ export function serializeAnthropicMessagesForTest(
 ): {
   system: string | undefined;
   messages: ReadonlyArray<{ role: 'user' | 'assistant'; content: unknown }>;
-  tools: ReadonlyArray<{ name: string; description: string; input_schema: unknown }> | undefined;
+  tools:
+    | ReadonlyArray<{ name: string; description: string | undefined; input_schema: unknown }>
+    | undefined;
 } {
   const out = toAnthropicMessages(messages as ChatMessage[], tools);
   return {

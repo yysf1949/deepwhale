@@ -64,7 +64,9 @@ describe('anthropic provider cache contract helper (D-33.1.3)', () => {
       ],
     );
     expect(payload.tools).toHaveLength(1);
-    expect(payload.tools?.[0]).toMatchObject({ name: 'read' });
-    expect(payload.tools?.[0]?.input_schema).toBeDefined();
+    const tool = payload.tools?.[0];
+    expect(tool).toBeDefined();
+    expect(tool?.name).toBe('read');
+    expect(tool?.input_schema).toBeDefined();
   });
 });
