@@ -1,14 +1,8 @@
 /**
- * Tool Registry — 33 工具的注册中心 (D-31.4.4, 2026-06-08).
+ * Tool Registry.
  *
- * Sprint 0.2 范围：
- * - register / get / list 基础 API
- * - 默认注册全部 6 工具
- * - name 重名启动时检测（pi #5316 教训）
- *
- * Sprint 1+ 扩展：
- * - MCP / Plugin / Skill 注册入口（v1.5/v2.0）
- * - 风险评级聚合（StormBreaker 用）
+ * The default profile is intentionally narrow: coding tools plus Code Intel
+ * essentials. Non-coding surfaces remain explicit opt-in profiles.
  */
 
 import type { Tool, ToolName } from '../types.js';
@@ -93,40 +87,60 @@ export class ToolRegistry {
   }
 }
 
-export type ToolRegistryProfile =
-  | 'default'
-  | 'core'
-  | 'coding'
-  | 'code-intel'
-  | 'web'
-  | 'engineering'
-  | 'research'
-  | 'productivity'
-  | 'media'
-  | 'all';
+export const STABLE_REGISTRY_PROFILES = ['core', 'coding', 'code-intel', 'productivity', 'media', 'all'] as const;
+export type StableToolRegistryProfile = (typeof STABLE_REGISTRY_PROFILES)[number];
 
-/** Sprint 1c-revive-3-D-12 review P1 修复: 显式注入 sandboxRunner. */
+export const LEGACY_OPT_IN_REGISTRY_PROFILES = ['web', 'engineering', 'research'] as const;
+export type LegacyOptInToolRegistryProfile = (typeof LEGACY_OPT_IN_REGISTRY_PROFILES)[number];
+
+export const TOOL_REGISTRY_PROFILES = [
+  'default',
+  ...STABLE_REGISTRY_PROFILES,
+  ...LEGACY_OPT_IN_REGISTRY_PROFILES,
+] as const;
+export type ToolRegistryProfile = (typeof TOOL_REGISTRY_PROFILES)[number];
+
+export interface RegistryProfilePolicy {
+  readonly profile: ToolRegistryProfile;
+  readonly kind: 'default' | 'stable' | 'legacy-opt-in';
+  readonly defaultEnabled: boolean;
+  readonly explicitOptInRequired: boolean;
+}
+
+export function isToolRegistryProfile(value: unknown): value is ToolRegistryProfile {
+  return typeof value === 'string' && (TOOL_REGISTRY_PROFILES as readonly string[]).includes(value);
+}
+
+export function registryProfilePolicy(profile: ToolRegistryProfile): RegistryProfilePolicy {
+  if (profile === 'default') {
+    return { profile, kind: 'default', defaultEnabled: true, explicitOptInRequired: false };
+  }
+  if ((LEGACY_OPT_IN_REGISTRY_PROFILES as readonly string[]).includes(profile)) {
+    return { profile, kind: 'legacy-opt-in', defaultEnabled: false, explicitOptInRequired: true };
+  }
+  return { profile, kind: 'stable', defaultEnabled: false, explicitOptInRequired: true };
+}
+
 export interface CreateDefaultRegistryOptions {
-  /** 注入 BashTool 的 SandboxRunner. 不传 = LocalSandboxRunner (v1.0 行为). */
+  /** Inject BashTool's sandbox runner. Defaults to LocalSandboxRunner. */
   readonly sandboxRunner?: SandboxRunner;
   /** Tool exposure profile. Default intentionally exposes only coding + code-intel essentials. */
   readonly profile?: ToolRegistryProfile;
 }
 
 /**
- * 默认 6 工具的 registry 工厂
+ * Registry factory.
  *
- * Sprint 1c-revive-3-D-12 review P1 修复 (2026-06-05): 加 `sandboxRunner` 显式参数.
- * 之前 `new BashTool()` 走默认 LocalSandboxRunner, `DEEPWHALE_SANDBOX=docker` 解析
- * 出的 DockerSandboxRunner 不会进 tool loop. 修法: mode 调用点从 env 解析 runner 后
- * 显式传入, 工具注册表跟 env 状态对齐.
+ * The default profile is the stabilization surface. Other profiles require
+ * explicit opt-in from task config or caller code. `sandboxRunner` remains
+ * injectable so mode layers can pass the runner resolved from environment.
  */
 export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}): ToolRegistry {
   const reg = new ToolRegistry();
   const runner = options.sandboxRunner ?? new LocalSandboxRunner();
   const profile = options.profile ?? 'default';
-  // D-33.2.3 (2026-06-09): tool→capability wiring is a future Stage 2.4 / Stage 3.4 task.
-  // This 1-line note marks the seam: each tool instance can later be mirrored
+  // D-33.2.3 (2026-06-09): tool-to-capability wiring is a future Stage 2.4 / Stage 3.4 task.
+  // This note marks the boundary: each tool instance can later be mirrored
   // as a Capability in @deepwhale/coding-agent/runtime/capability-registry.ts.
   // We intentionally do NOT mutate behavior here.
 
@@ -199,9 +213,10 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
     reg.register(new TextToSpeechTool());
   };
 
-  // Browser tools (browser_navigate, browser_click, browser_type) are opt-in only — they live in
-  // the `browser` profile and are registered by packages/coding-agent/src/browser/runtime.ts.
-  // The default profile intentionally does NOT register them.
+  // `web`, `engineering`, and `research` are legacy opt-in profiles retained
+  // for compatibility. They are not part of the stabilization default surface.
+  // Browser runtime profiles are separate capability profiles, not
+  // ToolRegistryProfile values.
   if (profile === 'default') {
     registerCoding();
     registerCodeIntel();

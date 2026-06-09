@@ -1,18 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
 
-describe('registry (D-31.1.7 + D-31.2.6 + D-31.3.5 + D-32.1.7 + D-32.1.7 + D-32.1.7)', () => {
-  it('all profile contains 41 tools', () => {
+describe('registry engineering profile (legacy opt-in)', () => {
+  it('keeps the all profile at the explicit full surface count', () => {
     const reg = createDefaultRegistry({ profile: 'all' });
     expect(reg.size()).toBe(41);
   });
 
-  it('engineering profile registers github_pr_workflow', () => {
+  it('registers GitHub PR workflow only when engineering is explicitly selected', () => {
     const reg = createDefaultRegistry({ profile: 'engineering' });
     expect(reg.get('github_pr_workflow')).toBeDefined();
   });
 
-  it('engineering profile registers kanban_orchestrator', () => {
+  it('registers kanban orchestration only when engineering is explicitly selected', () => {
     const reg = createDefaultRegistry({ profile: 'engineering' });
     expect(reg.get('kanban_orchestrator')).toBeDefined();
   });

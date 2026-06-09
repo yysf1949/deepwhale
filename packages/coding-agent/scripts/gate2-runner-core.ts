@@ -24,7 +24,7 @@ import { readFile } from 'node:fs/promises';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
-import type { ToolRegistryProfile } from '../src/tools/registry.js';
+import { isToolRegistryProfile, type ToolRegistryProfile } from '../src/tools/registry.js';
 
 export type Gate2Source = 'live-llm' | 'mock';
 export type Gate2ResultKind = 'live' | 'mock-validated' | 'live-blocked';
@@ -180,25 +180,12 @@ function parseJsonWithOptionalBom(raw: string): unknown {
   return JSON.parse(raw.replace(/^\uFEFF/, ''));
 }
 
-const VALID_REGISTRY_PROFILES: ReadonlySet<ToolRegistryProfile> = new Set([
-  'default',
-  'core',
-  'coding',
-  'code-intel',
-  'web',
-  'engineering',
-  'research',
-  'productivity',
-  'media',
-  'all',
-]);
-
 function readRegistryProfile(raw: unknown): ToolRegistryProfile {
   if (raw === undefined) return 'default';
-  if (typeof raw !== 'string' || !VALID_REGISTRY_PROFILES.has(raw as ToolRegistryProfile)) {
+  if (!isToolRegistryProfile(raw)) {
     throw new Error(`task-config invalid registryProfile: ${String(raw)}`);
   }
-  return raw as ToolRegistryProfile;
+  return raw;
 }
 
 /** Write report JSON + MD. */
