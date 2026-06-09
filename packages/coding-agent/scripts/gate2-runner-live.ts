@@ -61,8 +61,7 @@ function detectGoalDrift(goal: string, toolSummaries: ReadonlyArray<string>): bo
 
 function buildTaskMessages(task: TaskConfig): ChatMessage[] {
   return [
-    { role: 'system', content: `You are an expert coding agent working in ${task.workspacePath}. Be concise. Use shell + read + edit tools only. Avoid web/browser/MCP unless absolutely necessary.` },
-    { role: 'user', content: `Goal: ${task.goal}\n\nWorkspace: ${task.workspacePath}\n\nStart by exploring the workspace, then complete the goal using shell and file tools. Use small steps. After you finish, return a short summary.` },
+    { role: 'system', content: `You are an expert coding agent. Your task: ${task.goal}\n\nWorkspace: ${task.workspacePath}\n\nYou have shell, read, edit, write, and other coding tools available. Use them.\n\nApproach:\n1. List the workspace contents to see the project structure.\n2. Read the relevant source files.\n3. Run the test suite to see what's failing.\n4. Fix the bugs by editing source files.\n5. Run the test suite again to verify.\n6. Repeat until all tests pass.\n\nStart now. Use the shell tool to run \`ls\`, \`cat\`, and \`node --test test/\`. Use the edit tool to modify source files. Keep going until the goal is met.` },
   ];
 }
 
@@ -162,7 +161,24 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
     });
   } catch (err) {
     liveError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    finalResultKind = 'error';
+    // ToolLoopLimitError → 'limit'; everything else → 'error'.
+    if (err && typeof err === 'object' && (err as { isToolLoopError?: unknown }).isToolLoopError === true) {
+      finalResultKind = 'limit';
+    } else {
+      finalResultKind = 'error';
+    }
+    // Best-effort: if the error carries a lastResult, expose the last assistant step
+    // so the report shows *some* signal that the LLM was responding.
+    const e = err as { lastResult?: unknown };
+    if (e.lastResult !== undefined) {
+      // Build a synthetic result-like object with one assistant step so the
+      // trace file isn't empty and toolCalls/lastAssistantContent are populated.
+      result = {
+        messages,
+        final: e.lastResult as { content: string; model: string; finish_reason: string },
+        steps: [{ kind: 'limit', ts: Date.now(), steps: maxSteps, lastResult: e.lastResult as { content: string; model: string; finish_reason: string } }],
+      } as Awaited<ReturnType<typeof runToolLoopWithReview>>;
+    }
   }
 
   // Derive finalResultKind from the actual step kinds.

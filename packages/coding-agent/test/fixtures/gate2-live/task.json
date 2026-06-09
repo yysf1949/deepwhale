@@ -1,6 +1,6 @@
 {
-  "goal": "Fix the failing test in this fixture: a unit test expects greet('world') to return 'hello, world!' but greet currently returns 'hello world' (no comma, no exclamation). Edit the function to satisfy the test, then run pnpm test to confirm green. Do NOT modify the test file. Do NOT add new dependencies. Do NOT change the package version.",
+  "goal": "Fix the bugs in /tmp/gate2-fixture-workspace/src/calc.ts. There are 3 bugs (subtract, power, squareRoot). Run the test suite with `node --test test/` to find them, edit the source file, then run the tests again to verify all 6 tests pass. The test file is correct; only edit src/calc.ts.",
   "workspacePath": "/tmp/gate2-fixture-workspace",
-  "maxSteps": 35,
-  "expectedFile": "src/greet.ts"
+  "maxSteps": 40,
+  "expectedFile": "src/calc.ts"
 }
