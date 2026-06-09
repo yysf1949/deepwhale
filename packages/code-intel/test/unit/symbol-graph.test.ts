@@ -366,7 +366,6 @@ describe('advanced import resolution (D-33.2.1)', () => {
 
   it('resolves default re-export from barrel to the original declaring file', async () => {
     const graph = await buildSymbolGraph(ADV_FIXTURE);
-    const callGraph = await buildCallGraph(graph);
 
     // The default export `defaultWorker` in src/workers/default-worker.ts is
     // re-exported through src/barrel.ts. The barrel re-export to the
