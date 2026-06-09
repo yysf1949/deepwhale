@@ -5,15 +5,15 @@ Repo: D:\App\openClaw\projects\deepwhale
 
 ## Metrics
 
-- LOC: 43041 (minimum 50000, preferred 100000)
-- Supported files: 336
-- Files indexed: 336
-- Symbols indexed: 2596
-- References indexed: 15133
-- Call edges: 2606
-- Graph build: 1039ms
-- Call graph: 99ms
-- Elapsed: 1219ms / 1200000ms
+- LOC: 43496 (minimum 50000, preferred 100000)
+- Supported files: 354
+- Files indexed: 354
+- Symbols indexed: 2687
+- References indexed: 15328
+- Call edges: 2743
+- Graph build: 766ms
+- Call graph: 74ms
+- Elapsed: 911ms / 1200000ms
 
 ## Evidence
 
@@ -25,4 +25,4 @@ Repo: D:\App\openClaw\projects\deepwhale
 
 ## Failure Reasons
 
-- loc-below-minimum: 43041 < 50000
+- loc-below-minimum: 43496 < 50000
