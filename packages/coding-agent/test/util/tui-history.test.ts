@@ -144,4 +144,13 @@ describe('tui-history util (D-25 B4)', () => {
     // 截断 (不超 max) 0 丢
     expect(tuiHistoryTruncate(all)).toEqual(all)
   })
+
+  it('regression: tuiHistoryPath never resolves below a string-typed "undefined" dir (D-33.0.2)', () => {
+    delete process.env.HOME;
+    delete process.env.USERPROFILE;
+    delete process.env.DEEPWHALE_HOME;
+    const path = tuiHistoryPath().replaceAll('\\', '/');
+    expect(path).not.toContain('/undefined/');
+    expect(path).not.toContain('undefined/.deepwhale');
+  })
 })
