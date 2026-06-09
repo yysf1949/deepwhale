@@ -443,3 +443,44 @@ export async function compact(
     },
   };
 }
+
+/**
+ * High-level compaction wrapper for callers that want a simple
+ * "lifecycle hook + optional summary replace" API.
+ *
+ * - Emits `onPrefixCacheReset('compaction')` exactly once (compaction is the
+ *   only prefix-cache reset point in the system).
+ * - If a `compact` hook is provided, it replaces the default summary logic
+ *   and its return value is used directly.
+ * - If no hook is provided, returns a deterministic empty summary so callers
+ *   that just need the prefix-cache reset event still work.
+ *
+ * The legacy `compact(messages, config, summaryFn, options)` API is unchanged.
+ * This wrapper sits on top of it as a thin lifecycle adapter.
+ */
+export interface CompactHook {
+  (messages: ReadonlyArray<ChatMessage>): Promise<{ summary: string }> | { summary: string };
+}
+
+export interface CompactSessionOptions {
+  readonly messages: ReadonlyArray<ChatMessage>;
+  readonly onPrefixCacheReset?: (reason: 'compaction') => void;
+  readonly compact?: CompactHook;
+}
+
+export interface CompactSessionResult {
+  readonly summary: string;
+}
+
+export async function compactSession(opts: CompactSessionOptions): Promise<CompactSessionResult> {
+  if (opts.compact) {
+    const result = await opts.compact(opts.messages);
+    opts.onPrefixCacheReset?.('compaction');
+    return { summary: result.summary };
+  }
+  // Default fallback: deterministic empty summary; the real compaction logic
+  // (with config + summaryFn) is the caller's responsibility via the legacy
+  // `compact()` API. This wrapper only models the lifecycle event.
+  opts.onPrefixCacheReset?.('compaction');
+  return { summary: '' };
+}

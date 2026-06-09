@@ -2,7 +2,7 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
-> **当前分支状态（2026-06-08, `release/v2.0`）**：进入 **stabilization + Gate sprint**。新增非 coding 工具冻结；默认 registry 只暴露 coding + Code Intel essentials。Browser / media / productivity / research / engineering 工具保留为显式 profile opt-in，不再作为默认工具面。Code Intel 当前为 heuristic（AST declarations/imports + textual references/call matches），不是 IDE/LSP 级精确分析；Gate-1 未正式完成，需在 50K+（最好 100K）LOC 仓库上限时验证。
+> **当前分支状态（2026-06-09, `release/v2.0`）**：D-33.5 v3.0 execute review 收口（PR #3-#7 待 merge，PR #8 stage-5 待 push）。默认 registry 仍只暴露 coding + Code Intel essentials (19 tools)。v3.0 新增 Reviewer role (verification-only) · Compaction hook contract · Computer Use compat layer (provider-delegation only) · Gate-2 long-horizon harness (35-step fixture pass, retries=1, drift=false)。Browser enhancement (Task 5.3) 显式 skip — 需 Stage 3 browser/* 合并后做独立 sub-sprint。
 
 [![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 > 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
