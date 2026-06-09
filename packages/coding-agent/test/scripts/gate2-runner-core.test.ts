@@ -745,6 +745,30 @@ describe('gate2-runner-live: detectGoalDrift (D-40 stricter)', () => {
     expect(drift).toBe(true);
   });
 
+  it('nested tool args with an outside absolute path => DRIFT (D-61)', async () => {
+    const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
+    const goal = 'Fix the bugs in src/pricing.ts';
+    const workspacePath = 'C:/tmp/gate2-fixt-abc';
+    const drift = detectGoalDrift({
+      goal,
+      workspacePath,
+      toolCalls: [
+        {
+          toolName: 'patch',
+          args: {
+            edits: [
+              { file: 'C:/tmp/gate2-fixt-abc/src/pricing.ts', old: 'x', new: 'y' },
+              { file: 'C:/Users/butterfly443/Documents/leak.txt', old: 'a', new: 'b' },
+            ],
+          },
+        },
+      ],
+      assistantContent: ['I will fix the bugs in pricing.ts.'],
+      reviewCommands: ['node --test test/invoice.test.ts'],
+    });
+    expect(drift).toBe(true);
+  });
+
   it('relative review paths and URLs do not count as outside-workspace paths (D-53)', async () => {
     const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
     const goal = 'Fix the bugs in src/pricing.ts';
@@ -781,6 +805,27 @@ describe('gate2-runner-live: detectGoalDrift (D-40 stricter)', () => {
       reviewCommands: ['node --test test/invoice.test.ts'],
     });
     expect(drift).toBe(false);
+  });
+
+  it('Gate-2 task prompt avoids contradicting task-directed test runs (D-61)', async () => {
+    const { buildTaskMessages } = await import('../../scripts/gate2-runner-live.js') as unknown as {
+      buildTaskMessages: (
+        task: { goal: string; reviewGates?: ReadonlyArray<string>; registryProfile: 'default' },
+        workspacePath: string,
+      ) => Array<{ role: string; content: string }>;
+    };
+    const [system] = buildTaskMessages(
+      {
+        goal: 'Fix bugs, run the test suite one more time, then stop.',
+        reviewGates: ['node --test test/invoice.test.ts'],
+        registryProfile: 'default',
+      },
+      'C:/tmp/gate2-fixt-abc',
+    );
+    expect(system?.content).toContain('node --test test/invoice.test.ts');
+    expect(system?.content).toMatch(/final verification.*automatic/i);
+    expect(system?.content).not.toMatch(/you do not need to run it yourself/i);
+    expect(system?.content).not.toMatch(/Do not re-run the test after it passes/i);
   });
 });
 

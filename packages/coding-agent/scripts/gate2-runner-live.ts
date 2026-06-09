@@ -210,10 +210,10 @@ function argsReferenceOutsideWorkspace(args: unknown, workspaceNorm: string): bo
     return false;
   };
   if (typeof args === 'string') return visit(args);
-  if (Array.isArray(args)) return args.some((v) => (typeof v === 'string' ? visit(v) : false));
+  if (Array.isArray(args)) return args.some((v) => argsReferenceOutsideWorkspace(v, workspaceNorm));
   if (args && typeof args === 'object') {
     for (const v of Object.values(args as Record<string, unknown>)) {
-      if (typeof v === 'string' && visit(v)) return true;
+      if (argsReferenceOutsideWorkspace(v, workspaceNorm)) return true;
     }
   }
   return false;
@@ -316,7 +316,7 @@ function redactTraceString(value: string): string {
 // Task messages + tool summarization + TaskGraph adapter
 // ============================================================================
 
-function buildTaskMessages(task: TaskConfig, workspacePath: string): ChatMessage[] {
+export function buildTaskMessages(task: TaskConfig, workspacePath: string): ChatMessage[] {
   // Tell the LLM exactly what the expected file is, what the review gate is,
   // and to STOP cleanly once the review gate passes. This is the D-39 system
   // prompt tuned so the LLM naturally converges within maxSteps instead of
@@ -334,9 +334,9 @@ Your task: ${task.goal}
 
 ${expected}
 
-When you are DONE (all review gates pass), reply with the final answer and stop calling tools. Do not re-run the test after it passes — just stop.
+You may run tests or other verification commands when the task asks for them or when they help you diagnose the fix. When you believe the task is complete, reply with the final answer and stop calling tools.
 
-Available coding tools: shell, read, edit, write, find, grep, ls. The review gate (${gate}) is run automatically when you stop; you do not need to run it yourself.
+Available coding tools: shell, read, edit, write, find, grep, ls. The review gate (${gate}) is final verification and runs automatically after you stop, so your final answer should be based on the workspace state you created.
 `,
     },
   ];
