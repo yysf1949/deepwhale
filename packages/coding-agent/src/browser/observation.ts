@@ -31,15 +31,15 @@ function parseVisibleElements(html: string): VisibleElement[] {
   const buttonRe = /<button\b[^>]*>([\s\S]*?)<\/button>/gi;
   let m: RegExpExecArray | null;
   while ((m = buttonRe.exec(html)) !== null) {
-    out.push({ tag: 'button', text: m[1].replace(/<[^>]+>/g, '').trim() });
+    out.push({ tag: 'button', text: m[1]!.replace(/<[^>]+>/g, '').trim() });
   }
   const inputRe = /<input\b[^>]*aria-label="([^"]*)"[^>]*\/?>/gi;
   while ((m = inputRe.exec(html)) !== null) {
-    out.push({ tag: 'input', ariaLabel: m[1] });
+    out.push({ tag: 'input', ariaLabel: m[1]! });
   }
   const anchorRe = /<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
   while ((m = anchorRe.exec(html)) !== null) {
-    out.push({ tag: 'a', href: m[1], text: m[2].replace(/<[^>]+>/g, '').trim() });
+    out.push({ tag: 'a', href: m[1]!, text: m[2]!.replace(/<[^>]+>/g, '').trim() });
   }
   return out;
 }

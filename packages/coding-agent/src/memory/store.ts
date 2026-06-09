@@ -24,7 +24,9 @@ export class MemoryStore {
     const all = await this.loadAll();
     const idx = all.findIndex((m) => m.id === id);
     if (idx < 0) return;
-    all[idx].archived = true;
+    const target = all[idx];
+    if (!target) return;
+    target.archived = true;
     await this.writeAll(all);
   }
 

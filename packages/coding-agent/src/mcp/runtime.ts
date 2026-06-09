@@ -16,14 +16,15 @@ export function registerMcpManifest(
   manifest: McpServerManifest,
 ): void {
   for (const tool of manifest.tools) {
-    registry.register({
+    const cap: import('../runtime/capability-registry.js').Capability = {
       id: `mcp.${manifest.server}.${tool.name}`,
       source: 'mcp',
       riskLevel: 'medium',
       profiles: ['mcp', 'all'],
-      description: tool.description,
       sideEffects: ['network', 'execute'],
-    });
+    };
+    if (tool.description) cap.description = tool.description;
+    registry.register(cap);
   }
 }
 
