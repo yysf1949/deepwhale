@@ -8,7 +8,7 @@
  *
  * Companion to gate2-runner-core.ts which provides shared types and helpers.
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import {
@@ -134,7 +134,10 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   if (!existsSync(task.workspacePath)) {
     await mkdir(task.workspacePath, { recursive: true });
   }
-  const store = await createTaskGraphStore({ root: `${task.workspacePath}/.deepwhale/taskgraph` });
+  // Wipe any stale taskgraph from a prior run. Each run is a fresh TaskGraph.
+  const taskgraphRoot = `${task.workspacePath}/.deepwhale/taskgraph`;
+  await rm(taskgraphRoot, { recursive: true, force: true });
+  const store = await createTaskGraphStore({ root: taskgraphRoot });
   const reviewer: Reviewer = createReviewer({ runCommand: runShellCommand });
   const recorder = makeTaskGraphRecorder(store, task.goal);
   const maxSteps = task.maxSteps ?? 35;
