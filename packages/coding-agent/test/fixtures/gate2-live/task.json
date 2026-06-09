@@ -1,6 +1,6 @@
 {
-  "goal": "Fix the bugs in the workspace's src/calc.ts. There are 3 bugs (subtract, power, squareRoot). Run the test suite with `pnpm test` to see the failures, edit the source file using the patch tool, then run the tests again to verify all 6 tests pass. The test file is correct; only edit src/calc.ts. Use the patch tool to edit files. Aim for 5-15 tool calls.",
-  "workspacePath": "C:/Users/butterfly443/AppData/Local/Temp/gate2-fixture-workspace",
+  "goal": "Fix the 6 bugs in src/calc.ts so that the test suite passes. The bugs are: (1) subtract returns the sum instead of the difference, (2) multiply returns the sum, (3) divide returns the product, (4) power uses multiplication instead of exponentiation, (5) squareRoot returns the absolute value instead of the square root, (6) clamp returns max only and ignores value/min. Read the test file to understand the expected behaviour, then edit src/calc.ts so all 10 tests pass when you run pnpm test. Do NOT modify the test file or the package.json.",
+  "fixture": "gate2-live/fixture",
   "maxSteps": 50,
   "expectedFile": "src/calc.ts",
   "reviewGates": ["pnpm test"]

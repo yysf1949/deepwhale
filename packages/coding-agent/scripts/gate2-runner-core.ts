@@ -40,7 +40,18 @@ export interface LLMConfig {
 
 export interface TaskConfig {
   goal: string;
-  workspacePath: string;
+  /**
+   * Absolute path to a writable workspace. The runner creates this if missing.
+   * If absent, the runner will resolve `fixture` to a temp dir.
+   */
+  workspacePath?: string;
+  /**
+   * Path to a fixture template (relative to <pkg>/test/fixtures or absolute).
+   * When set (and workspacePath is absent), the runner copies this fixture
+   * into a fresh temp dir and uses that as the workspace. This makes the
+   * Gate-2 run reproducible across machines without hardcoded absolute paths.
+   */
+  fixture?: string;
   maxSteps?: number;
   expectedFile?: string;
   /** Review commands (default: ['pnpm test']). Each is run via the workspace's cwd. */
@@ -147,12 +158,13 @@ export async function readTaskConfig(path: string): Promise<TaskConfig> {
   if (!parsed.goal || parsed.goal.length === 0) {
     throw new Error(`task-config at ${path} has empty or missing goal`);
   }
-  if (!parsed.workspacePath || parsed.workspacePath.length === 0) {
-    throw new Error(`task-config at ${path} has empty or missing workspacePath`);
+  if ((!parsed.workspacePath || parsed.workspacePath.length === 0) && !parsed.fixture) {
+    throw new Error(`task-config at ${path} must have either workspacePath or fixture`);
   }
   return {
     goal: parsed.goal,
-    workspacePath: parsed.workspacePath,
+    ...(parsed.workspacePath !== undefined ? { workspacePath: parsed.workspacePath } : {}),
+    ...(parsed.fixture !== undefined ? { fixture: parsed.fixture } : {}),
     ...(parsed.maxSteps !== undefined ? { maxSteps: parsed.maxSteps } : {}),
     ...(parsed.expectedFile !== undefined ? { expectedFile: parsed.expectedFile } : {}),
     ...(parsed.reviewGates !== undefined ? { reviewGates: parsed.reviewGates } : {}),

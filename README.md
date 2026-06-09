@@ -2,16 +2,24 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
-> **当前分支状态（2026-06-09, `feature/d36-gate2-live` D-38 evidence hardening, Gate-2 LIVE not passed)**: D-38 把 passedLive 规则从"软判定"升级为"硬 fail"6 条件 (source=live-llm, review=approve, finalResult=pass, liveError absent, toolCalls∈[30,50], goalDriftDetected=false)。D-37 的 LIVE run (`proc_ffb3c705524d`, 42 calls, review=approve) 在新规则下被 downgraded:实际再跑 D-38 runner,**`passed_live=false`**,三个硬 fail 同时触发:
-> 1. `toolCalls=54 > 50` (max 触顶,LLM 没收敛)
-> 2. `finalResult=limit` (not `'pass'`)
-> 3. `goalDriftDetected=true` (heuristic 误判 — shell arg token 不含 goal words,但仍按硬 fail 规则)
+> **当前分支状态（2026-06-09, `feature/d36-gate2-live` D-39 repro + drift fix, Gate-2 LIVE not passed)**: D-39 主要工作:
+> 1. **Fixture 可复现** — `packages/coding-agent/test/fixtures/gate2-live/fixture/` 移到 repo,runner 跑时 `materializeFixture` copy 到 fresh temp dir,无 hardcoded `C:/Users/.../Temp`。`task.json` 改用 `fixture: "gate2-live/fixture"` 相对引用。
+> 2. **Drift detector 多信号** — 重写 `detectGoalDrift`,4 个 signal 任何一个 positive 就 NOT drift: (a) tool args 引用 workspace path; (b) tool args 引用 expectedFile; (c) assistant content 含 goal keyword; (d) tool args 含 review gate 命令。Legacy 单 signal token-overlap 在合法 `bash ls` 上误报的问题修了。
+> 3. **6-bug fixture** — bump from 3 bugs to 6 (subtract, multiply, divide, power, squareRoot, clamp),10 个 tests。task.json goal 改 6-bug 描述,去掉 "Aim for 5-15 tool calls" 跟 30-50 gate 冲突。
+> 4. **System prompt 调优** — D-39 改写,让 LLM 在 review gate 通过后自然 stop,不 over-explore。
 >
-> 实际 LLM 行为: DeepSeek v4-flash 调了 54 tool calls (bash/read_file/patch/write_file/find/execute_code),**所有 3 个 bug 正确 fix** (subtract/power/squareRoot),workspace `pnpm test` 返 `fail 0`,但 runner 自己 maxSteps 触顶且 drift heuristic 误报 → D-38 strict rules 不放过。**诚实结论**: evidence 已 produce (3 个文件:`gate-2-long-horizon-live.{json,md}` + `gate2-live-trace.json` 完整 94 steps transcript),**passed_live 硬 fail** by D-38 rules。要 unlock 真 pass 需要:(a) 改进 drift detector 看 assistant content 而不是 tool summary tokens,或 (b) 设计一个真正需要 30-50 calls 的子任务,或 (c) 提 `maxSteps` 让 LLM 自然 stop 报 `'pass'`。
+> D-39 LIVE 结果 (proc_548418ff4a85):
+> - source=live-llm ✓
+> - passed_live=FALSE (1 of 6 硬条件 fail)
+> - reviewStatus=approve ✓
+> - finalResult=pass ✓
+> - toolCalls=15 (FAIL: < 30 minimum, deepseek v4-flash 在 6-bug 单文件上 15 call 就收敛了)
+> - goalDriftDetected=FALSE ✓ (D-39 multi-signal 成功)
+> - 实际 LLM 行为: 6 个 bug 全部正确 fix,`pnpm test` 0-fail
 >
-> **未解锁任何新能力**。Browser enhancement / Desktop shell / Channel default tools 仍 off, default registry 19 tools 冻结。Runner dual-path (`--mock`/`--llm-config` 互斥) 全保留。
+> 诚实结论: passed_live=FALSE,**5/6 硬条件都通过**,只有 toolCalls<30 fail。LLM 太高效是 fixture 不够 substantial 的症状,不是 runner bug。要真 unlock passed_live=true 需要 D-40 sub-sprint 设计 multi-file refactor fixture (e.g. 100-line 模块拆 3 文件 + integration tests + JSDoc),让 LLM 自然需要 30+ calls。**D-39 没有改 strict rules 放水**。
 >
-> 验证: 23/23 gate2-runner-core unit tests pass (12 旧 + 11 新 D-38 strict rules + readTaskConfig reviewGates round-trip),`pnpm typecheck/lint` exit 0,`pnpm test` 1 fail (verify-runner D-11 pre-existing)。5 红线 0 改。`git diff --check` clean。
+> 验证: 31/31 gate2-runner-core unit tests pass (12 D-36 + 9 D-38 + 2 fixture round-trip + 4 D-39 drift + 2 materializeFixture)。`pnpm typecheck/lint` exit 0。`pnpm test` 1 fail (verify-runner D-11 pre-existing)。5 红线 0 改。`git diff --check` clean。
 
 [![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 > 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
