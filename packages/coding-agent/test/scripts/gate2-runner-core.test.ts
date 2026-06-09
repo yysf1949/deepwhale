@@ -532,6 +532,23 @@ describe('gate2-runner-live: detectGoalDrift (D-40 stricter)', () => {
     expect(drift).toBe(true);
   });
 
+  it('workspace scope + review gate without expectedFile or goal text => DRIFT (D-52)', async () => {
+    const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
+    const goal = 'Fix the bugs in src/pricing.ts so the invoice test suite passes';
+    const drift = detectGoalDrift({
+      goal,
+      expectedFile: 'src/pricing.ts',
+      workspacePath: 'C:/tmp/gate2-fixt-abc',
+      toolCalls: [
+        { toolName: 'bash', args: { command: 'ls C:/tmp/gate2-fixt-abc' } },
+        { toolName: 'bash', args: { command: 'node --test test/invoice.test.ts' } },
+      ],
+      assistantContent: ['I will run the verification command now.'],
+      reviewCommands: ['node --test test/invoice.test.ts'],
+    });
+    expect(drift).toBe(true);
+  });
+
   it('touches a workspace file but assistant works on unrelated goal => DRIFT (D-40)', async () => {
     const { detectGoalDrift } = await import('../../scripts/gate2-runner-live.js');
     const goal = 'Fix the bugs in src/pricing.ts so the invoice test suite passes';

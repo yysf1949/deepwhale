@@ -141,52 +141,44 @@ export interface DriftInput {
  *   2. EXPECTED FILE TOUCH: tool args reference expectedFile.
  *   3. ASSISTANT CONTENT: assistant text mentions any goal keyword (len>3).
  *   4. REVIEW GATE: agent ran the configured review gate (e.g. `pnpm test`).
+ *
+ * D-52 hardening: when expectedFile is configured, workspace scope plus
+ * review gate is not enough. The transcript must either touch expectedFile
+ * or assistant text must mention the goal.
  */
 export function detectGoalDrift(input: DriftInput): boolean {
   const workspaceNorm = input.workspacePath.replace(/\\/g, '/').toLowerCase();
   const expectedFile = input.expectedFile?.replace(/\\/g, '/').toLowerCase();
 
-  let positives = 0;
-
-  // Signal 1: workspace scope
-  if (input.toolCalls.some((tc) => argsReferenceWorkspace(tc.args, workspaceNorm, expectedFile))) {
-    positives++;
-  }
-
-  // Signal 2: expected file touch (only counted if expectedFile is set)
-  if (expectedFile && input.toolCalls.some((tc) => argsReferenceFile(tc.args, expectedFile))) {
-    positives++;
-  }
-
-  // Signal 3: assistant content
   const goalKeywords = Array.from(
     input.goal
       .toLowerCase()
       .split(/\W+/)
       .filter((t) => t.length > 3),
   );
-  if (
-    input.assistantContent.some((msg) => {
-      const msgLower = msg.toLowerCase();
-      return goalKeywords.some((kw) => kw.length > 3 && msgLower.includes(kw));
-    })
-  ) {
-    positives++;
-  }
 
-  // Signal 4: review gate was invoked
-  if (
-    input.toolCalls.some((tc) => {
-      if (tc.toolName !== 'bash') return false;
-      const cmd = extractBashCommand(tc.args);
-      if (cmd === undefined) return false;
-      return input.reviewCommands.some((gate) => {
-        const firstToken = gate.split(' ')[0]!;
-        return cmd.includes(firstToken) || cmd.includes(gate);
-      });
-    })
-  ) {
-    positives++;
+  const hasWorkspaceScope = input.toolCalls.some((tc) =>
+    argsReferenceWorkspace(tc.args, workspaceNorm, expectedFile),
+  );
+  const hasExpectedFileTouch = expectedFile !== undefined &&
+    input.toolCalls.some((tc) => argsReferenceFile(tc.args, expectedFile));
+  const assistantMentionsGoal = input.assistantContent.some((msg) => {
+    const msgLower = msg.toLowerCase();
+    return goalKeywords.some((kw) => kw.length > 3 && msgLower.includes(kw));
+  });
+  const reviewGateInvoked = input.toolCalls.some((tc) => {
+    if (tc.toolName !== 'bash') return false;
+    const cmd = extractBashCommand(tc.args);
+    if (cmd === undefined) return false;
+    return input.reviewCommands.some((gate) => {
+      const firstToken = gate.split(' ')[0]!;
+      return cmd.includes(firstToken) || cmd.includes(gate);
+    });
+  });
+
+  let positives = 0;
+  for (const signal of [hasWorkspaceScope, hasExpectedFileTouch, assistantMentionsGoal, reviewGateInvoked]) {
+    if (signal) positives++;
   }
 
   // Hard-fail drift: writes to a path OUTSIDE the materialized workspace
@@ -195,6 +187,10 @@ export function detectGoalDrift(input: DriftInput): boolean {
     argsReferenceOutsideWorkspace(tc.args, workspaceNorm),
   );
   if (outsideWorkspace) return true;
+
+  if (expectedFile !== undefined && !hasExpectedFileTouch && !assistantMentionsGoal) {
+    return true;
+  }
 
   // Need at least 2 of 4 positive signals to be considered in-scope.
   return positives < 2;
