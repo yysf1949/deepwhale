@@ -396,11 +396,12 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   } else {
     reviewGates = ['pnpm test'];
   }
+  const registryProfile = task.registryProfile ?? 'default';
   try {
     result = await runToolLoopWithReview({
       client,
       messages,
-      registry: createDefaultRegistry({ profile: 'all' }),
+      registry: createDefaultRegistry({ profile: registryProfile }),
       maxSteps,
       reviewer,
       reviewGates,
@@ -494,6 +495,7 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
     retries: 0,
     goalDriftDetected,
     ...(reviewStatus !== undefined ? { reviewStatus } : { reviewStatus: 'unavailable' }),
+    registryProfile,
     taskgraphNodes: nodeCount,
     fixture: { goal: task.goal, workspacePath },
     finalResult: finalResultKind,

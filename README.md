@@ -3,6 +3,7 @@
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
 > **当前分支状态（2026-06-09, `feature/d36-gate2-live` D-40 Gate-2 LIVE PASSED ✅）**: D-40 全部 6 硬条件 PASS，真 Gate-2 LIVE 跑通；D-41 只做证据与状态卫生，不解锁新能力。
+> **D45 证据口径补丁**: D40 的 persisted report 早于 `registryProfile` 字段；它证明 live runner + invoice fixture 在严格 6 条件下通过，但不能被重新解释成 default-profile proof。后续 Gate-2 live 证据必须记录 `registryProfile: "default"` 才能证明默认 19 tools 工具面也通过。
 >
 > 1. **5-file invoice fixture** — 替换 D-39 6-bug calc。新 fixture `fixtures/gate2-live/fixture/{src/{types,pricing,tax,format,invoice}.ts,test/invoice.test.ts}`，20 个 test assertions，**6 个隐藏 bug**（无注释标记）: `pricing.subtotal` `+`vs`*`, `pricing.applyDiscount flat` `+`vs`-`, `tax.taxFor` 错把 US-CA grocery 当免税, `format.formatInvoice` 漏 `|`, `invoice.buildInvoice` `total` 减税, `tax.RATES.EU-FR 0.21`。Task goal 额外要求 LLM 写 `docs/API.md` 描述 5 个 public function。
 > 2. **Drift detector 严格化** — D-39 "任一 positive signal" → D-40 "≥2 of 4 signals"。新加 hard-fail: writes outside materialized workspace。修了一个 path-normalize bug:workspace 用 `/` 但 args 用 `\\`,之前的 detector 比对 miss 误报 drift。

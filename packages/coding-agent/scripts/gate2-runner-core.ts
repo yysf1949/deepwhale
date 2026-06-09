@@ -24,6 +24,7 @@ import { readFile } from 'node:fs/promises';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
+import type { ToolRegistryProfile } from '../src/tools/registry.js';
 
 export type Gate2Source = 'live-llm' | 'mock';
 export type Gate2ResultKind = 'live' | 'mock-validated' | 'live-blocked';
@@ -56,6 +57,8 @@ export interface TaskConfig {
   expectedFile?: string;
   /** Review commands (default: ['pnpm test']). Each is run via the workspace's cwd. */
   reviewGates?: ReadonlyArray<string>;
+  /** Registry profile used for the live tool loop. Defaults to the frozen default surface. */
+  registryProfile: ToolRegistryProfile;
 }
 
 export interface RunSpec {
@@ -106,6 +109,7 @@ export interface Gate2Report {
   readonly retries: number;
   readonly goalDriftDetected: boolean;
   readonly reviewStatus?: 'approve' | 'request_changes' | 'unavailable';
+  readonly registryProfile?: ToolRegistryProfile;
   readonly taskgraphNodes?: number;
   readonly planPath?: string;
   readonly fixture?: { goal: string; workspacePath: string };
@@ -168,7 +172,29 @@ export async function readTaskConfig(path: string): Promise<TaskConfig> {
     ...(parsed.maxSteps !== undefined ? { maxSteps: parsed.maxSteps } : {}),
     ...(parsed.expectedFile !== undefined ? { expectedFile: parsed.expectedFile } : {}),
     ...(parsed.reviewGates !== undefined ? { reviewGates: parsed.reviewGates } : {}),
+    registryProfile: readRegistryProfile((parsed as { registryProfile?: unknown }).registryProfile),
   };
+}
+
+const VALID_REGISTRY_PROFILES: ReadonlySet<ToolRegistryProfile> = new Set([
+  'default',
+  'core',
+  'coding',
+  'code-intel',
+  'web',
+  'engineering',
+  'research',
+  'productivity',
+  'media',
+  'all',
+]);
+
+function readRegistryProfile(raw: unknown): ToolRegistryProfile {
+  if (raw === undefined) return 'default';
+  if (typeof raw !== 'string' || !VALID_REGISTRY_PROFILES.has(raw as ToolRegistryProfile)) {
+    throw new Error(`task-config invalid registryProfile: ${String(raw)}`);
+  }
+  return raw as ToolRegistryProfile;
 }
 
 /** Write report JSON + MD. */
@@ -210,6 +236,7 @@ function renderMarkdown(r: Gate2Report): string {
   lines.push(`- retries: ${r.retries}`);
   lines.push(`- goalDriftDetected: ${r.goalDriftDetected}`);
   if (r.reviewStatus !== undefined) lines.push(`- reviewStatus: \`${r.reviewStatus}\``);
+  if (r.registryProfile !== undefined) lines.push(`- registryProfile: \`${r.registryProfile}\``);
   if (r.taskgraphNodes !== undefined) lines.push(`- taskgraphNodes: ${r.taskgraphNodes}`);
   if (r.fixture !== undefined) {
     lines.push(`- goal: \`${r.fixture.goal}\``);

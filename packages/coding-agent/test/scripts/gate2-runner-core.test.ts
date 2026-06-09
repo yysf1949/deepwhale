@@ -218,6 +218,33 @@ describe('gate2-runner-core: writeReport produces machine-readable JSON and hone
       await rm(tmp, { recursive: true, force: true });
     }
   });
+
+  it('writes registryProfile into Gate-2 JSON and Markdown reports', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'g2-out-'));
+    try {
+      const report: Gate2Report = {
+        source: 'live-llm',
+        passed_live: true,
+        passed_mock: false,
+        toolCalls: 49,
+        retries: 0,
+        goalDriftDetected: false,
+        reviewStatus: 'approve',
+        registryProfile: 'default',
+        finalResult: 'pass',
+        startedAt: '2026-06-09T00:00:00Z',
+        finishedAt: '2026-06-09T00:01:00Z',
+        durationMs: 60_000,
+      };
+      const jsonPath = join(tmp, 'out.json');
+      const mdPath = join(tmp, 'out.md');
+      await writeReport(report, jsonPath, mdPath);
+      expect(JSON.parse(await readFile(jsonPath, 'utf8'))).toMatchObject({ registryProfile: 'default' });
+      expect(await readFile(mdPath, 'utf8')).toContain('registryProfile: `default`');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('gate2-runner-core: readTaskConfig', () => {
@@ -234,6 +261,50 @@ describe('gate2-runner-core: readTaskConfig', () => {
       expect(task.goal).toBe('fix the bug');
       expect(task.workspacePath).toBe('/tmp/ws');
       expect(task.maxSteps).toBe(35);
+      expect(task.registryProfile).toBe('default');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('defaults registryProfile to default when omitted', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'g2-'));
+    try {
+      const cfgPath = join(tmp, 'task.json');
+      await writeFile(cfgPath, JSON.stringify({ goal: 'fix', workspacePath: '/tmp/ws' }), 'utf8');
+      const task = await readTaskConfig(cfgPath);
+      expect(task.registryProfile).toBe('default');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('parses explicit all registryProfile as opt-in', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'g2-'));
+    try {
+      const cfgPath = join(tmp, 'task.json');
+      await writeFile(
+        cfgPath,
+        JSON.stringify({ goal: 'fix', workspacePath: '/tmp/ws', registryProfile: 'all' }),
+        'utf8',
+      );
+      const task = await readTaskConfig(cfgPath);
+      expect(task.registryProfile).toBe('all');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects unknown registryProfile values', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'g2-'));
+    try {
+      const cfgPath = join(tmp, 'task.json');
+      await writeFile(
+        cfgPath,
+        JSON.stringify({ goal: 'fix', workspacePath: '/tmp/ws', registryProfile: 'browser' }),
+        'utf8',
+      );
+      await expect(readTaskConfig(cfgPath)).rejects.toThrow(/invalid registryProfile/);
     } finally {
       await rm(tmp, { recursive: true, force: true });
     }

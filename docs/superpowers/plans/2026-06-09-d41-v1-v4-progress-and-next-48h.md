@@ -32,7 +32,12 @@
 - D44 live-test budget hygiene:
   - `compaction-cross-protocol-2d5.test.ts` keeps the same behavioral assertions but raises the live LLM loop budget from 5 to 10 iterations to avoid false negatives from convergence variance.
   - This does not change production code, Gate-2 strict pass rules, default registry exposure, or v1-v4 completion percentages.
-  - The next implementation slice remains D45: produce fresh Gate-1 preferred 100K+ evidence before any Code Intel maturity claim is upgraded.
+  - The next implementation slice is D45 registry-profile honesty; the fresh Gate-1 preferred 100K+ evidence remains D46/D47 before any Code Intel maturity claim is upgraded.
+- D45 registry-profile honesty:
+  - Gate-2 live task configs now default to `registryProfile: "default"` and reports persist the selected profile.
+  - Explicit `all` remains available only as an opt-in task-config choice, so future Gate-2 evidence cannot silently use the broad tool surface.
+  - D40 evidence remains valid as a live runner/fixture pass, but should not be reinterpreted as a default-surface proof unless regenerated with `registryProfile: "default"`.
+  - README now carries the same caveat so the historical `passed_live=true` report is not overclaimed as default-profile evidence.
 
 ## Progress Numbers
 
