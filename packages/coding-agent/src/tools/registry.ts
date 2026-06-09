@@ -194,6 +194,9 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
     reg.register(new TextToSpeechTool());
   };
 
+  // Browser tools (browser_navigate, browser_click, browser_type) are opt-in only — they live in
+  // the `browser` profile and are registered by packages/coding-agent/src/browser/runtime.ts.
+  // The default profile intentionally does NOT register them.
   if (profile === 'default') {
     registerCoding();
     registerCodeIntel();
