@@ -29,6 +29,10 @@
   - `docs/superpowers/gate-2-long-horizon-live.{json,md}` use `<materialized-gate2-fixture-workspace>`.
   - `README.md` says 49 tool calls and root fixture path `fixtures/gate2-live/fixture`.
   - Fresh D41 verification reported `pnpm typecheck`, `pnpm lint`, and `pnpm test` passing.
+- D44 live-test budget hygiene:
+  - `compaction-cross-protocol-2d5.test.ts` keeps the same behavioral assertions but raises the live LLM loop budget from 5 to 10 iterations to avoid false negatives from convergence variance.
+  - This does not change production code, Gate-2 strict pass rules, default registry exposure, or v1-v4 completion percentages.
+  - The next implementation slice remains D45: produce fresh Gate-1 preferred 100K+ evidence before any Code Intel maturity claim is upgraded.
 
 ## Progress Numbers
 
