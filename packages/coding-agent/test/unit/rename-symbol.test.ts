@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { RenameSymbolTool } from '../../src/tools/rename-symbol.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -86,5 +86,97 @@ describe('rename_symbol (D-32.2.4)', () => {
     expect(content).toContain('// foo should stay in this comment');
     expect(content).toContain('"foo should stay in this string"');
     expect(content).toContain('return baz();');
+  });
+});
+
+describe('rename_symbol conservative mode (D-33.2.2)', () => {
+  // 拍板 (D-33.2.2): default = reference-limited (no comment/string rewrite).
+  // allow_textual_fallback=true is an OPT-IN to also rewrite occurrences in
+  // comments and strings, using a word-boundary regex over the whole file.
+  let tool: RenameSymbolTool;
+  let tmpDir: string;
+  beforeAll(() => {
+    tool = new RenameSymbolTool();
+  });
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'rename-sym-d332-'));
+    writeFileSync(
+      join(tmpDir, 'a.ts'),
+      [
+        'export function target() { return 1; }',
+        'export function caller() { return target(); }',
+        "const text = 'target';",
+        '// target is documentation only',
+      ].join('\n'),
+    );
+    writeFileSync(join(tmpDir, 'b.ts'), 'function target() { return 2; }\n');
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not rewrite comments, strings, unrelated locals, or unrelated files by default', async () => {
+    // apply=true so we can inspect the actual on-disk file content (the
+    // dry-run output header itself contains the literal newName, which
+    // would defeat a string-substring check on the dry-run content).
+    const result = await tool.execute({
+      path: tmpDir,
+      oldName: 'target',
+      newName: 'renamedTarget',
+      apply: true,
+    });
+
+    expect(result.success).toBe(true);
+    const aContent = readFileSync(join(tmpDir, 'a.ts'), 'utf8');
+    // Identifier references in code ARE rewritten
+    expect(aContent).toContain('export function renamedTarget()');
+    expect(aContent).toContain('return renamedTarget()');
+    // But string and comment occurrences are NOT rewritten (conservative default)
+    expect(aContent).toContain("'target'");
+    expect(aContent).toContain('// target is documentation only');
+  });
+
+  it('requires allow_textual_fallback=true to do broad textual replacement', async () => {
+    // Use apply=true on a fresh fixture so we can compare on-disk file
+    // content for both the safe (default) and the broad (opt-in) paths.
+    const safeDir = mkdtempSync(join(tmpdir(), 'rename-sym-d332-safe-'));
+    const broadDir = mkdtempSync(join(tmpdir(), 'rename-sym-d332-broad-'));
+    for (const root of [safeDir, broadDir]) {
+      mkdirSync(join(root, 'src'), { recursive: true });
+      writeFileSync(
+        join(root, 'src', 'a.ts'),
+        [
+          'export function target() { return 1; }',
+          "const text = 'target';",
+        ].join('\n'),
+      );
+    }
+
+    const safeResult = await tool.execute({
+      path: safeDir,
+      oldName: 'target',
+      newName: 'renamedTarget',
+      apply: true,
+    });
+    const broadResult = await tool.execute({
+      path: broadDir,
+      oldName: 'target',
+      newName: 'renamedTarget',
+      apply: true,
+      allow_textual_fallback: true,
+    });
+
+    expect(safeResult.success).toBe(true);
+    expect(broadResult.success).toBe(true);
+
+    // Safe (default): string NOT rewritten
+    const safeContent = readFileSync(join(safeDir, 'src', 'a.ts'), 'utf8');
+    expect(safeContent).toContain("'target'");
+    // Broad (opt-in): string IS rewritten
+    const broadContent = readFileSync(join(broadDir, 'src', 'a.ts'), 'utf8');
+    expect(broadContent).toContain("'renamedTarget'");
+
+    rmSync(safeDir, { recursive: true, force: true });
+    rmSync(broadDir, { recursive: true, force: true });
   });
 });

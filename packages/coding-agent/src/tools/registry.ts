@@ -124,6 +124,10 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   const reg = new ToolRegistry();
   const runner = options.sandboxRunner ?? new LocalSandboxRunner();
   const profile = options.profile ?? 'default';
+  // D-33.2.3 (2026-06-09): tool→capability wiring is a future Stage 2.4 / Stage 3.4 task.
+  // This 1-line note marks the seam: each tool instance can later be mirrored
+  // as a Capability in @deepwhale/coding-agent/runtime/capability-registry.ts.
+  // We intentionally do NOT mutate behavior here.
 
   const registerCore = (): void => {
     reg.register(new ReadFileTool());

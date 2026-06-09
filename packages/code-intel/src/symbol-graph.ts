@@ -190,6 +190,16 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
             continue;
           }
           const importTarget = namespaceTarget ?? importTargets.get(call.name);
+          // 拍板 (D-33.2.1): prefer no edge over a false edge. If the file
+          // imports a name that could not be resolved (e.g. tsconfig path
+          // alias `@api/api` → `src/api/api` no such file), skip the
+          // name-based fallback — the call may be a local var or a dangling
+          // import, and we should not guess. If the file has no import of
+          // the name at all, this is likely a same-file function call, so
+          // allow the fallback.
+          if (!importTarget && hasUnresolvedImportOfName(fileSym, call.name)) {
+            continue;
+          }
           const targetName = importTarget?.split(':').slice(1).join(':') ?? call.name;
           const calleeIds = nameToIds.get(targetName);
           if (!calleeIds) continue;
@@ -313,6 +323,29 @@ function resolveNamespaceMemberTarget(
 
 function isNamespaceImportQualifier(fileSym: FileSymbols, qualifier: string): boolean {
   return fileSym.imports.some((imp) => imp.namespace && imp.local === qualifier);
+}
+
+function hasUnresolvedImportOfName(fileSym: FileSymbols, name: string): boolean {
+  // An import is "unresolved" if it declares the name but the import map
+  // (which is built by buildCallGraph) couldn't find a target file for it.
+  // buildCallGraph will only have placed it in the importTargets map when
+  // resolveImportedSymbolTarget succeeded, so we approximate by checking
+  // that the file has an import whose local name matches AND the from path
+  // is not a relative or namespace import that the resolver can handle.
+  return fileSym.imports.some((imp) => {
+    if (imp.local !== name) return false;
+    // Names resolved through namespace imports / barrels / relative paths
+    // ARE in the importTargets map. The remaining "unresolved" cases are
+    // bare specifiers (tsconfig aliases, node modules) that the relative
+    // resolver defers to resolvePathAliasImportFile. We can't fully
+    // distinguish them here without re-running the resolver, so we only
+    // signal "unresolved" when the import's `from` looks like a tsconfig
+    // alias prefix (i.e. starts with an `@`-style alias) or is a node
+    // module style specifier without a leading `./` or `../`.
+    if (imp.from.startsWith('.')) return false;
+    if (imp.namespace) return false;
+    return true;
+  });
 }
 
 function resolveImportedSymbolTarget(
