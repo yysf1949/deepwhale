@@ -225,7 +225,12 @@ export async function runToolLoop(
 
   // 5) 触顶
   steps.push({ kind: 'limit', ts: Date.now(), steps: maxSteps, lastResult });
-  throw new ToolLoopLimitError(maxSteps, lastResult);
+  const limitErr = new ToolLoopLimitError(maxSteps, lastResult);
+  // Attach the captured steps so callers (e.g. the tool-loop-policy wrapper)
+  // can build a partial result with the actual tool-call count, not just a
+  // synthetic "limit" sentinel.
+  Object.defineProperty(limitErr, 'partialSteps', { value: steps, enumerable: false });
+  throw limitErr;
 }
 
 // ============================================================================

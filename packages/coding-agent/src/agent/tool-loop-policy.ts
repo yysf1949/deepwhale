@@ -13,7 +13,7 @@
  */
 
 import { runToolLoop, type ToolLoopOptions, type ToolLoopResult } from './tool-loop.js';
-import type { ChatMessage, LLMClient } from '@deepwhale/llm';
+import type { ChatMessage, ChatResult, LLMClient } from '@deepwhale/llm';
 
 export type ReviewStatus = 'approve' | 'request_changes';
 
@@ -73,7 +73,33 @@ export async function runToolLoopWithReview(options: RunCommandWithReviewOptions
   if (loopOptions.isInteractive !== undefined) loopOptionsClean.isInteractive = loopOptions.isInteractive;
   if (loopOptions.yes !== undefined) loopOptionsClean.yes = loopOptions.yes;
   if (loopOptions.writer !== undefined) loopOptionsClean.writer = loopOptions.writer;
-  const result = await runToolLoop(client, messages, loopOptionsClean);
+  let result: Awaited<ReturnType<typeof runToolLoop>>;
+  try {
+    result = await runToolLoop(client, messages, loopOptionsClean);
+  } catch (err) {
+    // If the tool loop hit max-steps, build a partial result from the
+    // partialSteps attached to the error (see tool-loop.ts:5). This lets
+    // callers see the actual tool-call count rather than a synthetic 0.
+    if (err && typeof err === 'object' && (err as { isToolLoopError?: unknown }).isToolLoopError === true) {
+      const e = err as { lastResult?: ChatResult; partialSteps?: ReadonlyArray<unknown> };
+      const partialSteps = Array.isArray(e.partialSteps)
+        ? (e.partialSteps as Awaited<ReturnType<typeof runToolLoop>>['steps'])
+        : [];
+      // For the fallback, force finish_reason to 'length' (which is a real
+      // ChatResult variant) so the type is happy. The 'limit' state is
+      // already captured by the 'limit' step at the end of partialSteps.
+      const fallback: ChatResult = e.lastResult
+        ? { ...e.lastResult, finish_reason: 'length' as const }
+        : { model: 'unknown' as ChatResult['model'], content: '', finish_reason: 'length' as const };
+      result = {
+        messages: [],
+        final: e.lastResult ?? fallback,
+        steps: partialSteps,
+      };
+    } else {
+      throw err;
+    }
+  }
   let toolCallsRecorded = 0;
   if (taskGraph) {
     for (const step of result.steps) {
