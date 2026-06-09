@@ -2,7 +2,7 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
-> **当前分支状态（2026-06-09, `release/v2.0`）**：D-33.3 v2.0 closure 收口（PR #3-#6 待 merge）。默认 registry 仍只暴露 coding + Code Intel essentials (19 tools)。v2.0 新增 memory ranking / semantic search lexical fallback / browser foundation (opt-in, no live automation) / MCP runtime (manifest only) / Gate-1.5 viability harness (fixture-based)，全部保持默认 profile 之外。Code Intel 当前为 heuristic；Gate-1 Vite 86K LOC 已 pass，`pnpm gate1:current` 在当前 workspace (< 50K LOC) 报 `loc-below-minimum` 是 acceptable。
+> **当前分支状态（2026-06-09, `release/v2.0`）**：D-33.5 v3.0 execute review 收口（PR #3-#7 待 merge，PR #8 stage-5 待 push）。默认 registry 仍只暴露 coding + Code Intel essentials (19 tools)。v3.0 新增 Reviewer role (verification-only) · Compaction hook contract · Computer Use compat layer (provider-delegation only) · Gate-2 long-horizon harness (35-step fixture pass, retries=1, drift=false)。Browser enhancement (Task 5.3) 显式 skip — 需 Stage 3 browser/* 合并后做独立 sub-sprint。
 
 [![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 > 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
@@ -96,8 +96,6 @@ pnpm dev
 - 完整 seccomp / apparmor profile (D-12 拍板用 Docker default)
 - 远程容器 / Cloud sandbox
 - Desktop / Web UI (v4.0)
-
-> **v2.5 capability checklist (D-33.4 收口)**: task DAG state machine ✓ · Planner/Executor boundary (planner can decompose, executor can run, neither can do the other's job) ✓ · plan cache with stable keys ✓ · v2.5 release gate green. **Default registry unchanged**. `--mode=single` still runs the v1.0 Executor loop (no breaking change). New `runTaskLoop` is opt-in (callers must explicitly pass `tasks`). 5 红线 0 改. test count: 1046 → 1052 pass (+6 new tests).
 
 **Accept risks** (跟 README L459-466 一致):
 - 真 LLM cache 命中验证留 sprint 2 (D-20.2 P1 拍板)
