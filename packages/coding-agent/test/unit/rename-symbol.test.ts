@@ -276,4 +276,85 @@ describe('rename_symbol conservative mode (D-33.2.2)', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('renames a real TypeScript call after a private field on the same line', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d60-private-field-'));
+    try {
+      writeFileSync(
+        join(dir, 'provider.ts'),
+        [
+          'export function target() {',
+          '  return 1;',
+          '}',
+          'export class Box {',
+          '  #state = 0;',
+          '  run() { this.#state += 1; return target(); }',
+          '}',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+        apply: true,
+      });
+
+      expect(result.success).toBe(true);
+      const content = readFileSync(join(dir, 'provider.ts'), 'utf8');
+      expect(content).toContain('export function renamedTarget()');
+      expect(content).toContain('return renamedTarget();');
+      expect(content).toContain('this.#state += 1');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not report comments, strings, or TS private identifiers as skipped cross-file references', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d60-skipped-scan-'));
+    try {
+      writeFileSync(join(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      writeFileSync(join(dir, 'other.ts'), 'export function target() {\n  return 2;\n}\n');
+      writeFileSync(
+        join(dir, 'consumer.ts'),
+        [
+          "import { target as chosen } from './provider.js';",
+          '/* target is docs only and must not be counted */',
+          'const label = "target is a string only";',
+          'class Box {',
+          '  #target = 1;',
+          '  run() { return this.#target + chosen(); }',
+          '}',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+        targetFile: 'provider.ts',
+        apply: true,
+      });
+
+      expect(result.success).toBe(true);
+      const details = result.meta?.skippedReferenceDetails;
+      expect(details).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'consumer.ts', line: 1 }),
+          expect.objectContaining({ file: 'other.ts', line: 1 }),
+        ]),
+      );
+      expect(details).not.toEqual(expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', line: 2 })]));
+      expect(details).not.toEqual(expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', line: 3 })]));
+      expect(details).not.toEqual(expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', line: 5 })]));
+      expect(details).not.toEqual(expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', line: 6 })]));
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('/* target is docs only');
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('"target is a string only"');
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('#target');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

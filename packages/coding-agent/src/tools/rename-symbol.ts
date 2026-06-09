@@ -29,6 +29,17 @@ interface SkippedReference {
   reason: string;
 }
 
+interface LexicalScanState {
+  inBlockComment: boolean;
+}
+
+interface LexicalScanOptions {
+  readonly blockComments: boolean;
+  readonly slashLineComments: boolean;
+  readonly hashLineComments: boolean;
+  readonly skipHashPrivateIdentifier: boolean;
+}
+
 export class RenameSymbolTool implements Tool {
   readonly name = 'rename_symbol' as ToolName;
   readonly description = 'Heuristic symbol rename across a repo. Default dry-run preview; pass apply=true to write. Uses code-intel references where available, not IDE-grade type analysis. Medium risk (cross-file write).';
@@ -98,7 +109,7 @@ export class RenameSymbolTool implements Tool {
       for (const [file, fileRefs] of refsByFile) {
         const fullPath = resolve(repoPath, file);
         const original = await readFile(fullPath, 'utf8');
-        const refResult = rewriteReferences(original, fileRefs, oldName, newName);
+        const refResult = rewriteReferences(original, fileRefs, oldName, newName, graph.files.get(file)?.language);
         let rewritten = refResult.rewritten;
         let replacements = refResult.replacements;
         let textualReplacements = 0;
@@ -288,16 +299,19 @@ async function expandSkippedReferences(
     const source = await readFile(resolve(graph.repoRoot, file), 'utf8').catch(() => '');
     if (!source) continue;
     const lines = source.split('\n');
+    const lexicalOptions = lexicalOptionsForLanguage(graph.files.get(file)?.language);
+    const lexicalState: LexicalScanState = { inBlockComment: false };
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i] ?? '';
-      for (const token of scanIdentifierTokens(line)) {
+      const scanLine = maskComments(line, lexicalState, lexicalOptions);
+      for (const token of scanIdentifierTokens(scanLine, lexicalOptions)) {
         if (token.text !== oldName) continue;
         const candidate: SkippedReference = {
           file,
           line: i + 1,
           col: token.col,
-          kind: isMemberReference(line, token.col) ? 'property' : 'reference',
-          reason: isMemberReference(line, token.col)
+          kind: isMemberReference(scanLine, token.col) ? 'property' : 'reference',
+          reason: isMemberReference(scanLine, token.col)
             ? 'namespace/member candidate not rewritten by heuristic rename'
             : 'cross-file candidate not rewritten by heuristic rename',
         };
@@ -360,17 +374,20 @@ function rewriteReferences(
   refs: ReadonlyArray<Reference>,
   oldName: string,
   newName: string,
+  language: string | undefined,
 ): { rewritten: string; replacements: number } {
   const lineStarts = computeLineStarts(source);
+  const lexicalOptions = lexicalOptionsForLanguage(language);
+  const maskedSource = maskSourceComments(source, lexicalOptions);
   const replacementOffsets = new Set<number>();
 
   for (const ref of refs) {
     const lineStart = lineStarts[ref.line - 1];
     if (lineStart === undefined) continue;
     const lineEnd = findLineEnd(source, lineStart);
-    const rawLine = source.slice(lineStart, lineEnd);
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
-    const col = resolveReplacementColumn(line, ref, oldName);
+    const rawScanLine = maskedSource.slice(lineStart, lineEnd);
+    const scanLine = rawScanLine.endsWith('\r') ? rawScanLine.slice(0, -1) : rawScanLine;
+    const col = resolveReplacementColumn(scanLine, ref, oldName, lexicalOptions);
     if (col === null) continue;
     const offset = lineStart + col;
     if (source.slice(offset, offset + oldName.length) === oldName) {
@@ -386,31 +403,38 @@ function rewriteReferences(
   return { rewritten, replacements: offsets.length };
 }
 
-function resolveReplacementColumn(line: string, ref: Reference, oldName: string): number | null {
-  if (isTokenAt(line, ref.col, oldName)) {
+function resolveReplacementColumn(
+  line: string,
+  ref: Reference,
+  oldName: string,
+  options: LexicalScanOptions,
+): number | null {
+  if (isTokenAt(line, ref.col, oldName, options)) {
     return ref.col;
   }
 
-  const candidates = scanIdentifierTokens(line).filter((token) => token.text === oldName);
+  const candidates = scanIdentifierTokens(line, options).filter((token) => token.text === oldName);
   if (candidates.length === 0) return null;
   return candidates.find((token) => token.col >= ref.col)?.col ?? candidates[0]?.col ?? null;
 }
 
-function isTokenAt(line: string, col: number, oldName: string): boolean {
+function isTokenAt(line: string, col: number, oldName: string, options: LexicalScanOptions): boolean {
   if (line.slice(col, col + oldName.length) !== oldName) return false;
-  if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) return false;
+  if (isLikelyInsideString(line, col) || isAfterLineComment(line, col, options)) return false;
+  if (shouldSkipIdentifierAt(line, col, options)) return false;
   const before = col > 0 ? line[col - 1] : '';
   const after = line[col + oldName.length] ?? '';
   return !isIdentifierChar(before) && !isIdentifierChar(after);
 }
 
-function scanIdentifierTokens(line: string): Array<{ text: string; col: number }> {
+function scanIdentifierTokens(line: string, options: LexicalScanOptions): Array<{ text: string; col: number }> {
   const tokens: Array<{ text: string; col: number }> = [];
   const re = /[A-Za-z_$][\w$]*/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(line)) !== null) {
     const col = match.index;
-    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) continue;
+    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col, options)) continue;
+    if (shouldSkipIdentifierAt(line, col, options)) continue;
     tokens.push({ text: match[0], col });
   }
   return tokens;
@@ -437,9 +461,95 @@ function isLikelyInsideString(line: string, col: number): boolean {
   return singleQuotes % 2 === 1 || doubleQuotes % 2 === 1 || backticks % 2 === 1;
 }
 
-function isAfterLineComment(line: string, col: number): boolean {
-  const before = line.slice(0, col);
-  return before.indexOf('//') >= 0 || before.indexOf('#') >= 0;
+function maskSourceComments(source: string, options: LexicalScanOptions): string {
+  const state: LexicalScanState = { inBlockComment: false };
+  return source
+    .split('\n')
+    .map((line) => maskComments(line, state, options))
+    .join('\n');
+}
+
+function maskComments(line: string, state: LexicalScanState, options: LexicalScanOptions): string {
+  const chars = line.split('');
+  let i = 0;
+  while (options.blockComments && i < chars.length) {
+    if (state.inBlockComment) {
+      const end = line.indexOf('*/', i);
+      const until = end >= 0 ? end + 2 : chars.length;
+      for (let j = i; j < until; j++) chars[j] = ' ';
+      state.inBlockComment = end < 0;
+      i = until;
+      continue;
+    }
+
+    const start = line.indexOf('/*', i);
+    if (start < 0) break;
+    if (isLikelyInsideString(line, start) || isAfterLineComment(chars.join(''), start, options)) {
+      i = start + 2;
+      continue;
+    }
+
+    const end = line.indexOf('*/', start + 2);
+    const until = end >= 0 ? end + 2 : chars.length;
+    for (let j = start; j < until; j++) chars[j] = ' ';
+    state.inBlockComment = end < 0;
+    i = until;
+  }
+  maskLineComment(chars, chars.join(''), options);
+  return chars.join('');
+}
+
+function maskLineComment(chars: string[], line: string, options: LexicalScanOptions): void {
+  const start = lineCommentStart(line, options);
+  if (start < 0) return;
+  for (let i = start; i < chars.length; i++) chars[i] = ' ';
+}
+
+function lineCommentStart(line: string, options: LexicalScanOptions): number {
+  const starts: number[] = [];
+  if (options.slashLineComments) {
+    const slash = firstCommentTokenOutsideString(line, '//');
+    if (slash >= 0) starts.push(slash);
+  }
+  if (options.hashLineComments) {
+    const hash = firstCommentTokenOutsideString(line, '#');
+    if (hash >= 0) starts.push(hash);
+  }
+  return starts.length > 0 ? Math.min(...starts) : -1;
+}
+
+function firstCommentTokenOutsideString(line: string, token: string): number {
+  let index = line.indexOf(token);
+  while (index >= 0) {
+    if (!isLikelyInsideString(line, index)) return index;
+    index = line.indexOf(token, index + token.length);
+  }
+  return -1;
+}
+
+function isAfterLineComment(line: string, col: number, options: LexicalScanOptions): boolean {
+  return lineCommentStart(line.slice(0, col), options) >= 0;
+}
+
+function shouldSkipIdentifierAt(line: string, col: number, options: LexicalScanOptions): boolean {
+  return options.skipHashPrivateIdentifier && line[col - 1] === '#';
+}
+
+function lexicalOptionsForLanguage(language: string | undefined): LexicalScanOptions {
+  if (language === 'python' || language === 'bash') {
+    return {
+      blockComments: false,
+      slashLineComments: false,
+      hashLineComments: true,
+      skipHashPrivateIdentifier: false,
+    };
+  }
+  return {
+    blockComments: true,
+    slashLineComments: true,
+    hashLineComments: false,
+    skipHashPrivateIdentifier: language === 'typescript' || language === 'tsx' || language === 'javascript',
+  };
 }
 
 function countUnescaped(text: string, char: string): number {
