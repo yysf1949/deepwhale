@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { buildCallGraph, buildSymbolGraph, type CallEdge, type Reference } from './symbol-graph.js';
+import { buildCallGraph, buildSymbolGraph, type CallEdge, type Reference, type SymbolGraph } from './symbol-graph.js';
 import { getLanguageForExtension } from './languages.js';
 
 const DEFAULT_IGNORES: ReadonlySet<string> = new Set([
@@ -23,9 +23,12 @@ export interface Gate1Options {
   timeboxMs?: number;
   maxDepth?: number;
   entrySymbol: string;
+  entryFile?: string;
   requiredCall: {
     callerSymbol: string;
+    callerFile?: string;
     calleeSymbol: string;
+    calleeFile?: string;
   };
   modificationPoint: {
     file: string;
@@ -60,6 +63,7 @@ export interface Gate1Evidence {
 }
 
 export interface Gate1SymbolEvidence {
+  id: string;
   file: string;
   symbol: string;
   line: number;
@@ -91,6 +95,11 @@ export interface Gate1ParsedArgs {
   mdOut?: string;
 }
 
+interface Gate1SymbolSelector {
+  symbol: string;
+  file?: string;
+}
+
 export async function runGate1(options: Gate1Options): Promise<Gate1Result> {
   const started = Date.now();
   const repoPath = resolve(options.repoPath);
@@ -107,17 +116,18 @@ export async function runGate1(options: Gate1Options): Promise<Gate1Result> {
   const callGraphMs = Date.now() - callStarted;
   const elapsedMs = Date.now() - started;
 
-  const entry = firstSymbolEvidence(graph.byName.get(options.entrySymbol), options.entrySymbol);
+  const entrySelector = buildSelector(options.entrySymbol, options.entryFile);
+  const callerSelector = buildSelector(options.requiredCall.callerSymbol, options.requiredCall.callerFile);
+  const calleeSelector = buildSelector(options.requiredCall.calleeSymbol, options.requiredCall.calleeFile);
+  const entrySelection = selectSymbolEvidence(graph, graph.byName.get(options.entrySymbol), entrySelector, 'entry');
+  const callSelectorFailures = validateRequiredCallSelectors(graph, callerSelector, calleeSelector);
   const modificationPoint = findModificationPoint(
     graph.byName.get(options.modificationPoint.symbol),
     options.modificationPoint,
   );
-  const callChain = callGraph.edges.filter((edge) => {
-    return (
-      symbolIdName(edge.caller) === options.requiredCall.callerSymbol &&
-      symbolIdName(edge.callee) === options.requiredCall.calleeSymbol
-    );
-  });
+  const callChain = callSelectorFailures.length > 0
+    ? []
+    : callGraph.edges.filter((edge) => symbolIdMatches(edge.caller, callerSelector) && symbolIdMatches(edge.callee, calleeSelector));
 
   const metrics: Gate1Metrics = {
     loc: locStats.loc,
@@ -137,10 +147,11 @@ export async function runGate1(options: Gate1Options): Promise<Gate1Result> {
   const failureReasons: string[] = [];
   if (metrics.loc < minLoc) failureReasons.push(`loc-below-minimum: ${metrics.loc} < ${minLoc}`);
   if (elapsedMs > timeboxMs) failureReasons.push(`timebox-exceeded: ${elapsedMs}ms > ${timeboxMs}ms`);
-  if (!entry) failureReasons.push(`entry-not-found: ${options.entrySymbol}`);
-  if (callChain.length === 0) {
+  if (entrySelection.failureReason) failureReasons.push(entrySelection.failureReason);
+  for (const reason of callSelectorFailures) failureReasons.push(reason);
+  if (callSelectorFailures.length === 0 && callChain.length === 0) {
     failureReasons.push(
-      `call-chain-not-found: ${options.requiredCall.callerSymbol} -> ${options.requiredCall.calleeSymbol}`,
+      `call-chain-not-found: ${formatSelector(callerSelector)} -> ${formatSelector(calleeSelector)}`,
     );
   }
   if (!modificationPoint) {
@@ -148,7 +159,7 @@ export async function runGate1(options: Gate1Options): Promise<Gate1Result> {
   }
 
   const evidence: Gate1Evidence = { callChain };
-  if (entry) evidence.entry = entry;
+  if (entrySelection.evidence) evidence.entry = entrySelection.evidence;
   if (modificationPoint) evidence.modificationPoint = modificationPoint;
 
   return {
@@ -170,9 +181,12 @@ export async function readGate1Scenario(scenarioPath: string): Promise<Gate1Opti
   return {
     repoPath: resolve(scenarioDir, requiredString(scenario, 'repoPath')),
     entrySymbol: requiredString(scenario, 'entrySymbol'),
+    ...optionalStringProp(scenario, 'entryFile'),
     requiredCall: {
       callerSymbol: requiredString(asRecord(scenario.requiredCall, 'requiredCall'), 'callerSymbol'),
+      ...optionalStringProp(asRecord(scenario.requiredCall, 'requiredCall'), 'callerFile'),
       calleeSymbol: requiredString(asRecord(scenario.requiredCall, 'requiredCall'), 'calleeSymbol'),
+      ...optionalStringProp(asRecord(scenario.requiredCall, 'requiredCall'), 'calleeFile'),
     },
     modificationPoint: {
       file: requiredString(asRecord(scenario.modificationPoint, 'modificationPoint'), 'file'),
@@ -197,8 +211,11 @@ export function parseGate1Args(args: string[], cwd = process.cwd()): Gate1Parsed
 
   const repoPath = values.get('repo');
   const entrySymbol = values.get('entry');
+  const entryFile = values.get('entry-file');
   const callerSymbol = values.get('caller');
+  const callerFile = values.get('caller-file');
   const calleeSymbol = values.get('callee');
+  const calleeFile = values.get('callee-file');
   const modFile = values.get('mod-file');
   const modSymbol = values.get('mod-symbol');
   if (!repoPath || !entrySymbol || !callerSymbol || !calleeSymbol || !modFile || !modSymbol) {
@@ -213,9 +230,12 @@ export function parseGate1Args(args: string[], cwd = process.cwd()): Gate1Parsed
   const options: Gate1Options = {
     repoPath: resolve(cwd, repoPath),
     entrySymbol,
+    ...(entryFile ? { entryFile } : {}),
     requiredCall: {
       callerSymbol,
+      ...(callerFile ? { callerFile } : {}),
       calleeSymbol,
+      ...(calleeFile ? { calleeFile } : {}),
     },
     modificationPoint: {
       file: modFile,
@@ -275,10 +295,93 @@ async function walk(root: string, dir: string, depth: number, maxDepth: number, 
   }
 }
 
-function firstSymbolEvidence(refs: Reference[] | undefined, symbol: string): Gate1SymbolEvidence | undefined {
-  const ref = refs?.find((candidate) => candidate.kind === 'declaration') ?? refs?.[0];
-  if (!ref) return undefined;
-  return { file: ref.file, symbol, line: ref.line, col: ref.col, kind: ref.kind };
+function buildSelector(symbol: string, file: string | undefined): Gate1SymbolSelector {
+  const selector: Gate1SymbolSelector = { symbol };
+  const normalizedFile = normalizeGateFile(file);
+  if (normalizedFile !== undefined) selector.file = normalizedFile;
+  return selector;
+}
+
+function selectSymbolEvidence(
+  _graph: SymbolGraph,
+  refs: Reference[] | undefined,
+  selector: Gate1SymbolSelector,
+  label: string,
+): { evidence?: Gate1SymbolEvidence; failureReason?: string } {
+  const declarations = (refs ?? []).filter((candidate) => candidate.kind === 'declaration');
+  const matches = selector.file === undefined
+    ? declarations
+    : declarations.filter((candidate) => candidate.file === selector.file);
+  if (matches.length === 0) {
+    return { failureReason: `${label}-not-found: ${formatSelector(selector)}` };
+  }
+  if (selector.file === undefined && matches.length > 1) {
+    return {
+      failureReason: `${label}-ambiguous: ${selector.symbol} has ${matches.length} declarations; pass ${label}File`,
+    };
+  }
+  const ref = matches[0]!;
+  return {
+    evidence: {
+      id: symbolIdFromReference(ref, selector.symbol),
+      file: ref.file,
+      symbol: selector.symbol,
+      line: ref.line,
+      col: ref.col,
+      kind: ref.kind,
+    },
+  };
+}
+
+function validateRequiredCallSelectors(
+  graph: SymbolGraph,
+  caller: Gate1SymbolSelector,
+  callee: Gate1SymbolSelector,
+): string[] {
+  const failures: string[] = [];
+  for (const [label, selector, fileHint] of [
+    ['required-call-caller', caller, 'callerFile'],
+    ['required-call-callee', callee, 'calleeFile'],
+  ] as const) {
+    const ids = declarationIdsForSymbol(graph, selector.symbol).filter((id) => symbolIdMatches(id, selector));
+    if (ids.length === 0) {
+      failures.push(`${label}-not-found: ${formatSelector(selector)}`);
+    } else if (selector.file === undefined && ids.length > 1) {
+      failures.push(`${label}-ambiguous: ${selector.symbol} has ${ids.length} declarations; pass ${fileHint}`);
+    }
+  }
+  return failures;
+}
+
+function declarationIdsForSymbol(graph: SymbolGraph, symbol: string): string[] {
+  const ids: string[] = [];
+  for (const [filePath, fileSym] of graph.files) {
+    for (const s of fileSym.symbols) {
+      if (s.name === symbol) ids.push(`${filePath}:${s.scope ? `${s.scope}.` : ''}${s.name}`);
+    }
+  }
+  return ids;
+}
+
+function symbolIdMatches(id: string, selector: Gate1SymbolSelector): boolean {
+  if (symbolIdName(id) !== selector.symbol) return false;
+  return selector.file === undefined || symbolIdFile(id) === selector.file;
+}
+
+function symbolIdFile(id: string): string {
+  return id.split(':')[0] ?? '';
+}
+
+function symbolIdFromReference(ref: Reference, symbol: string): string {
+  return `${ref.file}:${ref.scope ? `${ref.scope}.` : ''}${symbol}`;
+}
+
+function normalizeGateFile(file: string | undefined): string | undefined {
+  return file?.split(/[\\/]+/).join('/');
+}
+
+function formatSelector(selector: Gate1SymbolSelector): string {
+  return selector.file ? `${selector.file}:${selector.symbol}` : selector.symbol;
 }
 
 function findModificationPoint(
@@ -288,7 +391,14 @@ function findModificationPoint(
   const normalizedFile = expected.file.split(/[\\/]+/).join('/');
   const ref = refs?.find((candidate) => candidate.file === normalizedFile && candidate.kind === 'declaration');
   if (!ref) return undefined;
-  return { file: ref.file, symbol: expected.symbol, line: ref.line, col: ref.col, kind: ref.kind };
+  return {
+    id: symbolIdFromReference(ref, expected.symbol),
+    file: ref.file,
+    symbol: expected.symbol,
+    line: ref.line,
+    col: ref.col,
+    kind: ref.kind,
+  };
 }
 
 function symbolIdName(id: string): string {
@@ -352,6 +462,15 @@ function requiredString(input: Record<string, unknown>, key: string): string {
     throw new Error(`gate1-scenario-required-string: ${key}`);
   }
   return value;
+}
+
+function optionalStringProp<T extends string>(input: Record<string, unknown>, key: T): Partial<Record<T, string>> {
+  const value = input[key];
+  if (value === undefined) return {};
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`gate1-scenario-invalid-string: ${key}`);
+  }
+  return { [key]: value } as Partial<Record<T, string>>;
 }
 
 function stripUtf8Bom(text: string): string {

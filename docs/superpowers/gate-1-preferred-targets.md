@@ -1,7 +1,7 @@
 # Gate-1 Preferred Target Inventory
 
 Status: minimum-only
-Generated: 2026-06-09T16:27:02.438Z
+Generated: 2026-06-09T17:22:59.555Z
 Targets root: D:\App\openClaw\projects\deepwhale\.gate-targets
 Minimum LOC: 50000
 Preferred LOC: 100000

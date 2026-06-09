@@ -12,9 +12,9 @@ Repo: D:\App\openClaw\projects\deepwhale\.gate-targets\vite
 - Symbols indexed: 7427
 - References indexed: 30821
 - Call edges: 32165
-- Graph build: 1592ms
-- Call graph: 568ms
-- Elapsed: 2406ms / 1200000ms
+- Graph build: 1396ms
+- Call graph: 358ms
+- Elapsed: 2021ms / 1200000ms
 
 ## Evidence
 

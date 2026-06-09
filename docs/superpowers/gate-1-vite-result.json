@@ -10,9 +10,9 @@
     "symbolsIndexed": 7427,
     "referencesIndexed": 30821,
     "callEdges": 32165,
-    "elapsedMs": 2406,
-    "graphBuildMs": 1592,
-    "callGraphMs": 568,
+    "elapsedMs": 2021,
+    "graphBuildMs": 1396,
+    "callGraphMs": 358,
     "minLoc": 50000,
     "preferredLoc": 100000,
     "timeboxMs": 1200000
@@ -27,6 +27,7 @@
       }
     ],
     "entry": {
+      "id": "packages/vite/src/node/server/index.ts:createServer",
       "file": "packages/vite/src/node/server/index.ts",
       "symbol": "createServer",
       "line": 473,
@@ -34,6 +35,7 @@
       "kind": "declaration"
     },
     "modificationPoint": {
+      "id": "packages/vite/src/node/server/index.ts:_createServer",
       "file": "packages/vite/src/node/server/index.ts",
       "symbol": "_createServer",
       "line": 479,
