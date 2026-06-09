@@ -59,8 +59,94 @@ describe('call_graph (D-32.2.3)', () => {
     const r = await tool.execute({ action: 'for-symbol', path: REPO, symbol: 'hello' });
     expect(r.success).toBe(true);
     expect(r.content).toContain('Symbol: hello');
-    expect(r.content).toContain('Calls (outgoing):');
-    expect(r.content).toContain('Called by (incoming):');
+    expect(r.content).toContain('Heuristic calls (outgoing, depth=2):');
+    expect(r.content).toContain('Heuristic called by (incoming, depth=2):');
+    expect(r.meta).toEqual(expect.objectContaining({ heuristic: true }));
+  });
+
+  it('for-symbol depth controls transitive outgoing traversal', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'dw-callgraph-depth-'));
+    tempDirs.push(repo);
+    writeFileSync(
+      join(repo, 'main.ts'),
+      [
+        'function leaf() {',
+        '  return 1;',
+        '}',
+        '',
+        'function mid() {',
+        '  return leaf();',
+        '}',
+        '',
+        'function root() {',
+        '  return mid();',
+        '}',
+      ].join('\n'),
+    );
+
+    const depth1 = await tool.execute({ action: 'for-symbol', path: repo, symbol: 'root', depth: 1 });
+    const depth2 = await tool.execute({ action: 'for-symbol', path: repo, symbol: 'root', depth: 2 });
+
+    expect(depth1.success).toBe(true);
+    expect(depth2.success).toBe(true);
+    expect(depth1.meta).toMatchObject({
+      traversalDepth: 1,
+      outgoingCount: 1,
+    });
+    expect(depth1.content).toContain('depth=1');
+    expect(depth1.content).toContain('main.ts:mid');
+    expect(depth1.content).not.toContain('main.ts:leaf');
+    expect(depth2.meta).toMatchObject({
+      traversalDepth: 2,
+      outgoingCount: 2,
+    });
+    expect(depth2.content).toContain('depth=2');
+    expect(depth2.content).toContain('main.ts:mid');
+    expect(depth2.content).toContain('main.ts:leaf');
+    expect(depth2.meta?.outgoing).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'main.ts:mid', depth: 1 }),
+        expect.objectContaining({ id: 'main.ts:leaf', depth: 2 }),
+      ]),
+    );
+  });
+
+  it('for-symbol depth controls transitive incoming traversal', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'dw-callgraph-incoming-depth-'));
+    tempDirs.push(repo);
+    writeFileSync(
+      join(repo, 'main.ts'),
+      [
+        'function leaf() {',
+        '  return 1;',
+        '}',
+        '',
+        'function mid() {',
+        '  return leaf();',
+        '}',
+        '',
+        'function root() {',
+        '  return mid();',
+        '}',
+      ].join('\n'),
+    );
+
+    const result = await tool.execute({ action: 'for-symbol', path: repo, symbol: 'leaf', depth: 2 });
+
+    expect(result.success).toBe(true);
+    expect(result.meta).toMatchObject({
+      traversalDepth: 2,
+      incomingCount: 2,
+    });
+    expect(result.content).toContain('Heuristic called by (incoming, depth=2):');
+    expect(result.content).toContain('main.ts:mid');
+    expect(result.content).toContain('main.ts:root');
+    expect(result.meta?.incoming).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'main.ts:mid', depth: 1 }),
+        expect.objectContaining({ id: 'main.ts:root', depth: 2 }),
+      ]),
+    );
   });
 
   it('returns error for missing symbol in for-symbol', async () => {

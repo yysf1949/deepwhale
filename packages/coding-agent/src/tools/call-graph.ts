@@ -12,7 +12,15 @@
 import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
-import { buildSymbolGraph, buildCallGraph } from '@deepwhale/code-intel';
+import { buildSymbolGraph, buildCallGraph, type CallGraph } from '@deepwhale/code-intel';
+
+interface TraversalNode {
+  id: string;
+  depth: number;
+  file: string;
+  name: string;
+  via?: string;
+}
 
 export class CallGraphTool implements Tool {
   readonly name = 'call_graph' as ToolName;
@@ -34,7 +42,7 @@ export class CallGraphTool implements Tool {
   async execute(input: Record<string, unknown>): Promise<ToolResult> {
     const action = input['action'];
     const repoPath = typeof input['path'] === 'string' ? resolve(input['path']) : process.cwd();
-    const depth = typeof input['depth'] === 'number' ? Math.min(input['depth'], 4) : 2;
+    const depth = parseTraversalDepth(input['depth']);
     try {
       const graph = await buildSymbolGraph(repoPath);
       const callGraph = await buildCallGraph(graph);
@@ -53,21 +61,28 @@ export class CallGraphTool implements Tool {
               }
             }
           }
-          const incoming = new Set<string>();
-          const outgoing = new Set<string>();
-          for (const id of matchingIds) {
-            for (const e of callGraph.byCaller.get(id) ?? []) outgoing.add(e.callee);
-            for (const e of callGraph.byCallee.get(id) ?? []) incoming.add(e.caller);
-          }
+          const outgoing = traverseCallGraph(callGraph, matchingIds, 'outgoing', depth);
+          const incoming = traverseCallGraph(callGraph, matchingIds, 'incoming', depth);
           const content = [
             `Symbol: ${sym}`,
-            `Calls (outgoing): ${[...outgoing].sort().join('\n  ') || '(none)'}`,
-            `Called by (incoming): ${[...incoming].sort().join('\n  ') || '(none)'}`,
+            `Matched declarations: ${[...matchingIds].sort().join('\n  ') || '(none)'}`,
+            `Heuristic calls (outgoing, depth=${depth}): ${formatTraversal(outgoing)}`,
+            `Heuristic called by (incoming, depth=${depth}): ${formatTraversal(incoming)}`,
           ].join('\n');
           return {
             success: true,
             content,
-            meta: { action, symbol: sym, outgoingCount: outgoing.size, incomingCount: incoming.size, depth },
+            meta: {
+              action,
+              symbol: sym,
+              rootIds: [...matchingIds].sort(),
+              traversalDepth: depth,
+              outgoingCount: outgoing.length,
+              incomingCount: incoming.length,
+              outgoing,
+              incoming,
+              heuristic: true,
+            },
           };
         }
         case 'for-file': {
@@ -82,7 +97,7 @@ export class CallGraphTool implements Tool {
           return {
             success: true,
             content,
-            meta: { action, file, edgeCount: fileEdges.length },
+            meta: { action, file, edgeCount: fileEdges.length, heuristic: true },
           };
         }
         case 'for-repo': {
@@ -112,7 +127,7 @@ export class CallGraphTool implements Tool {
           return {
             success: true,
             content,
-            meta: { action, edgeCount: callGraph.edges.length, depth },
+            meta: { action, edgeCount: callGraph.edges.length, heuristic: true },
           };
         }
         default:
@@ -122,6 +137,59 @@ export class CallGraphTool implements Tool {
       return { success: false, content: '', error: `call_graph error: ${e instanceof Error ? e.message : String(e)}` };
     }
   }
+}
+
+function parseTraversalDepth(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 2;
+  return Math.min(4, Math.max(1, Math.trunc(raw)));
+}
+
+function traverseCallGraph(
+  callGraph: CallGraph,
+  roots: ReadonlySet<string>,
+  direction: 'outgoing' | 'incoming',
+  maxDepth: number,
+): TraversalNode[] {
+  const index = direction === 'outgoing' ? callGraph.byCaller : callGraph.byCallee;
+  const nodes: TraversalNode[] = [];
+  const visited = new Set(roots);
+  const queue = [...roots].map((id) => ({ id, depth: 0 }));
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.depth >= maxDepth) continue;
+    for (const edge of index.get(current.id) ?? []) {
+      const nextId = direction === 'outgoing' ? edge.callee : edge.caller;
+      if (visited.has(nextId)) continue;
+      visited.add(nextId);
+      const nextDepth = current.depth + 1;
+      const node: TraversalNode = {
+        id: nextId,
+        depth: nextDepth,
+        file: symbolIdFile(nextId),
+        name: symbolIdName(nextId),
+        via: current.id,
+      };
+      nodes.push(node);
+      queue.push({ id: nextId, depth: nextDepth });
+    }
+  }
+
+  return nodes.sort((a, b) => a.depth - b.depth || a.id.localeCompare(b.id));
+}
+
+function formatTraversal(nodes: ReadonlyArray<TraversalNode>): string {
+  if (nodes.length === 0) return '(none)';
+  return nodes.map((node) => `d${node.depth} ${node.id}${node.via ? ` via ${node.via}` : ''}`).join('\n  ');
+}
+
+function symbolIdFile(id: string): string {
+  return id.split(':')[0] ?? '';
+}
+
+function symbolIdName(id: string): string {
+  const afterFile = id.split(':').slice(1).join(':');
+  return afterFile.split('.').pop() ?? afterFile;
 }
 
 export const callGraphTool = new CallGraphTool();
