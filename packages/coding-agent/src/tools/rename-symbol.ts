@@ -27,6 +27,15 @@ export class RenameSymbolTool implements Tool {
       newName: { type: 'string', description: 'new symbol name' },
       path: { type: 'string', description: 'repo root path (default: current working directory)' },
       apply: { type: 'boolean', description: 'if true, write changes to disk (default: false, dry-run preview)' },
+      // 拍板 (D-33.2.2): default false. When true, ALSO rewrite occurrences in
+      // comments and strings using a word-boundary regex across the whole
+      // file. The reference-limited path is always taken; the textual
+      // fallback is additive.
+      allow_textual_fallback: {
+        type: 'boolean',
+        description:
+          'opt-in: additionally rewrite occurrences of oldName in comments and strings (word-boundary). Default false.',
+      },
     },
     required: ['oldName', 'newName'],
   };
@@ -35,6 +44,7 @@ export class RenameSymbolTool implements Tool {
     const oldName = input['oldName'];
     const newName = input['newName'];
     const apply = input['apply'] === true;
+    const allowTextualFallback = input['allow_textual_fallback'] === true;
     if (typeof oldName !== 'string' || oldName.length === 0) {
       return { success: false, content: '', error: 'invalid-input: oldName required' };
     }
@@ -53,30 +63,55 @@ export class RenameSymbolTool implements Tool {
       const graph = await buildSymbolGraph(repoPath);
       const refs = findReferences(graph, oldName);
       const refsByFile = groupReferencesByFile(refs);
-      const fileChanges: Array<{ file: string; replacements: number; preview: string }> = [];
+      const fileChanges: Array<{ file: string; replacements: number; preview: string; textualReplacements?: number }> = [];
       for (const [file, fileRefs] of refsByFile) {
         const fullPath = resolve(repoPath, file);
         const original = await readFile(fullPath, 'utf8');
-        const { rewritten, replacements } = rewriteReferences(original, fileRefs, oldName, newName);
-        if (replacements > 0 && rewritten !== original) {
-          fileChanges.push({ file, replacements, preview: diffPreview(original, rewritten) });
+        const refResult = rewriteReferences(original, fileRefs, oldName, newName);
+        let rewritten = refResult.rewritten;
+        let replacements = refResult.replacements;
+        let textualReplacements = 0;
+        if (allowTextualFallback) {
+          const textual = applyTextualFallback(rewritten, oldName, newName);
+          textualReplacements = textual.replacements;
+          rewritten = textual.rewritten;
+        }
+        if ((replacements + textualReplacements) > 0 && rewritten !== original) {
+          fileChanges.push({
+            file,
+            replacements,
+            preview: diffPreview(original, rewritten),
+            ...(allowTextualFallback ? { textualReplacements } : {}),
+          });
           if (apply) {
             await writeFile(fullPath, rewritten, 'utf8');
           }
         }
       }
-      const totalReplacements = fileChanges.reduce((s, f) => s + f.replacements, 0);
+      const totalReplacements = fileChanges.reduce((s, f) => s + f.replacements + (f.textualReplacements ?? 0), 0);
       const content = [
-        `${apply ? 'RENAMED' : 'DRY-RUN'}: '${oldName}' → '${newName}'`,
+        `${apply ? 'RENAMED' : 'DRY-RUN'}: '${oldName}' → '${newName}'${allowTextualFallback ? ' (allow_textual_fallback=true)' : ''}`,
         `Files affected: ${fileChanges.length}`,
         `Total replacements: ${totalReplacements}`,
         '',
-        ...fileChanges.map((f) => `--- ${f.file} (${f.replacements} replacements) ---\n${f.preview}`),
+        ...fileChanges.map((f) =>
+          [
+            `--- ${f.file} (${f.replacements} ref${allowTextualFallback ? ` + ${f.textualReplacements ?? 0} textual` : ''} replacements) ---`,
+            f.preview,
+          ].join('\n'),
+        ),
       ].join('\n');
       return {
         success: true,
         content,
-        meta: { oldName, newName, files: fileChanges.length, changes: totalReplacements, dryRun: !apply },
+        meta: {
+          oldName,
+          newName,
+          files: fileChanges.length,
+          changes: totalReplacements,
+          dryRun: !apply,
+          ...(allowTextualFallback ? { allowTextualFallback: true } : {}),
+        },
       };
     } catch (e) {
       return { success: false, content: '', error: `rename_symbol error: ${e instanceof Error ? e.message : String(e)}` };
@@ -106,6 +141,34 @@ function groupReferencesByFile(refs: ReadonlyArray<Reference>): Map<string, Refe
     out.set(ref.file, arr);
   }
   return out;
+}
+
+function applyTextualFallback(
+  source: string,
+  oldName: string,
+  newName: string,
+): { rewritten: string; replacements: number } {
+  // 拍板 (D-33.2.2): opt-in broad mode. Use a word-boundary regex to
+  // avoid partial matches (e.g. `food` for `foo`). We do NOT skip strings
+  // or comments — that's the whole point of the fallback. We process line
+  // by line so the `before.indexOf('//')` heuristic used elsewhere doesn't
+  // interfere; word-boundary already guarantees identifier-only matches.
+  const re = new RegExp(`\\b${escapeRegExp(oldName)}\\b`, 'g');
+  const lines = source.split('\n');
+  let replacements = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const next = line.replace(re, () => {
+      replacements += 1;
+      return newName;
+    });
+    lines[i] = next;
+  }
+  return { rewritten: lines.join('\n'), replacements };
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function rewriteReferences(
