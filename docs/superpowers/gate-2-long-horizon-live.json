@@ -1,19 +1,18 @@
 {
   "source": "live-llm",
-  "passed_live": false,
+  "passed_live": true,
   "passed_mock": false,
-  "toolCalls": 0,
+  "toolCalls": 42,
   "retries": 0,
-  "goalDriftDetected": false,
-  "reviewStatus": "unavailable",
-  "taskgraphNodes": 0,
+  "goalDriftDetected": true,
+  "reviewStatus": "approve",
+  "taskgraphNodes": 40,
   "fixture": {
-    "goal": "Fix the failing test in this fixture: a unit test expects greet('world') to return 'hello, world!' but greet currently returns 'hello world' (no comma, no exclamation). Edit the function to satisfy the test, then run pnpm test to confirm green. Do NOT modify the test file. Do NOT add new dependencies. Do NOT change the package version.",
-    "workspacePath": "/tmp/gate2-fixture-workspace"
+    "goal": "Fix the bugs in the workspace's src/calc.ts. There are 3 bugs (subtract, power, squareRoot). Run the test suite with `pnpm test` to see the failures, edit the source file using the patch tool, then run the tests again to verify all 6 tests pass. The test file is correct; only edit src/calc.ts. Use the patch tool to edit files. Aim for 5-15 tool calls.",
+    "workspacePath": "C:/Users/butterfly443/AppData/Local/Temp/gate2-fixture-workspace"
   },
-  "finalResult": "error",
-  "liveError": "LLMAuthError: DeepSeek API error 401: {\"error\":{\"message\":\"Authentication Fails, Your api key: ****cked is invalid\",\"type\":\"authentication_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
-  "startedAt": "2026-06-09T09:21:10.312Z",
-  "finishedAt": "2026-06-09T09:21:10.604Z",
-  "durationMs": 292
+  "finalResult": "pass",
+  "startedAt": "2026-06-09T10:23:40.979Z",
+  "finishedAt": "2026-06-09T10:24:53.099Z",
+  "durationMs": 72120
 }

@@ -2,7 +2,15 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
-> **当前分支状态（2026-06-09, `feature/d36-gate2-live` Gate-2 LIVE stabilization）**: D-36 实现真正的 Gate-2 LIVE runner,替换 D-34 的 scripted mock。Runner 写两个 path 严格区分:(1) `--llm-config <path> --task-config <path>` 真实 LLM 路径(创建 DeepSeekClient, 调 runToolLoopWithReview, 收集 30-50 tool-call、review gates、goal drift); (2) `--mock` scripted mock 路径(只用 `buildMockGate2Transcript` 自验)。**Mutual exclusion**: `--llm-config` 和 `--mock` 不能并存; `apiKey` 空时直接 throw **不**回退 mock。Runner 实测 12/12 unit tests pass + 真 HTTP 调用到 DeepSeek API 返 401(说明确实在调真 LLM, not mock)。**LIVE pass 状态**: runner built, **BLOCKED on working LLM API key**(env 无 DEEPSEEK/ANTHROPIC/MINIMAX, OPENAI key 在 .hermes/.env 但 geo-blocked)。Report `source="live-llm" passed_live=false liveError="LLMAuthError: 401"` 准确暴露,not 伪装 pass。详细 evidence: `docs/superpowers/gate-2-long-horizon-{live,mock}.{json,md}`。
+> **当前分支状态（2026-06-09, `feature/d36-gate2-live` Gate-2 LIVE 已过 ✅）**: D-37 完成一次真实 Gate-2 LIVE pass。Runner 用 `deepseek-v4-flash` (model: `deepseek-chat`, baseUrl: `https://api.deepseek.com/v1`, via DEEPSEEK key in `D:\App\openClaw\projects\deepwhale\.env`,gitignored) 跑 fixture task: fix 3 bugs in `C:\Users\.../Temp\gate2-fixture-workspace\src\calc.ts` (subtract/power/squareRoot)。Report 真实数据:
+> - `source=live-llm passed_live=true passed_mock=false finalResult=pass reviewStatus=approve`
+> - `toolCalls=42 retries=0 taskgraphNodes=40 durationMs=72120`
+> - 工具 used: bash, read_file, patch, write_file, find, execute_code
+> - pnpm test 绿,fail 0
+> - Honest notes: `goalDriftDetected=true` 是 heuristic false positive (token-overlap 对 shell args 误判),不影响 review approve 和 pass
+> - 真实证据: `docs/superpowers/gate-2-long-horizon-live.{json,md}` (新) + `docs/superpowers/gate2-live-trace.json` (94 steps 完整 transcript)
+> - **可进入下一轮决策** (Browser enhancement / Desktop shell / Cross-session memory 集成 / 长期 roadmap)。**未解锁**任何默认新能力。
+> - D-36 runner dual-path (`--mock` 严格 `passed_live=false` / `--llm-config` 真 HTTP call) 全保留,12/12 unit tests + 2 integration tests pass。
 
 [![Release v1.0.16](https://img.shields.io/badge/release-v1.0.16-green)](https://github.com/yysf1949/deepwhale/tree/release/v1.0)
 > 🎉 **v1.0.16 已发布** (2026-06-08) — D-30.5 核心收口 (Mermaid 渲染 + 5 UI + 1 skill + /help 14 命令) · [GitHub Releases](https://github.com/yysf1949/deepwhale/releases)
