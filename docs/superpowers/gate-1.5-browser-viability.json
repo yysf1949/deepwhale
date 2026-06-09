@@ -1,0 +1,7 @@
+{
+  "decision": "continue",
+  "successRate": 0.8,
+  "successes": 16,
+  "failures": 4,
+  "fixture": "test/fixtures/browser-gate15/pass.json"
+}
