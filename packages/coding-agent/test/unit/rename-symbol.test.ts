@@ -199,4 +199,81 @@ describe('rename_symbol conservative mode (D-33.2.2)', () => {
     rmSync(safeDir, { recursive: true, force: true });
     rmSync(broadDir, { recursive: true, force: true });
   });
+
+  it('reports heuristic selector metadata and skipped cross-file alias references', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d48-alias-'));
+    try {
+      writeFileSync(join(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      writeFileSync(join(dir, 'other.ts'), 'export function target() {\n  return 2;\n}\n');
+      writeFileSync(
+        join(dir, 'consumer.ts'),
+        "import { target as chosen } from './provider.js';\nexport function run() {\n  return chosen();\n}\n",
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+        targetFile: 'provider.ts',
+        apply: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.meta).toMatchObject({
+        heuristic: true,
+        selector: { targetFile: 'provider.ts' },
+        ambiguousDeclarations: 2,
+        changedReferences: expect.any(Number),
+        skippedReferences: expect.any(Number),
+      });
+      expect(result.meta?.skippedReferenceDetails).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            file: 'consumer.ts',
+            reason: expect.stringMatching(/cross-file/),
+          }),
+        ]),
+      );
+      expect(readFileSync(join(dir, 'provider.ts'), 'utf8')).toContain('function renamedTarget()');
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('target as chosen');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports namespace member references as skipped instead of claiming full rename safety', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d48-namespace-'));
+    try {
+      writeFileSync(join(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      writeFileSync(
+        join(dir, 'consumer.ts'),
+        "import * as api from './provider.js';\nexport function run() {\n  return api.target();\n}\n",
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+        targetFile: 'provider.ts',
+        apply: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.meta).toMatchObject({
+        heuristic: true,
+        skippedReferences: expect.any(Number),
+      });
+      expect(result.meta?.skippedReferenceDetails).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            file: 'consumer.ts',
+            reason: expect.stringMatching(/cross-file|namespace/),
+          }),
+        ]),
+      );
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('api.target()');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

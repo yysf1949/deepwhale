@@ -13,7 +13,21 @@ import { readFile, writeFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
-import { buildSymbolGraph, findReferences, type Reference } from '@deepwhale/code-intel';
+import { buildSymbolGraph, findReferences, type Reference, type SymbolGraph } from '@deepwhale/code-intel';
+
+interface RenameSelector {
+  targetFile?: string;
+  targetLine?: number;
+  targetScope?: string;
+}
+
+interface SkippedReference {
+  file: string;
+  line: number;
+  col: number;
+  kind: Reference['kind'];
+  reason: string;
+}
 
 export class RenameSymbolTool implements Tool {
   readonly name = 'rename_symbol' as ToolName;
@@ -78,6 +92,7 @@ export class RenameSymbolTool implements Tool {
       if (!selection.ok) {
         return { success: false, content: '', error: selection.error };
       }
+      const skippedRefs = await expandSkippedReferences(graph, oldName, selection);
       const refsByFile = groupReferencesByFile(selection.refs);
       const fileChanges: Array<{ file: string; replacements: number; preview: string; textualReplacements?: number }> = [];
       for (const [file, fileRefs] of refsByFile) {
@@ -109,6 +124,7 @@ export class RenameSymbolTool implements Tool {
         `${apply ? 'RENAMED' : 'DRY-RUN'}: '${oldName}' → '${newName}'${allowTextualFallback ? ' (allow_textual_fallback=true)' : ''}`,
         `Files affected: ${fileChanges.length}`,
         `Total replacements: ${totalReplacements}`,
+        `Skipped heuristic references: ${skippedRefs.length}`,
         '',
         ...fileChanges.map((f) =>
           [
@@ -125,6 +141,12 @@ export class RenameSymbolTool implements Tool {
           newName,
           files: fileChanges.length,
           changes: totalReplacements,
+          heuristic: true,
+          selector: selection.selector,
+          ambiguousDeclarations: selection.ambiguousDeclarations,
+          changedReferences: totalReplacements,
+          skippedReferences: skippedRefs.length,
+          ...(skippedRefs.length > 0 ? { skippedReferenceDetails: skippedRefs } : {}),
           dryRun: !apply,
           ...(selection.targetFile ? { targetFile: selection.targetFile } : {}),
           ...(allowTextualFallback ? { allowTextualFallback: true } : {}),
@@ -163,11 +185,21 @@ function groupReferencesByFile(refs: ReadonlyArray<Reference>): Map<string, Refe
 function selectRenameReferences(
   refs: ReadonlyArray<Reference>,
   input: Record<string, unknown>,
-): { ok: true; refs: ReadonlyArray<Reference>; targetFile?: string } | { ok: false; error: string } {
+):
+  | {
+      ok: true;
+      refs: ReadonlyArray<Reference>;
+      skippedRefs: ReadonlyArray<SkippedReference>;
+      selector: RenameSelector;
+      ambiguousDeclarations: number;
+      targetFile?: string;
+    }
+  | { ok: false; error: string } {
   const declarations = refs.filter((ref) => ref.kind === 'declaration');
   const targetFile = optionalNormalizedPath(input['targetFile']);
   const targetLine = typeof input['targetLine'] === 'number' ? input['targetLine'] : undefined;
   const targetScope = typeof input['targetScope'] === 'string' ? input['targetScope'] : undefined;
+  const selector = buildSelector(targetFile, targetLine, targetScope);
   const hasSelector = targetFile !== undefined || targetLine !== undefined || targetScope !== undefined;
 
   if (declarations.length > 1 && !hasSelector) {
@@ -177,7 +209,15 @@ function selectRenameReferences(
     };
   }
 
-  if (!hasSelector) return { ok: true, refs };
+  if (!hasSelector) {
+    return {
+      ok: true,
+      refs,
+      skippedRefs: [],
+      selector,
+      ambiguousDeclarations: declarations.length,
+    };
+  }
 
   const matches = declarations.filter((ref) => {
     if (targetFile !== undefined && ref.file !== targetFile) return false;
@@ -194,11 +234,92 @@ function selectRenameReferences(
   }
 
   const selected = matches[0]!;
+  const selectedRefs = refs.filter((ref) => ref.file === selected.file);
+  const skippedRefs = refs
+    .filter((ref) => ref.file !== selected.file)
+    .map((ref) => skippedReferenceFrom(ref, 'cross-file binding not rewritten by heuristic rename'));
   return {
     ok: true,
-    refs: refs.filter((ref) => ref.file === selected.file),
+    refs: selectedRefs,
+    skippedRefs,
+    selector,
+    ambiguousDeclarations: declarations.length,
     targetFile: selected.file,
   };
+}
+
+function buildSelector(
+  targetFile: string | undefined,
+  targetLine: number | undefined,
+  targetScope: string | undefined,
+): RenameSelector {
+  const selector: RenameSelector = {};
+  if (targetFile !== undefined) selector.targetFile = targetFile;
+  if (targetLine !== undefined) selector.targetLine = targetLine;
+  if (targetScope !== undefined) selector.targetScope = targetScope;
+  return selector;
+}
+
+function skippedReferenceFrom(ref: Reference, reason: string): SkippedReference {
+  return {
+    file: ref.file,
+    line: ref.line,
+    col: ref.col,
+    kind: ref.kind,
+    reason,
+  };
+}
+
+async function expandSkippedReferences(
+  graph: SymbolGraph,
+  oldName: string,
+  selection: Extract<ReturnType<typeof selectRenameReferences>, { ok: true }>,
+): Promise<SkippedReference[]> {
+  const skipped = [...selection.skippedRefs];
+  if (!selection.targetFile) return skipped;
+
+  const seen = new Set<string>();
+  for (const ref of [...selection.refs, ...skipped]) {
+    seen.add(referenceKey(ref));
+  }
+
+  for (const file of graph.files.keys()) {
+    if (file === selection.targetFile) continue;
+    const source = await readFile(resolve(graph.repoRoot, file), 'utf8').catch(() => '');
+    if (!source) continue;
+    const lines = source.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? '';
+      for (const token of scanIdentifierTokens(line)) {
+        if (token.text !== oldName) continue;
+        const candidate: SkippedReference = {
+          file,
+          line: i + 1,
+          col: token.col,
+          kind: isMemberReference(line, token.col) ? 'property' : 'reference',
+          reason: isMemberReference(line, token.col)
+            ? 'namespace/member candidate not rewritten by heuristic rename'
+            : 'cross-file candidate not rewritten by heuristic rename',
+        };
+        const key = referenceKey(candidate);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        skipped.push(candidate);
+      }
+    }
+  }
+
+  return skipped;
+}
+
+function referenceKey(ref: Pick<SkippedReference, 'file' | 'line' | 'col'>): string {
+  return `${ref.file}:${ref.line}:${ref.col}`;
+}
+
+function isMemberReference(line: string, col: number): boolean {
+  let i = col - 1;
+  while (i >= 0 && /\s/.test(line[i] ?? '')) i--;
+  return line[i] === '.';
 }
 
 function optionalNormalizedPath(value: unknown): string | undefined {
