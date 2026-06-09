@@ -175,8 +175,28 @@ export async function readTaskConfig(path: string): Promise<TaskConfig> {
 export async function writeReport(report: Gate2Report, jsonPath: string, mdPath: string): Promise<void> {
   await mkdir(dirname(resolve(jsonPath)), { recursive: true });
   await mkdir(dirname(resolve(mdPath)), { recursive: true });
-  await writeFile(resolve(jsonPath), JSON.stringify(report, null, 2) + '\n', 'utf8');
-  await writeFile(resolve(mdPath), renderMarkdown(report), 'utf8');
+  const persisted = sanitizeReportForPersistence(report);
+  await writeFile(resolve(jsonPath), JSON.stringify(persisted, null, 2) + '\n', 'utf8');
+  await writeFile(resolve(mdPath), renderMarkdown(persisted), 'utf8');
+}
+
+function sanitizeReportForPersistence(report: Gate2Report): Gate2Report {
+  if (report.fixture === undefined) return report;
+  return {
+    ...report,
+    fixture: {
+      ...report.fixture,
+      workspacePath: sanitizeWorkspacePath(report.fixture.workspacePath),
+    },
+  };
+}
+
+function sanitizeWorkspacePath(path: string): string {
+  const normalized = path.replace(/\\/g, '/').toLowerCase();
+  if (normalized.includes('/gate2-fixt-') || normalized.includes('/appdata/local/temp/')) {
+    return '<materialized-gate2-fixture-workspace>';
+  }
+  return path;
 }
 
 function renderMarkdown(r: Gate2Report): string {

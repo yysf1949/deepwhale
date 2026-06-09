@@ -2,23 +2,23 @@
 
 > **DeepSeek-first 开源 Claude Code 替代品 → Codex Clone → Agent OS**
 
-> **当前分支状态（2026-06-09, `feature/d36-gate2-live` D-40 Gate-2 LIVE PASSED ✅）**: D-40 全部 6 硬条件 PASS,真 Gate-2 LIVE 跑通。
+> **当前分支状态（2026-06-09, `feature/d36-gate2-live` D-40 Gate-2 LIVE PASSED ✅）**: D-40 全部 6 硬条件 PASS，真 Gate-2 LIVE 跑通；D-41 只做证据与状态卫生，不解锁新能力。
 >
-> 1. **5-file invoice fixture** — 替换 D-39 6-bug calc。新 fixture `packages/coding-agent/test/fixtures/gate2-live/fixture/{src/{types,pricing,tax,format,invoice}.ts,test/invoice.test.ts}`,20 个 test assertions,**5 个隐藏 bug** (无注释标记): `pricing.subtotal` `+`vs`*`, `pricing.applyDiscount flat` `+`vs`-`, `tax.taxFor` 错把 US-CA 当 NY grocery exempt, `format.formatInvoice` 漏 `|`, `invoice.buildInvoice` `total` 减税, `tax.RATES.EU-FR 0.21`。Task goal 额外要求 LLM 写 `docs/API.md` 描述 5 个 public function。
+> 1. **5-file invoice fixture** — 替换 D-39 6-bug calc。新 fixture `fixtures/gate2-live/fixture/{src/{types,pricing,tax,format,invoice}.ts,test/invoice.test.ts}`，20 个 test assertions，**6 个隐藏 bug**（无注释标记）: `pricing.subtotal` `+`vs`*`, `pricing.applyDiscount flat` `+`vs`-`, `tax.taxFor` 错把 US-CA grocery 当免税, `format.formatInvoice` 漏 `|`, `invoice.buildInvoice` `total` 减税, `tax.RATES.EU-FR 0.21`。Task goal 额外要求 LLM 写 `docs/API.md` 描述 5 个 public function。
 > 2. **Drift detector 严格化** — D-39 "任一 positive signal" → D-40 "≥2 of 4 signals"。新加 hard-fail: writes outside materialized workspace。修了一个 path-normalize bug:workspace 用 `/` 但 args 用 `\\`,之前的 detector 比对 miss 误报 drift。
-> 3. **Test 32/32 pass** — D-39 31/31 + D-40 新加 1 materializeFixture test,加 5 个 D-40 drift 替换 4 个 D-39 lenient tests。
-> 4. **Final LIVE** — `proc_55c1fac2deca`, DeepSeek v4-flash, **37 tool calls (in [30,50])**, review=approve, finalResult=pass, drift=false, pnpm test 20/20 pass, docs/API.md 写好。
+> 3. **Test 33/33 pass** — D-39 31/31 + D-40 materialize/drift tests + D-41 report redaction regression。
+> 4. **Final LIVE evidence** — DeepSeek v4-flash, **49 tool calls (in [30,50])**, review=approve, finalResult=pass, drift=false, review gate `node --test test/invoice.test.ts` 20/20 pass, docs/API.md 写好。
 >
 > D-40 LIVE 结果:
 > - source=live-llm ✅
 > - passed_live=**TRUE** ✅
-> - toolCalls=37 (FAIL→PASS, 之前 D-39 是 15)
+> - toolCalls=49 (FAIL→PASS, 之前 D-39 是 15)
 > - reviewStatus=approve ✅
 > - finalResult=pass ✅
 > - liveError absent ✅
 > - goalDriftDetected=false ✅
 >
-> 验证: 32/32 unit tests pass (D-39 31 + 1 D-40 materializeFixture),`pnpm typecheck/lint` exit 0,`pnpm test` 1 fail (verify-runner D-11 pre-existing),5 红线 0 改,`git diff --check` clean,trace 无 secret patterns。
+> 验证: `packages/coding-agent/test/scripts/gate2-runner-core.test.ts` 33/33 pass；D-41 fresh `pnpm typecheck` / `pnpm lint` / `pnpm test` pass（193 test files: 192 passed, 1 skipped；1140 tests: 1136 passed, 4 skipped）；5 红线 0 改；`git diff --check` clean；trace 无真实 key patterns。D-41 起 `writeReport()` 会把 materialized temp workspace 路径脱敏为 `<materialized-gate2-fixture-workspace>`。
 >
 > **状态**: Gate-2 LIVE **passed_live=true** 严格 6 条件全过。**未解锁任何新能力**。Browser / Desktop / Channel / media / productivity 仍 off, default registry 19 tools 冻结。**eligible for next decision**。
 

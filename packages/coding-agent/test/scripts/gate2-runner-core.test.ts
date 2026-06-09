@@ -181,6 +181,43 @@ describe('gate2-runner-core: writeReport produces machine-readable JSON and hone
       await rm(tmp, { recursive: true, force: true });
     }
   });
+
+  it('redacts fixture workspace absolute paths in persisted reports', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'g2-out-'));
+    try {
+      const report: Gate2Report = {
+        source: 'live-llm',
+        passed_live: true,
+        passed_mock: false,
+        toolCalls: 49,
+        retries: 0,
+        goalDriftDetected: false,
+        reviewStatus: 'approve',
+        fixture: {
+          goal: 'fix invoice bugs',
+          workspacePath: 'C:\\Users\\BUTTER~1\\AppData\\Local\\Temp\\gate2-fixt-8269s6',
+        },
+        finalResult: 'pass',
+        startedAt: '2026-06-09T00:00:00Z',
+        finishedAt: '2026-06-09T00:01:00Z',
+        durationMs: 60_000,
+      };
+      const jsonPath = join(tmp, 'out.json');
+      const mdPath = join(tmp, 'out.md');
+      await writeReport(report, jsonPath, mdPath);
+
+      const jsonRaw = await readFile(jsonPath, 'utf8');
+      const mdRaw = await readFile(mdPath, 'utf8');
+      expect(jsonRaw).not.toContain('C:\\Users');
+      expect(mdRaw).not.toContain('C:\\Users');
+      expect(JSON.parse(jsonRaw) as Gate2Report).toMatchObject({
+        fixture: { workspacePath: '<materialized-gate2-fixture-workspace>' },
+      });
+      expect(mdRaw).toContain('workspace: `<materialized-gate2-fixture-workspace>`');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('gate2-runner-core: readTaskConfig', () => {

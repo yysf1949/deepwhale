@@ -9,7 +9,7 @@
 - reviewStatus: `approve`
 - taskgraphNodes: 41
 - goal: `Read test/invoice.test.ts and src/*.ts carefully. There are bugs in the invoice domain (src/types.ts, src/pricing.ts, src/tax.ts, src/format.ts, src/invoice.ts) that cause test failures. The bugs are NOT marked in source comments. You must read the tests and source together to identify them. After all tests pass, write a docs/API.md file in the workspace describing each public function (subtotal, applyDiscount, taxFor, formatInvoice, buildInvoice) with a one-line purpose and its signature. Then run the test suite one more time to confirm everything is still green.`
-- workspace: `C:\Users\BUTTER~1\AppData\Local\Temp\gate2-fixt-8269s6`
+- workspace: `<materialized-gate2-fixture-workspace>`
 - finalResult: `pass`
 - startedAt: 2026-06-09T13:04:25.108Z
 - finishedAt: 2026-06-09T13:07:07.628Z
