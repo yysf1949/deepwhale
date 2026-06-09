@@ -2,6 +2,7 @@
   "passed": true,
   "failureReasons": [],
   "repoPath": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\vite",
+  "locQualification": "minimum-50k",
   "metrics": {
     "loc": 86216,
     "supportedFiles": 1395,

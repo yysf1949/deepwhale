@@ -85,6 +85,45 @@ describe('Gate-1 runner', () => {
     }
   });
 
+  it('serializes LOC qualification into Gate-1 JSON evidence', async () => {
+    const dir = await makeFixtureRepo();
+    try {
+      const result = await runGate1({
+        repoPath: dir,
+        minLoc: 10,
+        preferredLoc: 100,
+        timeboxMs: 20 * 60 * 1000,
+        entrySymbol: 'createDefaultRegistry',
+        requiredCall: { callerSymbol: 'startApp', calleeSymbol: 'createDefaultRegistry' },
+        modificationPoint: { file: 'src/registry.ts', symbol: 'createDefaultRegistry' },
+      });
+
+      const parsed = JSON.parse(JSON.stringify(result)) as { locQualification?: string };
+      expect(parsed.locQualification).toBe('minimum-50k');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('renders below-minimum LOC qualification in markdown evidence', async () => {
+    const dir = await makeFixtureRepo();
+    try {
+      const result = await runGate1({
+        repoPath: dir,
+        minLoc: 50_000,
+        preferredLoc: 100_000,
+        timeboxMs: 20 * 60 * 1000,
+        entrySymbol: 'createDefaultRegistry',
+        requiredCall: { callerSymbol: 'startApp', calleeSymbol: 'createDefaultRegistry' },
+        modificationPoint: { file: 'src/registry.ts', symbol: 'createDefaultRegistry' },
+      });
+
+      expect(formatGate1Markdown(result)).toContain('LOC qualification: below-minimum');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('reads scenario JSON into Gate-1 options', async () => {
     const dir = await makeFixtureRepo();
     try {

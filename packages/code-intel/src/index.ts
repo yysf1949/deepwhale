@@ -60,6 +60,7 @@ export {
   type Gate1CliConfig,
   type Gate1ParsedArgs,
   type Gate1Metrics,
+  type Gate1LocQualification,
   type Gate1Evidence,
   type Gate1SymbolEvidence,
   type Gate1Result,

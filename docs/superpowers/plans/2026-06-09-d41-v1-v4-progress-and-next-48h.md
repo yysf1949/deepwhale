@@ -38,12 +38,12 @@ These are implementation-readiness estimates, not marketing release labels.
 | --- | ---: | --- | --- |
 | Gate-0 stabilization | 85% | default registry frozen, D41 fresh `pnpm typecheck` / `pnpm lint` / `pnpm test` passed | keep verification fresh after each stabilization slice |
 | v1.0 coding core | 85% | CLI/TUI/tools/session/policy/sandbox exist | release docs/version story and ongoing verify-runner regression coverage |
-| v1.5 Code Intel foundation | 70% | import/reference graph, heuristic call graph, conservative rename tests | real 50K+/100K Gate-1 needs fresh proof and accuracy gaps remain |
+| v1.5 Code Intel foundation | 73% | import/reference graph, heuristic call graph, conservative rename tests, Gate-1 LOC qualification in JSON/MD evidence | real 100K preferred Gate-1 proof and deeper rename binding remain |
 | v2.0 Observe/Browser foundation | 45% | browser observation/planner/runtime MVP and Gate-1.5 harness exist | real 20-task browser decision gate not run |
 | v2.5 Planning | 40% | TaskDag, planner boundary, plan cache exist | planner is still simple decomposition, weak integration |
 | v3.0 Execute/Review | 50% | reviewer, compaction hook, Computer compat, Gate-2 live runner passed D40 invoice fixture | Gate-2 fixture is still artificial and does not prove production long-horizon maturity |
 | v4.0 Agent OS | 30% | researcher, taskgraph, persistent memory, channel opt-in stubs exist | multi-role orchestration, desktop, marketplace, real persistence maturity missing |
-| v1-v4 aggregate | 56% | many modules and tests exist | much is MVP/heuristic; gates and docs are ahead of product maturity |
+| v1-v4 aggregate | 57% | many modules and tests exist | much is MVP/heuristic; gates and docs are ahead of product maturity |
 
 ## Non-Negotiables
 

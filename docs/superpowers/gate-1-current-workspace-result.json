@@ -1,19 +1,20 @@
 {
   "passed": false,
   "failureReasons": [
-    "loc-below-minimum: 43496 < 50000"
+    "loc-below-minimum: 47203 < 50000"
   ],
   "repoPath": "D:\\App\\openClaw\\projects\\deepwhale",
+  "locQualification": "below-minimum",
   "metrics": {
-    "loc": 43496,
-    "supportedFiles": 354,
-    "filesIndexed": 354,
-    "symbolsIndexed": 2687,
-    "referencesIndexed": 15328,
-    "callEdges": 2743,
-    "elapsedMs": 911,
-    "graphBuildMs": 766,
-    "callGraphMs": 74,
+    "loc": 47203,
+    "supportedFiles": 412,
+    "filesIndexed": 412,
+    "symbolsIndexed": 3091,
+    "referencesIndexed": 16564,
+    "callEdges": 3183,
+    "elapsedMs": 1190,
+    "graphBuildMs": 990,
+    "callGraphMs": 108,
     "minLoc": 50000,
     "preferredLoc": 100000,
     "timeboxMs": 1200000
