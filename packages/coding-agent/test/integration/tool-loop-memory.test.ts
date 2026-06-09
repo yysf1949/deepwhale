@@ -14,7 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import { runToolLoopWithMemory, type MemoryStore } from '../../src/agent/tool-loop-memory.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
-import type { ChatMessage, ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
+import type { ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
 
 class ScriptedLlm implements LLMClient {
   readonly model = 'scripted-mock' as ModelId;
