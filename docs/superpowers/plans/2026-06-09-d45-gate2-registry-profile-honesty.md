@@ -197,30 +197,38 @@ Execution note: sandboxed `pnpm.cmd test` failed with `[ERROR] fetch failed`; ap
 
 ## Task 4: Commit And Push
 
-- [ ] Inspect:
+- [x] Inspect:
 
 ```powershell
 git status --short --branch
 git diff --stat
 ```
 
-- [ ] Stage only D45 files:
+Execution note: staged scope was limited to the seven D45 files; unrelated untracked `docs/plans/*` and `docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md` remained untracked.
+
+- [x] Stage only D45 files:
 
 ```powershell
 git add packages/coding-agent/scripts/gate2-runner-core.ts packages/coding-agent/scripts/gate2-runner-live.ts packages/coding-agent/test/scripts/gate2-runner-core.test.ts fixtures/gate2-live/task.json docs/superpowers/plans/2026-06-09-d41-v1-v4-progress-and-next-48h.md docs/superpowers/plans/2026-06-09-d45-gate2-registry-profile-honesty.md
 ```
 
-- [ ] Commit:
+Execution note: README was also staged as part of D45 because it now carries the historical D40 evidence caveat.
+
+- [x] Commit:
 
 ```powershell
 git commit -m "fix(D-45): default gate2 live registry profile"
 ```
 
-- [ ] Push:
+Execution note: committed as `fe25d10`.
+
+- [x] Push:
 
 ```powershell
 git push origin feature/d36-gate2-live
 ```
+
+Execution note: pushed `feature/d36-gate2-live` to origin (`bfab97c..fe25d10`).
 
 ## Self-Review Notes
 
