@@ -124,6 +124,10 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
   const reg = new ToolRegistry();
   const runner = options.sandboxRunner ?? new LocalSandboxRunner();
   const profile = options.profile ?? 'default';
+  // D-33.2.3 (2026-06-09): tool→capability wiring is a future Stage 2.4 / Stage 3.4 task.
+  // This 1-line note marks the seam: each tool instance can later be mirrored
+  // as a Capability in @deepwhale/coding-agent/runtime/capability-registry.ts.
+  // We intentionally do NOT mutate behavior here.
 
   const registerCore = (): void => {
     reg.register(new ReadFileTool());
@@ -194,6 +198,9 @@ export function createDefaultRegistry(options: CreateDefaultRegistryOptions = {}
     reg.register(new TextToSpeechTool());
   };
 
+  // Browser tools (browser_navigate, browser_click, browser_type) are opt-in only — they live in
+  // the `browser` profile and are registered by packages/coding-agent/src/browser/runtime.ts.
+  // The default profile intentionally does NOT register them.
   if (profile === 'default') {
     registerCoding();
     registerCodeIntel();
