@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D98: v5.0 production hardening 3rd evidence OR 2nd cycle (gated on user direction; uncaught exception hook OR graceful shutdown sequence OR process-level exit policy)."
+  "nextAction": "D99: v5.0 production hardening 4th evidence OR 2nd cycle (gated on user direction)."
 }
