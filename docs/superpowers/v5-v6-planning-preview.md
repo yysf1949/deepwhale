@@ -21,7 +21,7 @@ The v5.0 themes remain the same: production hardening, plugin governance, distri
 - v2.5 percent: 65% (gate threshold: 65%, REACHED 2026-06-10 D-82)
 - v2.5 implementation gate: reached
 - **Aggregate implementation gate: REACHED 2026-06-10 D-86**
-- v5.0 implementation is now ACTIVE: D-87 AuditLog seed is the first v5.0 evidence fixture; D-88 wired it into runToolLoop (3 emit points, optional parameter). 5 红线 scope was intentionally modified for the first time (additive, no behavior change when auditLog omitted).
+- v5.0 implementation is now ACTIVE: D-87 AuditLog seed is the first v5.0 evidence fixture; D-88 wired it into runToolLoop (3 emit points, optional parameter); D-89 added PersistingAuditLog (file-backed JSONL + partial-line recovery, mirror D-78 + D-80); D-90 added readAuditLog (standalone async reader). v5.0 observability+auditability quartet complete: seed + integration + persistence + query. 5 红线 scope was intentionally modified once (D-88 additive) and is back to empty from D-89 onward.
 - D-87 sub-sprint: AuditLog minimal seed (in-memory, append-only, deterministic timestamps). Next v5.0 sub-sprints: file-backed persistence / ToolLoopPolicy integration / CLI dump.
 
 ## V5.0 Production Hardening And Distribution

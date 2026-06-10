@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D89 v5.0 AuditLog file-backed persistence
+- Current sprint: D90 v5.0 AuditLog reader (query side)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -75,6 +75,7 @@
 - D87 v5.0 observability+auditability minimal seed: 1 new AuditLog class (in-memory, append-only, deterministic timestamps via injected clock) + 1 new unit test. This is the first v5.0 evidence fixture.
 - D88 v5.0 observability+auditability tool-loop integration: 1 new unit test verifies that runToolLoop emits tool-call, tool-result, and loop-end events into a provided AuditLog. After D-88, the v5 audit log captures real tool-loop activity, not just synthetic events.
 - D89 v5.0 observability+auditability file-backed persistence: 1 new PersistingAuditLog class extends AuditLog with JSONL + atomic-rename + partial-line recovery (mirror D-78 + D-80 pattern) + 2 new unit tests (cross-instance + partial-line recovery). Audit events now survive process restarts.
+- D90 v5.0 observability+auditability query side: 1 new readAuditLog function (standalone async, JSONL reader with partial-line recovery + ENOENT handling) + 3 new unit tests (round-trip + ENOENT + partial-line). Completes the v5 audit log quartet: write (D-87/88/89) + read (D-90).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -92,8 +93,8 @@
 
 ### Next Decisions Needed
 
-1. D89 v5.0 AuditLog file-backed persistence is complete: 1 new PersistingAuditLog class + 2 new unit tests (cross-instance + partial-line recovery).
-2. Next implementation slice: D90 v5.0 third evidence (gated on user direction; observability: CLI dump command OR production hardening other theme).
+1. D90 v5.0 AuditLog reader (query side) is complete: 1 new readAuditLog function + 3 new unit tests. v5 observability quartet complete (write D-87/88/89 + read D-90).
+2. Next implementation slice: D91 v5.0 observability+auditability 5th evidence (gated on user direction; CLI dump command OR production hardening other theme).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

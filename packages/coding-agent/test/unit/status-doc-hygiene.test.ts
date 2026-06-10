@@ -174,6 +174,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toHaveLength(0);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D90:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D89:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D88:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D87:/m);
@@ -281,7 +282,7 @@ describe('status documentation hygiene (D-56)', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D89 v5.0 AuditLog file-backed persistence');
+      expect(block).toContain('Current sprint: D90 v5.0 AuditLog reader (query side)');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -308,14 +309,15 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D86 v4.0 cross-session multi-hop handoff fixture');
       expect(block).toContain('D87 v5.0 observability+auditability minimal seed');
       expect(block).toContain('D88 v5.0 observability+auditability tool-loop integration');
-      expect(block).toContain('D89 v5.0 AuditLog file-backed persistence');
+      expect(block).toContain('D89 v5.0 observability+auditability file-backed persistence');
+      expect(block).toContain('D90 v5.0 AuditLog reader (query side)');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: D90 v5.0 third evidence (gated on user direction; observability: CLI dump command OR production hardening other theme)');
+      expect(block).toContain('Next implementation slice: D91 v5.0 observability+auditability 5th evidence (gated on user direction; CLI dump command OR production hardening other theme)');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
-      expect(block).not.toMatch(/Current sprint: D88/i);
-      expect(block).not.toMatch(/Next implementation slice: D89/i);
+      expect(block).not.toMatch(/Current sprint: D89/i);
+      expect(block).not.toMatch(/Next implementation slice: D90/i);
       expect(block).not.toMatch(/Current sprint: D85/i);
       expect(block).not.toMatch(/Next implementation slice: D86/i);
       expect(block).not.toMatch(/Current sprint: D73/i);

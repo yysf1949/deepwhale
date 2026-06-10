@@ -31,7 +31,8 @@
       "evidence": [
         "D-87 (AuditLog minimal seed): in-memory, append-only, deterministic timestamps via injected clock",
         "D-88 (AuditLog wired into runToolLoop): 3 emit points (tool-call, tool-result, loop-end) with optional auditLog parameter; first v5.0 sub-sprint to modify a 5 红线 file (additive, optional)",
-        "D-89 (AuditLog file-backed persistence): PersistingAuditLog extends AuditLog with JSONL atomic write + partial-line recovery; cross-instance fixture present (mirror D-78 + D-80 pattern)"
+        "D-89 (AuditLog file-backed persistence): PersistingAuditLog extends AuditLog with JSONL atomic write + partial-line recovery; cross-instance fixture present (mirror D-78 + D-80 pattern)",
+        "D-90 (AuditLog reader): standalone async readAuditLog function with partial-line recovery + ENOENT handling; completes the v5 observability quartet (write D-87/88/89 + read D-90)"
       ],
       "themes": [
         "production hardening",
