@@ -174,6 +174,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toHaveLength(0);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D96:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D95:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D94:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D93:/m);
@@ -287,7 +288,7 @@ describe('status documentation hygiene (D-56)', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D95 v5.0 distribution/upgrade flow 2nd evidence (compareVersions)');
+      expect(block).toContain('Current sprint: D96 v5.0 production hardening 1st evidence (fatal-error formatter)');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -320,14 +321,15 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D92 v5.0 plugin governance 2nd evidence');
       expect(block).toContain('D93 v5.0 plugin governance 3rd evidence:');
       expect(block).toContain('D94 v5.0 distribution/upgrade flow 1st evidence:');
-      expect(block).toContain('D95 v5.0 distribution/upgrade flow 2nd evidence (compareVersions)');
+      expect(block).toContain('D95 v5.0 distribution/upgrade flow 2nd evidence:');
+      expect(block).toContain('D96 v5.0 production hardening 1st evidence (fatal-error formatter)');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: D96 v5.0 4th theme start (gated on user direction; production hardening OR distribution/upgrade flow 2nd cycle)');
+      expect(block).toContain('Next implementation slice: D97 v5.0 production hardening 2nd evidence (gated on user direction; SIGINT/SIGTERM handler OR uncaught exception hook OR graceful shutdown sequence)');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
-      expect(block).not.toMatch(/Current sprint: D94/i);
-      expect(block).not.toMatch(/Next implementation slice: D95/i);
+      expect(block).not.toMatch(/Current sprint: D95/i);
+      expect(block).not.toMatch(/Next implementation slice: D96/i);
       expect(block).not.toMatch(/Current sprint: D85/i);
       expect(block).not.toMatch(/Next implementation slice: D86/i);
       expect(block).not.toMatch(/Current sprint: D73/i);

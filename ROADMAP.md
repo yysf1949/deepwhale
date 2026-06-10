@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D95 v5.0 distribution/upgrade flow 2nd evidence (compareVersions)
+- Current sprint: D96 v5.0 production hardening 1st evidence (fatal-error formatter)
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -71,6 +71,7 @@
 - D93 v5.0 plugin governance 3rd evidence: ToolRegistry.listByCapability(cap) method added (composes D-91 toolCapabilities helper with existing list()) + 3 new unit tests assert correct subset for shell-exec / code-execute / file-write. Plugin-governance theme complete 1st cycle: vocabulary (D-91) + actual usage (D-92) + query (D-93).
 - D94 v5.0 distribution/upgrade flow 1st evidence: 1 new DistributionManifest type + 1 DISTRIBUTION_MANIFEST constant + 1 isValidDistributionManifest validator + 3 new unit tests. The 3rd v5.0 theme (distribution/upgrade flow) starts here; future D-95+ can build on this manifest (upgrade check, capability matrix, changelog generator).
 - D95 v5.0 distribution/upgrade flow 2nd evidence: 1 new compareVersions function (pure, no I/O, no external semver dep) + 1 UpgradeCheckResult interface + 1 UpgradeSeverity union + 4 new unit tests. The 2nd evidence piece of the distribution/upgrade flow theme: D-94 manifest answers "what am I?"; D-95 compareVersions answers "do I need to upgrade?"; together they form the v5.0 distribution/upgrade flow 1st cycle (description + decision).
+- D96 v5.0 production hardening 1st evidence: 1 new formatFatalError function (pure, defensive, never throws) + 1 recordFatalEvent helper (cross-theme bridge into v5.0 AuditLog from D-87) + 1 FatalErrorEvent interface + 4 new unit tests. The 4th and final v5.0 theme (production hardening) starts here; future D-97+ can build on this formatter (SIGINT/SIGTERM handler, uncaught exception hook, graceful shutdown sequence).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -96,8 +97,8 @@
 
 ### Next Roadmap Work
 
-1. D95 v5.0 distribution/upgrade flow 2nd evidence (compareVersions) is complete: 1 new function + 1 new interface + 1 new union + 4 new unit tests. Distribution/upgrade flow 1st cycle complete (D-94 manifest + D-95 upgrade check).
-2. Next implementation slice: D96 v5.0 4th theme start (gated on user direction; production hardening OR distribution/upgrade flow 2nd cycle).
+1. D96 v5.0 production hardening 1st evidence (fatal-error formatter) is complete: 1 new function + 1 new helper + 1 new interface + 4 new unit tests. The 4th and final v5.0 theme starts here. Cross-theme bridge: fatal events flow into v5.0 audit log (D-87/88/89/90).
+2. Next implementation slice: D97 v5.0 production hardening 2nd evidence (gated on user direction; SIGINT/SIGTERM handler OR uncaught exception hook OR graceful shutdown sequence).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

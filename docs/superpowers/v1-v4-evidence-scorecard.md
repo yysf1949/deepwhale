@@ -55,6 +55,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D93 records a v5.0 plugin governance 3rd evidence: ToolRegistry.listByCapability(cap) method added (composes D-91 toolCapabilities helper with existing list()) + 3 new unit tests assert correct subset for shell-exec / code-execute / file-write. Plugin-governance 1st cycle complete (vocabulary + actual usage + query).
 - D94 records a v5.0 distribution/upgrade flow 1st evidence: 1 new DistributionManifest type + 1 DISTRIBUTION_MANIFEST constant + 1 isValidDistributionManifest validator + 3 new unit tests. The 3rd v5.0 theme (distribution/upgrade flow) starts here; future D-95+ can build on this manifest (upgrade check, capability matrix, changelog generator).
 - D95 records a v5.0 distribution/upgrade flow 2nd evidence: 1 new compareVersions function (pure, no I/O, no external semver dep) + 1 UpgradeCheckResult interface + 1 UpgradeSeverity union + 4 new unit tests. Distribution/upgrade flow 1st cycle complete (D-94 manifest + D-95 upgrade check).
+- D96 records a v5.0 production hardening 1st evidence: 1 new formatFatalError function (pure, defensive, never throws) + 1 recordFatalEvent helper (cross-theme bridge into v5.0 AuditLog from D-87) + 1 FatalErrorEvent interface + 4 new unit tests. The 4th and final v5.0 theme (production hardening) starts here; future D-97+ can build on this formatter (SIGINT/SIGTERM handler, uncaught exception hook, graceful shutdown sequence).
 
 ## Next Actions
 
