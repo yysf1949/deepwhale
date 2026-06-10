@@ -38,6 +38,7 @@ import { computeArgsDigest } from '../policy/args-digest.js';
 import { sanitizeReason } from '../policy/sanitize-reason.js';
 import { appendPolicyDecisionEvent } from './session-adapter.js';
 import type { SessionWriter } from '@deepwhale/core';
+import type { AuditLog } from '../observability/audit-log.js';
 
 /** Sprint 1a 默认：跟 LLM 来回 5 轮（够用 coding agent 短任务，长任务 caller 调高）。 */
 export const TOOL_LOOP_DEFAULT_MAX_STEPS = 5;
@@ -65,6 +66,10 @@ export interface ToolLoopOptions {
   yes?: boolean;
   /** Sprint 1c-revive-3-D-13: session writer 注入 (写 policy_decision event 用). */
   writer?: SessionWriter | null;
+  /** D-88 v5.0 observability+auditability: optional audit log sink. When set,
+   *  runToolLoop emits tool-call, tool-result, and loop-end events into the log.
+   *  When unset (default), no observability side effects occur. */
+  auditLog?: AuditLog | null;
 }
 
 export type ToolLoopStep =
@@ -192,6 +197,10 @@ export async function runToolLoop(
     // 3) 如果没 tool_calls → 收敛,return
     const tcs = lastResult.tool_calls;
     if (!tcs || tcs.length === 0) {
+      options.auditLog?.record({
+        kind: 'loop-end',
+        payload: { toolCalls: steps.filter((s) => s.kind === 'tool').length },
+      });
       return { messages: working, final: lastResult, steps };
     }
 
@@ -200,6 +209,7 @@ export async function runToolLoop(
       if (options.signal?.aborted) {
         throw new LLMUnknownError('Tool loop aborted by caller', { cause: options.signal.reason });
       }
+      options.auditLog?.record({ kind: 'tool-call', payload: { name: tc.name } });
       const toolResult = await executeToolCall(registry, tc, toolTimeoutMs, options.signal, {
         ...(options.policy !== undefined ? { policy: options.policy } : {}),
         ...(options.isInteractive !== undefined ? { isInteractive: options.isInteractive } : {}),
@@ -220,6 +230,7 @@ export async function runToolLoop(
         result: toolResult,
         duration_ms: (toolResult.meta?.['duration_ms'] as number) ?? 0,
       });
+      options.auditLog?.record({ kind: 'tool-result', payload: { name: tc.name, ok: toolResult.success } });
     }
   }
 

@@ -28,6 +28,10 @@
       "name": "Production Hardening And Distribution",
       "implementationAllowed": true,
       "firstEvidence": "D-87 (AuditLog minimal seed)",
+      "evidence": [
+        "D-87 (AuditLog minimal seed): in-memory, append-only, deterministic timestamps via injected clock",
+        "D-88 (AuditLog wired into runToolLoop): 3 emit points (tool-call, tool-result, loop-end) with optional auditLog parameter; first v5.0 sub-sprint to modify a 5 红线 file (additive, optional)"
+      ],
       "themes": [
         "production hardening",
         "plugin governance",

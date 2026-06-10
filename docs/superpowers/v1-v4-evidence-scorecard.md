@@ -47,6 +47,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D85 records a v3.0 Gate-2 long-horizon boundary fixture: 2 new tests assert the inclusive 30-50 tool-call range at exact boundaries (30 and 50) and just outside (29 and 51).
 - D86 records a v4.0 cross-session multi-hop handoff fixture: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances. v5.0 implementation is now UNLOCKED (BOTH gates reached).
 - D87 records the first v5.0 evidence fixture: AuditLog minimal seed (in-memory, append-only, deterministic timestamps via injected clock) + 1 unit test.
+- D88 records a v5.0 AuditLog tool-loop integration: 1 new test verifies runToolLoop emits tool-call, tool-result, and loop-end events into a provided AuditLog. The audit log now captures real tool-loop activity, not just synthetic events.
 
 ## Next Actions
 
