@@ -8,7 +8,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 
 | Milestone | Percent | Evidence-backed status | Main blockers |
 | --- | ---: | --- | --- |
-| v1.0 | 70% | Mostly implemented coding baseline | Release/version hygiene remains noisy; full release gate is not freshly proven here |
+| v1.0 | 70% | Mostly implemented coding baseline; release/version claims are quarantined | Fresh release gate is not proven in this scorecard |
 | v1.5 | 65% | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename |
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
 | v2.5 | 40% | Planner/DAG/cache modules exist | Main-loop integration remains limited |
@@ -32,9 +32,10 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D70 refreshed Gate-1.5 fixture evidence: algorithmic decision is continue, but binding is false and branchDecision is defer-live-evidence.
 - D70 keeps Browser branch decision deferred until 20 live browser tasks are recorded.
 - D71 covers TypeScript combined default-plus-named import references and call edges.
+- D72 release/version hygiene report distinguishes package version from roadmap maturity.
 
 ## Next Actions
 
-1. D72: refresh release/version hygiene after the Gate-1.5 advisory decision.
-2. D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.
-3. D74: continue Code Intel correctness hardening only where tests prove specific behavior.
+1. D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.
+2. D74: continue Code Intel correctness hardening only where tests prove specific behavior.
+3. D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.

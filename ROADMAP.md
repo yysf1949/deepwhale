@@ -6,8 +6,9 @@
 - Date: 2026-06-10
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
+- Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D71 Code Intel import/reference graph correctness
+- Current sprint: D72 release/version hygiene refresh
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -45,12 +46,13 @@
 - D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
 - D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
 - D71 Code Intel combined import correctness: TypeScript combined default-plus-named imports are indexed and resolved in the heuristic symbol graph and call graph.
+- D72 release/version hygiene report: package version and historical release badges are explicitly quarantined from roadmap maturity claims.
 
 ### Milestone Status
 
 | Milestone | Evidence-backed status | Main blocker |
 | --- | --- | --- |
-| v1.0 | Mostly implemented coding baseline | Public release/version hygiene remains noisy |
+| v1.0 | Mostly implemented coding baseline | Fresh release gate is still not proven here |
 | v1.5 | Code Intel foundation exists | Preferred 100K Gate-1 evidence remains blocked |
 | v2.0 | Browser, MCP, and memory foundations exist as opt-in/early pieces | Gate-1.5 evidence and full integration are not complete |
 | v2.5 | Planner, task DAG, and plan cache exist | Main-loop integration is limited |
@@ -70,8 +72,8 @@
 
 ### Next Roadmap Work
 
-1. D71 Code Intel combined import correctness is complete and heuristic-scoped.
-2. Next implementation slice: D72 release/version hygiene refresh.
+1. D72 release/version hygiene report is complete and keeps historical release text quarantined.
+2. Next implementation slice: D73 Gate-1.5 live browser task decision.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -89,7 +91,7 @@
 - Prefer this block over older historical status text below.
 - Older roadmap text below is retained as history until a later cleanup sprint.
 - Any future release claim must cite a machine-readable report or a verified command output.
-- Package version 2.2.0 is the package line, not proof of roadmap v2.2 production maturity.
+- Package version 2.2.0 is a package line, not roadmap v2.2 maturity proof.
 - Existing modules in src/ are foundations unless the main runtime and tests prove integration.
 - This block is intentionally ASCII-only for automated checks.
 

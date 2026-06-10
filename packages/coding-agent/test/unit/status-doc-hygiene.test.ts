@@ -77,6 +77,33 @@ describe('status documentation hygiene (D-56)', () => {
     expect(readme).toContain(`Gate-1.5 binding branch decision: ${gate15.branchDecision}`);
   });
 
+  it('keeps release/version claims quarantined by a machine-readable hygiene report', () => {
+    const report = JSON.parse(readRepoFile('docs/superpowers/release-version-hygiene.json')) as {
+      packageVersionLine: string;
+      interpretation: {
+        packageVersion: string;
+        historicalReleaseBadges: string;
+        currentRoadmapMaturity: string;
+      };
+      constraints: string[];
+    };
+    const reportMd = readRepoFile('docs/superpowers/release-version-hygiene.md');
+
+    expect(report.packageVersionLine).toBe('2.2.0');
+    expect(report.interpretation.packageVersion).toBe('package-line-only');
+    expect(report.interpretation.historicalReleaseBadges).toBe('historical-context-only');
+    expect(report.interpretation.currentRoadmapMaturity).toBe('not-production-complete');
+    expect(report.constraints).toContain('Package version 2.2.0 is not roadmap v2.2 maturity proof.');
+    expect(report.constraints).toContain('Historical README release badges do not override the current-status block.');
+    expect(reportMd).toContain('Package Version Is Not Roadmap Maturity');
+
+    for (const path of DOCS) {
+      const block = currentStatusBlock(readRepoFile(path));
+      expect(block).toContain('Release/version hygiene report: docs/superpowers/release-version-hygiene.json');
+      expect(block).toContain('Package version 2.2.0 is a package line, not roadmap v2.2 maturity proof.');
+    }
+  });
+
   it('does not overclaim v1-v4 or default non-coding capability exposure', () => {
     const combined = DOCS.map((path) => readRepoFile(path)).join('\n');
 
@@ -109,14 +136,15 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toContain(
-      'D72: refresh release/version hygiene after the Gate-1.5 advisory decision.',
-    );
-    expect(scorecard.nextActions).toContain(
       'D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.',
     );
     expect(scorecard.nextActions).toContain(
       'D74: continue Code Intel correctness hardening only where tests prove specific behavior.',
     );
+    expect(scorecard.nextActions).toContain(
+      'D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.',
+    );
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D72:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D71:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D70:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D68:/m);
@@ -147,11 +175,11 @@ describe('status documentation hygiene (D-56)', () => {
     expect(previewMd).toContain('Planning preview only');
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D71', () => {
+  it('keeps the current sprint and next-work pointers aligned after D72', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D71 Code Intel import/reference graph correctness');
+      expect(block).toContain('Current sprint: D72 release/version hygiene refresh');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -162,10 +190,13 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D69 Gate-1 preferred blocker refresh');
       expect(block).toContain('D70 Gate-1.5 Browser decision hygiene');
       expect(block).toContain('D71 Code Intel combined import correctness');
+      expect(block).toContain('D72 release/version hygiene report');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
-      expect(block).toContain('Next implementation slice: D72 release/version hygiene refresh');
+      expect(block).toContain('Next implementation slice: D73 Gate-1.5 live browser task decision');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D71/i);
+      expect(block).not.toMatch(/Next implementation slice: D72/i);
       expect(block).not.toMatch(/Current sprint: D70/i);
       expect(block).not.toMatch(/Next implementation slice: D71/i);
       expect(block).not.toMatch(/Current sprint: D69/i);

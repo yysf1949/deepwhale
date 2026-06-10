@@ -6,8 +6,9 @@
 - Date: 2026-06-10
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
+- Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D71 Code Intel import/reference graph correctness
+- Current sprint: D72 release/version hygiene refresh
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -20,7 +21,7 @@
 - Keep mock evidence separate from live evidence.
 - Treat Code Intel as heuristic unless a test proves stronger semantics.
 - Treat module existence as foundation work, not production completion.
-- Treat package version 2.2.0 as a package line, not roadmap maturity proof.
+- Treat package version 2.2.0 as a package line, not roadmap v2.2 maturity proof.
 - Preserve unrelated untracked plan files.
 
 ### Gate Evidence
@@ -55,6 +56,7 @@
 - D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
 - D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
 - D71 Code Intel combined import correctness: TypeScript combined default-plus-named imports are indexed and resolved in the heuristic symbol graph and call graph.
+- D72 release/version hygiene report: package version and historical release badges are explicitly quarantined from roadmap maturity claims.
 
 ### Decision Hygiene
 
@@ -62,6 +64,7 @@
 - Older text is retained as historical context until a later cleanup sprint.
 - Future decisions must cite tests, reports, or current source files.
 - Do not use branch names, commit slogans, or package versions as completion evidence.
+- Package version 2.2.0 is a package line, not roadmap v2.2 maturity proof.
 - Do not use target inventory as proof of a Gate-1 scenario pass.
 - Do not describe minimum-50k Gate-1 evidence as preferred-100k evidence.
 - Do not describe fixture-only Gate-1.5 evidence as a binding Browser branch decision.
@@ -71,8 +74,8 @@
 
 ### Next Decisions Needed
 
-1. D71 Code Intel combined import correctness is complete and heuristic-scoped.
-2. Next implementation slice: D72 release/version hygiene refresh.
+1. D72 release/version hygiene report is complete and keeps historical release text quarantined.
+2. Next implementation slice: D73 Gate-1.5 live browser task decision.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

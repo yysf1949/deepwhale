@@ -6,8 +6,9 @@
 - Date: 2026-06-10
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
+- Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D71 Code Intel import/reference graph correctness
+- Current sprint: D72 release/version hygiene refresh
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -45,13 +46,14 @@
 - D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
 - D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
 - D71 Code Intel combined import correctness: TypeScript combined default-plus-named imports are indexed and resolved in the heuristic symbol graph and call graph.
+- D72 release/version hygiene report: package version and historical release badges are explicitly quarantined from roadmap maturity claims.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
 
 | Milestone | Current evidence-backed status | Main gap |
 | --- | --- | --- |
-| v1.0 | Mostly implemented coding baseline | Release docs and version story still need cleanup |
+| v1.0 | Mostly implemented coding baseline | Fresh release gate is still not proven here |
 | v1.5 | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is still blocked |
 | v2.0 | Memory, Browser foundation, MCP surfaces exist as early/opt-in pieces | Gate-1.5 and real integration remain incomplete |
 | v2.5 | Planner/DAG/cache modules exist | Integration into the main agent loop is still limited |
@@ -70,8 +72,8 @@
 
 ### Next Work
 
-1. D71 Code Intel combined import correctness is complete and heuristic-scoped.
-2. Next implementation slice: D72 release/version hygiene refresh.
+1. D72 release/version hygiene report is complete and keeps historical release text quarantined.
+2. Next implementation slice: D73 Gate-1.5 live browser task decision.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -82,6 +84,7 @@
 - Current Gate-2 trace: docs/superpowers/gate2-live-trace.json
 - Current Gate-1 preferred inventory: docs/superpowers/gate-1-preferred-targets.json
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
+- Release/version hygiene: docs/superpowers/release-version-hygiene.json
 - v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json
 - V1 to V4 master plan: docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md
 - D66 plan: docs/superpowers/plans/2026-06-10-d66-status-gate1-v1v4-rescore.md
@@ -90,6 +93,7 @@
 - D69 plan: docs/superpowers/plans/2026-06-10-d69-gate1-preferred-blocker-refresh.md
 - D70 plan: docs/superpowers/plans/2026-06-10-d70-gate15-browser-decision-hygiene.md
 - D71 plan: docs/superpowers/plans/2026-06-10-d71-code-intel-import-reference-correctness.md
+- D72 plan: docs/superpowers/plans/2026-06-10-d72-release-version-hygiene.md
 
 ### Status Hygiene Rules
 
@@ -101,7 +105,7 @@
 - Gate-1.5 fixture dry-run evidence can never bind the Browser roadmap branch.
 - A module existing in src/ is not the same as production integration.
 - A registry profile existing is not the same as default exposure.
-- Package version 2.2.0 is a package line, not proof that roadmap v2.2 capabilities are production-complete.
+- Package version 2.2.0 is a package line, not roadmap v2.2 maturity proof.
 - v5/v6 planning is allowed, but v1-v4 completion remains the active gate-driven objective.
 - This block is intentionally ASCII-only so tools can parse it reliably.
 
@@ -112,7 +116,7 @@
 - The next agent should start from current files and machine-readable evidence, not from old ship slogans.
 - This repository path is D:\App\openClaw\projects\deepwhale.
 - Ignore D:\App\openClaw\projects\openclaw-github for this project.
-- Last status hygiene sprint: D71.
+- Last status hygiene sprint: D72.
 
 <!-- status:current:end -->
 
