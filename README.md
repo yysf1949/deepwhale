@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D105 v5.0 cross-theme bridge (buildPolicySnapshot)
+- Current sprint: D106 v6.0 master plan (buildV6Plan)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -81,6 +81,7 @@
 - D103 v5.0 plugin governance 2nd cycle: 1 new enforceProfilePolicy pure function (reuses D-100 buildCapabilityMatrix + emits undeclared-capability + missing-capability violations) + 1 PolicyEnforcementResult interface + 1 PolicyViolation interface + 1 PolicyViolationKind union + 4 new unit tests. Plugin-governance theme 2nd cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100 + enforcement D-103.
 - D104 v5.0 production hardening 5th evidence: 1 new evaluateCrossInstanceRollback async function (cross-instance decision: read prior audit log via D-90 + check last event kind + freshness window; emit proceed / rollback / no-evidence decision) + 1 RollbackEvaluation interface + 1 RollbackEvaluationOptions interface + 1 RollbackDecision union + 4 new unit tests. Production-hardening 5-evidence set COMPLETE: format D-96 + signal D-97 + uncaught D-98 + drain D-99 + cross-instance recovery D-104.
 - D105 v5.0 cross-theme bridge: 1 new buildPolicySnapshot async function (orchestration layer: reuses D-100 buildCapabilityMatrix + D-101 generateChangelog + D-103 enforceProfilePolicy + D-104 evaluateCrossInstanceRollback; returns PolicySnapshot with capabilityMatrix + changelog + policyEnforcement + crossInstance + summary) + 1 PolicySnapshot interface + 1 PolicySnapshotSummary interface + 1 BuildPolicySnapshotInput interface + 4 new unit tests. v5.0 3-theme cross-bridge COMPLETE: plugin governance + distribution/upgrade + production hardening tied into 1 unified status struct.
+- D106 v6.0 master plan: 1 new docs/superpowers/v6.0-master-plan.md (4 themes: multi-agent safety + hosted/enterprise gates + distributed coordination + advanced observability; entry criteria checklist; first sub-sprint multi-agent safety seed designed) + 1 v6-plan-exists.test.ts (3 doc-existence tests) + 4 new entries. v6.0 plan promoted from 'planning preview only' to 'executable plan' (5/6 entry criteria checked).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -106,8 +107,8 @@
 
 ### Next Work
 
-1. D105 v5.0 cross-theme bridge (buildPolicySnapshot) is complete: 1 new function + 3 new types + 4 new unit tests. v5.0 3-theme cross-bridge COMPLETE: plugin governance + distribution/upgrade + production hardening tied into 1 unified status struct.
-2. Next implementation slice: D106 v5.0 4th theme cross-bridge OR v6.0 master plan doc (gated on user direction; observability+auditability cross-bridge via PolicySnapshot OR multi-agent safety policy minimal seed).
+1. D106 v6.0 master plan (buildV6Plan) is complete: 1 new doc + 3 new doc-existence tests + 4 new entries. v6.0 plan promoted from 'planning preview only' to 'executable plan' (5/6 entry criteria checked).
+2. Next implementation slice: D107 v6.0 multi-agent safety seed implementation OR v5.0 4th theme cross-bridge (gated on user direction; sub-agent type + sub-agent policy + sub-agent rollback OR observability+auditability cross-bridge via PolicySnapshot).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -182,8 +183,9 @@
 - D103 plan: docs/superpowers/plans/2026-06-10-d103-v5.0-profile-policy-enforcer.md
 - D104 plan: docs/superpowers/plans/2026-06-10-d104-v5.0-cross-instance-rollback.md
 - D105 plan: docs/superpowers/plans/2026-06-10-d105-v5.0-policy-snapshot.md
+- D106 plan: docs/superpowers/plans/2026-06-10-d106-v6.0-master-plan.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D105.
+- Last status hygiene sprint: D106.
 
 <!-- status:current:end -->
 

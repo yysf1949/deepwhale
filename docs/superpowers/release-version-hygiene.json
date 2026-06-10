@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D106: v5.0 4th theme cross-bridge OR v6.0 master plan doc (gated on user direction)."
+  "nextAction": "D107: v6.0 multi-agent safety seed implementation OR v5.0 4th theme cross-bridge (gated on user direction)."
 }
