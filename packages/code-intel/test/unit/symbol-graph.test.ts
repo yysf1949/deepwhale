@@ -520,6 +520,73 @@ describe('symbol-graph (D-32.2.1)', () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it('indexes and resolves TypeScript combined default and named imports', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-combined-imports-'));
+    try {
+      await writeFile(
+        resolve(dir, 'provider.ts'),
+        [
+          'export default function defaultTarget() {',
+          '  return 1;',
+          '}',
+          '',
+          'export function namedTarget() {',
+          '  return 2;',
+          '}',
+        ].join('\n'),
+      );
+      await writeFile(resolve(dir, 'other.ts'), 'export function namedTarget() {\n  return 3;\n}\n');
+      await writeFile(
+        resolve(dir, 'consumer.ts'),
+        [
+          "import defaultTarget, { namedTarget as chosenTarget } from './provider.js';",
+          '',
+          'export function run() {',
+          '  defaultTarget();',
+          '  return chosenTarget();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const defaultRefs = findReferences(g, 'defaultTarget');
+      const namedRefs = findReferences(g, 'namedTarget');
+      const chosenRefs = findReferences(g, 'chosenTarget');
+      const callGraph = await buildCallGraph(g);
+
+      expect(defaultRefs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'provider.ts', kind: 'declaration' }),
+          expect.objectContaining({ file: 'consumer.ts', kind: 'import', line: 1 }),
+          expect.objectContaining({ file: 'consumer.ts', kind: 'call', line: 4 }),
+        ]),
+      );
+      expect(namedRefs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'provider.ts', kind: 'declaration' }),
+          expect.objectContaining({ file: 'consumer.ts', kind: 'import', line: 1 }),
+        ]),
+      );
+      expect(chosenRefs).toEqual(
+        expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', kind: 'call', line: 5 })]),
+      );
+      expect(callGraph.edges.filter((edge) => edge.caller === 'consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:defaultTarget',
+          line: 4,
+        }),
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:namedTarget',
+          line: 5,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('advanced import resolution (D-33.2.1)', () => {

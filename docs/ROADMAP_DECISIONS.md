@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Decision mode: stabilization first, expansion later
-- Current sprint: D70 Gate-1.5 evidence refresh and Browser branch decision
+- Current sprint: D71 Code Intel import/reference graph correctness
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -54,6 +54,7 @@
 - D68 status and v5/v6 planning preview: public status blocks now link planning-preview-only v5/v6 evidence.
 - D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
 - D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
+- D71 Code Intel combined import correctness: TypeScript combined default-plus-named imports are indexed and resolved in the heuristic symbol graph and call graph.
 
 ### Decision Hygiene
 
@@ -70,8 +71,8 @@
 
 ### Next Decisions Needed
 
-1. D70 Gate-1.5 fixture evidence refresh is complete and advisory.
-2. Next implementation slice: D71 Code Intel import/reference graph correctness.
+1. D71 Code Intel combined import correctness is complete and heuristic-scoped.
+2. Next implementation slice: D72 release/version hygiene refresh.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

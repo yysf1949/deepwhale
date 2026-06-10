@@ -109,16 +109,21 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toContain(
-      'D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.',
-    );
-    expect(scorecard.nextActions).toContain(
       'D72: refresh release/version hygiene after the Gate-1.5 advisory decision.',
     );
+    expect(scorecard.nextActions).toContain(
+      'D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.',
+    );
+    expect(scorecard.nextActions).toContain(
+      'D74: continue Code Intel correctness hardening only where tests prove specific behavior.',
+    );
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D71:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D70:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D68:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D69:/m);
     expect(scorecardMd).toContain('Aggregate evidence-backed progress: 48%');
     expect(scorecardMd).toContain('D67 rename_symbol exposes hashline edit hunks');
+    expect(scorecardMd).toContain('D71 covers TypeScript combined default-plus-named import references');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
@@ -142,11 +147,11 @@ describe('status documentation hygiene (D-56)', () => {
     expect(previewMd).toContain('Planning preview only');
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D70', () => {
+  it('keeps the current sprint and next-work pointers aligned after D71', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D70 Gate-1.5 evidence refresh and Browser branch decision');
+      expect(block).toContain('Current sprint: D71 Code Intel import/reference graph correctness');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -156,10 +161,13 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D68 status and v5/v6 planning preview');
       expect(block).toContain('D69 Gate-1 preferred blocker refresh');
       expect(block).toContain('D70 Gate-1.5 Browser decision hygiene');
+      expect(block).toContain('D71 Code Intel combined import correctness');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
-      expect(block).toContain('Next implementation slice: D71 Code Intel import/reference graph correctness');
+      expect(block).toContain('Next implementation slice: D72 release/version hygiene refresh');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D70/i);
+      expect(block).not.toMatch(/Next implementation slice: D71/i);
       expect(block).not.toMatch(/Current sprint: D69/i);
       expect(block).not.toMatch(/Next implementation slice: D70/i);
       expect(block).not.toMatch(/Current sprint: D68/i);

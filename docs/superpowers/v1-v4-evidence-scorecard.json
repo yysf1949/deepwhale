@@ -32,7 +32,8 @@
         "Gate-1 minimum Vite evidence is present at 86216 supported LOC",
         "Code Intel descriptions and metadata label heuristic behavior",
         "D67 rename_symbol exposes hashline edit hunks and heuristic confidence metadata",
-        "D69 refreshed Gate-1 target inventory and Vite minimum-50k Gate-1 scenario evidence"
+        "D69 refreshed Gate-1 target inventory and Vite minimum-50k Gate-1 scenario evidence",
+        "D71 covers TypeScript combined default-plus-named import references and call edges"
       ],
       "blockers": [
         "preferred-100k Gate-1 evidence is blocked by missing local 100K+ target",
@@ -103,8 +104,8 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.",
     "D72: refresh release/version hygiene after the Gate-1.5 advisory decision.",
-    "D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work."
+    "D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.",
+    "D74: continue Code Intel correctness hardening only where tests prove specific behavior."
   ]
 }

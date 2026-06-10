@@ -614,6 +614,34 @@ function extractTsLikeImports(source: string, lexicalOptions: LexicalScanOptions
     }
   }
 
+  const combinedImportRe =
+    /\bimport\s+([A-Za-z_$][\w$]*)\s*,\s*\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"]/g;
+  let combinedMatch: RegExpExecArray | null;
+  while ((combinedMatch = combinedImportRe.exec(sourceForImports)) !== null) {
+    if (isOffsetInsideString(sourceForImports, combinedMatch.index)) continue;
+    const defaultLocal = combinedMatch[1] ?? '';
+    const body = combinedMatch[2] ?? '';
+    const from = combinedMatch[3] ?? '';
+    const defaultOffset = combinedMatch.index + combinedMatch[0].indexOf(defaultLocal);
+    const defaultPos = offsetToLineCol(sourceForImports, defaultOffset);
+    if (isIdentifierName(defaultLocal)) {
+      imports.push({ local: defaultLocal, from, line: defaultPos.line, col: defaultPos.col });
+    }
+
+    const bodyOffset = combinedMatch.index + combinedMatch[0].indexOf(body);
+    const specifierRe = /([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?/g;
+    let specifier: RegExpExecArray | null;
+    while ((specifier = specifierRe.exec(body)) !== null) {
+      const imported = specifier[1];
+      const local = specifier[2] ?? imported;
+      if (local && imported && isIdentifierName(local) && isIdentifierName(imported)) {
+        const localOffset = bodyOffset + specifier.index + specifier[0].lastIndexOf(local);
+        const pos = offsetToLineCol(sourceForImports, localOffset);
+        imports.push({ local, imported, from, line: pos.line, col: pos.col });
+      }
+    }
+  }
+
   const lines = sourceForImports.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';

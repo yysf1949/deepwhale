@@ -31,9 +31,10 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D69 keeps preferred-100k blocked because the local inventory still has no 100K+ target.
 - D70 refreshed Gate-1.5 fixture evidence: algorithmic decision is continue, but binding is false and branchDecision is defer-live-evidence.
 - D70 keeps Browser branch decision deferred until 20 live browser tasks are recorded.
+- D71 covers TypeScript combined default-plus-named import references and call edges.
 
 ## Next Actions
 
-1. D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.
-2. D72: refresh release/version hygiene after the Gate-1.5 advisory decision.
-3. D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.
+1. D72: refresh release/version hygiene after the Gate-1.5 advisory decision.
+2. D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.
+3. D74: continue Code Intel correctness hardening only where tests prove specific behavior.
