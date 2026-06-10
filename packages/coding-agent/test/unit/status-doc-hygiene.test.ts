@@ -174,7 +174,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toHaveLength(0);
-    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D110:/m);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D111:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D96:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D95:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D94:/m);
@@ -289,7 +289,7 @@ describe('status documentation hygiene (D-56)', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D110 v6.0 multi-agent safety 2nd cycle cross-bridge (buildSubAgentPolicySnapshot)');
+      expect(block).toContain('Current sprint: D111 v6.0 Theme 2 seed (enforceRateLimit)');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -337,14 +337,15 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D107 v6.0 multi-agent safety seed:');
       expect(block).toContain('D108 v6.0 multi-agent safety seed:');
       expect(block).toContain('D109 v6.0 multi-agent safety seed:');
-      expect(block).toContain('D110 v6.0 multi-agent safety 2nd cycle cross-bridge (buildSubAgentPolicySnapshot)');
+      expect(block).toContain('D110 v6.0 multi-agent safety 2nd cycle cross-bridge:');
+      expect(block).toContain('D111 v6.0 Theme 2 seed (enforceRateLimit)');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: D111 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed start OR v6.0 Theme 1 3rd cycle (CLI integration with D-89) (gated on user direction)');
+      expect(block).toContain('Next implementation slice: D112 v6.0 Theme 2 seed part 2 (per-tenant billing/quota using RateLimitPolicy as base) OR v6.0 Theme 1 3rd cycle (CLI integration with D-89) (gated on user direction)');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
-      expect(block).not.toMatch(/Current sprint: D109/i);
-      expect(block).not.toMatch(/Next implementation slice: D110/i);
+      expect(block).not.toMatch(/Current sprint: D110/i);
+      expect(block).not.toMatch(/Next implementation slice: D111/i);
       expect(block).not.toMatch(/Current sprint: D85/i);
       expect(block).not.toMatch(/Next implementation slice: D86/i);
       expect(block).not.toMatch(/Current sprint: D73/i);

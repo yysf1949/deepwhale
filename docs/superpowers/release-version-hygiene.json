@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D111: v6.0 Theme 2 (hosted/enterprise opt-in gates) seed start OR v6.0 Theme 1 3rd cycle (CLI integration with D-89) (gated on user direction)."
+  "nextAction": "D112: v6.0 Theme 2 seed part 2 (per-tenant billing/quota) OR v6.0 Theme 1 3rd cycle (CLI integration with D-89) (gated on user direction)."
 }
