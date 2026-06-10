@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D103 v5.0 plugin governance 2nd cycle (enforceProfilePolicy)
+- Current sprint: D104 v5.0 production hardening 5th evidence (evaluateCrossInstanceRollback)
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -79,6 +79,7 @@
 - D101 v5.0 distribution/upgrade flow 2nd cycle: 1 new generateChangelog pure function (compares 2 DistributionManifests, returns ChangelogDocument with version + capability-added/removed + channel + node-engine + supported-upgrade-origin entries) + 1 ChangelogDocument interface + 1 ChangelogEntry interface + 1 ChangelogChangeKind union + 4 new unit tests. Distribution/upgrade flow theme 2nd cycle COMPLETE: manifest D-94 + compareVersions D-95 + changelog generator D-101.
 - D102 v5.0 observability+auditability 2nd cycle: 1 new dumpAuditLog async function (reads via D-90 readAuditLog + applies eventKinds + sinceTimestamp filters + renders text or JSON format) + 1 AuditDumpResult interface + 1 AuditDumpOptions interface + 1 AuditDumpFormat union + 4 new unit tests. Observability+auditability theme 2nd cycle COMPLETE: write D-87/88/89 + read D-90 + render D-102.
 - D103 v5.0 plugin governance 2nd cycle: 1 new enforceProfilePolicy pure function (reuses D-100 buildCapabilityMatrix + emits undeclared-capability + missing-capability violations) + 1 PolicyEnforcementResult interface + 1 PolicyViolation interface + 1 PolicyViolationKind union + 4 new unit tests. Plugin-governance theme 2nd cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100 + enforcement D-103.
+- D104 v5.0 production hardening 5th evidence: 1 new evaluateCrossInstanceRollback async function (cross-instance decision: read prior audit log via D-90 + check last event kind + freshness window; emit proceed / rollback / no-evidence decision) + 1 RollbackEvaluation interface + 1 RollbackEvaluationOptions interface + 1 RollbackDecision union + 4 new unit tests. Production-hardening 5-evidence set COMPLETE: format D-96 + signal D-97 + uncaught D-98 + drain D-99 + cross-instance recovery D-104.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -104,8 +105,8 @@
 
 ### Next Roadmap Work
 
-1. D103 v5.0 plugin governance 2nd cycle (enforceProfilePolicy) is complete: 1 new function + 3 new types + 4 new unit tests. Plugin-governance theme 2nd cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100 + enforcement D-103.
-2. Next implementation slice: D104 v5.0 production hardening 5th evidence OR v6.0 master plan doc (gated on user direction; cross-instance rollback scenario test OR multi-agent safety policy minimal seed).
+1. D104 v5.0 production hardening 5th evidence (evaluateCrossInstanceRollback) is complete: 1 new function + 3 new types + 4 new unit tests. Production-hardening 5-evidence set COMPLETE: format D-96 + signal D-97 + uncaught D-98 + drain D-99 + cross-instance recovery D-104.
+2. Next implementation slice: D105 v5.0 4 themes cross-bridge OR v6.0 master plan doc (gated on user direction; 3 themes 2nd-cycle cross-bridge OR multi-agent safety policy minimal seed).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
