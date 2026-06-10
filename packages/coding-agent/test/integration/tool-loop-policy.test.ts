@@ -244,4 +244,154 @@ describe('tool-loop-policy integration', () => {
       }
     }
   });
+
+  it('records multi-task DAG plans with dependsOn dependencies (D-81 v2.5 multi-scenario)', async () => {
+    const llm = new ScriptedLlm([stopResult]);
+    const plannedGoals: string[] = [];
+    const planner: Planner = {
+      async plan({ goal }) {
+        plannedGoals.push(goal);
+        return {
+          tasks: [
+            { id: 'refactor-identify', goal: 'identify parser code', dependsOn: [] },
+            { id: 'refactor-design', goal: 'design streaming parser', dependsOn: ['refactor-identify'] },
+            { id: 'refactor-implement', goal: 'implement streaming parser', dependsOn: ['refactor-design'] },
+          ],
+        };
+      },
+      async callTool() {
+        throw new Error('planner cannot call tools');
+      },
+    };
+    const recordedPlans: Array<{ id: string; goal: string }> = [];
+    const taskGraph: TaskGraphRecorder & {
+      recordPlan: (input: { tasks: ReadonlyArray<{ id: string; goal: string }> }) => Promise<void>;
+    } = {
+      async recordToolCall() {
+        /* noop */
+      },
+      async recordGoal() {
+        /* noop */
+      },
+      async recordPlan(input) {
+        recordedPlans.push(...input.tasks);
+      },
+    };
+
+    await runToolLoopWithReview({
+      client: llm,
+      messages: [
+        { role: 'system', content: 'system prompt' },
+        { role: 'user', content: 'refactor the parser to use streaming' },
+      ],
+      registry: createDefaultRegistry(),
+      maxSteps: 3,
+      planner,
+      taskGraph,
+    });
+
+    expect(plannedGoals).toEqual(['refactor the parser to use streaming']);
+    expect(recordedPlans).toEqual([
+      { id: 'refactor-identify', goal: 'identify parser code' },
+      { id: 'refactor-design', goal: 'design streaming parser' },
+      { id: 'refactor-implement', goal: 'implement streaming parser' },
+    ]);
+  });
+
+  it('records a plan task with tool spec (verifies mapper preserves id + goal) (D-81 v2.5 multi-scenario)', async () => {
+    const llm = new ScriptedLlm([stopResult]);
+    const planner: Planner = {
+      async plan({ goal }) {
+        return {
+          tasks: [
+            {
+              id: 'cli-verbose-flag',
+              goal,
+              dependsOn: [],
+              tool: { name: 'edit_file', input: { path: 'bin/cli.ts', newFlag: '--verbose' } },
+            },
+          ],
+        };
+      },
+      async callTool() {
+        throw new Error('planner cannot call tools');
+      },
+    };
+    const recordedPlans: Array<{ id: string; goal: string }> = [];
+    const taskGraph: TaskGraphRecorder & {
+      recordPlan: (input: { tasks: ReadonlyArray<{ id: string; goal: string }> }) => Promise<void>;
+    } = {
+      async recordToolCall() {
+        /* noop */
+      },
+      async recordGoal() {
+        /* noop */
+      },
+      async recordPlan(input) {
+        recordedPlans.push(...input.tasks);
+      },
+    };
+
+    await runToolLoopWithReview({
+      client: llm,
+      messages: [
+        { role: 'system', content: 'system prompt' },
+        { role: 'user', content: 'add a verbose flag to the CLI' },
+      ],
+      registry: createDefaultRegistry(),
+      maxSteps: 3,
+      planner,
+      taskGraph,
+    });
+
+    // The mapper in tool-loop-policy.ts drops dependsOn + tool, so the
+    // recorded plan is id + goal only. This is the v2.5 contract: the task
+    // graph sees the planning intent, not the execution spec.
+    expect(recordedPlans).toEqual([
+      { id: 'cli-verbose-flag', goal: 'add a verbose flag to the CLI' },
+    ]);
+  });
+
+  it('does not call planner.plan when there is no user goal (D-81 v2.5 multi-scenario)', async () => {
+    const llm = new ScriptedLlm([stopResult]);
+    let plannerCallCount = 0;
+    const planner: Planner = {
+      async plan(_input) {
+        plannerCallCount += 1;
+        return { tasks: [] };
+      },
+      async callTool() {
+        throw new Error('planner cannot call tools');
+      },
+    };
+    let recordPlanCallCount = 0;
+    const taskGraph: TaskGraphRecorder & {
+      recordPlan: (input: { tasks: ReadonlyArray<{ id: string; goal: string }> }) => Promise<void>;
+    } = {
+      async recordToolCall() {
+        /* noop */
+      },
+      async recordGoal() {
+        /* noop */
+      },
+      async recordPlan() {
+        recordPlanCallCount += 1;
+      },
+    };
+
+    await runToolLoopWithReview({
+      client: llm,
+      messages: [{ role: 'system', content: 'system prompt' }],
+      registry: createDefaultRegistry(),
+      maxSteps: 3,
+      planner,
+      taskGraph,
+    });
+
+    // No user goal means no planner invocation, no plan recorded.
+    // This is the v2.5 planner-gating contract: the planner only fires
+    // when there is a fresh user goal to decompose.
+    expect(plannerCallCount).toBe(0);
+    expect(recordPlanCallCount).toBe(0);
+  });
 });
