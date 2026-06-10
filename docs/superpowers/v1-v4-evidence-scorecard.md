@@ -54,6 +54,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D92 records a v5.0 plugin governance 2nd evidence: 19 default tool files backfilled with accurate capabilities (BashTool -> shell-exec+network, ReadFileTool -> file-read, WriteFileTool/EditFileTool/PatchTool/RenameSymbolTool -> file-read+file-write, ExecuteCodeTool -> code-execute, 11 read-only tools -> file-read, TodoTool/PlanTool -> [] in-memory); 2 new unit tests verify all-19 invariant + 5 high-risk tool assertions. Plugin-governance theme now has real evidence (vocabulary + actual usage).
 - D93 records a v5.0 plugin governance 3rd evidence: ToolRegistry.listByCapability(cap) method added (composes D-91 toolCapabilities helper with existing list()) + 3 new unit tests assert correct subset for shell-exec / code-execute / file-write. Plugin-governance 1st cycle complete (vocabulary + actual usage + query).
 - D94 records a v5.0 distribution/upgrade flow 1st evidence: 1 new DistributionManifest type + 1 DISTRIBUTION_MANIFEST constant + 1 isValidDistributionManifest validator + 3 new unit tests. The 3rd v5.0 theme (distribution/upgrade flow) starts here; future D-95+ can build on this manifest (upgrade check, capability matrix, changelog generator).
+- D95 records a v5.0 distribution/upgrade flow 2nd evidence: 1 new compareVersions function (pure, no I/O, no external semver dep) + 1 UpgradeCheckResult interface + 1 UpgradeSeverity union + 4 new unit tests. Distribution/upgrade flow 1st cycle complete (D-94 manifest + D-95 upgrade check).
 
 ## Next Actions
 
