@@ -52,6 +52,12 @@ describe('status documentation hygiene (D-56)', () => {
       bestAvailable?: { name: string; loc: number };
       blocker?: string;
     };
+    const gate15 = JSON.parse(readRepoFile('docs/superpowers/gate-1.5-browser-viability.json')) as {
+      evidenceKind: string;
+      binding: boolean;
+      branchDecision: string;
+      decision: string;
+    };
 
     expect(readme).toContain('Branch: feature/d36-gate2-live');
     expect(readme).toContain('Package version line: 2.2.0');
@@ -65,6 +71,10 @@ describe('status documentation hygiene (D-56)', () => {
     expect(gate1Targets.blocker).toContain(
       `best local target is ${gate1Targets.bestAvailable?.name ?? 'unknown'} with ${gate1Targets.bestAvailable?.loc ?? 0} LOC`,
     );
+    expect(readme).toContain(`Gate-1.5 evidence kind: ${gate15.evidenceKind}`);
+    expect(readme).toContain(`Gate-1.5 algorithmic decision: ${gate15.decision}`);
+    expect(readme).toContain(`Gate-1.5 binding: ${String(gate15.binding)}`);
+    expect(readme).toContain(`Gate-1.5 binding branch decision: ${gate15.branchDecision}`);
   });
 
   it('does not overclaim v1-v4 or default non-coding capability exposure', () => {
@@ -99,11 +109,12 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toContain(
-      'D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work.',
-    );
-    expect(scorecard.nextActions).toContain(
       'D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.',
     );
+    expect(scorecard.nextActions).toContain(
+      'D72: refresh release/version hygiene after the Gate-1.5 advisory decision.',
+    );
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D70:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D68:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D69:/m);
     expect(scorecardMd).toContain('Aggregate evidence-backed progress: 48%');
@@ -131,11 +142,11 @@ describe('status documentation hygiene (D-56)', () => {
     expect(previewMd).toContain('Planning preview only');
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D69', () => {
+  it('keeps the current sprint and next-work pointers aligned after D70', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D69 Gate-1 preferred blocker refresh');
+      expect(block).toContain('Current sprint: D70 Gate-1.5 evidence refresh and Browser branch decision');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -144,8 +155,13 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D67 rename edit hunks');
       expect(block).toContain('D68 status and v5/v6 planning preview');
       expect(block).toContain('D69 Gate-1 preferred blocker refresh');
-      expect(block).toContain('Next implementation slice: D70 Gate-1.5 evidence refresh and Browser branch decision');
+      expect(block).toContain('D70 Gate-1.5 Browser decision hygiene');
+      expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
+      expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
+      expect(block).toContain('Next implementation slice: D71 Code Intel import/reference graph correctness');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D69/i);
+      expect(block).not.toMatch(/Next implementation slice: D70/i);
       expect(block).not.toMatch(/Current sprint: D68/i);
       expect(block).not.toMatch(/Next implementation slice: D69/i);
       expect(block).not.toMatch(/Current sprint: D66/i);

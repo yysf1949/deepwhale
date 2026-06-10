@@ -10,7 +10,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | --- | ---: | --- | --- |
 | v1.0 | 70% | Mostly implemented coding baseline | Release/version hygiene remains noisy; full release gate is not freshly proven here |
 | v1.5 | 65% | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename |
-| v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and integration are incomplete |
+| v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
 | v2.5 | 40% | Planner/DAG/cache modules exist | Main-loop integration remains limited |
 | v3.0 | 50% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes | Gate-2 is fixture-scoped, not broad production proof |
 | v4.0 | 25% | Researcher, TaskGraph, memory, and channel foundations exist | Agent OS orchestration, Desktop, channels, and crash-recovery evidence are incomplete |
@@ -29,9 +29,11 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D67 does not make rename_symbol IDE-grade; it remains reference-guided and heuristic.
 - D69 refreshed Gate-1 target inventory and Vite minimum-50k Gate-1 scenario evidence.
 - D69 keeps preferred-100k blocked because the local inventory still has no 100K+ target.
+- D70 refreshed Gate-1.5 fixture evidence: algorithmic decision is continue, but binding is false and branchDecision is defer-live-evidence.
+- D70 keeps Browser branch decision deferred until 20 live browser tasks are recorded.
 
 ## Next Actions
 
-1. D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work.
-2. D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.
-3. D72: refresh release/version hygiene after Gate-1.5 decision.
+1. D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.
+2. D72: refresh release/version hygiene after the Gate-1.5 advisory decision.
+3. D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.

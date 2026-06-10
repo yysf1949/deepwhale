@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D69 Gate-1 preferred blocker refresh
+- Current sprint: D70 Gate-1.5 evidence refresh and Browser branch decision
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -20,6 +20,11 @@
 - Gate-1 preferred status: minimum-only.
 - Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
 - Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json.
+- Gate-1.5 evidence kind: fixture-dry-run.
+- Gate-1.5 algorithmic decision: continue.
+- Gate-1.5 binding: false.
+- Gate-1.5 binding branch decision: defer-live-evidence.
+- Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -38,6 +43,7 @@
 - D67 rename edit hunks: rename_symbol dry-run/apply now exposes hashline edit hunks and heuristic confidence metadata.
 - D68 status and v5/v6 planning preview: public status blocks now link planning-preview-only v5/v6 evidence.
 - D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
+- D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
 
 ### Milestone Status
 
@@ -55,6 +61,7 @@
 - Do not weaken Gate-1 minimum or preferred LOC thresholds.
 - Do not count target inventory as a Gate-1 pass.
 - Do not count minimum-50k evidence as preferred-100k evidence.
+- Do not count fixture-only Gate-1.5 evidence as a binding Browser branch decision.
 - Do not count mock Gate-2 evidence as live evidence.
 - Do not unlock default Browser, Desktop, Channel, media, or productivity tools from Gate-2 alone.
 - Do not describe heuristic Code Intel as IDE-grade.
@@ -62,9 +69,9 @@
 
 ### Next Roadmap Work
 
-1. D69 Gate-1 preferred blocker refresh is complete for the current local inventory.
-2. Next implementation slice: D70 Gate-1.5 evidence refresh and Browser branch decision.
-3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
+1. D70 Gate-1.5 fixture evidence refresh is complete and advisory.
+2. Next implementation slice: D71 Code Intel import/reference graph correctness.
+3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
 

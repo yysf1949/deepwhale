@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Decision mode: stabilization first, expansion later
-- Current sprint: D69 Gate-1 preferred blocker refresh
+- Current sprint: D70 Gate-1.5 evidence refresh and Browser branch decision
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -29,6 +29,11 @@
 - Gate-1 preferred status: minimum-only.
 - Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
 - Gate-1 preferred evidence file: docs/superpowers/gate-1-preferred-targets.json.
+- Gate-1.5 evidence kind: fixture-dry-run.
+- Gate-1.5 algorithmic decision: continue.
+- Gate-1.5 binding: false.
+- Gate-1.5 binding branch decision: defer-live-evidence.
+- Gate-1.5 evidence file: docs/superpowers/gate-1.5-browser-viability.json.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -48,6 +53,7 @@
 - D67 rename edit hunks: rename_symbol dry-run/apply now exposes hashline edit hunks and heuristic confidence metadata.
 - D68 status and v5/v6 planning preview: public status blocks now link planning-preview-only v5/v6 evidence.
 - D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
+- D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
 
 ### Decision Hygiene
 
@@ -57,15 +63,16 @@
 - Do not use branch names, commit slogans, or package versions as completion evidence.
 - Do not use target inventory as proof of a Gate-1 scenario pass.
 - Do not describe minimum-50k Gate-1 evidence as preferred-100k evidence.
+- Do not describe fixture-only Gate-1.5 evidence as a binding Browser branch decision.
 - Do not describe default-profile Gate-2 evidence as v1-v4 completion.
 - Do not describe heuristic rename, references, or call graph as IDE-grade.
 - Keep default registry exposure narrow until the user explicitly changes the policy.
 
 ### Next Decisions Needed
 
-1. D69 Gate-1 preferred blocker refresh is complete for the current local inventory.
-2. Next implementation slice: D70 Gate-1.5 evidence refresh and Browser branch decision.
-3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
+1. D70 Gate-1.5 fixture evidence refresh is complete and advisory.
+2. Next implementation slice: D71 Code Intel import/reference graph correctness.
+3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
 6. v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json.

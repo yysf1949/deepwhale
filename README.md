@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Work mode: stabilization + Gate sprint
-- Current sprint: D69 Gate-1 preferred blocker refresh
+- Current sprint: D70 Gate-1.5 evidence refresh and Browser branch decision
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -26,6 +26,11 @@
 - Gate-1 preferred status: minimum-only
 - Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
 - Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json
+- Gate-1.5 evidence kind: fixture-dry-run
+- Gate-1.5 algorithmic decision: continue
+- Gate-1.5 binding: false
+- Gate-1.5 binding branch decision: defer-live-evidence
+- Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 
 ### Completed Stabilization Slices
@@ -38,6 +43,7 @@
 - D67 rename edit hunks: rename_symbol dry-run/apply now exposes hashline edit hunks and heuristic confidence metadata.
 - D68 status and v5/v6 planning preview: public status blocks now link planning-preview-only v5/v6 evidence.
 - D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
+- D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -63,9 +69,9 @@
 
 ### Next Work
 
-1. D69 Gate-1 preferred blocker refresh is complete for the current local inventory.
-2. Next implementation slice: D70 Gate-1.5 evidence refresh and Browser branch decision.
-3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
+1. D70 Gate-1.5 fixture evidence refresh is complete and advisory.
+2. Next implementation slice: D71 Code Intel import/reference graph correctness.
+3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
 
@@ -81,6 +87,7 @@
 - D67 plan: docs/superpowers/plans/2026-06-10-d67-rename-symbol-edit-hunks.md
 - D68 plan: docs/superpowers/plans/2026-06-10-d68-status-v5-v6-planning.md
 - D69 plan: docs/superpowers/plans/2026-06-10-d69-gate1-preferred-blocker-refresh.md
+- D70 plan: docs/superpowers/plans/2026-06-10-d70-gate15-browser-decision-hygiene.md
 
 ### Status Hygiene Rules
 
@@ -89,6 +96,7 @@
 - A mock pass can never imply passed_live=true.
 - A target inventory can never imply a Gate-1 pass by itself.
 - A minimum-50k Gate-1 target can never be described as preferred-100k.
+- Gate-1.5 fixture dry-run evidence can never bind the Browser roadmap branch.
 - A module existing in src/ is not the same as production integration.
 - A registry profile existing is not the same as default exposure.
 - Package version 2.2.0 is a package line, not proof that roadmap v2.2 capabilities are production-complete.
@@ -102,7 +110,7 @@
 - The next agent should start from current files and machine-readable evidence, not from old ship slogans.
 - This repository path is D:\App\openClaw\projects\deepwhale.
 - Ignore D:\App\openClaw\projects\openclaw-github for this project.
-- Last status hygiene sprint: D69.
+- Last status hygiene sprint: D70.
 
 <!-- status:current:end -->
 

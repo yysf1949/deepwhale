@@ -46,7 +46,8 @@
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
-        "MCP package and runtime foundation exist"
+        "MCP package and runtime foundation exist",
+        "D70 refreshed Gate-1.5 fixture evidence with binding=false and branchDecision=defer-live-evidence"
       ],
       "blockers": [
         "Gate-1.5 live 20-task browser evidence is not complete",
@@ -76,7 +77,7 @@
       ],
       "blockers": [
         "Gate-2 evidence is a default-profile invoice fixture pass, not broad long-horizon production proof",
-        "Gate-1.5 branch decision remains incomplete"
+        "Gate-1.5 binding branch decision remains deferred pending live browser tasks"
       ]
     },
     {
@@ -102,8 +103,8 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work.",
     "D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.",
-    "D72: refresh release/version hygiene after Gate-1.5 decision."
+    "D72: refresh release/version hygiene after the Gate-1.5 advisory decision.",
+    "D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work."
   ]
 }

@@ -3,5 +3,10 @@
   "successRate": 0.8,
   "successes": 16,
   "failures": 4,
-  "fixture": "test/fixtures/browser-gate15/pass.json"
+  "evidenceKind": "fixture-dry-run",
+  "requiredLiveTasks": 20,
+  "binding": false,
+  "branchDecision": "defer-live-evidence",
+  "interpretation": "Fixture dry-run result is advisory only; collect 20 live browser tasks before changing the Browser roadmap branch.",
+  "fixture": "packages/coding-agent/test/fixtures/browser-gate15/pass.json"
 }

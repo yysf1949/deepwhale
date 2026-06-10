@@ -3,7 +3,7 @@
  * Gate-1.5 Browser Viability Harness (D-33.3.5, 2026-06-09)
  *
  * Fixture-based dry-run: reads --fixture JSON (array of {id, status} tasks),
- * calls evaluateBrowserGate15, writes --json + --md reports.
+ * calls buildBrowserGate15Report, writes --json + --md reports.
  *
  * NO live browser automation, NO real MCP subprocess. Pure report logic.
  */
@@ -26,6 +26,7 @@ function parseArgs(argv) {
   for (const required of ['fixture', 'json', 'md']) {
     if (!out[required]) throw new Error(`missing required flag --${required}`);
   }
+  out['evidence-kind'] ??= 'fixture-dry-run';
   return out;
 }
 
@@ -44,12 +45,16 @@ function buildMarkdown(result, fixturePath) {
     '# Gate-1.5 Browser Viability',
     '',
     `- **fixture**: \`${fixturePath}\``,
-    `- **decision**: \`${result.decision}\``,
+    `- **evidence kind**: \`${result.evidenceKind}\``,
+    `- **algorithmic decision**: \`${result.decision}\``,
+    `- **binding branch decision**: \`${result.branchDecision}\``,
+    `- **binding**: \`${String(result.binding)}\``,
+    `- **required live tasks**: ${result.requiredLiveTasks}`,
     `- **successes**: ${result.successes}`,
     `- **failures**: ${result.failures}`,
     `- **success rate**: ${pct}%`,
     '',
-    '> Pure dry-run harness. No live browser automation. (D-33.3.5)',
+    `> ${result.interpretation}`,
     '',
   ].join('\n');
 }
@@ -64,8 +69,9 @@ async function main() {
   const data = JSON.parse(raw);
   if (!Array.isArray(data.tasks)) throw new Error('fixture must have { tasks: [...] }');
 
-  const { evaluateBrowserGate15 } = await importEvaluator();
-  const result = evaluateBrowserGate15(data.tasks);
+  const evidenceKind = args['evidence-kind'];
+  const { buildBrowserGate15Report } = await importEvaluator();
+  const result = buildBrowserGate15Report({ tasks: data.tasks, evidenceKind });
 
   const jsonBody = JSON.stringify({ ...result, fixture: args.fixture }, null, 2);
   const mdBody = buildMarkdown(result, args.fixture);
@@ -76,7 +82,7 @@ async function main() {
   await writeFile(mdPath, mdBody + '\n');
 
   process.stdout.write(
-    `[gate15] decision=${result.decision} rate=${(result.successRate * 100).toFixed(1)}% (${result.successes}/${result.successes + result.failures})\n`,
+    `[gate15] decision=${result.decision} branchDecision=${result.branchDecision} binding=${String(result.binding)} rate=${(result.successRate * 100).toFixed(1)}% (${result.successes}/${result.successes + result.failures})\n`,
   );
   process.stdout.write(`[gate15] wrote ${jsonPath}\n`);
   process.stdout.write(`[gate15] wrote ${mdPath}\n`);
