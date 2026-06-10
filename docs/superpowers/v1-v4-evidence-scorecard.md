@@ -2,7 +2,7 @@
 
 Generated: 2026-06-10
 
-Aggregate evidence-backed progress: 48%
+Aggregate evidence-backed progress: 50%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
@@ -11,7 +11,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | v1.0 | 70% | Mostly implemented coding baseline; release/version claims are quarantined | Fresh release gate is not proven in this scorecard |
 | v1.5 | 65% | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename |
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
-| v2.5 | 40% | Planner/DAG/cache modules exist | Main-loop integration remains limited |
+| v2.5 | 50% | Planner/DAG/cache modules exist; main-loop planner.plan evidence fixture present | Integration is a single-fixture proof, not multi-scenario long-horizon |
 | v3.0 | 50% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes | Gate-2 is fixture-scoped, not broad production proof |
 | v4.0 | 25% | Researcher, TaskGraph, memory, and channel foundations exist | Agent OS orchestration, Desktop, channels, and crash-recovery evidence are incomplete |
 
@@ -36,9 +36,8 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D73 live Browser task ledger records 0/20 live tasks and binding=false.
 - D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
+- D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
 
 ## Next Actions
 
-1. D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available.
-2. D77: convert the v2.5 planner integration gap into a main-loop evidence fixture before any rescore.
-3. D78: harden cross-session memory crash/reload evidence before any v4.0 rescore.
+1. D78: harden cross-session memory crash/reload evidence before any v4.0 rescore.

@@ -14,6 +14,9 @@
 
 import { runToolLoop, type ToolLoopOptions, type ToolLoopResult } from './tool-loop.js';
 import type { ChatMessage, ChatResult, LLMClient } from '@deepwhale/llm';
+import type { Planner } from '../planner/planner.js';
+
+export type { Planner };
 
 export type ReviewStatus = 'approve' | 'request_changes';
 
@@ -31,6 +34,7 @@ export interface Reviewer {
 export interface TaskGraphRecorder {
   recordToolCall(input: { toolName: string; argsDigest: string; success: boolean; durationMs: number }): Promise<void>;
   recordGoal(goal: string): Promise<void>;
+  recordPlan?(input: { tasks: ReadonlyArray<{ id: string; goal: string }> }): Promise<void>;
 }
 
 export interface RunCommandWithReviewOptions extends Omit<ToolLoopOptions, 'registry' | 'maxSteps'> {
@@ -41,6 +45,7 @@ export interface RunCommandWithReviewOptions extends Omit<ToolLoopOptions, 'regi
   readonly reviewer?: Reviewer;
   readonly reviewGates?: ReadonlyArray<string>;
   readonly taskGraph?: TaskGraphRecorder;
+  readonly planner?: Planner;
 }
 
 export interface RunCommandWithReviewResult extends ToolLoopResult {
@@ -72,7 +77,7 @@ function latestUserGoal(messages: ReadonlyArray<ChatMessage>): string | undefine
  * wrapper here that composes this one.
  */
 export async function runToolLoopWithReview(options: RunCommandWithReviewOptions): Promise<RunCommandWithReviewResult> {
-  const { client, messages, reviewer, reviewGates, taskGraph, ...loopOptions } = options;
+  const { client, messages, reviewer, reviewGates, taskGraph, planner, ...loopOptions } = options;
   const loopOptionsClean: ToolLoopOptions = {};
   if (loopOptions.registry !== undefined) loopOptionsClean.registry = loopOptions.registry;
   if (loopOptions.maxSteps !== undefined) loopOptionsClean.maxSteps = loopOptions.maxSteps;
@@ -86,6 +91,17 @@ export async function runToolLoopWithReview(options: RunCommandWithReviewOptions
   if (taskGraph) {
     const goal = latestUserGoal(messages);
     if (goal) await taskGraph.recordGoal(goal);
+  }
+  if (planner) {
+    const goal = latestUserGoal(messages);
+    if (goal) {
+      const plan = await planner.plan({ goal });
+      if (taskGraph && typeof taskGraph.recordPlan === 'function') {
+        await taskGraph.recordPlan({
+          tasks: plan.tasks.map((t) => ({ id: t.id, goal: t.goal })),
+        });
+      }
+    }
   }
   let result: Awaited<ReturnType<typeof runToolLoop>>;
   try {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runToolLoopWithReview, type Reviewer, type TaskGraphRecorder } from '../../src/agent/tool-loop-policy.js';
+import { runToolLoopWithReview, type Planner, type Reviewer, type TaskGraphRecorder } from '../../src/agent/tool-loop-policy.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
 import type { ChatMessage, ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
 
@@ -141,5 +141,48 @@ describe('tool-loop-policy integration', () => {
     });
 
     expect(recordedGoals).toEqual(['ship D75 task graph evidence']);
+  });
+
+  it('calls planner.plan with the latest user goal and records the resulting tasks into the task graph (D-77)', async () => {
+    const llm = new ScriptedLlm([stopResult]);
+    const plannedGoals: string[] = [];
+    const planner: Planner = {
+      async plan({ goal }) {
+        plannedGoals.push(goal);
+        return { tasks: [{ id: 'p-0', goal, dependsOn: [] }] };
+      },
+      async callTool() {
+        throw new Error('planner cannot call tools');
+      },
+    };
+    const recordedPlans: Array<{ id: string; goal: string }> = [];
+    const taskGraph: TaskGraphRecorder & {
+      recordPlan: (input: { tasks: ReadonlyArray<{ id: string; goal: string }> }) => Promise<void>;
+    } = {
+      async recordToolCall() {
+        /* noop */
+      },
+      async recordGoal() {
+        /* noop */
+      },
+      async recordPlan(input) {
+        recordedPlans.push(...input.tasks);
+      },
+    };
+
+    await runToolLoopWithReview({
+      client: llm,
+      messages: [
+        { role: 'system', content: 'system prompt' },
+        { role: 'user', content: 'ship D77 planner evidence' },
+      ],
+      registry: createDefaultRegistry(),
+      maxSteps: 3,
+      planner,
+      taskGraph,
+    });
+
+    expect(plannedGoals).toEqual(['ship D77 planner evidence']);
+    expect(recordedPlans).toEqual([{ id: 'p-0', goal: 'ship D77 planner evidence' }]);
   });
 });

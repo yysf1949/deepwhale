@@ -8,7 +8,7 @@
 - Package version line: 2.2.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D75 TaskGraph goal recording integration evidence
+- Current sprint: D77 planner main-loop evidence fixture
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -52,6 +52,7 @@
 - D73 Gate-1.5 live browser task ledger: no 20-task live evidence exists, so Browser branch decision remains deferred and enhancement stays locked.
 - D74 Code Intel default re-export call graph correctness: calls imported through default re-export barrels resolve to the original named default declaration.
 - D75 TaskGraph goal recording integration evidence: runToolLoopWithReview records the latest user goal when a TaskGraphRecorder is provided.
+- D77 planner main-loop evidence fixture: runToolLoopWithReview calls planner.plan with the latest user goal and records the resulting tasks into the task graph when a Planner is provided.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -77,8 +78,8 @@
 
 ### Next Roadmap Work
 
-1. D75 TaskGraph goal recording integration evidence is complete: runToolLoopWithReview now records the latest user goal through the TaskGraphRecorder.
-2. Next implementation slice: D76 Gate-1.5 live Browser task sourcing.
+1. D77 planner main-loop evidence fixture is complete: runToolLoopWithReview now calls planner.plan with the latest user goal and records the resulting tasks into the task graph.
+2. Next implementation slice: D78 cross-session memory crash/reload evidence.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

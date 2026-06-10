@@ -8,7 +8,7 @@
 - Package version line: 2.2.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D75 TaskGraph goal recording integration evidence
+- Current sprint: D77 planner main-loop evidence fixture
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -52,6 +52,7 @@
 - D73 Gate-1.5 live browser task ledger: no 20-task live evidence exists, so Browser branch decision remains deferred and enhancement stays locked.
 - D74 Code Intel default re-export call graph correctness: calls imported through default re-export barrels resolve to the original named default declaration.
 - D75 TaskGraph goal recording integration evidence: runToolLoopWithReview records the latest user goal when a TaskGraphRecorder is provided.
+- D77 planner main-loop evidence fixture: runToolLoopWithReview calls planner.plan with the latest user goal and records the resulting tasks into the task graph when a Planner is provided.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -77,8 +78,8 @@
 
 ### Next Work
 
-1. D75 TaskGraph goal recording integration evidence is complete: runToolLoopWithReview now records the latest user goal through the TaskGraphRecorder.
-2. Next implementation slice: D76 Gate-1.5 live Browser task sourcing.
+1. D77 planner main-loop evidence fixture is complete: runToolLoopWithReview now calls planner.plan with the latest user goal and records the resulting tasks into the task graph.
+2. Next implementation slice: D78 cross-session memory crash/reload evidence.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -124,7 +125,9 @@
 - The next agent should start from current files and machine-readable evidence, not from old ship slogans.
 - This repository path is D:\App\openClaw\projects\deepwhale.
 - Ignore D:\App\openClaw\projects\openclaw-github for this project.
-- Last status hygiene sprint: D75.
+- D75 plan: docs/superpowers/plans/2026-06-10-d75-taskgraph-goal-recording.md
+- D77 plan: docs/superpowers/plans/2026-06-10-d77-planner-main-loop-evidence.md
+- Last status hygiene sprint: D77.
 
 <!-- status:current:end -->
 
