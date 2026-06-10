@@ -47,7 +47,7 @@ export class FindReferencesTool implements Tool {
         return {
           success: true,
           content: String(refs.length),
-          meta: { name, count: refs.length, path: repoPath },
+          meta: { name, count: refs.length, path: repoPath, heuristic: true },
         };
       }
       const content = refs
@@ -56,7 +56,7 @@ export class FindReferencesTool implements Tool {
       return {
         success: true,
         content: content || '(no references)',
-        meta: { name, count: refs.length, path: repoPath, fileFilter: fileFilter ?? null },
+        meta: { name, count: refs.length, path: repoPath, fileFilter: fileFilter ?? null, heuristic: true },
       };
     } catch (e) {
       return { success: false, content: '', error: `find_references error: ${e instanceof Error ? e.message : String(e)}` };

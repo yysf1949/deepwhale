@@ -42,6 +42,13 @@ describe('find_references (D-32.2.2)', () => {
     const r = await tool.execute({ action: 'count', name: 'Greeter', path: REPO });
     expect(r.success).toBe(true);
     expect(r.content).toMatch(/^\d+$/);
+    expect((r.meta as { heuristic?: boolean })?.heuristic).toBe(true);
+  });
+
+  it('labels reference results as heuristic in metadata', async () => {
+    const r = await tool.execute({ action: 'references', name: 'Greeter', path: REPO });
+    expect(r.success).toBe(true);
+    expect((r.meta as { heuristic?: boolean })?.heuristic).toBe(true);
   });
 
   it('returns (no references) for unknown symbol', async () => {
