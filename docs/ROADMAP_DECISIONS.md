@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D102 v5.0 observability+auditability 2nd cycle (dumpAuditLog)
+- Current sprint: D103 v5.0 plugin governance 2nd cycle (enforceProfilePolicy)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -88,6 +88,7 @@
 - D100 v5.0 plugin governance 2nd cycle: 1 new buildCapabilityMatrix pure function (cross-theme bridge: D-91 ToolCapability vocabulary + D-94 DistributionManifest; returns CapabilityMatrix with entries + undeclaredToolCapabilities + toolsWithoutCapabilities) + 1 CapabilityMatrix interface + 1 CapabilityMatrixEntry interface + 1 UndeclaredToolCapability interface + 4 new unit tests. Plugin-governance theme 1st cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100.
 - D101 v5.0 distribution/upgrade flow 2nd cycle: 1 new generateChangelog pure function (compares 2 DistributionManifests, returns ChangelogDocument with version + capability-added/removed + channel + node-engine + supported-upgrade-origin entries) + 1 ChangelogDocument interface + 1 ChangelogEntry interface + 1 ChangelogChangeKind union + 4 new unit tests. Distribution/upgrade flow theme 2nd cycle COMPLETE: manifest D-94 + compareVersions D-95 + changelog generator D-101.
 - D102 v5.0 observability+auditability 2nd cycle: 1 new dumpAuditLog async function (reads via D-90 readAuditLog + applies eventKinds + sinceTimestamp filters + renders text or JSON format) + 1 AuditDumpResult interface + 1 AuditDumpOptions interface + 1 AuditDumpFormat union + 4 new unit tests. Observability+auditability theme 2nd cycle COMPLETE: write D-87/88/89 + read D-90 + render D-102.
+- D103 v5.0 plugin governance 2nd cycle: 1 new enforceProfilePolicy pure function (reuses D-100 buildCapabilityMatrix + emits undeclared-capability + missing-capability violations) + 1 PolicyEnforcementResult interface + 1 PolicyViolation interface + 1 PolicyViolationKind union + 4 new unit tests. Plugin-governance theme 2nd cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100 + enforcement D-103.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -105,8 +106,8 @@
 
 ### Next Decisions Needed
 
-1. D102 v5.0 observability+auditability 2nd cycle (dumpAuditLog) is complete: 1 new function + 3 new types + 4 new unit tests. Observability+auditability theme 2nd cycle COMPLETE: write D-87/88/89 + read D-90 + render D-102.
-2. Next implementation slice: D103 v5.0 plugin governance 2nd cycle OR v6.0 master plan doc (gated on user direction; capability-matrix-driven profile-policy enforcer OR multi-agent safety policy minimal seed).
+1. D103 v5.0 plugin governance 2nd cycle (enforceProfilePolicy) is complete: 1 new function + 3 new types + 4 new unit tests. Plugin-governance theme 2nd cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100 + enforcement D-103.
+2. Next implementation slice: D104 v5.0 production hardening 5th evidence OR v6.0 master plan doc (gated on user direction; cross-instance rollback scenario test OR multi-agent safety policy minimal seed).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

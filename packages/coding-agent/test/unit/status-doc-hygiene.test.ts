@@ -174,7 +174,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toHaveLength(0);
-    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D102:/m);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D103:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D96:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D95:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D94:/m);
@@ -289,7 +289,7 @@ describe('status documentation hygiene (D-56)', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D102 v5.0 observability+auditability 2nd cycle (dumpAuditLog)');
+      expect(block).toContain('Current sprint: D103 v5.0 plugin governance 2nd cycle (enforceProfilePolicy)');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -329,14 +329,15 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D99 v5.0 production hardening 4th evidence:');
       expect(block).toContain('D100 v5.0 plugin governance 2nd cycle:');
       expect(block).toContain('D101 v5.0 distribution/upgrade flow 2nd cycle:');
-      expect(block).toContain('D102 v5.0 observability+auditability 2nd cycle (dumpAuditLog)');
+      expect(block).toContain('D102 v5.0 observability+auditability 2nd cycle:');
+      expect(block).toContain('D103 v5.0 plugin governance 2nd cycle (enforceProfilePolicy)');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: D103 v5.0 plugin governance 2nd cycle OR v6.0 master plan doc (gated on user direction; capability-matrix-driven profile-policy enforcer OR multi-agent safety policy minimal seed)');
+      expect(block).toContain('Next implementation slice: D104 v5.0 production hardening 5th evidence OR v6.0 master plan doc (gated on user direction; cross-instance rollback scenario test OR multi-agent safety policy minimal seed)');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
-      expect(block).not.toMatch(/Current sprint: D101/i);
-      expect(block).not.toMatch(/Next implementation slice: D102/i);
+      expect(block).not.toMatch(/Current sprint: D102/i);
+      expect(block).not.toMatch(/Next implementation slice: D103/i);
       expect(block).not.toMatch(/Current sprint: D85/i);
       expect(block).not.toMatch(/Next implementation slice: D86/i);
       expect(block).not.toMatch(/Current sprint: D73/i);
