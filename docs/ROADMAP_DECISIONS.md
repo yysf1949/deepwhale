@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D107 v6.0 multi-agent safety seed (registerSubAgent)
+- Current sprint: D108 v6.0 multi-agent safety seed (enforceSubAgentPolicy)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -93,6 +93,7 @@
 - D105 v5.0 cross-theme bridge: 1 new buildPolicySnapshot async function (orchestration layer: reuses D-100 buildCapabilityMatrix + D-101 generateChangelog + D-103 enforceProfilePolicy + D-104 evaluateCrossInstanceRollback; returns PolicySnapshot with capabilityMatrix + changelog + policyEnforcement + crossInstance + summary) + 1 PolicySnapshot interface + 1 PolicySnapshotSummary interface + 1 BuildPolicySnapshotInput interface + 4 new unit tests. v5.0 3-theme cross-bridge COMPLETE: plugin governance + distribution/upgrade + production hardening tied into 1 unified status struct.
 - D106 v6.0 master plan: 1 new docs/superpowers/v6.0-master-plan.md (4 themes: multi-agent safety + hosted/enterprise gates + distributed coordination + advanced observability; entry criteria checklist; first sub-sprint multi-agent safety seed designed) + 1 v6-plan-exists.test.ts (3 doc-existence tests) + 4 new entries. v6.0 plan promoted from 'planning preview only' to 'executable plan' (5/6 entry criteria checked).
 - D107 v6.0 multi-agent safety seed: 1 new SubAgentId branded type + 1 SubAgent interface + 1 SubAgentRegistry class (in-memory map-based, register/unregister/get/list/listByParent/size/clear + asSubAgentId + isSubAgentId helpers) + 1 new file + 1 new test file + 4 new unit tests. Multi-agent safety seed part 1 of 3 COMPLETE: foundational type system. D-108 will add enforceSubAgentPolicy; D-109 will add rollbackSubAgent.
+- D108 v6.0 multi-agent safety seed: 1 new enforceSubAgentPolicy thin wrapper function (reuses D-103 enforceProfilePolicy + D-107 SubAgent + D-94 DistributionManifest; returns SubAgentPolicyEvaluation with subAgentId + parentAgentId + decision (allow/deny) + summary) + 1 SubAgentPolicyEvaluation interface + 1 SubAgentPolicyDecision union + 4 new unit tests. Multi-agent safety seed part 2 of 3 COMPLETE: enforcement layer. D-109 will add rollbackSubAgent.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -110,8 +111,8 @@
 
 ### Next Decisions Needed
 
-1. D107 v6.0 multi-agent safety seed (registerSubAgent) is complete: 1 new file + 6 new unit tests (4 registry + 2 asSubAgentId). Multi-agent safety seed part 1 of 3 COMPLETE: foundational type system.
-2. Next implementation slice: D108 v6.0 multi-agent safety seed part 2 OR v5.0 4th theme cross-bridge (gated on user direction; enforceSubAgentPolicy reusing D-103 OR observability+auditability cross-bridge via PolicySnapshot).
+1. D108 v6.0 multi-agent safety seed (enforceSubAgentPolicy) is complete: 1 new function + 2 new types + 4 new unit tests. Multi-agent safety seed part 2 of 3 COMPLETE: enforcement layer.
+2. Next implementation slice: D109 v6.0 multi-agent safety seed part 3 OR v5.0 4th theme cross-bridge (gated on user direction; rollbackSubAgent reusing D-89 + D-104 OR observability+auditability cross-bridge via PolicySnapshot).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
