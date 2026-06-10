@@ -64,7 +64,8 @@
       "status": "planner/DAG/cache modules exist; main-loop integration remains limited",
       "evidence": [
         "planner, task DAG, and plan cache modules exist",
-        "module-level tests exist for planner foundations"
+        "module-level tests exist for planner foundations",
+        "D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview"
       ],
       "blockers": [
         "planner integration into the primary agent loop is limited",
@@ -107,8 +108,8 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.",
     "D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available.",
-    "D77: convert the v2.5 planner integration gap into a main-loop evidence fixture before any rescore."
+    "D77: convert the v2.5 planner integration gap into a main-loop evidence fixture before any rescore.",
+    "D78: harden cross-session memory crash/reload evidence before any v4.0 rescore."
   ]
 }

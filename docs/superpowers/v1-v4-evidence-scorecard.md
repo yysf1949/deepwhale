@@ -35,9 +35,10 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D72 release/version hygiene report distinguishes package version from roadmap maturity.
 - D73 live Browser task ledger records 0/20 live tasks and binding=false.
 - D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
+- D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 
 ## Next Actions
 
-1. D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.
-2. D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available.
-3. D77: convert the v2.5 planner integration gap into a main-loop evidence fixture before any rescore.
+1. D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available.
+2. D77: convert the v2.5 planner integration gap into a main-loop evidence fixture before any rescore.
+3. D78: harden cross-session memory crash/reload evidence before any v4.0 rescore.

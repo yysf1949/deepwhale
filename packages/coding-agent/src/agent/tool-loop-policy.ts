@@ -54,6 +54,16 @@ const DEFAULT_REVIEW_GATES: ReadonlyArray<string> = [
   'pnpm test',
 ];
 
+function latestUserGoal(messages: ReadonlyArray<ChatMessage>): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message?.role !== 'user' || typeof message.content !== 'string') continue;
+    const goal = message.content.trim();
+    if (goal.length > 0) return goal;
+  }
+  return undefined;
+}
+
 /**
  * Run a tool loop and (optionally) wire Reviewer / TaskGraph into the result.
  *
@@ -73,6 +83,10 @@ export async function runToolLoopWithReview(options: RunCommandWithReviewOptions
   if (loopOptions.isInteractive !== undefined) loopOptionsClean.isInteractive = loopOptions.isInteractive;
   if (loopOptions.yes !== undefined) loopOptionsClean.yes = loopOptions.yes;
   if (loopOptions.writer !== undefined) loopOptionsClean.writer = loopOptions.writer;
+  if (taskGraph) {
+    const goal = latestUserGoal(messages);
+    if (goal) await taskGraph.recordGoal(goal);
+  }
   let result: Awaited<ReturnType<typeof runToolLoop>>;
   try {
     result = await runToolLoop(client, messages, loopOptionsClean);

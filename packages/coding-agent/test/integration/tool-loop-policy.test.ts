@@ -114,4 +114,32 @@ describe('tool-loop-policy integration', () => {
     expect(recorded).toEqual(['bash']);
     expect(result.toolCallsRecorded).toBe(1);
   });
+
+  it('records the latest user goal into the task graph when provided', async () => {
+    const llm = new ScriptedLlm([stopResult]);
+    const recordedGoals: string[] = [];
+    const taskGraph: TaskGraphRecorder = {
+      async recordToolCall() {
+        /* noop */
+      },
+      async recordGoal(goal) {
+        recordedGoals.push(goal);
+      },
+    };
+
+    await runToolLoopWithReview({
+      client: llm,
+      messages: [
+        { role: 'system', content: 'system prompt' },
+        { role: 'user', content: 'first goal' },
+        { role: 'assistant', content: 'ack' },
+        { role: 'user', content: 'ship D75 task graph evidence' },
+      ],
+      registry: createDefaultRegistry(),
+      maxSteps: 3,
+      taskGraph,
+    });
+
+    expect(recordedGoals).toEqual(['ship D75 task graph evidence']);
+  });
 });
