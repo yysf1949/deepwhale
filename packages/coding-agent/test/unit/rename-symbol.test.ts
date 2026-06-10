@@ -48,6 +48,12 @@ describe('rename_symbol (D-32.2.4)', () => {
     expect(r.content).toMatch(/no-op/i);
   });
 
+  it('marks no-op success results as heuristic metadata', async () => {
+    const r = await tool.execute({ oldName: 'foo', newName: 'foo', path: tmpDir });
+    expect(r.success).toBe(true);
+    expect(r.meta).toMatchObject({ heuristic: true });
+  });
+
   it('returns (no changes) for unknown symbol', async () => {
     const r = await tool.execute({ oldName: 'nonexistent_xyz_abc', newName: 'newone', path: tmpDir });
     expect(r.success).toBe(true);

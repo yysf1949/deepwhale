@@ -89,7 +89,7 @@ export class RenameSymbolTool implements Tool {
       return { success: false, content: '', error: 'invalid-input: newName required' };
     }
     if (oldName === newName) {
-      return { success: true, content: '(oldName == newName, no-op)', meta: { changes: 0 } };
+      return { success: true, content: '(oldName == newName, no-op)', meta: { changes: 0, heuristic: true, dryRun: true } };
     }
     const repoPath = typeof input['path'] === 'string' ? resolve(input['path']) : process.cwd();
     try {

@@ -66,6 +66,7 @@ export class SmartSearchTool implements Tool {
           localCount: results.filter((r) => r.source === 'local').length,
           remoteCount: results.filter((r) => r.source === 'remote').length,
           remoteEnabled,
+          heuristic: true,
         },
       };
     } catch (e) {
