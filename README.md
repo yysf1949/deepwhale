@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D93 v5.0 plugin governance 3rd evidence (ToolRegistry.listByCapability)
+- Current sprint: D94 v5.0 distribution/upgrade flow 1st evidence (DistributionManifest)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -69,6 +69,7 @@
 - D91 v5.0 plugin governance minimal seed: 1 new ToolCapability type + 1 toolCapabilities helper + 1 isToolCapability type guard + 1 optional capabilities field on Tool (additive, backward-compatible) + 3 new unit tests. The v5.0 plugin-governance theme starts here; future D-92+ can backfill capabilities on specific tools and add a registry filter.
 - D92 v5.0 plugin governance 2nd evidence: 19 default tool files backfilled with accurate capabilities (BashTool -> shell-exec+network, ReadFileTool -> file-read, WriteFileTool/EditFileTool/PatchTool/RenameSymbolTool -> file-read+file-write, ExecuteCodeTool -> code-execute, 11 read-only tools -> file-read, TodoTool/PlanTool -> [] in-memory); 2 new unit tests verify all-19 invariant + 5 high-risk tool assertions. v5.0 plugin-governance theme has real evidence: vocabulary (D-91) + actual usage (D-92).
 - D93 v5.0 plugin governance 3rd evidence: ToolRegistry.listByCapability(cap) method added (composes D-91 toolCapabilities helper with existing list()) + 3 new unit tests assert correct subset for shell-exec / code-execute / file-write. Plugin-governance theme complete 1st cycle: vocabulary (D-91) + actual usage (D-92) + query (D-93).
+- D94 v5.0 distribution/upgrade flow 1st evidence: 1 new DistributionManifest type + 1 DISTRIBUTION_MANIFEST constant + 1 isValidDistributionManifest validator + 3 new unit tests. The 3rd v5.0 theme (distribution/upgrade flow) starts here; future D-95+ can build on this manifest (upgrade check, capability matrix, changelog generator).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -94,8 +95,8 @@
 
 ### Next Work
 
-1. D93 v5.0 plugin governance 3rd evidence (ToolRegistry.listByCapability) is complete: 1 new method + 3 new unit tests. Plugin-governance theme 1st cycle complete (vocabulary + actual usage + query).
-2. Next implementation slice: D94 v5.0 3rd theme start (gated on user direction; distribution/upgrade flow OR production hardening OR plugin governance 2nd cycle).
+1. D94 v5.0 distribution/upgrade flow 1st evidence (DistributionManifest) is complete: 1 new type + 1 constant + 1 validator + 3 new unit tests. The 3rd v5.0 theme starts here.
+2. Next implementation slice: D95 v5.0 distribution/upgrade flow 2nd evidence (gated on user direction; upgrade check function OR capability matrix OR changelog generator).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -158,8 +159,9 @@
 - D91 plan: docs/superpowers/plans/2026-06-10-d91-v5.0-tool-capabilities.md
 - D92 plan: docs/superpowers/plans/2026-06-10-d92-v5.0-default-tool-capabilities.md
 - D93 plan: docs/superpowers/plans/2026-06-10-d93-v5.0-registry-capability-filter.md
+- D94 plan: docs/superpowers/plans/2026-06-10-d94-v5.0-distribution-manifest.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D93.
+- Last status hygiene sprint: D94.
 
 <!-- status:current:end -->
 
