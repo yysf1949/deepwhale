@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D112 v6.0 Theme 2 seed (enforceTenantQuota)
+- Current sprint: D113 v6.0 Theme 2 seed (validateOidcToken)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -88,6 +88,7 @@
 - D110 v6.0 multi-agent safety 2nd cycle cross-bridge: 1 new buildSubAgentPolicySnapshot async function (orchestration layer: reuses D-108 enforceSubAgentPolicy + D-109 rollbackSubAgent + D-94 DistributionManifest; returns SubAgentPolicySnapshot with policy + rollback + summary; canRun = policy.allow && rollback !== rolled-back) + 1 SubAgentPolicySnapshot interface + 1 SubAgentPolicySnapshotSummary interface + 1 BuildSubAgentPolicySnapshotInput interface + 4 new unit tests. v6.0 Theme 1 (multi-agent safety) 2nd cycle cross-bridge COMPLETE: mirrors v5.0 D-105 buildPolicySnapshot pattern. v6.0 Theme 1 SEED + CROSS-BRIDGE COMPLETE: 4 sub-sprints (D-107 + D-108 + D-109 + D-110) shipped.
 - D111 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new enforceRateLimit pure function (per-tenant rate limiting: returns RateLimitResult with decision 'allow'/'allow-with-warning'/'deny' + utilizationPercent + retryAfterMs + summary; supports warnAtPercent default 80%) + 1 TenantId branded type + 1 asTenantId + 1 isTenantId + 1 RateLimitPolicy interface + 1 RateLimitDecision union + 1 RateLimitResult interface + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed start: per-tenant rate limiting foundational types + enforcement function. D-112+ will add billing/quota, SSO/OIDC, SIEM integration.
 - D112 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new enforceTenantQuota pure function (per-tenant billing/quota: returns QuotaResult with decision 'allow'/'allow-with-warning'/'deny' + utilizationPercent + overage + summary; supports warnAtPercent default 80% + 4 CostDimension types: tokens, requests, storage, compute-seconds) + 1 TenantQuota interface + 1 CostDimension union + 1 QuotaDecision union + 1 QuotaResult interface + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 2 of 3+ COMPLETE. D-112 complements D-111 (rate limit time-windowed) by tracking cumulative usage. D-113+ will add SSO/OIDC, SIEM integration; D-114+ planned for Theme 2 2nd cycle cross-bridge.
+- D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new validateOidcToken pure function (SSO/OIDC integration: validates claim-level invariants (expiry + issuer + audience) + extracts tenantId + subject; trusts caller's pre-decoded claims; NO JWT signature verification yet) + 1 OidcProvider interface + 1 OidcToken interface + 1 OidcAuthResult interface + 1 OidcValidationOptions interface + 1 OidcAuthDecision union + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). D-114+ planned: SIEM integration, Theme 2 2nd cycle cross-bridge.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -113,8 +114,8 @@
 
 ### Next Work
 
-1. D112 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed (enforceTenantQuota) is complete: 1 new function + 4 new types + 4 new unit tests. v6.0 Theme 2 seed part 2 of 3+ COMPLETE. D-112 complements D-111 (rate limit time-windowed) by tracking cumulative usage. D-113+ will add SSO/OIDC, SIEM integration; D-114+ planned for Theme 2 2nd cycle cross-bridge.
-2. Next implementation slice: D113 v6.0 Theme 2 seed part 3 (SSO/OIDC integration) OR v6.0 Theme 1 3rd cycle (CLI integration with D-89) (gated on user direction).
+1. D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed (validateOidcToken) is complete: 1 new function + 5 new types + 4 new unit tests. v6.0 Theme 2 seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). D-114+ planned: SIEM integration, Theme 2 2nd cycle cross-bridge.
+2. Next implementation slice: D114 v6.0 Theme 2 2nd cycle cross-bridge (buildTenantPolicySnapshot unifying rate-limit + quota + auth) OR v6.0 Theme 1 3rd cycle (CLI integration with D-89) (gated on user direction).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -196,8 +197,9 @@
 - D110 plan: docs/superpowers/plans/2026-06-10-d110-v6.0-sub-agent-policy-snapshot.md
 - D111 plan: docs/superpowers/plans/2026-06-10-d111-v6.0-tenant-rate-limit.md
 - D112 plan: docs/superpowers/plans/2026-06-10-d112-v6.0-tenant-quota.md
+- D113 plan: docs/superpowers/plans/2026-06-10-d113-v6.0-sso-oidc.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D112.
+- Last status hygiene sprint: D113.
 
 <!-- status:current:end -->
 
