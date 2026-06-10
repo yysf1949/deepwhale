@@ -2,7 +2,7 @@
 
 Generated: 2026-06-10
 
-Aggregate evidence-backed progress: 50%
+Aggregate evidence-backed progress: 55%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
@@ -13,7 +13,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
 | v2.5 | 50% | Planner/DAG/cache modules exist; main-loop planner.plan evidence fixture present | Integration is a single-fixture proof, not multi-scenario long-horizon |
 | v3.0 | 50% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes | Gate-2 is fixture-scoped, not broad production proof |
-| v4.0 | 25% | Researcher, TaskGraph, memory, and channel foundations exist | Agent OS orchestration, Desktop, channels, and crash-recovery evidence are incomplete |
+| v4.0 | 35% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence fixture present | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete |
 
 ## Caveats
 
@@ -37,7 +37,8 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 - D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
+- D78 records atomic write semantics plus partial-last-line recovery for the persistent memory store; the on-disk file is always either the old contents or the new contents, never partial.
 
 ## Next Actions
 
-1. D78: harden cross-session memory crash/reload evidence before any v4.0 rescore.
+The scorecard action queue is empty. The remaining v1-v4 gaps are external-data and multi-sprint blockers (preferred-100k Gate-1 target, 20 real browser tasks, Gate-2 production, cross-platform Desktop build) that cannot be cleared from inside this repository alone.

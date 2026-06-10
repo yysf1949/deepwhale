@@ -8,7 +8,7 @@
  * and recovered.
  */
 
-import { promises as fs } from 'node:fs';
+import { closeSync, fsyncSync, openSync, promises as fs, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
 export type MemoryScope = 'user' | 'project' | 'session';
@@ -46,9 +46,9 @@ export class PersistentMemoryStore {
   }
 
   async load(): Promise<void> {
+    let raw: string;
     try {
-      const raw = await fs.readFile(this.file, 'utf8');
-      this.items = raw.split('\n').filter(Boolean).map((line) => JSON.parse(line) as PersistentMemoryItem);
+      raw = await fs.readFile(this.file, 'utf8');
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         this.items = [];
@@ -56,6 +56,21 @@ export class PersistentMemoryStore {
       }
       throw err;
     }
+    const lines = raw.split('\n').filter(Boolean);
+    const parsed: PersistentMemoryItem[] = [];
+    for (const line of lines) {
+      try {
+        parsed.push(JSON.parse(line) as PersistentMemoryItem);
+      } catch {
+        // Stop at the first corrupt line: the previous flush was interrupted.
+        // The atomic-rename write path means the destination is either the
+        // old contents or the new contents; a corrupt line here means the
+        // destination itself was truncated. Keep the successfully-parsed
+        // lines and stop.
+        break;
+      }
+    }
+    this.items = parsed;
   }
 
   async put(input: PutMemoryInput): Promise<void> {
@@ -116,7 +131,21 @@ export class PersistentMemoryStore {
   private async flush(): Promise<void> {
     await fs.mkdir(join(this.file, '..'), { recursive: true });
     const lines = this.items.map((m) => JSON.stringify(m));
-    await fs.writeFile(this.file, lines.join('\n') + (lines.length ? '\n' : ''));
+    const payload = lines.length ? lines.join('\n') + '\n' : '';
+    const tmp = `${this.file}.tmp-${process.pid}-${Date.now()}`;
+    // Write to temp, fsync, then rename over the destination. The rename is
+    // atomic on POSIX and Node.js >= 15 on Windows (uses MoveFileEx with
+    // MOVEFILE_REPLACE_EXISTING), so the destination is always either the
+    // old contents or the new contents, never partial.
+    await fs.writeFile(tmp, payload);
+    try {
+      const fd = openSync(tmp, 'r');
+      try { fsyncSync(fd); } finally { closeSync(fd); }
+    } catch {
+      // Best-effort fsync; if it fails (e.g. unsupported FS), the rename
+      // still gives us atomic-rename semantics.
+    }
+    renameSync(tmp, this.file);
   }
 }
 

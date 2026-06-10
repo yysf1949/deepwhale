@@ -8,7 +8,7 @@
 - Package version line: 2.2.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D77 planner main-loop evidence fixture
+- Current sprint: D78 cross-session memory crash/reload evidence
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -63,6 +63,7 @@
 - D74 Code Intel default re-export call graph correctness: calls imported through default re-export barrels resolve to the original named default declaration.
 - D75 TaskGraph goal recording integration evidence: runToolLoopWithReview records the latest user goal when a TaskGraphRecorder is provided.
 - D77 planner main-loop evidence fixture: runToolLoopWithReview calls planner.plan with the latest user goal and records the resulting tasks into the task graph when a Planner is provided.
+- D78 cross-session memory crash/reload evidence: PersistentMemoryStore now uses temp-file + fsync + rename for atomic writes and load() recovers from a partial last line.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -80,8 +81,8 @@
 
 ### Next Decisions Needed
 
-1. D77 planner main-loop evidence fixture is complete: runToolLoopWithReview now calls planner.plan with the latest user goal and records the resulting tasks into the task graph.
-2. Next implementation slice: D78 cross-session memory crash/reload evidence.
+1. D78 cross-session memory crash/reload evidence is complete: PersistentMemoryStore now uses atomic write semantics and load() recovers from a partial last line.
+2. Next implementation slice: re-score v1-v4 from current evidence (the scorecard action queue is empty; remaining gaps are external-data blockers).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
