@@ -21,7 +21,7 @@ The v5.0 themes remain the same: production hardening, plugin governance, distri
 - v2.5 percent: 65% (gate threshold: 65%, REACHED 2026-06-10 D-82)
 - v2.5 implementation gate: reached
 - **Aggregate implementation gate: REACHED 2026-06-10 D-86**
-- v5.0 implementation is now ACTIVE: 6 evidence items across 2 themes. Theme 1: observability+auditability quartet complete (D-87 seed, D-88 integration, D-89 persistence, D-90 query). Theme 2: plugin governance has vocabulary + actual usage (D-91 type/helper, D-92 backfilled 19 default tools). 5 红线 scope was intentionally modified once (D-88 additive) and is back to empty from D-89 onward.
+- v5.0 implementation is now ACTIVE: 7 evidence items across 2 themes. Theme 1: observability+auditability quartet complete (D-87 seed, D-88 integration, D-89 persistence, D-90 query). Theme 2: plugin governance 1st cycle complete (D-91 vocabulary, D-92 actual usage on 19 default tools, D-93 query via ToolRegistry.listByCapability). 5 红线 scope was intentionally modified once (D-88 additive) and is back to empty from D-89 onward.
 - D-87 sub-sprint: AuditLog minimal seed (in-memory, append-only, deterministic timestamps). Next v5.0 sub-sprints: file-backed persistence / ToolLoopPolicy integration / CLI dump.
 
 ## V5.0 Production Hardening And Distribution

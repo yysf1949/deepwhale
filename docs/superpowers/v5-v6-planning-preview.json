@@ -34,7 +34,8 @@
         "D-89 (AuditLog file-backed persistence): PersistingAuditLog extends AuditLog with JSONL atomic write + partial-line recovery; cross-instance fixture present (mirror D-78 + D-80 pattern)",
         "D-90 (AuditLog reader): standalone async readAuditLog function with partial-line recovery + ENOENT handling; completes the v5 observability quartet (write D-87/88/89 + read D-90)",
         "D-91 (Plugin governance minimal seed): ToolCapability type + toolCapabilities helper + isToolCapability type guard + 3 unit tests. Optional capabilities field on Tool (additive, backward-compatible). The plugin-governance theme starts here.",
-        "D-92 (Plugin governance 2nd evidence: default tool capability backfill): all 19 default tools now declare accurate capabilities; 2 new unit tests verify completeness + accuracy. Plugin-governance theme now has real evidence (vocabulary D-91 + actual usage D-92)."
+        "D-92 (Plugin governance 2nd evidence: default tool capability backfill): all 19 default tools now declare accurate capabilities; 2 new unit tests verify completeness + accuracy. Plugin-governance theme now has real evidence (vocabulary D-91 + actual usage D-92).",
+        "D-93 (Plugin governance 3rd evidence: ToolRegistry.listByCapability): registry-level filter composes D-91 toolCapabilities helper with existing list(); 3 new unit tests assert correct subset for shell-exec / code-execute / file-write. Plugin-governance theme 1st cycle complete (vocabulary + actual usage + query)."
       ],
       "themes": [
         "production hardening",

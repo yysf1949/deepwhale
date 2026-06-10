@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D92 v5.0 plugin governance 2nd evidence (default tool capability backfill)
+- Current sprint: D93 v5.0 plugin governance 3rd evidence (ToolRegistry.listByCapability)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -78,6 +78,7 @@
 - D90 v5.0 observability+auditability query side: 1 new readAuditLog function (standalone async, JSONL reader with partial-line recovery + ENOENT handling) + 3 new unit tests (round-trip + ENOENT + partial-line). Completes the v5 audit log quartet: write (D-87/88/89) + read (D-90).
 - D91 v5.0 plugin governance minimal seed: 1 new ToolCapability type + 1 toolCapabilities helper + 1 isToolCapability type guard + 1 optional capabilities field on Tool (additive, backward-compatible) + 3 new unit tests. The v5.0 plugin-governance theme starts here; future D-92+ can backfill capabilities on specific tools and add a registry filter.
 - D92 v5.0 plugin governance 2nd evidence: 19 default tool files backfilled with accurate capabilities (BashTool -> shell-exec+network, ReadFileTool -> file-read, WriteFileTool/EditFileTool/PatchTool/RenameSymbolTool -> file-read+file-write, ExecuteCodeTool -> code-execute, 11 read-only tools -> file-read, TodoTool/PlanTool -> [] in-memory); 2 new unit tests verify all-19 invariant + 5 high-risk tool assertions. v5.0 plugin-governance theme has real evidence: vocabulary (D-91) + actual usage (D-92).
+- D93 v5.0 plugin governance 3rd evidence: ToolRegistry.listByCapability(cap) method added (composes D-91 toolCapabilities helper with existing list()) + 3 new unit tests assert correct subset for shell-exec / code-execute / file-write. Plugin-governance theme complete 1st cycle: vocabulary (D-91) + actual usage (D-92) + query (D-93).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -95,8 +96,8 @@
 
 ### Next Decisions Needed
 
-1. D92 v5.0 plugin governance 2nd evidence (default tool capability backfill) is complete: 19 default tool files backfilled + 2 new unit tests. v5.0 plugin-governance theme has real evidence.
-2. Next implementation slice: D93 v5.0 plugin governance 3rd evidence (gated on user direction; registry-level capability filter OR profile-level capability policy).
+1. D93 v5.0 plugin governance 3rd evidence (ToolRegistry.listByCapability) is complete: 1 new method + 3 new unit tests. Plugin-governance theme 1st cycle complete (vocabulary + actual usage + query).
+2. Next implementation slice: D94 v5.0 3rd theme start (gated on user direction; distribution/upgrade flow OR production hardening OR plugin governance 2nd cycle).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

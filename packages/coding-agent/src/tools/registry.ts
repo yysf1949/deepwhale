@@ -10,6 +10,7 @@
 import type { Tool, ToolName } from '../types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import { LocalSandboxRunner } from '../sandbox/local-runner.js';
+import { toolCapabilities, type ToolCapability } from '../governance/tool-capabilities.js';
 import { ReadFileTool } from './read-file.js';
 import { WriteFileTool } from './write-file.js';
 import { EditFileTool } from './edit-file.js';
@@ -57,6 +58,16 @@ export class ToolRegistry {
 
   list(): ReadonlyArray<Tool> {
     return Array.from(this.tools.values());
+  }
+
+  /**
+   * D-93 v5.0 plugin governance: return the tools that declare the given
+   * capability. Composes the D-91 toolCapabilities() helper with list().
+   * The helper returns [] for tools that don't declare capabilities
+   * (backward-compatible), so the filter correctly excludes such tools.
+   */
+  listByCapability(cap: ToolCapability): Tool[] {
+    return this.list().filter((t) => toolCapabilities(t).includes(cap));
   }
 
   size(): number {
