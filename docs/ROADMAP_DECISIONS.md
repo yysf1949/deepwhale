@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D98 v5.0 production hardening 3rd evidence (installProcessUncaughtHandlers)
+- Current sprint: D99 v5.0 production hardening 4th evidence (gracefulShutdown)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -84,6 +84,7 @@
 - D96 v5.0 production hardening 1st evidence: 1 new formatFatalError function (pure, defensive, never throws) + 1 recordFatalEvent helper (cross-theme bridge into v5.0 AuditLog from D-87) + 1 FatalErrorEvent interface + 4 new unit tests. The 4th and final v5.0 theme (production hardening) starts here; future D-97+ can build on this formatter (SIGINT/SIGTERM handler, uncaught exception hook, graceful shutdown sequence).
 - D97 v5.0 production hardening 2nd evidence: 1 new installSignalHandlers function (SIGINT + SIGTERM, cross-theme bridge into v5.0 AuditLog via 'fatal-signal' events, idempotent cleanup) + 1 SignalHandlerOptions interface + 4 new unit tests. Production-hardening 1st cycle complete: format fatal errors (D-96) + handle process signals (D-97).
 - D98 v5.0 production hardening 3rd evidence: 1 new installProcessUncaughtHandlers function (uncaughtException + unhandledRejection, cross-theme bridge into v5.0 AuditLog via 'fatal-uncaught' events, idempotent cleanup, default-onUncaught uses process.exit(1) for non-zero failure exit) + 1 ProcessUncaughtHandlerOptions interface + 1 NormalizedUncaughtPayload interface + 4 new unit tests. Production-hardening theme now covers a 3-event taxonomy: format fatal errors (D-96) + handle process signals (D-97) + catch unhandled exceptions (D-98).
+- D99 v5.0 production hardening 4th evidence: 1 new gracefulShutdown async function (sequences beforeExit -> auditLog record -> onComplete in 3 ordered steps; cross-theme bridge into v5.0 AuditLog via 'graceful-shutdown' events; defensive: errors at any step are caught and surfaced via ShutdownResult) + 1 GracefulShutdownOptions interface + 1 ShutdownResult interface + 1 ShutdownTrigger union + 4 new unit tests. Production-hardening 4-step protocol COMPLETE: format fatal errors (D-96) + handle process signals (D-97) + catch unhandled exceptions (D-98) + drain pending work (D-99).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -101,8 +102,8 @@
 
 ### Next Decisions Needed
 
-1. D98 v5.0 production hardening 3rd evidence (installProcessUncaughtHandlers) is complete: 1 new function + 2 new interfaces + 4 new unit tests. Production-hardening 3-event taxonomy: format D-96 + handle D-97 + catch D-98.
-2. Next implementation slice: D99 v5.0 production hardening 4th evidence OR 2nd cycle (gated on user direction; graceful shutdown sequence OR process-level exit policy OR uncaught handler integration into runToolLoop).
+1. D99 v5.0 production hardening 4th evidence (gracefulShutdown) is complete: 1 new function + 3 new types + 4 new unit tests. Production-hardening 4-step protocol COMPLETE: format D-96 + handle D-97 + catch D-98 + drain D-99.
+2. Next implementation slice: D100 v5.0 plugin governance 2nd cycle OR distribution/upgrade flow 2nd cycle (gated on user direction; cross-pkg capability matrix OR changelog generator OR persisted-config-loader).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

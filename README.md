@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D98 v5.0 production hardening 3rd evidence (installProcessUncaughtHandlers)
+- Current sprint: D99 v5.0 production hardening 4th evidence (gracefulShutdown)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -74,6 +74,7 @@
 - D96 v5.0 production hardening 1st evidence: 1 new formatFatalError function (pure, defensive, never throws) + 1 recordFatalEvent helper (cross-theme bridge into v5.0 AuditLog from D-87) + 1 FatalErrorEvent interface + 4 new unit tests. The 4th and final v5.0 theme (production hardening) starts here; future D-97+ can build on this formatter (SIGINT/SIGTERM handler, uncaught exception hook, graceful shutdown sequence).
 - D97 v5.0 production hardening 2nd evidence: 1 new installSignalHandlers function (SIGINT + SIGTERM, cross-theme bridge into v5.0 AuditLog via 'fatal-signal' events, idempotent cleanup) + 1 SignalHandlerOptions interface + 4 new unit tests. Production-hardening 1st cycle complete: format fatal errors (D-96) + handle process signals (D-97).
 - D98 v5.0 production hardening 3rd evidence: 1 new installProcessUncaughtHandlers function (uncaughtException + unhandledRejection, cross-theme bridge into v5.0 AuditLog via 'fatal-uncaught' events, idempotent cleanup, default-onUncaught uses process.exit(1) for non-zero failure exit) + 1 ProcessUncaughtHandlerOptions interface + 1 NormalizedUncaughtPayload interface + 4 new unit tests. Production-hardening theme now covers a 3-event taxonomy: format fatal errors (D-96) + handle process signals (D-97) + catch unhandled exceptions (D-98).
+- D99 v5.0 production hardening 4th evidence: 1 new gracefulShutdown async function (sequences beforeExit -> auditLog record -> onComplete in 3 ordered steps; cross-theme bridge into v5.0 AuditLog via 'graceful-shutdown' events; defensive: errors at any step are caught and surfaced via ShutdownResult) + 1 GracefulShutdownOptions interface + 1 ShutdownResult interface + 1 ShutdownTrigger union + 4 new unit tests. Production-hardening 4-step protocol COMPLETE: format fatal errors (D-96) + handle process signals (D-97) + catch unhandled exceptions (D-98) + drain pending work (D-99).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -99,8 +100,8 @@
 
 ### Next Work
 
-1. D98 v5.0 production hardening 3rd evidence (installProcessUncaughtHandlers) is complete: 1 new function + 2 new interfaces + 4 new unit tests. Production-hardening 3-event taxonomy: format D-96 + handle D-97 + catch D-98.
-2. Next implementation slice: D99 v5.0 production hardening 4th evidence OR 2nd cycle (gated on user direction; graceful shutdown sequence OR process-level exit policy OR uncaught handler integration into runToolLoop).
+1. D99 v5.0 production hardening 4th evidence (gracefulShutdown) is complete: 1 new function + 3 new types + 4 new unit tests. Production-hardening 4-step protocol COMPLETE: format D-96 + handle D-97 + catch D-98 + drain D-99.
+2. Next implementation slice: D100 v5.0 plugin governance 2nd cycle OR distribution/upgrade flow 2nd cycle (gated on user direction; cross-pkg capability matrix OR changelog generator OR persisted-config-loader).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -168,8 +169,9 @@
 - D96 plan: docs/superpowers/plans/2026-06-10-d96-v5.0-fatal-error-formatter.md
 - D97 plan: docs/superpowers/plans/2026-06-10-d97-v5.0-signal-handler.md
 - D98 plan: docs/superpowers/plans/2026-06-10-d98-v5.0-process-uncaught-handler.md
+- D99 plan: docs/superpowers/plans/2026-06-10-d99-v5.0-graceful-shutdown.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D98.
+- Last status hygiene sprint: D99.
 
 <!-- status:current:end -->
 

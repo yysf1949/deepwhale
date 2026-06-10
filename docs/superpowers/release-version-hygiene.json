@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D99: v5.0 production hardening 4th evidence OR 2nd cycle (gated on user direction)."
+  "nextAction": "D100: v5.0 plugin governance 2nd cycle OR distribution/upgrade flow 2nd cycle (gated on user direction)."
 }
