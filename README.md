@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D108 v6.0 multi-agent safety seed (enforceSubAgentPolicy)
+- Current sprint: D109 v6.0 multi-agent safety seed (rollbackSubAgent)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -84,6 +84,7 @@
 - D106 v6.0 master plan: 1 new docs/superpowers/v6.0-master-plan.md (4 themes: multi-agent safety + hosted/enterprise gates + distributed coordination + advanced observability; entry criteria checklist; first sub-sprint multi-agent safety seed designed) + 1 v6-plan-exists.test.ts (3 doc-existence tests) + 4 new entries. v6.0 plan promoted from 'planning preview only' to 'executable plan' (5/6 entry criteria checked).
 - D107 v6.0 multi-agent safety seed: 1 new SubAgentId branded type + 1 SubAgent interface + 1 SubAgentRegistry class (in-memory map-based, register/unregister/get/list/listByParent/size/clear + asSubAgentId + isSubAgentId helpers) + 1 new file + 1 new test file + 4 new unit tests. Multi-agent safety seed part 1 of 3 COMPLETE: foundational type system. D-108 will add enforceSubAgentPolicy; D-109 will add rollbackSubAgent.
 - D108 v6.0 multi-agent safety seed: 1 new enforceSubAgentPolicy thin wrapper function (reuses D-103 enforceProfilePolicy + D-107 SubAgent + D-94 DistributionManifest; returns SubAgentPolicyEvaluation with subAgentId + parentAgentId + decision (allow/deny) + summary) + 1 SubAgentPolicyEvaluation interface + 1 SubAgentPolicyDecision union + 4 new unit tests. Multi-agent safety seed part 2 of 3 COMPLETE: enforcement layer. D-109 will add rollbackSubAgent.
+- D109 v6.0 multi-agent safety seed: 1 new rollbackSubAgent pure function (identifies sub-agent-owned events via event.payload.subAgentId + marks with rolledBackAt + rollbackReason + emits new 'sub-agent-rollback' event; supports dryRun mode for preview) + 1 SubAgentRollbackResult interface + 1 SubAgentRollbackOptions interface + 1 SubAgentRollbackOutcome union + 4 new unit tests. Multi-agent safety seed part 3 of 3 COMPLETE: rollback side. v6.0 Theme 1 (multi-agent safety) SEED-COMPLETE: 3 of 3 sub-sprints (D-107 + D-108 + D-109) shipped.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -109,8 +110,8 @@
 
 ### Next Work
 
-1. D108 v6.0 multi-agent safety seed (enforceSubAgentPolicy) is complete: 1 new function + 2 new types + 4 new unit tests. Multi-agent safety seed part 2 of 3 COMPLETE: enforcement layer.
-2. Next implementation slice: D109 v6.0 multi-agent safety seed part 3 OR v5.0 4th theme cross-bridge (gated on user direction; rollbackSubAgent reusing D-89 + D-104 OR observability+auditability cross-bridge via PolicySnapshot).
+1. D109 v6.0 multi-agent safety seed (rollbackSubAgent) is complete: 1 new function + 3 new types + 4 new unit tests. Multi-agent safety seed part 3 of 3 COMPLETE: rollback side. v6.0 Theme 1 (multi-agent safety) SEED-COMPLETE: 3 of 3 sub-sprints (D-107 + D-108 + D-109) shipped.
+2. Next implementation slice: D110 v6.0 multi-agent safety Theme 1 2nd cycle cross-bridge OR v5.0 4th theme cross-bridge (gated on user direction; buildSubAgentPolicySnapshot unifying enforceSubAgentPolicy + rollbackSubAgent OR observability+auditability cross-bridge via PolicySnapshot).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -188,8 +189,9 @@
 - D106 plan: docs/superpowers/plans/2026-06-10-d106-v6.0-master-plan.md
 - D107 plan: docs/superpowers/plans/2026-06-10-d107-v6.0-multi-agent-sub-agent.md
 - D108 plan: docs/superpowers/plans/2026-06-10-d108-v6.0-multi-agent-sub-agent-policy.md
+- D109 plan: docs/superpowers/plans/2026-06-10-d109-v6.0-rollback-sub-agent.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D108.
+- Last status hygiene sprint: D109.
 
 <!-- status:current:end -->
 
