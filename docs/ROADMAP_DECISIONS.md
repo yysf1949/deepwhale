@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D96 v5.0 production hardening 1st evidence (fatal-error formatter)
+- Current sprint: D97 v5.0 production hardening 2nd evidence (installSignalHandlers)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -82,6 +82,7 @@
 - D94 v5.0 distribution/upgrade flow 1st evidence: 1 new DistributionManifest type + 1 DISTRIBUTION_MANIFEST constant + 1 isValidDistributionManifest validator + 3 new unit tests. The 3rd v5.0 theme (distribution/upgrade flow) starts here; future D-95+ can build on this manifest (upgrade check, capability matrix, changelog generator).
 - D95 v5.0 distribution/upgrade flow 2nd evidence: 1 new compareVersions function (pure, no I/O, no external semver dep) + 1 UpgradeCheckResult interface + 1 UpgradeSeverity union + 4 new unit tests. The 2nd evidence piece of the distribution/upgrade flow theme: D-94 manifest answers "what am I?"; D-95 compareVersions answers "do I need to upgrade?"; together they form the v5.0 distribution/upgrade flow 1st cycle (description + decision).
 - D96 v5.0 production hardening 1st evidence: 1 new formatFatalError function (pure, defensive, never throws) + 1 recordFatalEvent helper (cross-theme bridge into v5.0 AuditLog from D-87) + 1 FatalErrorEvent interface + 4 new unit tests. The 4th and final v5.0 theme (production hardening) starts here; future D-97+ can build on this formatter (SIGINT/SIGTERM handler, uncaught exception hook, graceful shutdown sequence).
+- D97 v5.0 production hardening 2nd evidence: 1 new installSignalHandlers function (SIGINT + SIGTERM, cross-theme bridge into v5.0 AuditLog via 'fatal-signal' events, idempotent cleanup) + 1 SignalHandlerOptions interface + 4 new unit tests. Production-hardening 1st cycle complete: format fatal errors (D-96) + handle process signals (D-97).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -99,8 +100,8 @@
 
 ### Next Decisions Needed
 
-1. D96 v5.0 production hardening 1st evidence (fatal-error formatter) is complete: 1 new function + 1 new helper + 1 new interface + 4 new unit tests. The 4th and final v5.0 theme starts here. Cross-theme bridge: fatal events flow into v5.0 audit log (D-87/88/89/90).
-2. Next implementation slice: D97 v5.0 production hardening 2nd evidence (gated on user direction; SIGINT/SIGTERM handler OR uncaught exception hook OR graceful shutdown sequence).
+1. D97 v5.0 production hardening 2nd evidence (installSignalHandlers) is complete: 1 new function + 1 new interface + 4 new unit tests. Production-hardening 1st cycle complete (format D-96 + handle D-97).
+2. Next implementation slice: D98 v5.0 production hardening 3rd evidence OR 2nd cycle (gated on user direction; uncaught exception hook OR graceful shutdown sequence OR process-level exit policy).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
