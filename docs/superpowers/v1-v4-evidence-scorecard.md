@@ -2,13 +2,13 @@
 
 Generated: 2026-06-10
 
-Aggregate evidence-backed progress: 61%
+Aggregate evidence-backed progress: 62%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
 | Milestone | Percent | Evidence-backed status | Main blockers |
 | --- | ---: | --- | --- |
-| v1.0 | 75% | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | No new public code claims; v1.0 ship ritual (tag, npm publish) is gated on user approval |
+| v1.0 | 80% | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79); default registry invariant asserted (D-83) | No new public code claims; v1.0 ship ritual (tag, npm publish) is gated on user approval |
 | v1.5 | 65% | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename |
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
 | v2.5 | 65% | Planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 + D-82); v5 implementation gate reached (v2.5 >= 65%) | Integration is 5 fixtures; a real long-horizon multi-step execution run is still not proven in this scorecard; release gate scenarios are not freshly proven |
@@ -42,6 +42,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D80 records cross-session TaskGraph persistence: a second PersistingTaskGraphRecorder instance loaded from the same file sees the first instance's records (D-78 storage layer + D-80 Agent OS layer).
 - D81 adds 3 multi-scenario planner integration tests: multi-task DAG with dependsOn dependencies, tool spec preservation, and negative test confirming planner is gated by goal presence.
 - D82 adds 1 investigate-goal scenario (single task, no dependsOn) -- brings v2.5 to 65%, crossing the v5 implementation gate threshold.
+- D83 records a v1.0 default-registry invariant: 19-tool narrow default + no non-coding opt-in tools exposed by default (verified by 2 unit tests).
 
 ## Next Actions
 

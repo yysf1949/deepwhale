@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D82 v2.5 investigate-goal scenario fixture
+- Current sprint: D83 v1.0 default registry invariant fixture
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -68,6 +68,7 @@
 - D80 TaskGraph cross-session persistence evidence: PersistingTaskGraphRecorder mirrors the PersistentMemoryStore pattern (JSONL + atomic-rename + partial-line recovery); cross-session integration test records in instance A, then verifies instance B (same file) sees A's entries.
 - D81 v2.5 multi-scenario planner evidence: 3 new planner integration scenarios (multi-task DAG with dependsOn dependencies, tool spec preservation, and negative test confirming planner is gated by goal presence) advance the v2.5 blocker from 'single-fixture proof' to 'multi-scenario evidence'.
 - D82 v2.5 investigate-goal scenario fixture: 1 new planner integration scenario (single-task investigation, no dependsOn) advances v2.5 to 65% and crosses the v5 implementation gate threshold (>=65%).
+- D83 v1.0 default registry invariant fixture: 2 new unit tests assert the default registry contains exactly 19 tools (coding + Code Intel essentials) and no non-coding opt-in tools are exposed by default.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -85,8 +86,8 @@
 
 ### Next Decisions Needed
 
-1. D82 v2.5 investigate-goal scenario fixture is complete: 1 new scenario (single-task investigation) advances v2.5 to 65% and crosses the v5 implementation gate.
-2. Next implementation slice: D83 v5 implementation kickoff (gated on user direction; v5 plan doc exists at docs/superpowers/plans/2026-06-10-d75-taskgraph-goal-recording.md).
+1. D83 v1.0 default registry invariant fixture is complete: 2 new unit tests assert exactly 19 default tools and no non-coding opt-in tools are exposed.
+2. Next implementation slice: D84 v1.5 Code Intel fixture (gated on user direction; v5 gate still blocked on aggregate 62% < 65%).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
