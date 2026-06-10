@@ -283,6 +283,62 @@ describe('rename_symbol conservative mode (D-33.2.2)', () => {
     }
   });
 
+  it('dry-run reports hashline edit hunks and heuristic confidence metadata', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d67-hunks-'));
+    try {
+      writeFileSync(
+        join(dir, 'provider.ts'),
+        [
+          'export function target() {',
+          '  return target();',
+          '}',
+          'function helper() {',
+          '  return 1;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('Confidence: heuristic');
+      expect(result.content).toContain('@@');
+      expect(result.meta).toMatchObject({
+        heuristic: true,
+        confidence: 'heuristic',
+        editEngine: 'hashline',
+        dryRun: true,
+      });
+      expect(result.meta?.editHunks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            file: 'provider.ts',
+            line: 1,
+            kind: 'declaration',
+            engine: 'hashline',
+            confidence: 'heuristic',
+            oldText: 'export function target() {',
+            newText: 'export function renamedTarget() {',
+          }),
+          expect.objectContaining({
+            file: 'provider.ts',
+            line: 2,
+            oldText: '  return target();',
+            newText: '  return renamedTarget();',
+          }),
+        ]),
+      );
+      expect(readFileSync(join(dir, 'provider.ts'), 'utf8')).toContain('export function target()');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('renames a real TypeScript call after a private field on the same line', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d60-private-field-'));
     try {

@@ -12,6 +12,7 @@
 import { readFile, writeFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
+import { computeLineHashes, createDefaultEngine, type EditEngine, type EditIntent } from '@deepwhale/edit-engine';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { buildSymbolGraph, findReferences, type Reference, type SymbolGraph } from '@deepwhale/code-intel';
 
@@ -38,6 +39,31 @@ interface LexicalScanOptions {
   readonly slashLineComments: boolean;
   readonly hashLineComments: boolean;
   readonly skipHashPrivateIdentifier: boolean;
+}
+
+interface RenameEditHunk {
+  file: string;
+  line: number;
+  kind: Reference['kind'] | 'textual';
+  engine: string;
+  confidence: 'heuristic';
+  oldText: string;
+  newText: string;
+  patch: string;
+}
+
+interface RenameEditCandidate {
+  file: string;
+  line: number;
+  kind: Reference['kind'] | 'textual';
+}
+
+interface FileChange {
+  file: string;
+  replacements: number;
+  preview: string;
+  editHunks: RenameEditHunk[];
+  textualReplacements?: number;
 }
 
 export class RenameSymbolTool implements Tool {
@@ -105,36 +131,49 @@ export class RenameSymbolTool implements Tool {
       }
       const skippedRefs = await expandSkippedReferences(graph, oldName, selection);
       const refsByFile = groupReferencesByFile(selection.refs);
-      const fileChanges: Array<{ file: string; replacements: number; preview: string; textualReplacements?: number }> = [];
+      const editEngine = createDefaultEngine();
+      const fileChanges: FileChange[] = [];
       for (const [file, fileRefs] of refsByFile) {
         const fullPath = resolve(repoPath, file);
         const original = await readFile(fullPath, 'utf8');
-        const refResult = rewriteReferences(original, fileRefs, oldName, newName, graph.files.get(file)?.language);
+        const refResult = rewriteReferences(original, fileRefs, oldName, newName, file, graph.files.get(file)?.language);
         let rewritten = refResult.rewritten;
         let replacements = refResult.replacements;
         let textualReplacements = 0;
+        let candidateHunks = refResult.editHunks;
         if (allowTextualFallback) {
-          const textual = applyTextualFallback(rewritten, oldName, newName);
+          const textual = applyTextualFallback(rewritten, oldName, newName, file);
           textualReplacements = textual.replacements;
           rewritten = textual.rewritten;
+          candidateHunks = [...candidateHunks, ...textual.editHunks];
         }
         if ((replacements + textualReplacements) > 0 && rewritten !== original) {
+          const editHunks = buildEditHunks(original, rewritten, candidateHunks, file, editEngine);
           fileChanges.push({
             file,
             replacements,
-            preview: diffPreview(original, rewritten),
+            preview: formatEditHunks(editHunks),
+            editHunks,
             ...(allowTextualFallback ? { textualReplacements } : {}),
           });
           if (apply) {
-            await writeFile(fullPath, rewritten, 'utf8');
+            const applied = applyEditHunks(original, editHunks, editEngine);
+            if (!applied.ok) {
+              return { success: false, content: '', error: `rename_symbol error: edit-engine ${applied.error}` };
+            }
+            await writeFile(fullPath, applied.text, 'utf8');
           }
         }
       }
       const totalReplacements = fileChanges.reduce((s, f) => s + f.replacements + (f.textualReplacements ?? 0), 0);
+      const editHunks = fileChanges.flatMap((f) => f.editHunks);
       const content = [
         `${apply ? 'RENAMED' : 'DRY-RUN'}: '${oldName}' → '${newName}'${allowTextualFallback ? ' (allow_textual_fallback=true)' : ''}`,
+        `Edit engine: ${editEngine.name}`,
+        'Confidence: heuristic',
         `Files affected: ${fileChanges.length}`,
         `Total replacements: ${totalReplacements}`,
+        `Edit hunks: ${editHunks.length}`,
         `Skipped heuristic references: ${skippedRefs.length}`,
         '',
         ...fileChanges.map((f) =>
@@ -153,6 +192,9 @@ export class RenameSymbolTool implements Tool {
           files: fileChanges.length,
           changes: totalReplacements,
           heuristic: true,
+          confidence: 'heuristic',
+          editEngine: editEngine.name,
+          editHunks,
           selector: selection.selector,
           ambiguousDeclarations: selection.ambiguousDeclarations,
           changedReferences: totalReplacements,
@@ -167,20 +209,6 @@ export class RenameSymbolTool implements Tool {
       return { success: false, content: '', error: `rename_symbol error: ${e instanceof Error ? e.message : String(e)}` };
     }
   }
-}
-
-function diffPreview(original: string, rewritten: string): string {
-  // Trivial diff: just return first 5 changed lines context
-  const oLines = original.split('\n');
-  const rLines = rewritten.split('\n');
-  const out: string[] = [];
-  for (let i = 0; i < oLines.length && out.length < 5; i++) {
-    if (oLines[i] !== rLines[i]) {
-      out.push(`- L${i + 1}: ${oLines[i]}`);
-      out.push(`+ L${i + 1}: ${rLines[i]}`);
-    }
-  }
-  return out.length === 0 ? '(no visible diff)' : out.join('\n');
 }
 
 function groupReferencesByFile(refs: ReadonlyArray<Reference>): Map<string, Reference[]> {
@@ -345,7 +373,8 @@ function applyTextualFallback(
   source: string,
   oldName: string,
   newName: string,
-): { rewritten: string; replacements: number } {
+  file: string,
+): { rewritten: string; replacements: number; editHunks: RenameEditCandidate[] } {
   // 拍板 (D-33.2.2): opt-in broad mode. Use a word-boundary regex to
   // avoid partial matches (e.g. `food` for `foo`). We do NOT skip strings
   // or comments — that's the whole point of the fallback. We process line
@@ -354,15 +383,21 @@ function applyTextualFallback(
   const re = new RegExp(`\\b${escapeRegExp(oldName)}\\b`, 'g');
   const lines = source.split('\n');
   let replacements = 0;
+  const editHunks: RenameEditCandidate[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
+    let lineReplacements = 0;
     const next = line.replace(re, () => {
       replacements += 1;
+      lineReplacements += 1;
       return newName;
     });
+    if (lineReplacements > 0 && next !== line) {
+      editHunks.push({ file, line: i + 1, kind: 'textual' });
+    }
     lines[i] = next;
   }
-  return { rewritten: lines.join('\n'), replacements };
+  return { rewritten: lines.join('\n'), replacements, editHunks };
 }
 
 function escapeRegExp(s: string): string {
@@ -374,12 +409,14 @@ function rewriteReferences(
   refs: ReadonlyArray<Reference>,
   oldName: string,
   newName: string,
+  file: string,
   language: string | undefined,
-): { rewritten: string; replacements: number } {
+): { rewritten: string; replacements: number; editHunks: RenameEditCandidate[] } {
   const lineStarts = computeLineStarts(source);
   const lexicalOptions = lexicalOptionsForLanguage(language);
   const maskedSource = maskSourceComments(source, lexicalOptions);
   const replacementOffsets = new Set<number>();
+  const candidatesByOffset = new Map<number, RenameEditCandidate>();
 
   for (const ref of refs) {
     const lineStart = lineStarts[ref.line - 1];
@@ -392,6 +429,7 @@ function rewriteReferences(
     const offset = lineStart + col;
     if (source.slice(offset, offset + oldName.length) === oldName) {
       replacementOffsets.add(offset);
+      candidatesByOffset.set(offset, { file, line: ref.line, kind: ref.kind });
     }
   }
 
@@ -400,7 +438,101 @@ function rewriteReferences(
   for (const offset of offsets) {
     rewritten = rewritten.slice(0, offset) + newName + rewritten.slice(offset + oldName.length);
   }
-  return { rewritten, replacements: offsets.length };
+  const editHunks = offsets
+    .map((offset) => candidatesByOffset.get(offset))
+    .filter((candidate): candidate is RenameEditCandidate => candidate !== undefined);
+  return { rewritten, replacements: offsets.length, editHunks };
+}
+
+function buildEditHunks(
+  original: string,
+  rewritten: string,
+  candidates: ReadonlyArray<RenameEditCandidate>,
+  file: string,
+  editEngine: EditEngine,
+): RenameEditHunk[] {
+  const originalLines = original.split('\n');
+  const rewrittenLines = rewritten.split('\n');
+  const lineHashes = computeLineHashes(original);
+  const candidatesByLine = groupCandidatesByLine(candidates);
+  const out: RenameEditHunk[] = [];
+  const lineCount = Math.max(originalLines.length, rewrittenLines.length);
+
+  for (let i = 0; i < lineCount; i++) {
+    const oldText = originalLines[i] ?? '';
+    const newText = rewrittenLines[i] ?? '';
+    if (oldText === newText) continue;
+    const line = i + 1;
+    const hash = lineHashes[i];
+    if (hash === undefined) continue;
+    const kind = selectCandidateKind(candidatesByLine.get(line));
+    const intent: EditIntent = {
+      file,
+      anchor: { kind: 'line-hash', line, hash },
+      oldText,
+      newText,
+    };
+    out.push({
+      file,
+      line,
+      kind,
+      engine: editEngine.name,
+      confidence: 'heuristic',
+      oldText,
+      newText,
+      patch: editEngine.format(intent),
+    });
+  }
+
+  return out;
+}
+
+function groupCandidatesByLine(candidates: ReadonlyArray<RenameEditCandidate>): Map<number, RenameEditCandidate[]> {
+  const out = new Map<number, RenameEditCandidate[]>();
+  for (const candidate of candidates) {
+    const arr = out.get(candidate.line) ?? [];
+    arr.push(candidate);
+    out.set(candidate.line, arr);
+  }
+  return out;
+}
+
+function selectCandidateKind(candidates: ReadonlyArray<RenameEditCandidate> | undefined): Reference['kind'] | 'textual' {
+  if (candidates === undefined || candidates.length === 0) return 'textual';
+  const declaration = candidates.find((candidate) => candidate.kind === 'declaration');
+  if (declaration !== undefined) return declaration.kind;
+  const nonTextual = candidates.find((candidate) => candidate.kind !== 'textual');
+  return nonTextual?.kind ?? 'textual';
+}
+
+function formatEditHunks(hunks: ReadonlyArray<RenameEditHunk>): string {
+  if (hunks.length === 0) return '(no visible diff)';
+  return hunks
+    .map((hunk) =>
+      [
+        `# L${hunk.line} ${hunk.kind} ${hunk.confidence}`,
+        hunk.patch,
+        `- ${hunk.oldText}`,
+        `+ ${hunk.newText}`,
+      ].join('\n'),
+    )
+    .join('\n');
+}
+
+function applyEditHunks(
+  original: string,
+  hunks: ReadonlyArray<RenameEditHunk>,
+  editEngine: EditEngine,
+): { ok: true; text: string } | { ok: false; error: string } {
+  let text = original;
+  for (const hunk of hunks) {
+    const result = editEngine.apply({ path: hunk.file, text }, hunk.patch);
+    if (!result.ok) {
+      return { ok: false, error: `${result.error.kind}: ${JSON.stringify(result.error)}` };
+    }
+    text = result.newText;
+  }
+  return { ok: true, text };
 }
 
 function resolveReplacementColumn(
