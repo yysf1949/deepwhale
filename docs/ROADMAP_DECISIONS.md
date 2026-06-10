@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Decision mode: stabilization first, expansion later
-- Current sprint: D68 post-D67 status and v5/v6 planning preview
+- Current sprint: D69 Gate-1 preferred blocker refresh
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -46,6 +46,8 @@
 - D64 registry opt-in loading isolation: default registry loading stays narrow and opt-in profiles load through an async boundary.
 - D65 Code Intel truthfulness metadata: smart_search and rename_symbol no-op paths expose heuristic metadata.
 - D67 rename edit hunks: rename_symbol dry-run/apply now exposes hashline edit hunks and heuristic confidence metadata.
+- D68 status and v5/v6 planning preview: public status blocks now link planning-preview-only v5/v6 evidence.
+- D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
 
 ### Decision Hygiene
 
@@ -61,8 +63,8 @@
 
 ### Next Decisions Needed
 
-1. Finish D68 post-D67 status hygiene and v5/v6 planning preview.
-2. Next implementation slice: D69 Gate-1 preferred 100K evidence or explicit blocker refresh.
+1. D69 Gate-1 preferred blocker refresh is complete for the current local inventory.
+2. Next implementation slice: D70 Gate-1.5 evidence refresh and Browser branch decision.
 3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

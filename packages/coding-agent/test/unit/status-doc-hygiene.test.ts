@@ -99,12 +99,13 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toContain(
-      'D68: publish post-D67 status hygiene and v5/v6 planning preview without starting v5/v6 implementation.',
+      'D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work.',
     );
     expect(scorecard.nextActions).toContain(
-      'D69: obtain or prepare a real local 100K+ Gate-1 target and run the Gate-1 scenario, or keep the blocker explicit.',
+      'D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.',
     );
-    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D67:/m);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D68:/m);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D69:/m);
     expect(scorecardMd).toContain('Aggregate evidence-backed progress: 48%');
     expect(scorecardMd).toContain('D67 rename_symbol exposes hashline edit hunks');
     for (const path of DOCS) {
@@ -130,19 +131,23 @@ describe('status documentation hygiene (D-56)', () => {
     expect(previewMd).toContain('Planning preview only');
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D67', () => {
+  it('keeps the current sprint and next-work pointers aligned after D69', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D68 post-D67 status and v5/v6 planning preview');
+      expect(block).toContain('Current sprint: D69 Gate-1 preferred blocker refresh');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
       expect(block).toContain('D64 registry opt-in loading isolation');
       expect(block).toContain('D65 Code Intel truthfulness metadata');
       expect(block).toContain('D67 rename edit hunks');
-      expect(block).toContain('Next implementation slice: D69 Gate-1 preferred 100K evidence or explicit blocker refresh');
+      expect(block).toContain('D68 status and v5/v6 planning preview');
+      expect(block).toContain('D69 Gate-1 preferred blocker refresh');
+      expect(block).toContain('Next implementation slice: D70 Gate-1.5 evidence refresh and Browser branch decision');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D68/i);
+      expect(block).not.toMatch(/Next implementation slice: D69/i);
       expect(block).not.toMatch(/Current sprint: D66/i);
       expect(block).not.toMatch(/Next implementation slice: D67/i);
       expect(block).not.toMatch(/Current sprint: D62/i);

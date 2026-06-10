@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Work mode: stabilization + Gate sprint
-- Current sprint: D68 post-D67 status and v5/v6 planning preview
+- Current sprint: D69 Gate-1 preferred blocker refresh
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -36,6 +36,8 @@
 - D64 registry opt-in loading isolation: default registry loading stays narrow and opt-in profiles load through an async boundary.
 - D65 Code Intel truthfulness metadata: smart_search and rename_symbol no-op paths expose heuristic metadata.
 - D67 rename edit hunks: rename_symbol dry-run/apply now exposes hashline edit hunks and heuristic confidence metadata.
+- D68 status and v5/v6 planning preview: public status blocks now link planning-preview-only v5/v6 evidence.
+- D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -61,8 +63,8 @@
 
 ### Next Work
 
-1. Finish D68 post-D67 status hygiene and v5/v6 planning preview.
-2. Next implementation slice: D69 Gate-1 preferred 100K evidence or explicit blocker refresh.
+1. D69 Gate-1 preferred blocker refresh is complete for the current local inventory.
+2. Next implementation slice: D70 Gate-1.5 evidence refresh and Browser branch decision.
 3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -78,6 +80,7 @@
 - D66 plan: docs/superpowers/plans/2026-06-10-d66-status-gate1-v1v4-rescore.md
 - D67 plan: docs/superpowers/plans/2026-06-10-d67-rename-symbol-edit-hunks.md
 - D68 plan: docs/superpowers/plans/2026-06-10-d68-status-v5-v6-planning.md
+- D69 plan: docs/superpowers/plans/2026-06-10-d69-gate1-preferred-blocker-refresh.md
 
 ### Status Hygiene Rules
 
@@ -99,7 +102,7 @@
 - The next agent should start from current files and machine-readable evidence, not from old ship slogans.
 - This repository path is D:\App\openClaw\projects\deepwhale.
 - Ignore D:\App\openClaw\projects\openclaw-github for this project.
-- Last status hygiene sprint: D68.
+- Last status hygiene sprint: D69.
 
 <!-- status:current:end -->
 

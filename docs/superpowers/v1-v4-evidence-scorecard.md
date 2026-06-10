@@ -27,9 +27,11 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 
 - D67 rename_symbol exposes hashline edit hunks and heuristic confidence metadata.
 - D67 does not make rename_symbol IDE-grade; it remains reference-guided and heuristic.
+- D69 refreshed Gate-1 target inventory and Vite minimum-50k Gate-1 scenario evidence.
+- D69 keeps preferred-100k blocked because the local inventory still has no 100K+ target.
 
 ## Next Actions
 
-1. D68: publish post-D67 status hygiene and v5/v6 planning preview without starting v5/v6 implementation.
-2. D69: obtain or prepare a real local 100K+ Gate-1 target and run the Gate-1 scenario, or keep the blocker explicit.
-3. D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work.
+1. D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work.
+2. D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.
+3. D72: refresh release/version hygiene after Gate-1.5 decision.

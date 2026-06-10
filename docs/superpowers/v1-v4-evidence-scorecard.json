@@ -31,7 +31,8 @@
         "symbol graph, reference graph, heuristic call graph, and Code Intel tools exist",
         "Gate-1 minimum Vite evidence is present at 86216 supported LOC",
         "Code Intel descriptions and metadata label heuristic behavior",
-        "D67 rename_symbol exposes hashline edit hunks and heuristic confidence metadata"
+        "D67 rename_symbol exposes hashline edit hunks and heuristic confidence metadata",
+        "D69 refreshed Gate-1 target inventory and Vite minimum-50k Gate-1 scenario evidence"
       ],
       "blockers": [
         "preferred-100k Gate-1 evidence is blocked by missing local 100K+ target",
@@ -101,8 +102,8 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D68: publish post-D67 status hygiene and v5/v6 planning preview without starting v5/v6 implementation.",
-    "D69: obtain or prepare a real local 100K+ Gate-1 target and run the Gate-1 scenario, or keep the blocker explicit.",
-    "D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work."
+    "D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work.",
+    "D71: deepen Code Intel import/reference graph correctness without claiming IDE-grade semantics.",
+    "D72: refresh release/version hygiene after Gate-1.5 decision."
   ]
 }

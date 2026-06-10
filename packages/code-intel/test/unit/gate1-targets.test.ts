@@ -11,7 +11,8 @@ describe('Gate-1 target inventory', () => {
       const report = await inventoryGate1Targets({ targetsRoot: root, minimumLoc: 10, preferredLoc: 20 });
 
       expect(report.status).toBe('minimum-only');
-      expect(report.preferredTargets).toEqual([]);
+      expect(report.preferredTargets).toHaveLength(0);
+      expect(report.minimumTargets).toHaveLength(1);
       expect(report.bestAvailable?.name).toBe('vite');
       expect(report.blocker).toContain('best local target is vite with 12 LOC');
       expect(report.blocker).toContain('below preferred 20 LOC');
@@ -19,6 +20,7 @@ describe('Gate-1 target inventory', () => {
       const md = renderGate1TargetInventoryMarkdown(report);
       expect(md).toContain('Status: minimum-only');
       expect(md).toContain('Preferred targets: 0');
+      expect(md).toContain('`preferred-100k` is required before claiming preferred Code Intel maturity.');
       expect(md).toContain('This inventory does not itself prove Gate-1 pass on a target');
     } finally {
       await rm(root, { recursive: true, force: true });
