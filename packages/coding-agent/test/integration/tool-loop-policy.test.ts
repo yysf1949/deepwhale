@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { runToolLoopWithReview, type Planner, type Reviewer, type TaskGraphRecorder } from '../../src/agent/tool-loop-policy.js';
+import { PersistingTaskGraphRecorder } from '../../src/agent/persisting-task-graph-recorder.js';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
 import type { ChatMessage, ChatResult, LLMClient, ModelId } from '@deepwhale/llm';
 
@@ -184,5 +188,60 @@ describe('tool-loop-policy integration', () => {
 
     expect(plannedGoals).toEqual(['ship D77 planner evidence']);
     expect(recordedPlans).toEqual([{ id: 'p-0', goal: 'ship D77 planner evidence' }]);
+  });
+
+  it('passes task graph records across separate recorder instances pointing at the same file (D-80 cross-session)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tool-loop-policy-d80-'));
+    const file = join(dir, 'task-graph.jsonl');
+    try {
+      // Instance A: fresh recorder, run one tool loop, record goal + 1 tool call.
+      const recorderA = new PersistingTaskGraphRecorder({ file });
+      await recorderA.load();
+      const llmA = new ScriptedLlm([toolCallResult, stopResult]);
+      await runToolLoopWithReview({
+        client: llmA,
+        messages: [
+          { role: 'system', content: 'system prompt' },
+          { role: 'user', content: 'D-80 cross-session goal from instance A' },
+        ],
+        registry: createDefaultRegistry(),
+        maxSteps: 3,
+        taskGraph: recorderA,
+      });
+
+      // After A's run, the file should contain a goal + 1 tool call.
+      expect(recorderA.getGoals().map((g) => g.goal)).toEqual(['D-80 cross-session goal from instance A']);
+      expect(recorderA.getToolCalls().map((t) => t.toolName)).toEqual(['bash']);
+
+      // Instance B: fresh recorder from the same file. After load(), B sees A's records.
+      const recorderB = new PersistingTaskGraphRecorder({ file });
+      await recorderB.load();
+      expect(recorderB.getGoals().map((g) => g.goal)).toEqual(['D-80 cross-session goal from instance A']);
+      expect(recorderB.getToolCalls().map((t) => t.toolName)).toEqual(['bash']);
+
+      // B runs a second tool loop; both A's and B's records survive in B's view.
+      const llmB = new ScriptedLlm([toolCallResult, stopResult]);
+      await runToolLoopWithReview({
+        client: llmB,
+        messages: [
+          { role: 'system', content: 'system prompt' },
+          { role: 'user', content: 'D-80 second goal from instance B' },
+        ],
+        registry: createDefaultRegistry(),
+        maxSteps: 3,
+        taskGraph: recorderB,
+      });
+      expect(recorderB.getGoals().map((g) => g.goal)).toEqual([
+        'D-80 cross-session goal from instance A',
+        'D-80 second goal from instance B',
+      ]);
+      expect(recorderB.getToolCalls().map((t) => t.toolName)).toEqual(['bash', 'bash']);
+    } finally {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
+    }
   });
 });

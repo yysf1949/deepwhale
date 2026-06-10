@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D79 v1.0 fresh release gate proof + version bump
+- Current sprint: D80 TaskGraph cross-session persistence evidence
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -55,6 +55,7 @@
 - D77 planner main-loop evidence fixture: runToolLoopWithReview calls planner.plan with the latest user goal and records the resulting tasks into the task graph when a Planner is provided.
 - D78 cross-session memory crash/reload evidence: PersistentMemoryStore now uses temp-file + fsync + rename for atomic writes and load() recovers from a partial last line.
 - D79 v1.0 fresh release gate proof + version bump: docs/superpowers/v1.0-fresh-release-gate.{json,md} capture typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0 (line-only, per D-72 hygiene).
+- D80 TaskGraph cross-session persistence evidence: PersistingTaskGraphRecorder mirrors the PersistentMemoryStore pattern (JSONL + atomic-rename + partial-line recovery); cross-session integration test records in instance A, then verifies instance B (same file) sees A's entries.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -80,8 +81,8 @@
 
 ### Next Work
 
-1. D79 v1.0 fresh release gate proof is complete: typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0.
-2. Next implementation slice: D80 v1.0 ship ritual on release/v1.0 branch (gated on user approval: tag, npm publish, force-push).
+1. D80 TaskGraph cross-session persistence evidence is complete: PersistingTaskGraphRecorder uses JSONL + atomic-rename + partial-line recovery; cross-instance test records in A, B sees A's records.
+2. Next implementation slice: D81 next v1-v4 slice (gated on user direction; v5/v6 implementation blocked on scorecard >= 65%, currently 58%).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -130,8 +131,9 @@
 - D77 plan: docs/superpowers/plans/2026-06-10-d77-planner-main-loop-evidence.md
 - D78 plan: docs/superpowers/plans/2026-06-10-d78-cross-session-memory-crash-reload.md
 - D79 plan: docs/superpowers/plans/2026-06-10-d79-v1.0-fresh-release-gate.md
+- D80 plan: docs/superpowers/plans/2026-06-10-d80-taskgraph-cross-session-persistence.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D79.
+- Last status hygiene sprint: D80.
 
 <!-- status:current:end -->
 

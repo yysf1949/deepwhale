@@ -2,7 +2,7 @@
 
 Generated: 2026-06-10
 
-Aggregate evidence-backed progress: 56%
+Aggregate evidence-backed progress: 58%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
@@ -13,7 +13,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
 | v2.5 | 50% | Planner/DAG/cache modules exist; main-loop planner.plan evidence fixture present | Integration is a single-fixture proof, not multi-scenario long-horizon |
 | v3.0 | 50% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes | Gate-2 is fixture-scoped, not broad production proof |
-| v4.0 | 35% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence fixture present | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete |
+| v4.0 | 45% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus cross-session TaskGraph persistence evidence fixtures present | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete; cross-session evidence is deterministic unit-style fixtures (D-78 + D-80), not real cross-platform SIGKILL tests |
 
 ## Caveats
 
@@ -38,7 +38,8 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 - D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
 - D78 records atomic write semantics plus partial-last-line recovery for the persistent memory store; the on-disk file is always either the old contents or the new contents, never partial.
-- D79 produces a fresh v1.0 release gate proof: docs/superpowers/v1.0-fresh-release-gate.{json,md} show typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 → 2.3.0 (line-only, per D-72 hygiene).
+- D79 produces a fresh v1.0 release gate proof: docs/superpowers/v1.0-fresh-release-gate.{json,md} show typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0 (line-only, per D-72 hygiene).
+- D80 records cross-session TaskGraph persistence: a second PersistingTaskGraphRecorder instance loaded from the same file sees the first instance's records (D-78 storage layer + D-80 Agent OS layer).
 
 ## Next Actions
 
