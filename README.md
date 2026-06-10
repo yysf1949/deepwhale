@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Work mode: stabilization + Gate sprint
-- Current sprint: D62 status/doc hygiene after D61
+- Current sprint: D66 status, Gate-1 blocker, and v1-v4 rescore
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -26,11 +26,15 @@
 - Gate-1 preferred status: minimum-only
 - Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
 - Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json
+- Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 
 ### Completed Stabilization Slices
 
 - D60 rename scanner truthfulness: comments, strings, block comments, and TS private identifiers are handled more honestly by rename_symbol scanner tests.
 - D61 Gate-2 drift prompt hardening: nested tool args are scanned for outside-workspace paths and the live prompt no longer contradicts task-directed test runs.
+- D63 Code Intel heuristic metadata: find_references exposes heuristic metadata in success results.
+- D64 registry opt-in loading isolation: default registry loading stays narrow and opt-in profiles load through an async boundary.
+- D65 Code Intel truthfulness metadata: smart_search and rename_symbol no-op paths expose heuristic metadata.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -56,20 +60,20 @@
 
 ### Next Work
 
-1. D62: finish status/doc hygiene after D61 and keep the public status blocks current.
-2. Next implementation slice: D63 Code Intel heuristic metadata.
-3. D64: isolate opt-in registry profile loading without expanding the default profile.
-4. D65: refresh Gate-1 preferred 100K evidence or keep the machine-readable blocker explicit.
-5. Continue v1-v4 completion only through verified gates.
-6. Plan v5/v6 after v1-v4 status is evidence-backed, not before.
+1. Finish D66 status, Gate-1 blocker, and v1-v4 scorecard hygiene.
+2. Next implementation slice: D67 Gate-1 preferred 100K target or stronger Code Intel rename safety.
+3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
+4. Continue v1-v4 completion only through verified gates.
+5. Plan v5/v6 after v1-v4 status is evidence-backed, not before.
 
 ### Reading Guide
 
 - Current Gate-2 live evidence: docs/superpowers/gate-2-long-horizon-live.json
 - Current Gate-2 trace: docs/superpowers/gate2-live-trace.json
 - Current Gate-1 preferred inventory: docs/superpowers/gate-1-preferred-targets.json
+- Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 - V1 to V4 master plan: docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md
-- D62 plan: docs/superpowers/plans/2026-06-10-d62-status-doc-hygiene-after-d61.md
+- D66 plan: docs/superpowers/plans/2026-06-10-d66-status-gate1-v1v4-rescore.md
 
 ### Status Hygiene Rules
 
@@ -91,7 +95,7 @@
 - The next agent should start from current files and machine-readable evidence, not from old ship slogans.
 - This repository path is D:\App\openClaw\projects\deepwhale.
 - Ignore D:\App\openClaw\projects\openclaw-github for this project.
-- Last status hygiene sprint: D62.
+- Last status hygiene sprint: D66.
 
 <!-- status:current:end -->
 

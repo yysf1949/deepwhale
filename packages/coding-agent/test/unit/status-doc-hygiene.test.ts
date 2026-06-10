@@ -47,7 +47,9 @@ describe('status documentation hygiene (D-56)', () => {
     };
     const gate1Targets = JSON.parse(readRepoFile('docs/superpowers/gate-1-preferred-targets.json')) as {
       status: string;
+      preferredLoc: number;
       preferredTargets: unknown[];
+      bestAvailable?: { name: string; loc: number };
       blocker?: string;
     };
 
@@ -59,7 +61,10 @@ describe('status documentation hygiene (D-56)', () => {
     expect(readme).toContain(`Gate-1 preferred status: ${gate1Targets.status}`);
     expect(readme).toContain('preferred-100k is blocked');
     expect(gate1Targets.preferredTargets).toHaveLength(0);
-    expect(gate1Targets.blocker).toMatch(/no local 100K\+ target/i);
+    expect(gate1Targets.blocker).toContain(`preferred ${gate1Targets.preferredLoc} LOC`);
+    expect(gate1Targets.blocker).toContain(
+      `best local target is ${gate1Targets.bestAvailable?.name ?? 'unknown'} with ${gate1Targets.bestAvailable?.loc ?? 0} LOC`,
+    );
   });
 
   it('does not overclaim v1-v4 or default non-coding capability exposure', () => {
@@ -80,14 +85,38 @@ describe('status documentation hygiene (D-56)', () => {
     );
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D60/D61', () => {
+  it('keeps the v1-v4 evidence scorecard machine-readable and caveated', () => {
+    const scorecard = JSON.parse(readRepoFile('docs/superpowers/v1-v4-evidence-scorecard.json')) as {
+      aggregatePercent: number;
+      milestones: Array<{ id: string; percent: number; status: string }>;
+      caveats: string[];
+    };
+    const scorecardMd = readRepoFile('docs/superpowers/v1-v4-evidence-scorecard.md');
+
+    expect(scorecard.aggregatePercent).toBe(48);
+    expect(scorecard.milestones.map((m) => m.id)).toEqual(['v1.0', 'v1.5', 'v2.0', 'v2.5', 'v3.0', 'v4.0']);
+    expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
+    expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
+    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 48%');
+    for (const path of DOCS) {
+      const block = currentStatusBlock(readRepoFile(path));
+      expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
+    }
+  });
+
+  it('keeps the current sprint and next-work pointers aligned after D63-D65', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D62 status/doc hygiene after D61');
+      expect(block).toContain('Current sprint: D66 status, Gate-1 blocker, and v1-v4 rescore');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
-      expect(block).toContain('Next implementation slice: D63 Code Intel heuristic metadata');
+      expect(block).toContain('D63 Code Intel heuristic metadata');
+      expect(block).toContain('D64 registry opt-in loading isolation');
+      expect(block).toContain('D65 Code Intel truthfulness metadata');
+      expect(block).toContain('Next implementation slice: D67 Gate-1 preferred 100K target or stronger Code Intel rename safety');
+      expect(block).not.toMatch(/Current sprint: D62/i);
+      expect(block).not.toMatch(/Next implementation slice: D63/i);
       expect(block).not.toMatch(/Current sprint: D56/i);
       expect(block).not.toMatch(/Next (Work|Roadmap Work|Decisions Needed)[\s\S]*D57:/);
       expect(block).not.toMatch(/Next (Work|Roadmap Work|Decisions Needed)[\s\S]*D58:/);

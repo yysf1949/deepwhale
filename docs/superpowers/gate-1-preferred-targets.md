@@ -1,7 +1,7 @@
 # Gate-1 Preferred Target Inventory
 
 Status: minimum-only
-Generated: 2026-06-09T17:22:59.555Z
+Generated: 2026-06-10T01:27:28.847Z
 Targets root: D:\App\openClaw\projects\deepwhale\.gate-targets
 Minimum LOC: 50000
 Preferred LOC: 100000
@@ -15,7 +15,7 @@ Preferred LOC: 100000
 
 ## Blocker
 
-- no local 100K+ target found for preferred Gate-1 evidence; best local target is vite with 86216 LOC, below preferred 100000
+- no local preferred Gate-1 target found; best local target is vite with 86216 LOC, below preferred 100000 LOC
 
 ## Targets
 

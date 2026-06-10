@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Decision mode: stabilization first, expansion later
-- Current sprint: D62 status/doc hygiene after D61
+- Current sprint: D66 status, Gate-1 blocker, and v1-v4 rescore
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -35,12 +35,16 @@
 - Gate-2 evidence file: docs/superpowers/gate-2-long-horizon-live.json.
 - Gate-2 interpretation: default-profile invoice fixture passed the live runner conditions.
 - Gate-2 limit: it does not unlock Browser, Desktop, Channel, media, or productivity defaults.
+- Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 
 ### Completed Stabilization Slices
 
 - D60 rename scanner truthfulness: keep rename_symbol scanner claims conservative and tested around comments, strings, block comments, and TS private identifiers.
 - D61 Gate-2 drift prompt hardening: inspect nested tool args for outside-workspace paths and keep Gate-2 live prompts aligned with task-directed verification.
 - D62 status/doc hygiene after D61: keep public current-status blocks synchronized with the latest evidence.
+- D63 Code Intel heuristic metadata: find_references exposes heuristic metadata in success results.
+- D64 registry opt-in loading isolation: default registry loading stays narrow and opt-in profiles load through an async boundary.
+- D65 Code Intel truthfulness metadata: smart_search and rename_symbol no-op paths expose heuristic metadata.
 
 ### Decision Hygiene
 
@@ -56,12 +60,11 @@
 
 ### Next Decisions Needed
 
-1. D62: finish status/doc hygiene after D61 and keep tests guarding stale next-work pointers.
-2. Next implementation slice: D63 Code Intel heuristic metadata.
-3. D64: decide whether to split registry profile loading into opt-in modules.
-4. D65: decide how to obtain or explicitly block local 100K+ Gate-1 evidence.
-5. Re-score v1-v4 after D63-D65 evidence.
-6. Draft v5 and v6 only after v1-v4 gaps are evidence-backed.
+1. Finish D66 status, Gate-1 blocker, and v1-v4 scorecard hygiene.
+2. Next implementation slice: D67 Gate-1 preferred 100K target or stronger Code Intel rename safety.
+3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
+4. Re-score v1-v4 after D63-D66 evidence.
+5. Draft v5 and v6 only after v1-v4 gaps are evidence-backed.
 
 ### Repository Scope
 

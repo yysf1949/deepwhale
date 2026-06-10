@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-09T17:22:59.555Z",
+  "generatedAt": "2026-06-10T01:27:28.847Z",
   "targetsRoot": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets",
   "minimumLoc": 50000,
   "preferredLoc": 100000,
@@ -30,5 +30,5 @@
     "supportedFiles": 1395,
     "locQualification": "minimum-50k"
   },
-  "blocker": "no local 100K+ target found for preferred Gate-1 evidence; best local target is vite with 86216 LOC, below preferred 100000"
+  "blocker": "no local preferred Gate-1 target found; best local target is vite with 86216 LOC, below preferred 100000 LOC"
 }

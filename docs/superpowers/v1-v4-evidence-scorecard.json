@@ -1,0 +1,107 @@
+{
+  "generatedAt": "2026-06-10T00:00:00.000Z",
+  "basis": {
+    "branch": "feature/d36-gate2-live",
+    "packageVersionLine": "2.2.0",
+    "gate1PreferredReport": "docs/superpowers/gate-1-preferred-targets.json",
+    "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
+    "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md"
+  },
+  "aggregatePercent": 48,
+  "milestones": [
+    {
+      "id": "v1.0",
+      "percent": 70,
+      "status": "mostly implemented coding baseline; release/version hygiene remains noisy",
+      "evidence": [
+        "coding tool registry baseline exists",
+        "core session and tool-loop tests exist",
+        "public docs explicitly avoid production-complete claims"
+      ],
+      "blockers": [
+        "release/version story remains noisy",
+        "full release gate is not freshly proven in this scorecard"
+      ]
+    },
+    {
+      "id": "v1.5",
+      "percent": 65,
+      "status": "Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 evidence is blocked",
+      "evidence": [
+        "symbol graph, reference graph, heuristic call graph, and Code Intel tools exist",
+        "Gate-1 minimum Vite evidence is present at 86216 supported LOC",
+        "Code Intel descriptions and metadata label heuristic behavior"
+      ],
+      "blockers": [
+        "preferred-100k Gate-1 evidence is blocked by missing local 100K+ target",
+        "rename_symbol is reference-guided lexical rewrite, not IDE-grade AST/edit-engine rename"
+      ]
+    },
+    {
+      "id": "v2.0",
+      "percent": 40,
+      "status": "memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5/live integration incomplete",
+      "evidence": [
+        "memory modules exist",
+        "Browser foundation modules exist behind opt-in surfaces",
+        "MCP package and runtime foundation exist"
+      ],
+      "blockers": [
+        "Gate-1.5 live 20-task browser evidence is not complete",
+        "default registry must remain coding plus Code Intel essentials"
+      ]
+    },
+    {
+      "id": "v2.5",
+      "percent": 40,
+      "status": "planner/DAG/cache modules exist; main-loop integration remains limited",
+      "evidence": [
+        "planner, task DAG, and plan cache modules exist",
+        "module-level tests exist for planner foundations"
+      ],
+      "blockers": [
+        "planner integration into the primary agent loop is limited",
+        "release gate scenarios are not freshly proven in this scorecard"
+      ]
+    },
+    {
+      "id": "v3.0",
+      "percent": 50,
+      "status": "Reviewer and Gate-2 runner exist; current Gate-2 live fixture passes under default profile",
+      "evidence": [
+        "Reviewer modules exist",
+        "Gate-2 live evidence is passed_live=true with toolCalls=31 and registryProfile=default"
+      ],
+      "blockers": [
+        "Gate-2 evidence is a default-profile invoice fixture pass, not broad long-horizon production proof",
+        "Gate-1.5 branch decision remains incomplete"
+      ]
+    },
+    {
+      "id": "v4.0",
+      "percent": 25,
+      "status": "Researcher, TaskGraph, memory, and channel foundations exist; Agent OS/Desktop/channels are not production-complete",
+      "evidence": [
+        "Researcher and TaskGraph modules exist",
+        "persistent memory and channel foundation modules exist"
+      ],
+      "blockers": [
+        "Agent OS orchestration is not production-complete",
+        "Desktop and channels remain stopped or opt-in, not default-enabled",
+        "cross-session crash recovery and persistent memory hand-edit verification are not freshly proven"
+      ]
+    }
+  ],
+  "caveats": [
+    "Gate-2 default-profile fixture pass is not v1-v4 production completion.",
+    "Gate-1 minimum-50k evidence is not preferred-100k evidence.",
+    "Module existence is not production integration.",
+    "Code Intel rename, reference, call graph, and smart search behavior remains heuristic unless a specific test proves stronger semantics.",
+    "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
+  ],
+  "nextActions": [
+    "D67: obtain or prepare a real local 100K+ Gate-1 target and run the scenario, or keep the blocker explicit.",
+    "D67 alternative: deepen Code Intel rename safety with AST/edit-engine-backed edits before stronger release claims.",
+    "After D67, re-run full verification and update this scorecard from current evidence."
+  ]
+}

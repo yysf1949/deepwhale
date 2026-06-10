@@ -166,6 +166,6 @@ function blockerForStatus(
 ): string | undefined {
   if (status === 'preferred-available') return undefined;
   if (status === 'none') return 'no local Gate-1 target directories found';
-  if (!bestAvailable) return `no local 100K+ target found for preferred Gate-1 evidence`;
-  return `no local 100K+ target found for preferred Gate-1 evidence; best local target is ${bestAvailable.name} with ${bestAvailable.loc} LOC, below preferred ${preferredLoc}`;
+  if (!bestAvailable) return `no local preferred Gate-1 target found for preferred ${preferredLoc} LOC evidence`;
+  return `no local preferred Gate-1 target found; best local target is ${bestAvailable.name} with ${bestAvailable.loc} LOC, below preferred ${preferredLoc} LOC`;
 }

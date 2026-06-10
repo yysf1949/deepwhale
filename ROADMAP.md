@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D62 status/doc hygiene after D61
+- Current sprint: D66 status, Gate-1 blocker, and v1-v4 rescore
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -25,12 +25,16 @@
 - Gate-2 toolCalls=31.
 - Gate-2 report: docs/superpowers/gate-2-long-horizon-live.json.
 - Gate-2 interpretation: a default-profile live fixture pass, not a blanket v1-v4 completion proof.
+- Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 
 ### Completed Stabilization Slices
 
 - D60 rename scanner truthfulness: rename_symbol scanner behavior is more honest around comments, strings, block comments, and TS private identifiers.
 - D61 Gate-2 drift prompt hardening: nested tool args are checked for outside-workspace paths and the live task prompt supports task-directed verification.
 - D62 status/doc hygiene after D61: public current-status blocks are aligned to current evidence and stale D56-D59 next-work pointers are removed.
+- D63 Code Intel heuristic metadata: find_references exposes heuristic metadata in success results.
+- D64 registry opt-in loading isolation: default registry loading stays narrow and opt-in profiles load through an async boundary.
+- D65 Code Intel truthfulness metadata: smart_search and rename_symbol no-op paths expose heuristic metadata.
 
 ### Milestone Status
 
@@ -55,12 +59,11 @@
 
 ### Next Roadmap Work
 
-1. D62: finish status/doc hygiene after D61 and keep current-status tests strict.
-2. Next implementation slice: D63 Code Intel heuristic metadata.
-3. D64: isolate opt-in registry profile loading without expanding the default profile.
-4. D65: produce preferred 100K Gate-1 evidence or keep the blocker machine-readable.
-5. Re-score v1-v4 only from current tests and gate artifacts.
-6. Plan v5 and v6 after v1-v4 status is evidence-backed.
+1. Finish D66 status, Gate-1 blocker, and v1-v4 scorecard hygiene.
+2. Next implementation slice: D67 Gate-1 preferred 100K target or stronger Code Intel rename safety.
+3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
+4. Re-score v1-v4 only from current tests and gate artifacts.
+5. Plan v5 and v6 after v1-v4 status is evidence-backed.
 
 ### V5/V6 Planning Boundary
 
