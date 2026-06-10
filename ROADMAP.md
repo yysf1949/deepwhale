@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D109 v6.0 multi-agent safety seed (rollbackSubAgent)
+- Current sprint: D110 v6.0 multi-agent safety 2nd cycle cross-bridge (buildSubAgentPolicySnapshot)
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -85,6 +85,7 @@
 - D107 v6.0 multi-agent safety seed: 1 new SubAgentId branded type + 1 SubAgent interface + 1 SubAgentRegistry class (in-memory map-based, register/unregister/get/list/listByParent/size/clear + asSubAgentId + isSubAgentId helpers) + 1 new file + 1 new test file + 4 new unit tests. Multi-agent safety seed part 1 of 3 COMPLETE: foundational type system. D-108 will add enforceSubAgentPolicy; D-109 will add rollbackSubAgent.
 - D108 v6.0 multi-agent safety seed: 1 new enforceSubAgentPolicy thin wrapper function (reuses D-103 enforceProfilePolicy + D-107 SubAgent + D-94 DistributionManifest; returns SubAgentPolicyEvaluation with subAgentId + parentAgentId + decision (allow/deny) + summary) + 1 SubAgentPolicyEvaluation interface + 1 SubAgentPolicyDecision union + 4 new unit tests. Multi-agent safety seed part 2 of 3 COMPLETE: enforcement layer. D-109 will add rollbackSubAgent.
 - D109 v6.0 multi-agent safety seed: 1 new rollbackSubAgent pure function (identifies sub-agent-owned events via event.payload.subAgentId + marks with rolledBackAt + rollbackReason + emits new 'sub-agent-rollback' event; supports dryRun mode for preview) + 1 SubAgentRollbackResult interface + 1 SubAgentRollbackOptions interface + 1 SubAgentRollbackOutcome union + 4 new unit tests. Multi-agent safety seed part 3 of 3 COMPLETE: rollback side. v6.0 Theme 1 (multi-agent safety) SEED-COMPLETE: 3 of 3 sub-sprints (D-107 + D-108 + D-109) shipped.
+- D110 v6.0 multi-agent safety 2nd cycle cross-bridge: 1 new buildSubAgentPolicySnapshot async function (orchestration layer: reuses D-108 enforceSubAgentPolicy + D-109 rollbackSubAgent + D-94 DistributionManifest; returns SubAgentPolicySnapshot with policy + rollback + summary; canRun = policy.allow && rollback !== rolled-back) + 1 SubAgentPolicySnapshot interface + 1 SubAgentPolicySnapshotSummary interface + 1 BuildSubAgentPolicySnapshotInput interface + 4 new unit tests. v6.0 Theme 1 (multi-agent safety) 2nd cycle cross-bridge COMPLETE: mirrors v5.0 D-105 buildPolicySnapshot pattern. v6.0 Theme 1 SEED + CROSS-BRIDGE COMPLETE: 4 sub-sprints (D-107 + D-108 + D-109 + D-110) shipped.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -110,8 +111,8 @@
 
 ### Next Roadmap Work
 
-1. D109 v6.0 multi-agent safety seed (rollbackSubAgent) is complete: 1 new function + 3 new types + 4 new unit tests. Multi-agent safety seed part 3 of 3 COMPLETE: rollback side. v6.0 Theme 1 (multi-agent safety) SEED-COMPLETE: 3 of 3 sub-sprints (D-107 + D-108 + D-109) shipped.
-2. Next implementation slice: D110 v6.0 multi-agent safety Theme 1 2nd cycle cross-bridge OR v5.0 4th theme cross-bridge (gated on user direction; buildSubAgentPolicySnapshot unifying enforceSubAgentPolicy + rollbackSubAgent OR observability+auditability cross-bridge via PolicySnapshot).
+1. D110 v6.0 multi-agent safety 2nd cycle cross-bridge (buildSubAgentPolicySnapshot) is complete: 1 new function + 3 new types + 4 new unit tests. v6.0 Theme 1 (multi-agent safety) 2nd cycle cross-bridge COMPLETE. Mirrors v5.0 D-105 buildPolicySnapshot pattern. v6.0 Theme 1 SEED + CROSS-BRIDGE COMPLETE: 4 sub-sprints (D-107 + D-108 + D-109 + D-110) shipped.
+2. Next implementation slice: D111 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed start OR v6.0 Theme 1 3rd cycle (CLI integration with D-89) (gated on user direction).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
