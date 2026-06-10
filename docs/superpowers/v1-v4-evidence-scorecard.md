@@ -2,13 +2,13 @@
 
 Generated: 2026-06-10
 
-Aggregate evidence-backed progress: 55%
+Aggregate evidence-backed progress: 56%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
 | Milestone | Percent | Evidence-backed status | Main blockers |
 | --- | ---: | --- | --- |
-| v1.0 | 70% | Mostly implemented coding baseline; release/version claims are quarantined | Fresh release gate is not proven in this scorecard |
+| v1.0 | 75% | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | No new public code claims; v1.0 ship ritual (tag, npm publish) is gated on user approval |
 | v1.5 | 65% | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename |
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
 | v2.5 | 50% | Planner/DAG/cache modules exist; main-loop planner.plan evidence fixture present | Integration is a single-fixture proof, not multi-scenario long-horizon |
@@ -38,6 +38,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 - D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
 - D78 records atomic write semantics plus partial-last-line recovery for the persistent memory store; the on-disk file is always either the old contents or the new contents, never partial.
+- D79 produces a fresh v1.0 release gate proof: docs/superpowers/v1.0-fresh-release-gate.{json,md} show typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 → 2.3.0 (line-only, per D-72 hygiene).
 
 ## Next Actions
 

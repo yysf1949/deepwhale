@@ -1,6 +1,6 @@
 {
   "name": "deepwhale",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "DeepSeek-first AI coding client. Hypothesis-driven roadmap, workspace monorepo.",
   "type": "module",

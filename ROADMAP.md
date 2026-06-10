@@ -5,10 +5,10 @@
 
 - Date: 2026-06-10
 - Branch: feature/d36-gate2-live
-- Package version line: 2.2.0
+- Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D78 cross-session memory crash/reload evidence
+- Current sprint: D79 v1.0 fresh release gate proof + version bump
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -54,12 +54,13 @@
 - D75 TaskGraph goal recording integration evidence: runToolLoopWithReview records the latest user goal when a TaskGraphRecorder is provided.
 - D77 planner main-loop evidence fixture: runToolLoopWithReview calls planner.plan with the latest user goal and records the resulting tasks into the task graph when a Planner is provided.
 - D78 cross-session memory crash/reload evidence: PersistentMemoryStore now uses temp-file + fsync + rename for atomic writes and load() recovers from a partial last line.
+- D79 v1.0 fresh release gate proof + version bump: docs/superpowers/v1.0-fresh-release-gate.{json,md} capture typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0 (line-only, per D-72 hygiene).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
 | Milestone | Evidence-backed status | Main blocker |
 | --- | --- | --- |
-| v1.0 | Mostly implemented coding baseline | Fresh release gate is still not proven here |
+| v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (preferred-100k Gate-1, 20 real browser tasks, Gate-2 production, cross-platform Desktop, cross-platform SIGKILL) |
 | v1.5 | Code Intel foundation exists | Preferred 100K Gate-1 evidence remains blocked |
 | v2.0 | Browser, MCP, and memory foundations exist as opt-in/early pieces | Gate-1.5 evidence and full integration are not complete |
 | v2.5 | Planner, task DAG, and plan cache exist | Main-loop integration is limited |
@@ -79,8 +80,8 @@
 
 ### Next Roadmap Work
 
-1. D78 cross-session memory crash/reload evidence is complete: PersistentMemoryStore now uses atomic write semantics and load() recovers from a partial last line.
-2. Next implementation slice: re-score v1-v4 from current evidence (the scorecard action queue is empty; remaining gaps are external-data blockers).
+1. D79 v1.0 fresh release gate proof is complete: typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0.
+2. Next implementation slice: D80 v1.0 ship ritual on release/v1.0 branch (gated on user approval: tag, npm publish, force-push).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -98,7 +99,7 @@
 - Prefer this block over older historical status text below.
 - Older roadmap text below is retained as history until a later cleanup sprint.
 - Any future release claim must cite a machine-readable report or a verified command output.
-- Package version 2.2.0 is a package line, not roadmap v2.2 maturity proof.
+- Package version 2.3.0 is a package line, not roadmap v2.3 maturity proof.
 - Existing modules in src/ are foundations unless the main runtime and tests prove integration.
 - This block is intentionally ASCII-only for automated checks.
 
@@ -1169,3 +1170,4 @@ deepwhale>
 **下次更新**：v0.1 release 时
 **架构详情**：[docs/ARCHITECTURE.md](./ARCHITECTURE.md)
 **总报告**：[docs/research/MASTER_RESEARCH.md](./docs/research/MASTER_RESEARCH.md)
+- v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json

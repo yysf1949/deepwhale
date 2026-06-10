@@ -5,10 +5,10 @@
 
 - Date: 2026-06-10
 - Branch: feature/d36-gate2-live
-- Package version line: 2.2.0
+- Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D78 cross-session memory crash/reload evidence
+- Current sprint: D79 v1.0 fresh release gate proof + version bump
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -54,13 +54,14 @@
 - D75 TaskGraph goal recording integration evidence: runToolLoopWithReview records the latest user goal when a TaskGraphRecorder is provided.
 - D77 planner main-loop evidence fixture: runToolLoopWithReview calls planner.plan with the latest user goal and records the resulting tasks into the task graph when a Planner is provided.
 - D78 cross-session memory crash/reload evidence: PersistentMemoryStore now uses temp-file + fsync + rename for atomic writes and load() recovers from a partial last line.
+- D79 v1.0 fresh release gate proof + version bump: docs/superpowers/v1.0-fresh-release-gate.{json,md} capture typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0 (line-only, per D-72 hygiene).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
 
 | Milestone | Current evidence-backed status | Main gap |
 | --- | --- | --- |
-| v1.0 | Mostly implemented coding baseline | Fresh release gate is still not proven here |
+| v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (preferred-100k Gate-1, 20 real browser tasks, Gate-2 production, cross-platform Desktop, cross-platform SIGKILL) |
 | v1.5 | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is still blocked |
 | v2.0 | Memory, Browser foundation, MCP surfaces exist as early/opt-in pieces | Gate-1.5 and real integration remain incomplete |
 | v2.5 | Planner/DAG/cache modules exist | Integration into the main agent loop is still limited |
@@ -79,8 +80,8 @@
 
 ### Next Work
 
-1. D78 cross-session memory crash/reload evidence is complete: PersistentMemoryStore now uses atomic write semantics and load() recovers from a partial last line.
-2. Next implementation slice: re-score v1-v4 from current evidence (the scorecard action queue is empty; remaining gaps are external-data blockers).
+1. D79 v1.0 fresh release gate proof is complete: typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0.
+2. Next implementation slice: D80 v1.0 ship ritual on release/v1.0 branch (gated on user approval: tag, npm publish, force-push).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -115,7 +116,7 @@
 - Gate-1.5 fixture dry-run evidence can never bind the Browser roadmap branch.
 - A module existing in src/ is not the same as production integration.
 - A registry profile existing is not the same as default exposure.
-- Package version 2.2.0 is a package line, not roadmap v2.2 maturity proof.
+- Package version 2.3.0 is a package line, not roadmap v2.3 maturity proof.
 - v5/v6 planning is allowed, but v1-v4 completion remains the active gate-driven objective.
 - This block is intentionally ASCII-only so tools can parse it reliably.
 
@@ -128,7 +129,9 @@
 - Ignore D:\App\openClaw\projects\openclaw-github for this project.
 - D77 plan: docs/superpowers/plans/2026-06-10-d77-planner-main-loop-evidence.md
 - D78 plan: docs/superpowers/plans/2026-06-10-d78-cross-session-memory-crash-reload.md
-- Last status hygiene sprint: D78.
+- D79 plan: docs/superpowers/plans/2026-06-10-d79-v1.0-fresh-release-gate.md
+- v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
+- Last status hygiene sprint: D79.
 
 <!-- status:current:end -->
 

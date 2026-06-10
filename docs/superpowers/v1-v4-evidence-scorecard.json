@@ -7,21 +7,22 @@
     "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
     "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md"
   },
-  "aggregatePercent": 55,
+  "aggregatePercent": 56,
   "milestones": [
     {
       "id": "v1.0",
-      "percent": 70,
-      "status": "mostly implemented coding baseline; release/version claims are quarantined but fresh release gate is not proven here",
+      "percent": 75,
+      "status": "Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79)",
       "evidence": [
         "coding tool registry baseline exists",
         "core session and tool-loop tests exist",
         "public docs explicitly avoid production-complete claims",
-        "D72 release/version hygiene report distinguishes package version from roadmap maturity"
+        "D72 release/version hygiene report distinguishes package version from roadmap maturity",
+        "D79 produces a fresh v1.0 release gate proof (typecheck + lint + test + build + diff --check all exit 0; 5 红线 preserved)"
       ],
       "blockers": [
-        "fresh release gate is not proven in this scorecard",
-        "full release gate is not freshly proven in this scorecard"
+        "package version 2.3.0 is a package line, not roadmap v2.3 maturity proof",
+        "no new public code claims; the v1.0 ship ritual (tag, npm publish) is gated on user approval"
       ]
     },
     {

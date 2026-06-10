@@ -60,7 +60,7 @@ describe('status documentation hygiene (D-56)', () => {
     };
 
     expect(readme).toContain('Branch: feature/d36-gate2-live');
-    expect(readme).toContain('Package version line: 2.2.0');
+    expect(readme).toContain('Package version line: 2.3.0');
     expect(readme).toContain(`Gate-2 live evidence: passed_live=${String(gate2.passed_live)}`);
     expect(readme).toContain(`registryProfile=${gate2.registryProfile ?? 'unknown'}`);
     expect(readme).toContain(`toolCalls=${gate2.toolCalls}`);
@@ -89,18 +89,18 @@ describe('status documentation hygiene (D-56)', () => {
     };
     const reportMd = readRepoFile('docs/superpowers/release-version-hygiene.md');
 
-    expect(report.packageVersionLine).toBe('2.2.0');
+    expect(report.packageVersionLine).toBe('2.3.0');
     expect(report.interpretation.packageVersion).toBe('package-line-only');
     expect(report.interpretation.historicalReleaseBadges).toBe('historical-context-only');
     expect(report.interpretation.currentRoadmapMaturity).toBe('not-production-complete');
-    expect(report.constraints).toContain('Package version 2.2.0 is not roadmap v2.2 maturity proof.');
+    expect(report.constraints).toContain('Package version 2.3.0 is not roadmap v2.3 maturity proof.');
     expect(report.constraints).toContain('Historical README release badges do not override the current-status block.');
     expect(reportMd).toContain('Package Version Is Not Roadmap Maturity');
 
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Release/version hygiene report: docs/superpowers/release-version-hygiene.json');
-      expect(block).toContain('Package version 2.2.0 is a package line, not roadmap v2.2 maturity proof.');
+      expect(block).toContain('Package version 2.3.0 is a package line, not roadmap v2.3 maturity proof.');
     }
   });
 
@@ -169,25 +169,67 @@ describe('status documentation hygiene (D-56)', () => {
     };
     const scorecardMd = readRepoFile('docs/superpowers/v1-v4-evidence-scorecard.md');
 
-    expect(scorecard.aggregatePercent).toBe(55);
+    expect(scorecard.aggregatePercent).toBe(56);
     expect(scorecard.milestones.map((m) => m.id)).toEqual(['v1.0', 'v1.5', 'v2.0', 'v2.5', 'v3.0', 'v4.0']);
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toHaveLength(0);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D78:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D77:/m);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D75:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D73:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D72:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D71:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D70:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D68:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D69:/m);
-    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 55%');
+    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 56%');
     expect(scorecardMd).toContain('D67 rename_symbol exposes hashline edit hunks');
     expect(scorecardMd).toContain('D71 covers TypeScript combined default-plus-named import references');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
+    }
+  });
+
+  it('keeps v1.0 fresh release gate evidence present and machine-readable (D-79)', () => {
+    const gate = JSON.parse(readRepoFile('docs/superpowers/v1.0-fresh-release-gate.json')) as {
+      subSprint: string;
+      packageVersionAfter: string;
+      verificationMatrix: {
+        typecheck: { exitCode: number; result: string };
+        lint: { exitCode: number; result: string };
+        test: { exitCode: number; passingTests: number; failingTests: number; result: string };
+        build: { exitCode: number; result: string };
+        diffCheck: { exitCode: number; result: string };
+      };
+      fiveRedLines: { preserved: boolean };
+      caveats: string[];
+    };
+    const gateMd = readRepoFile('docs/superpowers/v1.0-fresh-release-gate.md');
+
+    expect(gate.subSprint).toBe('D-79 v1.0 fresh release gate proof');
+    expect(gate.packageVersionAfter).toBe('2.3.0');
+    expect(gate.verificationMatrix.typecheck.exitCode).toBe(0);
+    expect(gate.verificationMatrix.typecheck.result).toBe('pass');
+    expect(gate.verificationMatrix.lint.exitCode).toBe(0);
+    expect(gate.verificationMatrix.lint.result).toBe('pass');
+    expect(gate.verificationMatrix.test.exitCode).toBe(0);
+    expect(gate.verificationMatrix.test.passingTests).toBe(1199);
+    expect(gate.verificationMatrix.test.failingTests).toBe(1);
+    expect(gate.verificationMatrix.build.exitCode).toBe(0);
+    expect(gate.verificationMatrix.diffCheck.exitCode).toBe(0);
+    expect(gate.fiveRedLines.preserved).toBe(true);
+    expect(gate.caveats.some((c) => c.includes('not roadmap v2.3 maturity'))).toBe(true);
+
+    expect(gateMd).toContain('V1.0 Fresh Release Gate Evidence');
+    expect(gateMd).toContain('Package version 2.3.0');
+    expect(gateMd).toContain('5 红线 Preservation');
+    for (const path of DOCS) {
+      const text = readRepoFile(path);
+      expect(text, `${path} should reference the v1.0 fresh release gate evidence`).toContain(
+        'v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json',
+      );
     }
   });
 
@@ -212,7 +254,7 @@ describe('status documentation hygiene (D-56)', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D78 cross-session memory crash/reload evidence');
+      expect(block).toContain('Current sprint: D79 v1.0 fresh release gate proof + version bump');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -229,15 +271,16 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D75 TaskGraph goal recording integration evidence');
       expect(block).toContain('D77 planner main-loop evidence fixture');
       expect(block).toContain('D78 cross-session memory crash/reload evidence');
+      expect(block).toContain('D79 v1.0 fresh release gate proof + version bump');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: re-score v1-v4 from current evidence');
+      expect(block).toContain('Next implementation slice: D80 v1.0 ship ritual on release/v1.0 branch (gated on user approval: tag, npm publish, force-push)');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D78/i);
+      expect(block).not.toMatch(/Next implementation slice: D79/i);
       expect(block).not.toMatch(/Current sprint: D77/i);
       expect(block).not.toMatch(/Next implementation slice: D78/i);
-      expect(block).not.toMatch(/Current sprint: D75/i);
-      expect(block).not.toMatch(/Next implementation slice: D76/i);
       expect(block).not.toMatch(/Current sprint: D73/i);
       expect(block).not.toMatch(/Next implementation slice: D74/i);
       expect(block).not.toMatch(/Current sprint: D72/i);

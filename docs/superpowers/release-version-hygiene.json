@@ -2,7 +2,7 @@
   "generatedAt": "2026-06-10T00:00:00.000Z",
   "slice": "D72",
   "branch": "feature/d36-gate2-live",
-  "packageVersionLine": "2.2.0",
+  "packageVersionLine": "2.3.0",
   "sourceOfTruth": {
     "packageFile": "package.json",
     "currentStatusDocs": [
@@ -16,13 +16,13 @@
     "packageVersion": "package-line-only",
     "historicalReleaseBadges": "historical-context-only",
     "currentRoadmapMaturity": "not-production-complete",
-    "freshReleaseGate": "not-proven-in-this-scorecard"
+    "freshReleaseGate": "proven-2026-06-10 (D-79)"
   },
   "constraints": [
-    "Package version 2.2.0 is not roadmap v2.2 maturity proof.",
+    "Package version 2.3.0 is not roadmap v2.3 maturity proof.",
     "Historical README release badges do not override the current-status block.",
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work."
+  "nextAction": "D80: prepare v1.0 ship ritual on release/v1.0 branch (gated on user approval: tag, npm publish, force-push)."
 }
