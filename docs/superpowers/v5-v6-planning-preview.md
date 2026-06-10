@@ -13,9 +13,9 @@ This document does not start v5/v6 implementation. The active objective remains 
 - Gate-1 preferred-100k, Gate-1.5, and production long-horizon evidence must not be inferred from fixture or module existence.
 - v5.0 implementation allowed only when v1-v4 scorecard aggregate >= 65% AND v2.5 percent >= 65%.
 
-## Gate Status (2026-06-10, D-83)
+## Gate Status (2026-06-10, D-84)
 
-- v1-v4 aggregate percent: 62% (gate threshold: 65%, NOT yet reached)
+- v1-v4 aggregate percent: 63% (gate threshold: 65%, NOT yet reached)
 - v2.5 percent: 65% (gate threshold: 65%, REACHED 2026-06-10 D-82)
 - v2.5 implementation gate: reached
 - Aggregate implementation gate: NOT yet reached

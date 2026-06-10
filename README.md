@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D83 v1.0 default registry invariant fixture
+- Current sprint: D84 v1.5 Code Intel re-export chain call graph fixture
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -59,6 +59,7 @@
 - D81 v2.5 multi-scenario planner evidence: 3 new planner integration scenarios (multi-task DAG with dependsOn dependencies, tool spec preservation, and negative test confirming planner is gated by goal presence) advance the v2.5 blocker from 'single-fixture proof' to 'multi-scenario evidence'.
 - D82 v2.5 investigate-goal scenario fixture: 1 new planner integration scenario (single-task investigation, no dependsOn) advances v2.5 to 65% and crosses the v5 implementation gate threshold (>=65%).
 - D83 v1.0 default registry invariant fixture: 2 new unit tests assert the default registry contains exactly 19 tools (coding + Code Intel essentials) and no non-coding opt-in tools are exposed by default.
+- D84 v1.5 Code Intel re-export chain call graph fixture: 1 new test asserts the call-graph heuristic follows a caller -> intermediate re-exporter -> target chain, recognizing transitive callers across a re-export boundary.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -84,8 +85,8 @@
 
 ### Next Work
 
-1. D83 v1.0 default registry invariant fixture is complete: 2 new unit tests assert exactly 19 default tools and no non-coding opt-in tools are exposed.
-2. Next implementation slice: D84 v1.5 Code Intel fixture (gated on user direction; v5 gate still blocked on aggregate 62% < 65%).
+1. D84 v1.5 Code Intel re-export chain call graph fixture is complete: 1 new test asserts transitive callers are recognized across a re-export boundary.
+2. Next implementation slice: D85 v3.0 Gate-2 runner fixture (gated on user direction; v5 gate still blocked on aggregate 63% < 65%).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -138,8 +139,9 @@
 - D81 plan: docs/superpowers/plans/2026-06-10-d81-v2.5-multi-scenario-planner.md
 - D82 plan: docs/superpowers/plans/2026-06-10-d82-v2.5-investigate-scenario.md
 - D83 plan: docs/superpowers/plans/2026-06-10-d83-v1.0-default-registry-invariant.md
+- D84 plan: docs/superpowers/plans/2026-06-10-d84-v1.5-reexport-call-graph.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D83.
+- Last status hygiene sprint: D84.
 
 <!-- status:current:end -->
 

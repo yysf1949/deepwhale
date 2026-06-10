@@ -157,6 +157,40 @@ describe('call_graph (D-32.2.3)', () => {
     }
   });
 
+  it('for-symbol handles re-export chain (caller -> intermediate re-exporter -> target) (D-84 v1.5)', async () => {
+    // Setup: caller imports `answer` from intermediate, intermediate
+    // re-exports `answer` from target. The call graph for `answer` should
+    // find caller.ts as a transitive caller via the re-export chain.
+    const repo = mkdtempSync(join(tmpdir(), 'dw-callgraph-reexport-'));
+    tempDirs.push(repo);
+    writeFileSync(
+      join(repo, 'target.ts'),
+      'export function answer() { return 42; }\n',
+    );
+    writeFileSync(
+      join(repo, 'intermediate.ts'),
+      "export { answer } from './target';\n",
+    );
+    writeFileSync(
+      join(repo, 'caller.ts'),
+      "import { answer } from './intermediate';\nexport function run() { return answer(); }\n",
+    );
+
+    const result = await tool.execute({
+      action: 'for-symbol',
+      path: repo,
+      symbol: 'answer',
+      depth: 3,
+    });
+
+    // The call graph must recognize the re-export chain: caller.ts is a
+    // transitive caller of `answer` via the re-export through intermediate.ts.
+    // If the heuristic ignores re-exports, the incoming list would be empty.
+    expect(result.success).toBe(true);
+    expect(result.meta?.incomingCount).toBeGreaterThan(0);
+    expect(result.content).toContain('caller.ts');
+  });
+
   it('returns error for missing file in for-file', async () => {
     const r = await tool.execute({ action: 'for-file', path: REPO });
     expect(r.success).toBe(false);
