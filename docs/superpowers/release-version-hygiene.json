@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D89: v5.0 audit log file-backed persistence (mirror D-78 JSONL pattern; gated on user direction)."
+  "nextAction": "D90: v5.0 third evidence (gated on user direction; observability: CLI dump command OR production hardening other theme)."
 }

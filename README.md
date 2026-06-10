@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D88 v5.0 AuditLog tool-loop integration
+- Current sprint: D89 v5.0 AuditLog file-backed persistence
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -64,6 +64,7 @@
 - D86 v4.0 cross-session multi-hop handoff fixture: 1 new test extends D-80 from 2-instance to 3-instance handoffs (A writes 3, B writes 2, C reads all 5 in order), completing v4.0 multi-hop cross-session coverage.
 - D87 v5.0 observability+auditability minimal seed: 1 new AuditLog class (in-memory, append-only, deterministic timestamps via injected clock) + 1 new unit test. This is the first v5.0 evidence fixture.
 - D88 v5.0 observability+auditability tool-loop integration: 1 new unit test verifies that runToolLoop emits tool-call, tool-result, and loop-end events into a provided AuditLog. After D-88, the v5 audit log captures real tool-loop activity, not just synthetic events.
+- D89 v5.0 observability+auditability file-backed persistence: 1 new PersistingAuditLog class extends AuditLog with JSONL + atomic-rename + partial-line recovery (mirror D-78 + D-80 pattern) + 2 new unit tests (cross-instance + partial-line recovery). Audit events now survive process restarts.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -89,8 +90,8 @@
 
 ### Next Work
 
-1. D88 v5.0 AuditLog tool-loop integration is complete: 1 new test verifies runToolLoop emits tool-call + tool-result + loop-end events into a provided AuditLog.
-2. Next implementation slice: D89 v5.0 audit log file-backed persistence (mirror D-78 JSONL pattern; gated on user direction).
+1. D89 v5.0 AuditLog file-backed persistence is complete: 1 new PersistingAuditLog class + 2 new unit tests (cross-instance + partial-line recovery).
+2. Next implementation slice: D90 v5.0 third evidence (gated on user direction; observability: CLI dump command OR production hardening other theme).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -148,8 +149,9 @@
 - D86 plan: docs/superpowers/plans/2026-06-10-d86-v4.0-cross-session-recordplan.md
 - D87 plan: docs/superpowers/plans/2026-06-10-d87-v5.0-audit-log-seed.md
 - D88 plan: docs/superpowers/plans/2026-06-10-d88-v5.0-audit-log-tool-loop-integration.md
+- D89 plan: docs/superpowers/plans/2026-06-10-d89-v5.0-audit-log-file-persistence.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D88.
+- Last status hygiene sprint: D89.
 
 <!-- status:current:end -->
 

@@ -48,6 +48,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D86 records a v4.0 cross-session multi-hop handoff fixture: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances. v5.0 implementation is now UNLOCKED (BOTH gates reached).
 - D87 records the first v5.0 evidence fixture: AuditLog minimal seed (in-memory, append-only, deterministic timestamps via injected clock) + 1 unit test.
 - D88 records a v5.0 AuditLog tool-loop integration: 1 new test verifies runToolLoop emits tool-call, tool-result, and loop-end events into a provided AuditLog. The audit log now captures real tool-loop activity, not just synthetic events.
+- D89 records a v5.0 AuditLog file-backed persistence: 1 new PersistingAuditLog class extends AuditLog with JSONL + atomic-rename + partial-line recovery (mirror D-78 + D-80 pattern) + 2 new unit tests. Audit events now survive process restarts.
 
 ## Next Actions
 
