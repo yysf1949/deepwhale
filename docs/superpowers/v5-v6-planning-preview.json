@@ -13,11 +13,11 @@
     "v5.0 implementation allowed only when v1-v4 scorecard aggregate >= 65% AND v2.5 percent >= 65%"
   ],
   "gateStatus": {
-    "v1v4AggregatePercent": 64,
+    "v1v4AggregatePercent": 65,
     "v2.5Percent": 65,
     "v2.5GateReached": true,
-    "aggregateGateReached": false,
-    "note": "v2.5 implementation gate (>= 65%) reached 2026-06-10 (D-82). Aggregate gate (>= 65%) NOT yet reached; currently 64% (D-85). v5.0 implementation remains blocked on the aggregate gate; the user can override this gate with explicit direction."
+    "aggregateGateReached": true,
+    "note": "BOTH gates reached 2026-06-10: v1-v4 aggregate 65% (D-86) AND v2.5 65% (D-82). v5.0 implementation is now UNLOCKED. Implementation remains gated only on explicit user kickoff direction (the v5 plan doc lists the v5.0 themes: production hardening, plugin governance, distribution/upgrade flow, observability/auditability)."
   },
   "phases": [
     {

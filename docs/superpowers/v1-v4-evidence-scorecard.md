@@ -2,7 +2,7 @@
 
 Generated: 2026-06-10
 
-Aggregate evidence-backed progress: 64%
+Aggregate evidence-backed progress: 65%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
@@ -13,7 +13,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
 | v2.5 | 65% | Planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 + D-82); v5 implementation gate reached (v2.5 >= 65%) | Integration is 5 fixtures; a real long-horizon multi-step execution run is still not proven in this scorecard; release gate scenarios are not freshly proven |
 | v3.0 | 55% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes; inclusive 30-50 boundary fixture present (D-85) | Gate-2 is fixture-scoped, not broad production proof; production long-horizon evidence is not yet present |
-| v4.0 | 45% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus cross-session TaskGraph persistence evidence fixtures present | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete; cross-session evidence is deterministic unit-style fixtures (D-78 + D-80), not real cross-platform SIGKILL tests |
+| v4.0 | 50% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present (D-78 + D-80 + D-86) | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete; cross-session evidence is deterministic unit-style fixtures, not real cross-platform SIGKILL tests |
 
 ## Caveats
 
@@ -45,6 +45,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D83 records a v1.0 default-registry invariant: 19-tool narrow default + no non-coding opt-in tools exposed by default (verified by 2 unit tests).
 - D84 records a v1.5 Code Intel re-export chain call-graph fixture: the heuristic correctly recognizes transitive callers across a caller -> intermediate re-exporter -> target boundary (verified by 1 new test).
 - D85 records a v3.0 Gate-2 long-horizon boundary fixture: 2 new tests assert the inclusive 30-50 tool-call range at exact boundaries (30 and 50) and just outside (29 and 51).
+- D86 records a v4.0 cross-session multi-hop handoff fixture: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances. v5.0 implementation is now UNLOCKED (BOTH gates reached).
 
 ## Next Actions
 

@@ -13,14 +13,14 @@ This document does not start v5/v6 implementation. The active objective remains 
 - Gate-1 preferred-100k, Gate-1.5, and production long-horizon evidence must not be inferred from fixture or module existence.
 - v5.0 implementation allowed only when v1-v4 scorecard aggregate >= 65% AND v2.5 percent >= 65%.
 
-## Gate Status (2026-06-10, D-85)
+## Gate Status (2026-06-10, D-86)
 
-- v1-v4 aggregate percent: 64% (gate threshold: 65%, NOT yet reached)
+- v1-v4 aggregate percent: 65% (gate threshold: 65%, **REACHED 2026-06-10 D-86**)
 - v2.5 percent: 65% (gate threshold: 65%, REACHED 2026-06-10 D-82)
 - v2.5 implementation gate: reached
-- Aggregate implementation gate: NOT yet reached
-- v5.0 implementation remains blocked on the aggregate gate.
-- The user can override this gate with explicit direction.
+- **Aggregate implementation gate: REACHED 2026-06-10 D-86**
+- **v5.0 implementation is now UNLOCKED** (gated only on explicit user kickoff direction)
+- The v5 plan doc lists the v5.0 themes: production hardening, plugin governance, distribution/upgrade flow, observability/auditability.
 
 ## V5.0 Production Hardening And Distribution
 

@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D85 v3.0 Gate-2 long-horizon boundary fixture
+- Current sprint: D86 v4.0 cross-session multi-hop handoff fixture
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -61,6 +61,7 @@
 - D83 v1.0 default registry invariant fixture: 2 new unit tests assert the default registry contains exactly 19 tools (coding + Code Intel essentials) and no non-coding opt-in tools are exposed by default.
 - D84 v1.5 Code Intel re-export chain call graph fixture: 1 new test asserts the call-graph heuristic follows a caller -> intermediate re-exporter -> target chain, recognizing transitive callers across a re-export boundary.
 - D85 v3.0 Gate-2 long-horizon boundary fixture: 2 new unit tests assert the inclusive 30-50 tool-call range at the exact boundaries (30 and 50) and just outside (29 and 51).
+- D86 v4.0 cross-session multi-hop handoff fixture: 1 new test extends D-80 from 2-instance to 3-instance handoffs (A writes 3, B writes 2, C reads all 5 in order), completing v4.0 multi-hop cross-session coverage.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -86,8 +87,8 @@
 
 ### Next Roadmap Work
 
-1. D85 v3.0 Gate-2 long-horizon boundary fixture is complete: 2 new unit tests assert the inclusive 30-50 tool-call range at exact boundaries and just outside.
-2. Next implementation slice: D86 v4.0 cross-session fixture (gated on user direction; v5 gate still blocked on aggregate 64% < 65%).
+1. D86 v4.0 cross-session multi-hop handoff fixture is complete: 1 new test verifies 3-instance handoff (A writes 3, B writes 2, C reads all 5 in order).
+2. Next implementation slice: D87 v5 implementation kickoff (BOTH v5 gates unlocked: v1-v4 aggregate 65% AND v2.5 65%; v5 plan doc is the implementation roadmap).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D86: v4.0 cross-session fixture (v4.0 45% -> 50%, aggregate 64% -> 65% = unlock v5 implementation BOTH gates)."
+  "nextAction": "D87: v5 implementation kickoff. v1-v4 aggregate 65% AND v2.5 65% BOTH reached 2026-06-10; v5 plan doc is the implementation roadmap. v5.0 implementation is now UNLOCKED (gated only on explicit user kickoff direction)."
 }

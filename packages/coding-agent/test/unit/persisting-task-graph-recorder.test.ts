@@ -129,4 +129,37 @@ describe('PersistingTaskGraphRecorder (D-80)', () => {
     expect(parsed.kind).toBe('goal');
     expect(parsed.goal).toBe('round-trip goal');
   });
+
+  it('preserves 3-instance handoff: A writes 3, B writes 2, C reads all 5 in order (D-86 v4.0 multi-hop cross-session)', async () => {
+    // Multi-instance timeline: instance A, then B, then C all point at the
+    // same file. The 5 entries written by A and B must be visible to C in
+    // write order. This extends D-80 from 2-instance to 3-instance
+    // handoffs, the natural Agent OS pattern (session N -> session N+1
+    // -> session N+2).
+    const dir = mkdtempSync(join(tmpdir(), 'dw-taskgraph-multihop-'));
+    const file = join(dir, 'taskgraph.jsonl');
+    try {
+      const a = new PersistingTaskGraphRecorder({ file });
+      await a.recordGoal('hop-1 step-1 from A');
+      await a.recordGoal('hop-1 step-2 from A');
+      await a.recordGoal('hop-1 step-3 from A');
+
+      const b = new PersistingTaskGraphRecorder({ file });
+      await b.load();
+      await b.recordGoal('hop-2 step-1 from B');
+      await b.recordGoal('hop-2 step-2 from B');
+
+      const c = new PersistingTaskGraphRecorder({ file });
+      await c.load();
+      expect(c.getGoals().map((g) => g.goal)).toEqual([
+        'hop-1 step-1 from A',
+        'hop-1 step-2 from A',
+        'hop-1 step-3 from A',
+        'hop-2 step-1 from B',
+        'hop-2 step-2 from B',
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

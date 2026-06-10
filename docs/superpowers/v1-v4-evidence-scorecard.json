@@ -7,7 +7,7 @@
     "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
     "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md"
   },
-  "aggregatePercent": 64,
+  "aggregatePercent": 65,
   "milestones": [
     {
       "id": "v1.0",
@@ -94,18 +94,19 @@
     },
     {
       "id": "v4.0",
-      "percent": 45,
-      "status": "Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus cross-session TaskGraph persistence evidence fixtures present",
+      "percent": 50,
+      "status": "Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present",
       "evidence": [
         "Researcher and TaskGraph modules exist",
         "persistent memory and channel foundation modules exist",
         "D78 records atomic write semantics plus partial-last-line recovery for the persistent memory store",
-        "D80 records cross-session TaskGraph persistence: a second PersistingTaskGraphRecorder instance loaded from the same file sees the first instance's records (D-78 storage layer + D-80 Agent OS layer)"
+        "D80 records cross-session TaskGraph persistence: a second PersistingTaskGraphRecorder instance loaded from the same file sees the first instance's records (D-78 storage layer + D-80 Agent OS layer)",
+        "D86 records multi-hop cross-session handoff: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances"
       ],
       "blockers": [
         "Agent OS orchestration is not production-complete",
         "Desktop and channels remain stopped or opt-in, not default-enabled",
-        "cross-session crash recovery evidence is deterministic unit-style fixtures (D-78 + D-80), not real cross-platform SIGKILL tests"
+        "cross-session crash recovery evidence is deterministic unit-style fixtures (D-78 + D-80 + D-86), not real cross-platform SIGKILL tests"
       ]
     }
   ],
