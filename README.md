@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D81 v2.5 multi-scenario planner evidence
+- Current sprint: D82 v2.5 investigate-goal scenario fixture
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -57,6 +57,7 @@
 - D79 v1.0 fresh release gate proof + version bump: docs/superpowers/v1.0-fresh-release-gate.{json,md} capture typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0 (line-only, per D-72 hygiene).
 - D80 TaskGraph cross-session persistence evidence: PersistingTaskGraphRecorder mirrors the PersistentMemoryStore pattern (JSONL + atomic-rename + partial-line recovery); cross-session integration test records in instance A, then verifies instance B (same file) sees A's entries.
 - D81 v2.5 multi-scenario planner evidence: 3 new planner integration scenarios (multi-task DAG with dependsOn dependencies, tool spec preservation, and negative test confirming planner is gated by goal presence) advance the v2.5 blocker from 'single-fixture proof' to 'multi-scenario evidence'.
+- D82 v2.5 investigate-goal scenario fixture: 1 new planner integration scenario (single-task investigation, no dependsOn) advances v2.5 to 65% and crosses the v5 implementation gate threshold (>=65%).
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -82,8 +83,8 @@
 
 ### Next Work
 
-1. D81 v2.5 multi-scenario planner evidence is complete: 3 new scenarios (multi-task DAG, tool spec, no-goal) verified the planner integration is correctly gated and handles varied goal types.
-2. Next implementation slice: D82 next v1-v4 slice (gated on user direction; v5/v6 implementation blocked on scorecard >= 65%, currently 60%).
+1. D82 v2.5 investigate-goal scenario fixture is complete: 1 new scenario (single-task investigation) advances v2.5 to 65% and crosses the v5 implementation gate.
+2. Next implementation slice: D83 v5 implementation kickoff (gated on user direction; v5 plan doc exists at docs/superpowers/plans/2026-06-10-d75-taskgraph-goal-recording.md).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -134,8 +135,9 @@
 - D79 plan: docs/superpowers/plans/2026-06-10-d79-v1.0-fresh-release-gate.md
 - D80 plan: docs/superpowers/plans/2026-06-10-d80-taskgraph-cross-session-persistence.md
 - D81 plan: docs/superpowers/plans/2026-06-10-d81-v2.5-multi-scenario-planner.md
+- D82 plan: docs/superpowers/plans/2026-06-10-d82-v2.5-investigate-scenario.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D81.
+- Last status hygiene sprint: D82.
 
 <!-- status:current:end -->
 

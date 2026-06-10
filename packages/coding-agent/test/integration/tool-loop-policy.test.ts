@@ -394,4 +394,56 @@ describe('tool-loop-policy integration', () => {
     expect(plannerCallCount).toBe(0);
     expect(recordPlanCallCount).toBe(0);
   });
+
+  it('records a single-task investigation plan with no dependencies (D-82 v2.5 investigate scenario)', async () => {
+    // Investigation goals: the planner returns a single atomic task
+    // with no dependsOn and no tool spec. This is the common
+    // "research X" / "look into Y" pattern that does not decompose.
+    const llm = new ScriptedLlm([stopResult]);
+    const plannedGoals: string[] = [];
+    const planner: Planner = {
+      async plan({ goal }) {
+        plannedGoals.push(goal);
+        return {
+          tasks: [{ id: 'investigate-parser-slow', goal, dependsOn: [] }],
+        };
+      },
+      async callTool() {
+        throw new Error('planner cannot call tools');
+      },
+    };
+    const recordedPlans: Array<{ id: string; goal: string }> = [];
+    const taskGraph: TaskGraphRecorder & {
+      recordPlan: (input: { tasks: ReadonlyArray<{ id: string; goal: string }> }) => Promise<void>;
+    } = {
+      async recordToolCall() {
+        /* noop */
+      },
+      async recordGoal() {
+        /* noop */
+      },
+      async recordPlan(input) {
+        recordedPlans.push(...input.tasks);
+      },
+    };
+
+    await runToolLoopWithReview({
+      client: llm,
+      messages: [
+        { role: 'system', content: 'system prompt' },
+        { role: 'user', content: 'investigate why the parser is slow' },
+      ],
+      registry: createDefaultRegistry(),
+      maxSteps: 3,
+      planner,
+      taskGraph,
+    });
+
+    // The single atomic task is recorded with the goal flowing through
+    // the mapper (id + goal only, no dependsOn / tool per the v2.5 contract).
+    expect(plannedGoals).toEqual(['investigate why the parser is slow']);
+    expect(recordedPlans).toEqual([
+      { id: 'investigate-parser-slow', goal: 'investigate why the parser is slow' },
+    ]);
+  });
 });

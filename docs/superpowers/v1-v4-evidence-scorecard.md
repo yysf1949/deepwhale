@@ -2,7 +2,7 @@
 
 Generated: 2026-06-10
 
-Aggregate evidence-backed progress: 60%
+Aggregate evidence-backed progress: 61%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
@@ -11,7 +11,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | v1.0 | 75% | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | No new public code claims; v1.0 ship ritual (tag, npm publish) is gated on user approval |
 | v1.5 | 65% | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename |
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and binding branch decision are incomplete |
-| v2.5 | 60% | Planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 scenarios) | Integration is 4 fixtures (1 base + D-77 + 3 D-81), not a true long-horizon multi-step execution run; release gate scenarios are not freshly proven in this scorecard |
+| v2.5 | 65% | Planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 + D-82); v5 implementation gate reached (v2.5 >= 65%) | Integration is 5 fixtures; a real long-horizon multi-step execution run is still not proven in this scorecard; release gate scenarios are not freshly proven |
 | v3.0 | 50% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes | Gate-2 is fixture-scoped, not broad production proof |
 | v4.0 | 45% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus cross-session TaskGraph persistence evidence fixtures present | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete; cross-session evidence is deterministic unit-style fixtures (D-78 + D-80), not real cross-platform SIGKILL tests |
 
@@ -41,6 +41,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D79 produces a fresh v1.0 release gate proof: docs/superpowers/v1.0-fresh-release-gate.{json,md} show typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0 (line-only, per D-72 hygiene).
 - D80 records cross-session TaskGraph persistence: a second PersistingTaskGraphRecorder instance loaded from the same file sees the first instance's records (D-78 storage layer + D-80 Agent OS layer).
 - D81 adds 3 multi-scenario planner integration tests: multi-task DAG with dependsOn dependencies, tool spec preservation, and negative test confirming planner is gated by goal presence.
+- D82 adds 1 investigate-goal scenario (single task, no dependsOn) -- brings v2.5 to 65%, crossing the v5 implementation gate threshold.
 
 ## Next Actions
 
