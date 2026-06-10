@@ -13,11 +13,11 @@
     "v5.0 implementation allowed only when v1-v4 scorecard aggregate >= 65% AND v2.5 percent >= 65%"
   ],
   "gateStatus": {
-    "v1v4AggregatePercent": 63,
+    "v1v4AggregatePercent": 64,
     "v2.5Percent": 65,
     "v2.5GateReached": true,
     "aggregateGateReached": false,
-    "note": "v2.5 implementation gate (>= 65%) reached 2026-06-10 (D-82). Aggregate gate (>= 65%) NOT yet reached; currently 63% (D-84). v5.0 implementation remains blocked on the aggregate gate; the user can override this gate with explicit direction."
+    "note": "v2.5 implementation gate (>= 65%) reached 2026-06-10 (D-82). Aggregate gate (>= 65%) NOT yet reached; currently 64% (D-85). v5.0 implementation remains blocked on the aggregate gate; the user can override this gate with explicit direction."
   },
   "phases": [
     {

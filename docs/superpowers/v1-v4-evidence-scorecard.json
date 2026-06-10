@@ -7,7 +7,7 @@
     "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
     "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md"
   },
-  "aggregatePercent": 63,
+  "aggregatePercent": 64,
   "milestones": [
     {
       "id": "v1.0",
@@ -80,11 +80,12 @@
     },
     {
       "id": "v3.0",
-      "percent": 50,
-      "status": "Reviewer and Gate-2 runner exist; current Gate-2 live fixture passes under default profile",
+      "percent": 55,
+      "status": "Reviewer and Gate-2 runner exist; current Gate-2 live fixture passes under default profile; inclusive 30-50 boundary fixture present (D-85)",
       "evidence": [
         "Reviewer modules exist",
-        "Gate-2 live evidence is passed_live=true with toolCalls=31 and registryProfile=default"
+        "Gate-2 live evidence is passed_live=true with toolCalls=31 and registryProfile=default",
+        "D85 records a v3.0 Gate-2 long-horizon boundary fixture: 2 new tests assert the inclusive 30-50 tool-call range at exact boundaries (30 and 50) and just outside (29 and 51)"
       ],
       "blockers": [
         "Gate-2 evidence is a default-profile invoice fixture pass, not broad long-horizon production proof",

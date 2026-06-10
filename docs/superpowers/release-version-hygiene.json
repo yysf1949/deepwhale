@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D85: v3.0 Gate-2 runner fixture (v3.0 50% -> 55%, aggregate 63% -> 64%)."
+  "nextAction": "D86: v4.0 cross-session fixture (v4.0 45% -> 50%, aggregate 64% -> 65% = unlock v5 implementation BOTH gates)."
 }
