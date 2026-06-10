@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D101: v5.0 distribution/upgrade flow 2nd cycle OR observability+auditability 2nd cycle (gated on user direction)."
+  "nextAction": "D102: v5.0 observability+auditability 2nd cycle OR plugin governance 2nd cycle (gated on user direction)."
 }

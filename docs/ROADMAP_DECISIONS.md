@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D100 v5.0 plugin governance 2nd cycle (buildCapabilityMatrix)
+- Current sprint: D101 v5.0 distribution/upgrade flow 2nd cycle (generateChangelog)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -86,6 +86,7 @@
 - D98 v5.0 production hardening 3rd evidence: 1 new installProcessUncaughtHandlers function (uncaughtException + unhandledRejection, cross-theme bridge into v5.0 AuditLog via 'fatal-uncaught' events, idempotent cleanup, default-onUncaught uses process.exit(1) for non-zero failure exit) + 1 ProcessUncaughtHandlerOptions interface + 1 NormalizedUncaughtPayload interface + 4 new unit tests. Production-hardening theme now covers a 3-event taxonomy: format fatal errors (D-96) + handle process signals (D-97) + catch unhandled exceptions (D-98).
 - D99 v5.0 production hardening 4th evidence: 1 new gracefulShutdown async function (sequences beforeExit -> auditLog record -> onComplete in 3 ordered steps; cross-theme bridge into v5.0 AuditLog via 'graceful-shutdown' events; defensive: errors at any step are caught and surfaced via ShutdownResult) + 1 GracefulShutdownOptions interface + 1 ShutdownResult interface + 1 ShutdownTrigger union + 4 new unit tests. Production-hardening 4-step protocol COMPLETE: format fatal errors (D-96) + handle process signals (D-97) + catch unhandled exceptions (D-98) + drain pending work (D-99).
 - D100 v5.0 plugin governance 2nd cycle: 1 new buildCapabilityMatrix pure function (cross-theme bridge: D-91 ToolCapability vocabulary + D-94 DistributionManifest; returns CapabilityMatrix with entries + undeclaredToolCapabilities + toolsWithoutCapabilities) + 1 CapabilityMatrix interface + 1 CapabilityMatrixEntry interface + 1 UndeclaredToolCapability interface + 4 new unit tests. Plugin-governance theme 1st cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100.
+- D101 v5.0 distribution/upgrade flow 2nd cycle: 1 new generateChangelog pure function (compares 2 DistributionManifests, returns ChangelogDocument with version + capability-added/removed + channel + node-engine + supported-upgrade-origin entries) + 1 ChangelogDocument interface + 1 ChangelogEntry interface + 1 ChangelogChangeKind union + 4 new unit tests. Distribution/upgrade flow theme 2nd cycle COMPLETE: manifest D-94 + compareVersions D-95 + changelog generator D-101.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -103,8 +104,8 @@
 
 ### Next Decisions Needed
 
-1. D100 v5.0 plugin governance 2nd cycle (buildCapabilityMatrix) is complete: 1 new function + 3 new interfaces + 4 new unit tests. Plugin-governance theme 1st cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100.
-2. Next implementation slice: D101 v5.0 distribution/upgrade flow 2nd cycle OR observability+auditability 2nd cycle (gated on user direction; changelog generator OR AuditLog CLI dump OR persisted-config-loader).
+1. D101 v5.0 distribution/upgrade flow 2nd cycle (generateChangelog) is complete: 1 new function + 3 new types + 4 new unit tests. Distribution/upgrade flow theme 2nd cycle COMPLETE: manifest D-94 + compareVersions D-95 + changelog generator D-101.
+2. Next implementation slice: D102 v5.0 observability+auditability 2nd cycle OR plugin governance 2nd cycle (gated on user direction; AuditLog CLI dump OR capability-matrix-driven profile-policy enforcer OR persisted-config-loader).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
