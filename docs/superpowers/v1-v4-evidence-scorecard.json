@@ -48,16 +48,17 @@
     {
       "id": "v2.0",
       "percent": 40,
-      "status": "memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5/live integration incomplete",
+      "status": "memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing exists, but live result evidence is incomplete",
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
         "MCP package and runtime foundation exist",
         "D70 refreshed Gate-1.5 fixture evidence with binding=false and branchDecision=defer-live-evidence",
-        "D73 live Browser task ledger records 0/20 live tasks and binding=false"
+        "D73 live Browser task ledger records 0/20 live tasks and binding=false",
+        "D114 queues 20 pending candidate live Browser tasks as sourcing evidence only; 0/20 completed live results exist and binding remains false"
       ],
       "blockers": [
-        "Gate-1.5 live 20-task browser evidence is not complete",
+        "Gate-1.5 live 20-task browser result evidence is not complete",
         "default registry must remain coding plus Code Intel essentials"
       ]
     },
@@ -117,5 +118,9 @@
     "Code Intel rename, reference, call graph, and smart search behavior remains heuristic unless a specific test proves stronger semantics.",
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
-  "nextActions": []
+  "nextActions": [
+    "D115: run queued Gate-1.5 Browser tasks only through an explicit opt-in live runner, then record success or failed results without unlocking Browser defaults.",
+    "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
+    "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
+  ]
 }

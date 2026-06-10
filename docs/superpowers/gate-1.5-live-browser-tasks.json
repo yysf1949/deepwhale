@@ -1,10 +1,12 @@
 {
-  "generatedAt": "2026-06-10T00:00:00.000Z",
-  "slice": "D73",
+  "generatedAt": "2026-06-11T00:00:00.000Z",
+  "slice": "D114",
   "branch": "feature/d36-gate2-live",
-  "evidenceKind": "live-browser-task-ledger",
-  "status": "deferred",
+  "evidenceKind": "live-browser-task-sourcing-ledger",
+  "status": "queued",
   "requiredTasks": 20,
+  "candidateTasks": 20,
+  "pendingTasks": 20,
   "completedTasks": 0,
   "successes": 0,
   "failures": 0,
@@ -12,13 +14,175 @@
   "binding": false,
   "branchDecision": "defer-live-evidence",
   "browserEnhancementUnlocked": false,
-  "reason": "No 20-task live browser evidence has been collected in this repository state.",
+  "reason": "20 candidate live Browser tasks are queued but not yet executed; no completed live Browser result evidence exists in this repository state.",
   "fixtureReport": "docs/superpowers/gate-1.5-browser-viability.json",
+  "tasks": [
+    {
+      "id": "docs-search-query",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/docs",
+      "goal": "Search documentation for a named feature and open the most relevant result.",
+      "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "docs-filter-results",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/docs/search",
+      "goal": "Filter documentation search results by a category and verify the filtered list changes.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "account-login-form",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/login",
+      "goal": "Fill an account login form with test credentials and stop before submitting real credentials.",
+      "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "contact-form-required-field",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/contact",
+      "goal": "Submit a contact form with one required field missing and observe the validation message.",
+      "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "newsletter-signup",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/newsletter",
+      "goal": "Enter an email address into a newsletter signup form and verify the confirmation state.",
+      "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "product-search",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/store",
+      "goal": "Search for a product by name and identify the first matching result.",
+      "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "product-sort",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/store",
+      "goal": "Change product sort order and verify the result order changes.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "cart-add-item",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/store/item",
+      "goal": "Add one item to a cart and verify the cart count increments.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "cart-update-quantity",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/cart",
+      "goal": "Update an item quantity in a cart and verify the subtotal updates.",
+      "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "checkout-address-validation",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/checkout",
+      "goal": "Enter an incomplete shipping address and observe the validation message.",
+      "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "table-filter",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/admin/table",
+      "goal": "Filter a data table by text and verify non-matching rows disappear.",
+      "requiredCapabilities": ["browser.navigate", "browser.type"],
+      "status": "pending"
+    },
+    {
+      "id": "table-pagination",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/admin/table",
+      "goal": "Move to the next page of a paginated table and verify the page indicator changes.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "settings-toggle",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/settings",
+      "goal": "Toggle a binary setting and verify the saved state is visible.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "profile-edit",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/profile",
+      "goal": "Edit a profile display name and verify the preview reflects the change.",
+      "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "modal-open-close",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/dashboard",
+      "goal": "Open a modal dialog and close it with the visible close control.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "tabs-switch",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/dashboard",
+      "goal": "Switch between two tabs and verify the active panel changes.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "keyboard-search-shortcut",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/app",
+      "goal": "Focus the site search field and enter a query using browser typing.",
+      "requiredCapabilities": ["browser.navigate", "browser.type"],
+      "status": "pending"
+    },
+    {
+      "id": "breadcrumb-navigation",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/docs/topic/page",
+      "goal": "Use breadcrumb navigation to return to the parent topic.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "download-link-detection",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/downloads",
+      "goal": "Find a download link for a named asset without downloading executable content.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    },
+    {
+      "id": "error-page-recovery",
+      "source": "gate-1.5-seed",
+      "url": "https://example.com/missing-page",
+      "goal": "Recover from a not-found page by navigating back to the home page.",
+      "requiredCapabilities": ["browser.navigate", "browser.click"],
+      "status": "pending"
+    }
+  ],
   "constraints": [
-    "Fixture dry-run evidence remains advisory only.",
-    "A binding Browser branch decision requires 20 live browser tasks.",
+    "Candidate tasks are sourcing evidence only; they are not completed live Browser evidence.",
+    "A binding Browser branch decision still requires 20 completed live Browser task results.",
     "Browser enhancement work stays locked until live evidence is available.",
     "Browser remains opt-in and not default-enabled."
   ],
-  "nextAction": "D74: continue Code Intel correctness hardening only where tests prove specific behavior."
+  "nextAction": "D115: run queued tasks with an opt-in live Browser runner and record success or failed results."
 }

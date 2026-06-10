@@ -3,12 +3,12 @@
 <!-- status:current:start -->
 ## Current Status
 
-- Date: 2026-06-10
+- Date: 2026-06-11
 - Branch: feature/d36-gate2-live
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D113 v6.0 Theme 2 seed (validateOidcToken)
+- Current sprint: D114 Gate-1.5 live Browser task sourcing
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -36,7 +36,7 @@
 - Gate-1.5 binding branch decision: defer-live-evidence.
 - Gate-1.5 evidence file: docs/superpowers/gate-1.5-browser-viability.json.
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json.
-- Gate-1.5 live tasks: 0/20; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live task sourcing: 20 candidates queued, 0/20 completed; binding=false; Browser enhancement unlocked=false.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -97,8 +97,9 @@
 - D109 v6.0 multi-agent safety seed: 1 new rollbackSubAgent pure function (identifies sub-agent-owned events via event.payload.subAgentId + marks with rolledBackAt + rollbackReason + emits new 'sub-agent-rollback' event; supports dryRun mode for preview) + 1 SubAgentRollbackResult interface + 1 SubAgentRollbackOptions interface + 1 SubAgentRollbackOutcome union + 4 new unit tests. Multi-agent safety seed part 3 of 3 COMPLETE: rollback side. v6.0 Theme 1 (multi-agent safety) SEED-COMPLETE: 3 of 3 sub-sprints (D-107 + D-108 + D-109) shipped.
 - D110 v6.0 multi-agent safety 2nd cycle cross-bridge: 1 new buildSubAgentPolicySnapshot async function (orchestration layer: reuses D-108 enforceSubAgentPolicy + D-109 rollbackSubAgent + D-94 DistributionManifest; returns SubAgentPolicySnapshot with policy + rollback + summary; canRun = policy.allow && rollback !== rolled-back) + 1 SubAgentPolicySnapshot interface + 1 SubAgentPolicySnapshotSummary interface + 1 BuildSubAgentPolicySnapshotInput interface + 4 new unit tests. v6.0 Theme 1 (multi-agent safety) 2nd cycle cross-bridge COMPLETE: mirrors v5.0 D-105 buildPolicySnapshot pattern. v6.0 Theme 1 SEED + CROSS-BRIDGE COMPLETE: 4 sub-sprints (D-107 + D-108 + D-109 + D-110) shipped.
 - D111 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new enforceRateLimit pure function (per-tenant rate limiting: returns RateLimitResult with decision 'allow'/'allow-with-warning'/'deny' + utilizationPercent + retryAfterMs + summary; supports warnAtPercent default 80%) + 1 TenantId branded type + 1 asTenantId + 1 isTenantId + 1 RateLimitPolicy interface + 1 RateLimitDecision union + 1 RateLimitResult interface + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed start: per-tenant rate limiting foundational types + enforcement function. D-112+ will add billing/quota, SSO/OIDC, SIEM integration.
-- D112 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new enforceTenantQuota pure function (per-tenant billing/quota: returns QuotaResult with decision 'allow'/'allow-with-warning'/'deny' + utilizationPercent + overage + summary; supports warnAtPercent default 80% + 4 CostDimension types: tokens, requests, storage, compute-seconds) + 1 TenantQuota interface + 1 CostDimension union + 1 QuotaDecision union + 1 QuotaResult interface + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 2 of 3+ COMPLETE. D-112 complements D-111 (rate limit time-windowed) by tracking cumulative usage. D-113+ will add SSO/OIDC, SIEM integration; D-114+ planned for Theme 2 2nd cycle cross-bridge.
-- D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new validateOidcToken pure function (SSO/OIDC integration: validates claim-level invariants (expiry + issuer + audience) + extracts tenantId + subject; trusts caller's pre-decoded claims; NO JWT signature verification yet) + 1 OidcProvider interface + 1 OidcToken interface + 1 OidcAuthResult interface + 1 OidcValidationOptions interface + 1 OidcAuthDecision union + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). D-114+ planned: SIEM integration, Theme 2 2nd cycle cross-bridge.
+- D112 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new enforceTenantQuota pure function (per-tenant billing/quota: returns QuotaResult with decision 'allow'/'allow-with-warning'/'deny' + utilizationPercent + overage + summary; supports warnAtPercent default 80% + 4 CostDimension types: tokens, requests, storage, compute-seconds) + 1 TenantQuota interface + 1 CostDimension union + 1 QuotaDecision union + 1 QuotaResult interface + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 2 of 3+ COMPLETE. D-112 complements D-111 (rate limit time-windowed) by tracking cumulative usage. D-113 added SSO/OIDC; SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.
+- D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new validateOidcToken pure function (SSO/OIDC integration: validates claim-level invariants (expiry + issuer + audience) + extracts tenantId + subject; trusts caller's pre-decoded claims; NO JWT signature verification yet) + 1 OidcProvider interface + 1 OidcToken interface + 1 OidcAuthResult interface + 1 OidcValidationOptions interface + 1 OidcAuthDecision union + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.
+- D114 Gate-1.5 live Browser task sourcing: 1 new pure ledger builder + 2 new unit tests queue 20 pending candidate tasks for opt-in live Browser execution while keeping Gate-1.5 binding=false and Browser enhancement locked.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -116,9 +117,9 @@
 
 ### Next Decisions Needed
 
-1. D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed (validateOidcToken) is complete: 1 new function + 5 new types + 4 new unit tests. v6.0 Theme 2 seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). D-114+ planned: SIEM integration, Theme 2 2nd cycle cross-bridge.
-2. Next implementation slice: D114 v6.0 Theme 2 2nd cycle cross-bridge (buildTenantPolicySnapshot unifying rate-limit + quota + auth) OR v6.0 Theme 1 3rd cycle (CLI integration with D-89) (gated on user direction).
-3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
+1. D114 Gate-1.5 live Browser task sourcing is complete: 20 candidate live Browser tasks are queued as sourcing evidence only; 0/20 completed live results exist; binding remains false.
+2. Next implementation slice: D115 Gate-1.5 opt-in live Browser task runner.
+3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
 6. v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json.
