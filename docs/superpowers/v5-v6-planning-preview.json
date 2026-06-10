@@ -1,0 +1,48 @@
+{
+  "generatedAt": "2026-06-10T00:00:00.000Z",
+  "status": "planning-preview-only",
+  "implementationAllowed": false,
+  "basis": {
+    "v1v4Scorecard": "docs/superpowers/v1-v4-evidence-scorecard.json",
+    "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md"
+  },
+  "gates": [
+    "v1-v4 evidence gaps must remain explicit before v5/v6 implementation starts",
+    "default registry must remain coding plus Code Intel essentials unless a later explicit release gate changes it",
+    "Gate-1 preferred-100k, Gate-1.5, and production long-horizon evidence must not be inferred from fixture/module existence"
+  ],
+  "phases": [
+    {
+      "id": "v5.0",
+      "name": "Production Hardening And Distribution",
+      "implementationAllowed": false,
+      "themes": [
+        "production hardening",
+        "plugin governance",
+        "distribution and upgrade flow",
+        "observability and auditability"
+      ],
+      "entryCriteria": [
+        "v1-v4 scorecard has explicit evidence for remaining gate gaps",
+        "Gate-1 preferred or blocker is freshly documented",
+        "Gate-1.5 and Gate-2 interpretations remain honest"
+      ]
+    },
+    {
+      "id": "v6.0",
+      "name": "Collaborative Agent Operations",
+      "implementationAllowed": false,
+      "themes": [
+        "collaborative multi-agent operations",
+        "enterprise controls",
+        "hosted service mode",
+        "ecosystem scaling"
+      ],
+      "entryCriteria": [
+        "v5 production hardening has shipped with verification evidence",
+        "multi-agent safety, audit, and rollback policies are tested",
+        "hosted or enterprise surfaces have explicit opt-in and policy gates"
+      ]
+    }
+  ]
+}

@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Decision mode: stabilization first, expansion later
-- Current sprint: D66 status, Gate-1 blocker, and v1-v4 rescore
+- Current sprint: D68 post-D67 status and v5/v6 planning preview
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -45,6 +45,7 @@
 - D63 Code Intel heuristic metadata: find_references exposes heuristic metadata in success results.
 - D64 registry opt-in loading isolation: default registry loading stays narrow and opt-in profiles load through an async boundary.
 - D65 Code Intel truthfulness metadata: smart_search and rename_symbol no-op paths expose heuristic metadata.
+- D67 rename edit hunks: rename_symbol dry-run/apply now exposes hashline edit hunks and heuristic confidence metadata.
 
 ### Decision Hygiene
 
@@ -60,11 +61,12 @@
 
 ### Next Decisions Needed
 
-1. Finish D66 status, Gate-1 blocker, and v1-v4 scorecard hygiene.
-2. Next implementation slice: D67 Gate-1 preferred 100K target or stronger Code Intel rename safety.
+1. Finish D68 post-D67 status hygiene and v5/v6 planning preview.
+2. Next implementation slice: D69 Gate-1 preferred 100K evidence or explicit blocker refresh.
 3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
-4. Re-score v1-v4 after D63-D66 evidence.
-5. Draft v5 and v6 only after v1-v4 gaps are evidence-backed.
+4. Re-score v1-v4 after current gate evidence changes.
+5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
+6. v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json.
 
 ### Repository Scope
 

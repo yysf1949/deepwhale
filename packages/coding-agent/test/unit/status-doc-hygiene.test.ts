@@ -90,6 +90,7 @@ describe('status documentation hygiene (D-56)', () => {
       aggregatePercent: number;
       milestones: Array<{ id: string; percent: number; status: string }>;
       caveats: string[];
+      nextActions: string[];
     };
     const scorecardMd = readRepoFile('docs/superpowers/v1-v4-evidence-scorecard.md');
 
@@ -97,24 +98,53 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.milestones.map((m) => m.id)).toEqual(['v1.0', 'v1.5', 'v2.0', 'v2.5', 'v3.0', 'v4.0']);
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
+    expect(scorecard.nextActions).toContain(
+      'D68: publish post-D67 status hygiene and v5/v6 planning preview without starting v5/v6 implementation.',
+    );
+    expect(scorecard.nextActions).toContain(
+      'D69: obtain or prepare a real local 100K+ Gate-1 target and run the Gate-1 scenario, or keep the blocker explicit.',
+    );
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D67:/m);
     expect(scorecardMd).toContain('Aggregate evidence-backed progress: 48%');
+    expect(scorecardMd).toContain('D67 rename_symbol exposes hashline edit hunks');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D63-D65', () => {
+  it('keeps v5/v6 planning preview gated and machine-readable', () => {
+    const preview = JSON.parse(readRepoFile('docs/superpowers/v5-v6-planning-preview.json')) as {
+      status: string;
+      gates: string[];
+      phases: Array<{ id: string; implementationAllowed: boolean; themes: string[] }>;
+    };
+    const previewMd = readRepoFile('docs/superpowers/v5-v6-planning-preview.md');
+
+    expect(preview.status).toBe('planning-preview-only');
+    expect(preview.gates).toContain('v1-v4 evidence gaps must remain explicit before v5/v6 implementation starts');
+    expect(preview.phases.map((phase) => phase.id)).toEqual(['v5.0', 'v6.0']);
+    expect(preview.phases.every((phase) => phase.implementationAllowed === false)).toBe(true);
+    expect(preview.phases[0]?.themes).toContain('production hardening');
+    expect(preview.phases[1]?.themes).toContain('collaborative multi-agent operations');
+    expect(previewMd).toContain('Planning preview only');
+  });
+
+  it('keeps the current sprint and next-work pointers aligned after D67', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D66 status, Gate-1 blocker, and v1-v4 rescore');
+      expect(block).toContain('Current sprint: D68 post-D67 status and v5/v6 planning preview');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
       expect(block).toContain('D64 registry opt-in loading isolation');
       expect(block).toContain('D65 Code Intel truthfulness metadata');
-      expect(block).toContain('Next implementation slice: D67 Gate-1 preferred 100K target or stronger Code Intel rename safety');
+      expect(block).toContain('D67 rename edit hunks');
+      expect(block).toContain('Next implementation slice: D69 Gate-1 preferred 100K evidence or explicit blocker refresh');
+      expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D66/i);
+      expect(block).not.toMatch(/Next implementation slice: D67/i);
       expect(block).not.toMatch(/Current sprint: D62/i);
       expect(block).not.toMatch(/Next implementation slice: D63/i);
       expect(block).not.toMatch(/Current sprint: D56/i);

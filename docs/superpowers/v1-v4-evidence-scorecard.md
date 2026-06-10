@@ -9,7 +9,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | Milestone | Percent | Evidence-backed status | Main blockers |
 | --- | ---: | --- | --- |
 | v1.0 | 70% | Mostly implemented coding baseline | Release/version hygiene remains noisy; full release gate is not freshly proven here |
-| v1.5 | 65% | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST/edit-engine rename |
+| v1.5 | 65% | Code Intel foundation exists and is labeled heuristic | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename |
 | v2.0 | 40% | Memory, Browser, and MCP foundations exist as opt-in or early pieces | Gate-1.5 live evidence and integration are incomplete |
 | v2.5 | 40% | Planner/DAG/cache modules exist | Main-loop integration remains limited |
 | v3.0 | 50% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes | Gate-2 is fixture-scoped, not broad production proof |
@@ -23,8 +23,13 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - Code Intel rename, reference, call graph, and smart search behavior remains heuristic unless a specific test proves stronger semantics.
 - Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in.
 
+## Evidence Updates
+
+- D67 rename_symbol exposes hashline edit hunks and heuristic confidence metadata.
+- D67 does not make rename_symbol IDE-grade; it remains reference-guided and heuristic.
+
 ## Next Actions
 
-1. D67: obtain or prepare a real local 100K+ Gate-1 target and run the scenario, or keep the blocker explicit.
-2. D67 alternative: deepen Code Intel rename safety with AST/edit-engine-backed edits before stronger release claims.
-3. After D67, re-run full verification and update this scorecard from current evidence.
+1. D68: publish post-D67 status hygiene and v5/v6 planning preview without starting v5/v6 implementation.
+2. D69: obtain or prepare a real local 100K+ Gate-1 target and run the Gate-1 scenario, or keep the blocker explicit.
+3. D70: refresh Gate-1.5 evidence and decide whether Browser remains frozen, minimal, or eligible for continued opt-in work.

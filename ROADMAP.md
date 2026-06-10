@@ -7,7 +7,7 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.2.0
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D66 status, Gate-1 blocker, and v1-v4 rescore
+- Current sprint: D68 post-D67 status and v5/v6 planning preview
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -35,6 +35,7 @@
 - D63 Code Intel heuristic metadata: find_references exposes heuristic metadata in success results.
 - D64 registry opt-in loading isolation: default registry loading stays narrow and opt-in profiles load through an async boundary.
 - D65 Code Intel truthfulness metadata: smart_search and rename_symbol no-op paths expose heuristic metadata.
+- D67 rename edit hunks: rename_symbol dry-run/apply now exposes hashline edit hunks and heuristic confidence metadata.
 
 ### Milestone Status
 
@@ -59,15 +60,16 @@
 
 ### Next Roadmap Work
 
-1. Finish D66 status, Gate-1 blocker, and v1-v4 scorecard hygiene.
-2. Next implementation slice: D67 Gate-1 preferred 100K target or stronger Code Intel rename safety.
+1. Finish D68 post-D67 status hygiene and v5/v6 planning preview.
+2. Next implementation slice: D69 Gate-1 preferred 100K evidence or explicit blocker refresh.
 3. Keep Gate-1 preferred blocked unless a real local 100K+ target is available and passes the scenario.
 4. Re-score v1-v4 only from current tests and gate artifacts.
-5. Plan v5 and v6 after v1-v4 status is evidence-backed.
+5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
 
 ### V5/V6 Planning Boundary
 
 - v5 should not start implementation until v1-v4 gate gaps are explicit.
+- v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json.
 - v5 planning may cover production hardening, plugin governance, distribution, and observability.
 - v6 planning may cover collaborative multi-agent operations, enterprise controls, hosted service mode, and ecosystem scaling.
 - v5/v6 plans must inherit the same gate discipline: evidence first, no overclaiming.
