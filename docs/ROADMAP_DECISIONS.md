@@ -8,7 +8,7 @@
 - Package version line: 2.2.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D72 release/version hygiene refresh
+- Current sprint: D73 Gate-1.5 live browser task decision
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -35,6 +35,8 @@
 - Gate-1.5 binding: false.
 - Gate-1.5 binding branch decision: defer-live-evidence.
 - Gate-1.5 evidence file: docs/superpowers/gate-1.5-browser-viability.json.
+- Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json.
+- Gate-1.5 live tasks: 0/20; binding=false; Browser enhancement unlocked=false.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -57,6 +59,7 @@
 - D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
 - D71 Code Intel combined import correctness: TypeScript combined default-plus-named imports are indexed and resolved in the heuristic symbol graph and call graph.
 - D72 release/version hygiene report: package version and historical release badges are explicitly quarantined from roadmap maturity claims.
+- D73 Gate-1.5 live browser task ledger: no 20-task live evidence exists, so Browser branch decision remains deferred and enhancement stays locked.
 
 ### Decision Hygiene
 
@@ -74,8 +77,8 @@
 
 ### Next Decisions Needed
 
-1. D72 release/version hygiene report is complete and keeps historical release text quarantined.
-2. Next implementation slice: D73 Gate-1.5 live browser task decision.
+1. D73 Gate-1.5 live browser task ledger is complete and keeps Browser enhancement locked.
+2. Next implementation slice: D74 Code Intel correctness hardening.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

@@ -104,6 +104,44 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
+  it('keeps Gate-1.5 live Browser task evidence deferred until 20 live tasks exist', () => {
+    const ledger = JSON.parse(readRepoFile('docs/superpowers/gate-1.5-live-browser-tasks.json')) as {
+      evidenceKind: string;
+      status: string;
+      requiredTasks: number;
+      completedTasks: number;
+      successes: number;
+      failures: number;
+      successRate: number | null;
+      binding: boolean;
+      branchDecision: string;
+      browserEnhancementUnlocked: boolean;
+      reason: string;
+      fixtureReport: string;
+    };
+    const ledgerMd = readRepoFile('docs/superpowers/gate-1.5-live-browser-tasks.md');
+
+    expect(ledger.evidenceKind).toBe('live-browser-task-ledger');
+    expect(ledger.status).toBe('deferred');
+    expect(ledger.requiredTasks).toBe(20);
+    expect(ledger.completedTasks).toBe(0);
+    expect(ledger.successes).toBe(0);
+    expect(ledger.failures).toBe(0);
+    expect(ledger.successRate).toBeNull();
+    expect(ledger.binding).toBe(false);
+    expect(ledger.branchDecision).toBe('defer-live-evidence');
+    expect(ledger.browserEnhancementUnlocked).toBe(false);
+    expect(ledger.reason).toContain('No 20-task live browser evidence has been collected');
+    expect(ledger.fixtureReport).toBe('docs/superpowers/gate-1.5-browser-viability.json');
+    expect(ledgerMd).toContain('Live Browser Task Evidence Deferred');
+
+    for (const path of DOCS) {
+      const block = currentStatusBlock(readRepoFile(path));
+      expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
+      expect(block).toContain('Gate-1.5 live tasks: 0/20; binding=false; Browser enhancement unlocked=false.');
+    }
+  });
+
   it('does not overclaim v1-v4 or default non-coding capability exposure', () => {
     const combined = DOCS.map((path) => readRepoFile(path)).join('\n');
 
@@ -136,14 +174,15 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toContain(
-      'D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.',
-    );
-    expect(scorecard.nextActions).toContain(
       'D74: continue Code Intel correctness hardening only where tests prove specific behavior.',
     );
     expect(scorecard.nextActions).toContain(
       'D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.',
     );
+    expect(scorecard.nextActions).toContain(
+      'D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available.',
+    );
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D73:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D72:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D71:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D70:/m);
@@ -175,11 +214,11 @@ describe('status documentation hygiene (D-56)', () => {
     expect(previewMd).toContain('Planning preview only');
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D72', () => {
+  it('keeps the current sprint and next-work pointers aligned after D73', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D72 release/version hygiene refresh');
+      expect(block).toContain('Current sprint: D73 Gate-1.5 live browser task decision');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -191,10 +230,14 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D70 Gate-1.5 Browser decision hygiene');
       expect(block).toContain('D71 Code Intel combined import correctness');
       expect(block).toContain('D72 release/version hygiene report');
+      expect(block).toContain('D73 Gate-1.5 live browser task ledger');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
-      expect(block).toContain('Next implementation slice: D73 Gate-1.5 live browser task decision');
+      expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
+      expect(block).toContain('Next implementation slice: D74 Code Intel correctness hardening');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D72/i);
+      expect(block).not.toMatch(/Next implementation slice: D73/i);
       expect(block).not.toMatch(/Current sprint: D71/i);
       expect(block).not.toMatch(/Next implementation slice: D72/i);
       expect(block).not.toMatch(/Current sprint: D70/i);

@@ -49,7 +49,8 @@
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
         "MCP package and runtime foundation exist",
-        "D70 refreshed Gate-1.5 fixture evidence with binding=false and branchDecision=defer-live-evidence"
+        "D70 refreshed Gate-1.5 fixture evidence with binding=false and branchDecision=defer-live-evidence",
+        "D73 live Browser task ledger records 0/20 live tasks and binding=false"
       ],
       "blockers": [
         "Gate-1.5 live 20-task browser evidence is not complete",
@@ -105,8 +106,8 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D73: collect or explicitly defer live Gate-1.5 browser tasks before Browser enhancement work.",
     "D74: continue Code Intel correctness hardening only where tests prove specific behavior.",
-    "D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools."
+    "D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.",
+    "D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available."
   ]
 }
