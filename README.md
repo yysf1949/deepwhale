@@ -8,7 +8,7 @@
 - Package version line: 2.2.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D73 Gate-1.5 live browser task decision
+- Current sprint: D74 Code Intel default re-export call graph correctness
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -50,6 +50,7 @@
 - D71 Code Intel combined import correctness: TypeScript combined default-plus-named imports are indexed and resolved in the heuristic symbol graph and call graph.
 - D72 release/version hygiene report: package version and historical release badges are explicitly quarantined from roadmap maturity claims.
 - D73 Gate-1.5 live browser task ledger: no 20-task live evidence exists, so Browser branch decision remains deferred and enhancement stays locked.
+- D74 Code Intel default re-export call graph correctness: calls imported through default re-export barrels resolve to the original named default declaration.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -75,8 +76,8 @@
 
 ### Next Work
 
-1. D73 Gate-1.5 live browser task ledger is complete and keeps Browser enhancement locked.
-2. Next implementation slice: D74 Code Intel correctness hardening.
+1. D74 Code Intel default re-export call graph correctness is complete and remains a heuristic improvement.
+2. Next implementation slice: D75 planner, reviewer, memory, and main-loop integration evidence.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -99,6 +100,7 @@
 - D71 plan: docs/superpowers/plans/2026-06-10-d71-code-intel-import-reference-correctness.md
 - D72 plan: docs/superpowers/plans/2026-06-10-d72-release-version-hygiene.md
 - D73 plan: docs/superpowers/plans/2026-06-10-d73-gate15-live-browser-task-decision.md
+- D74 plan: docs/superpowers/plans/2026-06-10-d74-code-intel-default-reexport-callgraph.md
 
 ### Status Hygiene Rules
 
@@ -121,7 +123,7 @@
 - The next agent should start from current files and machine-readable evidence, not from old ship slogans.
 - This repository path is D:\App\openClaw\projects\deepwhale.
 - Ignore D:\App\openClaw\projects\openclaw-github for this project.
-- Last status hygiene sprint: D73.
+- Last status hygiene sprint: D74.
 
 <!-- status:current:end -->
 

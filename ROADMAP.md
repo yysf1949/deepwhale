@@ -8,7 +8,7 @@
 - Package version line: 2.2.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D73 Gate-1.5 live browser task decision
+- Current sprint: D74 Code Intel default re-export call graph correctness
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -50,6 +50,7 @@
 - D71 Code Intel combined import correctness: TypeScript combined default-plus-named imports are indexed and resolved in the heuristic symbol graph and call graph.
 - D72 release/version hygiene report: package version and historical release badges are explicitly quarantined from roadmap maturity claims.
 - D73 Gate-1.5 live browser task ledger: no 20-task live evidence exists, so Browser branch decision remains deferred and enhancement stays locked.
+- D74 Code Intel default re-export call graph correctness: calls imported through default re-export barrels resolve to the original named default declaration.
 
 ### Milestone Status
 
@@ -75,8 +76,8 @@
 
 ### Next Roadmap Work
 
-1. D73 Gate-1.5 live browser task ledger is complete and keeps Browser enhancement locked.
-2. Next implementation slice: D74 Code Intel correctness hardening.
+1. D74 Code Intel default re-export call graph correctness is complete and remains a heuristic improvement.
+2. Next implementation slice: D75 planner, reviewer, memory, and main-loop integration evidence.
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

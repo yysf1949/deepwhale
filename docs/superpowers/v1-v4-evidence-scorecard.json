@@ -34,7 +34,8 @@
         "Code Intel descriptions and metadata label heuristic behavior",
         "D67 rename_symbol exposes hashline edit hunks and heuristic confidence metadata",
         "D69 refreshed Gate-1 target inventory and Vite minimum-50k Gate-1 scenario evidence",
-        "D71 covers TypeScript combined default-plus-named import references and call edges"
+        "D71 covers TypeScript combined default-plus-named import references and call edges",
+        "D74 resolves TypeScript default re-export barrel call edges to the original named default declaration"
       ],
       "blockers": [
         "preferred-100k Gate-1 evidence is blocked by missing local 100K+ target",
@@ -106,8 +107,8 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D74: continue Code Intel correctness hardening only where tests prove specific behavior.",
     "D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.",
-    "D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available."
+    "D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available.",
+    "D77: convert the v2.5 planner integration gap into a main-loop evidence fixture before any rescore."
   ]
 }

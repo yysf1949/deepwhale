@@ -458,6 +458,45 @@ describe('symbol-graph (D-32.2.1)', () => {
     }
   });
 
+  it('resolves calls imported through TypeScript default re-export barrels to the original named default declaration', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-default-reexport-'));
+    try {
+      await writeFile(
+        resolve(dir, 'provider.ts'),
+        [
+          'export default function defaultTarget() {',
+          '  return 1;',
+          '}',
+        ].join('\n'),
+      );
+      await writeFile(resolve(dir, 'barrel.ts'), "export { default as defaultTarget } from './provider.js';\n");
+      await writeFile(resolve(dir, 'other.ts'), 'export function defaultTarget() {\n  return 2;\n}\n');
+      await writeFile(
+        resolve(dir, 'consumer.ts'),
+        [
+          "import { defaultTarget } from './barrel.js';",
+          '',
+          'export function run() {',
+          '  return defaultTarget();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+
+      expect(callGraph.edges.filter((edge) => edge.caller === 'consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:defaultTarget',
+          line: 4,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('resolves TypeScript tsconfig path aliases to their call target', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-tsconfig-paths-'));
     try {

@@ -34,9 +34,10 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D71 covers TypeScript combined default-plus-named import references and call edges.
 - D72 release/version hygiene report distinguishes package version from roadmap maturity.
 - D73 live Browser task ledger records 0/20 live tasks and binding=false.
+- D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
 
 ## Next Actions
 
-1. D74: continue Code Intel correctness hardening only where tests prove specific behavior.
-2. D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.
-3. D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available.
+1. D75: tighten planner, reviewer, memory, and main-loop integration evidence without expanding default tools.
+2. D76: collect real Gate-1.5 Browser task runs only after opt-in Browser task sourcing is available.
+3. D77: convert the v2.5 planner integration gap into a main-loop evidence fixture before any rescore.

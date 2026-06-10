@@ -45,6 +45,8 @@ export interface Symbol {
   endCol: number;
   /** Enclosing scope name (e.g. class name for a method). */
   scope?: string;
+  /** True when this named TS/JS declaration appears inside `export default ...`. */
+  defaultExport?: boolean;
   /** File path the symbol was extracted from. */
   file: string;
 }
@@ -108,6 +110,14 @@ function makeSymbol(
   return base;
 }
 
+function withDefaultExport(symbol: Symbol, node: Node): Symbol {
+  const parent = node.parent;
+  if (parent?.type === 'export_statement' && /\bexport\s+default\b/.test(parent.text)) {
+    return { ...symbol, defaultExport: true };
+  }
+  return symbol;
+}
+
 function visitChildren(
   node: Node,
   file: string,
@@ -131,14 +141,14 @@ function extractTsLike(
     if (t === 'function_declaration' || t === 'function') {
       const name = node.childForFieldName('name')?.text ?? firstIdentifierText(node);
       if (name) {
-        out.push(makeSymbol(node, name, 'function', file, scope));
+        out.push(withDefaultExport(makeSymbol(node, name, 'function', file, scope), node));
         visitChildren(node, file, name, visit);
         return;
       }
     } else if (t === 'class_declaration' || t === 'class') {
       const name = node.childForFieldName('name')?.text ?? firstIdentifierText(node);
       if (name) {
-        out.push(makeSymbol(node, name, 'class', file, scope));
+        out.push(withDefaultExport(makeSymbol(node, name, 'class', file, scope), node));
         visitChildren(node, file, name, visit);
         return;
       }

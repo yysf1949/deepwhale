@@ -386,6 +386,10 @@ function resolveReExportTarget(
   const fileSym = graph.files.get(filePath);
   if (!fileSym) return undefined;
   if (fileSym.symbols.some((symbol) => symbol.name === symbolName)) return key;
+  if (symbolName === 'default') {
+    const defaultTarget = findDefaultExportTarget(filePath, fileSym);
+    if (defaultTarget) return defaultTarget;
+  }
 
   for (const imp of fileSym.imports) {
     if (imp.local !== symbolName) continue;
@@ -400,6 +404,14 @@ function resolveReExportTarget(
     if (target) return target;
   }
   return undefined;
+}
+
+function findDefaultExportTarget(filePath: string, fileSym: FileSymbols): string | undefined {
+  const defaultSymbols = fileSym.symbols.filter((symbol) => symbol.defaultExport && symbol.name.length > 0);
+  if (defaultSymbols.length !== 1) return undefined;
+  const symbol = defaultSymbols[0];
+  if (!symbol) return undefined;
+  return `${filePath}:${symbol.scope ? symbol.scope + '.' : ''}${symbol.name}`;
 }
 
 function resolveRelativeImportFile(filePath: string, from: string, graph: SymbolGraph): string | undefined {
