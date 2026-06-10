@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import {
   createDefaultRegistry,
   isToolRegistryProfile,
@@ -70,5 +72,40 @@ describe('registry profile policy (D-57)', () => {
     expect(names).not.toContain('arxiv');
     expect(names).not.toContain('notion');
     expect(names).not.toContain('spotify');
+  });
+
+  it('keeps opt-in tool modules out of the synchronous default registry module graph', async () => {
+    const source = await readFile(resolve(process.cwd(), 'packages/coding-agent/src/tools/registry.ts'), 'utf8');
+
+    for (const moduleName of [
+      'web-search',
+      'web-extract',
+      'browser-navigate',
+      'delegate-task',
+      'vision-analyze',
+      'text-to-speech',
+      'github-pr-workflow',
+      'github-issues',
+      'github-code-review',
+      'kanban-orchestrator',
+      'cloudflare-pages-deploy',
+      'webhook-subscriptions',
+      'arxiv',
+      'blogwatcher',
+      'llm-wiki',
+      'polymarket',
+      'notion',
+      'linear',
+      'airtable',
+      'ocr-and-documents',
+      'spotify',
+      'youtube-content',
+    ]) {
+      expect(source).not.toContain(`'./${moduleName}.js'`);
+    }
+  });
+
+  it('fails closed when synchronous callers request opt-in profiles', () => {
+    expect(() => createDefaultRegistry({ profile: 'media' })).toThrow(/createRegistryForProfile/);
   });
 });

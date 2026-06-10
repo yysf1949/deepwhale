@@ -8,14 +8,14 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { dispatchSlashBuiltin } from '../../src/repl/repl-command-router.js';
-import { createDefaultRegistry } from '../../src/tools/registry.js';
+import { createRegistryForProfile } from '../../src/tools/registry.js';
 
 describe('repl slash /tools (with vision + tts, D-30.4.7; +6 D-31.1.7; +4 D-31.2.6)', () => {
   it('lists vision_analyze + text_to_speech alongside other tools (40 total)', async () => {
     const out = vi.fn();
     const outStream = { write: out, isTTY: true } as unknown as NodeJS.WritableStream;
     const errStream = { write: vi.fn(), isTTY: true } as unknown as NodeJS.WritableStream;
-    const registry = createDefaultRegistry({ profile: 'all' });
+    const registry = await createRegistryForProfile({ profile: 'all' });
     const tools = registry.list().map((t) => ({ name: t.name, description: t.description }));
     const result = await dispatchSlashBuiltin('/tools', {
       out: outStream,

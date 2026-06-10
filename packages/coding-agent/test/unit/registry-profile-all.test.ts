@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createDefaultRegistry } from '../../src/tools/registry.js';
+import { createDefaultRegistry, createRegistryForProfile } from '../../src/tools/registry.js';
 
 describe('registry (D-32.3.4 — +1 smart_search)', () => {
-  it('all profile contains 41 tools', () => {
-    const reg = createDefaultRegistry({ profile: 'all' });
+  it('all profile contains 41 tools', async () => {
+    const reg = await createRegistryForProfile({ profile: 'all' });
     expect(reg.size()).toBe(41);
   });
   it('code-intel profile registers smart_search', () => {

@@ -32,7 +32,7 @@ import { DeepSeekClient } from '@deepwhale/llm';
 import { runToolLoopWithReview, type Reviewer, type TaskGraphRecorder } from '../src/agent/tool-loop-policy.js';
 import { createReviewer, type ReviewStatus } from '../src/reviewer/reviewer.js';
 import { createTaskGraphStore, type TaskGraphStore } from '../src/taskgraph/taskgraph.js';
-import { createDefaultRegistry } from '../src/tools/registry.js';
+import { createRegistryForProfile } from '../src/tools/registry.js';
 import { existsSync } from 'node:fs';
 import type { ChatMessage, LLMClient } from '@deepwhale/llm';
 
@@ -459,11 +459,12 @@ export async function runLive(spec: RunSpec): Promise<RunLiveResult> {
   }
   const registryProfile = task.registryProfile ?? 'default';
   try {
+    const registry = await createRegistryForProfile({ profile: registryProfile });
     result = await withGate2ReviewCwd(workspacePath, () =>
       runToolLoopWithReview({
         client,
         messages,
-        registry: createDefaultRegistry({ profile: registryProfile }),
+        registry,
         maxSteps,
         reviewer,
         reviewGates,

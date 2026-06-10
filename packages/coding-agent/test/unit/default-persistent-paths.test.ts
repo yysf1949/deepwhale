@@ -39,7 +39,7 @@ describe('default persistent tool paths (D-55)', () => {
   });
 
   it('does not place default local state below literal undefined/null home dirs', async () => {
-    const [{ blogwatcher }, { kanbanOrchestrator }, { llmWiki }, { webhookSubscriptions }, { createDefaultRegistry }] = await Promise.all([
+    const [{ blogwatcher }, { kanbanOrchestrator }, { llmWiki }, { webhookSubscriptions }, { createRegistryForProfile }] = await Promise.all([
       import('../../src/tools/blogwatcher.js'),
       import('../../src/tools/kanban-orchestrator.js'),
       import('../../src/tools/llm-wiki.js'),
@@ -52,7 +52,7 @@ describe('default persistent tool paths (D-55)', () => {
     expectSafePersistentPath((llmWiki as unknown as { dbPath: string }).dbPath);
     expectSafePersistentPath((webhookSubscriptions as unknown as { subsDir: string }).subsDir);
 
-    const researchBlogwatcher = createDefaultRegistry({ profile: 'research' }).require('blogwatcher');
+    const researchBlogwatcher = (await createRegistryForProfile({ profile: 'research' })).require('blogwatcher');
     expectSafePersistentPath((researchBlogwatcher as unknown as { rootDir: string }).rootDir);
   });
 });

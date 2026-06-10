@@ -5,7 +5,7 @@ import { WriteFileTool } from '../src/tools/write-file.js';
 import { BashTool } from '../src/tools/bash.js';
 import { FindTool } from '../src/tools/find.js';
 import { GrepTool } from '../src/tools/grep.js';
-import { ToolRegistry, createDefaultRegistry } from '../src/tools/registry.js';
+import { ToolRegistry, createRegistryForProfile } from '../src/tools/registry.js';
 import { computeLineHashes } from '@deepwhale/edit-engine';
 import { promises as fs, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,8 +13,8 @@ import { join } from 'node:path';
 
 describe('Sprint 0.2: 6 tools (v1.0 MVP) + explicit opt-in expansion profiles', () => {
   describe('ToolRegistry', () => {
-    it('createDefaultRegistry({ profile: all }) registers the complete 41-tool surface', () => {
-      const reg = createDefaultRegistry({ profile: 'all' });
+    it('createRegistryForProfile({ profile: all }) registers the complete 41-tool surface', async () => {
+      const reg = await createRegistryForProfile({ profile: 'all' });
       expect(reg.size()).toBe(41);
       expect(reg.get('read_file')?.name).toBe('read_file');
       expect(reg.get('write_file')?.name).toBe('write_file');
