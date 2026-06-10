@@ -46,6 +46,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D84 records a v1.5 Code Intel re-export chain call-graph fixture: the heuristic correctly recognizes transitive callers across a caller -> intermediate re-exporter -> target boundary (verified by 1 new test).
 - D85 records a v3.0 Gate-2 long-horizon boundary fixture: 2 new tests assert the inclusive 30-50 tool-call range at exact boundaries (30 and 50) and just outside (29 and 51).
 - D86 records a v4.0 cross-session multi-hop handoff fixture: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances. v5.0 implementation is now UNLOCKED (BOTH gates reached).
+- D87 records the first v5.0 evidence fixture: AuditLog minimal seed (in-memory, append-only, deterministic timestamps via injected clock) + 1 unit test.
 
 ## Next Actions
 

@@ -174,6 +174,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toHaveLength(0);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D87:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D86:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D85:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D84:/m);
@@ -248,20 +249,37 @@ describe('status documentation hygiene (D-56)', () => {
     };
     const previewMd = readRepoFile('docs/superpowers/v5-v6-planning-preview.md');
 
-    expect(preview.status).toBe('planning-preview-only');
+    expect(preview.status).toMatch(/^(planning-preview-only|in-progress)$/);
     expect(preview.gates).toContain('v1-v4 evidence gaps must remain explicit before v5/v6 implementation starts');
     expect(preview.phases.map((phase) => phase.id)).toEqual(['v5.0', 'v6.0']);
-    expect(preview.phases.every((phase) => phase.implementationAllowed === false)).toBe(true);
+    // v5.0 implementationAllowed reflects the actual D-87 status (true if first
+    // evidence recorded, false if still planning-only). v6.0 remains gated on
+    // v5 completion. We assert the invariant "v6.0 cannot start before v5.0".
+    const v5Phase = preview.phases.find((p) => p.id === 'v5.0');
+    const v6Phase = preview.phases.find((p) => p.id === 'v6.0');
+    expect(v5Phase).toBeDefined();
+    expect(v6Phase).toBeDefined();
+    if (v5Phase?.implementationAllowed === true) {
+      // v5.0 ACTIVE: v6.0 must still be gated (entry criteria on v5 completion).
+      expect(v6Phase?.implementationAllowed).toBe(false);
+      expect(preview.status).toBe('in-progress');
+      // firstEvidence must be present.
+      expect((v5Phase as { firstEvidence?: string }).firstEvidence).toMatch(/^D-\d+/);
+    } else {
+      // v5.0 still PLANNING-ONLY: every phase must be gated.
+      expect(preview.phases.every((phase) => phase.implementationAllowed === false)).toBe(true);
+      expect(preview.status).toBe('planning-preview-only');
+    }
     expect(preview.phases[0]?.themes).toContain('production hardening');
     expect(preview.phases[1]?.themes).toContain('collaborative multi-agent operations');
-    expect(previewMd).toContain('Planning preview only');
+    expect(previewMd).toMatch(/Status:.*(Planning preview only|In progress)/);
   });
 
   it('keeps the current sprint and next-work pointers aligned after D74', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D86 v4.0 cross-session multi-hop handoff fixture');
+      expect(block).toContain('Current sprint: D87 v5.0 observability+auditability minimal seed');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -286,15 +304,16 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D84 v1.5 Code Intel re-export chain call graph fixture');
       expect(block).toContain('D85 v3.0 Gate-2 long-horizon boundary fixture');
       expect(block).toContain('D86 v4.0 cross-session multi-hop handoff fixture');
+      expect(block).toContain('D87 v5.0 observability+auditability minimal seed');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: D87 v5 implementation kickoff (BOTH v5 gates unlocked: v1-v4 aggregate 65% AND v2.5 65%; v5 plan doc is the implementation roadmap)');
+      expect(block).toContain('Next implementation slice: D88 v5.0 second evidence (gated on user direction; observability expansion: file-backed persistence OR ToolLoopPolicy integration OR CLI dump)');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D86/i);
+      expect(block).not.toMatch(/Next implementation slice: D87/i);
       expect(block).not.toMatch(/Current sprint: D85/i);
       expect(block).not.toMatch(/Next implementation slice: D86/i);
-      expect(block).not.toMatch(/Current sprint: D84/i);
-      expect(block).not.toMatch(/Next implementation slice: D85/i);
       expect(block).not.toMatch(/Current sprint: D73/i);
       expect(block).not.toMatch(/Next implementation slice: D74/i);
       expect(block).not.toMatch(/Current sprint: D72/i);

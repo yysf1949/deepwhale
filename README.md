@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D86 v4.0 cross-session multi-hop handoff fixture
+- Current sprint: D87 v5.0 observability+auditability minimal seed
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -62,6 +62,7 @@
 - D84 v1.5 Code Intel re-export chain call graph fixture: 1 new test asserts the call-graph heuristic follows a caller -> intermediate re-exporter -> target chain, recognizing transitive callers across a re-export boundary.
 - D85 v3.0 Gate-2 long-horizon boundary fixture: 2 new unit tests assert the inclusive 30-50 tool-call range at the exact boundaries (30 and 50) and just outside (29 and 51).
 - D86 v4.0 cross-session multi-hop handoff fixture: 1 new test extends D-80 from 2-instance to 3-instance handoffs (A writes 3, B writes 2, C reads all 5 in order), completing v4.0 multi-hop cross-session coverage.
+- D87 v5.0 observability+auditability minimal seed: 1 new AuditLog class (in-memory, append-only, deterministic timestamps via injected clock) + 1 new unit test. This is the first v5.0 evidence fixture.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -87,8 +88,8 @@
 
 ### Next Work
 
-1. D86 v4.0 cross-session multi-hop handoff fixture is complete: 1 new test verifies 3-instance handoff (A writes 3, B writes 2, C reads all 5 in order).
-2. Next implementation slice: D87 v5 implementation kickoff (BOTH v5 gates unlocked: v1-v4 aggregate 65% AND v2.5 65%; v5 plan doc is the implementation roadmap).
+1. D87 v5.0 observability+auditability minimal seed is complete: 1 new AuditLog class + 1 new unit test. v5.0 first-evidence recorded.
+2. Next implementation slice: D88 v5.0 second evidence (gated on user direction; observability expansion: file-backed persistence OR ToolLoopPolicy integration OR CLI dump).
 3. Keep Browser branch decision deferred until 20 live browser tasks are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -144,8 +145,9 @@
 - D84 plan: docs/superpowers/plans/2026-06-10-d84-v1.5-reexport-call-graph.md
 - D85 plan: docs/superpowers/plans/2026-06-10-d85-v3.0-gate2-boundary.md
 - D86 plan: docs/superpowers/plans/2026-06-10-d86-v4.0-cross-session-recordplan.md
+- D87 plan: docs/superpowers/plans/2026-06-10-d87-v5.0-audit-log-seed.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D86.
+- Last status hygiene sprint: D87.
 
 <!-- status:current:end -->
 
