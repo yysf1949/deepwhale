@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D92: v5.0 plugin governance 2nd evidence (gated on user direction; tool capability backfill on default tools OR registry-level capability filter)."
+  "nextAction": "D93: v5.0 plugin governance 3rd evidence (gated on user direction; registry-level capability filter OR profile-level capability policy)."
 }

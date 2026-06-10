@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { deepwhaleRoot } from '../util/deepwhale-paths.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export interface TodoItem {
   id: string;
@@ -71,6 +72,7 @@ export class TodoTool implements Tool {
   readonly description =
     'Manage todos (list / add / mark_done). Persisted to ~/.deepwhale/todos/current.json. Low risk.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = [] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

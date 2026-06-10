@@ -13,6 +13,7 @@ import { join, relative, resolve, sep } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { parseFile, extractSymbols, getLanguageForExtension, type LanguageId, type Symbol } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 const DEFAULT_IGNORES: ReadonlySet<string> = new Set([
   'node_modules', '.git', 'dist', 'build', '.next', 'out', '.turbo', 'coverage', '.deepwhale',
@@ -25,6 +26,7 @@ export class AnalyzeRepoTool implements Tool {
   readonly name = 'analyze_repo' as ToolName;
   readonly description = 'Walk a repo and report file count, language distribution, total symbol count, and top symbols. Low risk (read-only walk).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

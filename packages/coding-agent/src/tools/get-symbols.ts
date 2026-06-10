@@ -12,6 +12,7 @@ import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { parseFile, extractSymbols, type LanguageId, type Symbol, type SymbolKind } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 const VALID_KINDS: ReadonlySet<SymbolKind> = new Set<SymbolKind>([
   'function', 'class', 'method', 'variable', 'import', 'export', 'type',
@@ -21,6 +22,7 @@ export class GetSymbolsTool implements Tool {
   readonly name = 'get_symbols' as ToolName;
   readonly description = 'Extract symbols (function / class / method / import / export / type / variable) from a source file via web-tree-sitter. Low risk (read-only).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

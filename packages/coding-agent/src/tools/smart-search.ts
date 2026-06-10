@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { buildSymbolGraph, findReferences } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 const execFile = promisify(execFileCb);
 const REMOTE_SEARCH_TIMEOUT_MS = 2_000;
@@ -24,6 +25,7 @@ export class SmartSearchTool implements Tool {
   readonly name = 'smart_search' as ToolName;
   readonly description = 'Heuristic code search with symbol-aware local matches. Remote GitHub search is explicit opt-in via action=remote; local/all results are not IDE-grade/type-aware. Low risk (read-only).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

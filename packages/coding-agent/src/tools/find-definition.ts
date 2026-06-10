@@ -12,11 +12,13 @@ import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { parseFile, extractSymbols, type LanguageId } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export class FindDefinitionTool implements Tool {
   readonly name = 'find_definition' as ToolName;
   readonly description = 'Find the first definition of a symbol by name in a single source file. Low risk (read-only).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

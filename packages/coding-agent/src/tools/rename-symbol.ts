@@ -15,6 +15,7 @@ import type { ToolName } from '@deepwhale/core';
 import { computeLineHashes, createDefaultEngine, type EditEngine, type EditIntent } from '@deepwhale/edit-engine';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { buildSymbolGraph, findReferences, type Reference, type SymbolGraph } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 interface RenameSelector {
   targetFile?: string;
@@ -70,6 +71,7 @@ export class RenameSymbolTool implements Tool {
   readonly name = 'rename_symbol' as ToolName;
   readonly description = 'Heuristic symbol rename across a repo. Default dry-run preview; pass apply=true to write. Uses code-intel references where available, not IDE-grade type analysis. Medium risk (cross-file write).';
   readonly risk: 'low' | 'medium' | 'high' = 'medium';
+  readonly capabilities: readonly ToolCapability[] = ['file-read', 'file-write'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

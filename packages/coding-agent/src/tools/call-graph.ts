@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { buildSymbolGraph, buildCallGraph, type CallGraph } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 interface TraversalNode {
   id: string;
@@ -26,6 +27,7 @@ export class CallGraphTool implements Tool {
   readonly name = 'call_graph' as ToolName;
   readonly description = 'Build a heuristic call graph for a repo using AST symbols plus textual call matches; no type analysis or dynamic dispatch resolution. 3 sub-actions: for-symbol / for-file / for-repo. Low risk (read-only walk).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

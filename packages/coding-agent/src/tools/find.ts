@@ -15,6 +15,7 @@ import { resolve, join, relative } from 'node:path';
 import process from 'node:process';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 const MAX_DEPTH_DEFAULT = 10;
 const MAX_RESULTS_DEFAULT = 1000;
@@ -24,6 +25,7 @@ export class FindTool implements Tool {
   readonly description =
     'Find files by name pattern in a directory tree. Cross-platform Node implementation (no shell).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

@@ -14,12 +14,14 @@ import { createDefaultEngine } from '@deepwhale/edit-engine';
 import type { FileContent, EditEngine } from '@deepwhale/edit-engine';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export class EditFileTool implements Tool {
   readonly name = 'edit_file' as ToolName;
   readonly description =
     'Edit a local file using a hashline-format patch (3-hex TAG anchors). The patch is applied through the EditEngine abstraction — engine can be swapped via EDIT_ENGINE env var.';
   readonly risk: 'low' | 'medium' | 'high' = 'medium';
+  readonly capabilities: readonly ToolCapability[] = ['file-read', 'file-write'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

@@ -12,11 +12,13 @@ import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { buildSymbolGraph, findReferences, type Reference } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export class FindReferencesTool implements Tool {
   readonly name = 'find_references' as ToolName;
   readonly description = 'Heuristic reference search across a repo. Uses AST declarations/imports plus textual identifier matches; no type analysis or IDE-grade rename safety. 2 modes: references / count. Low risk (read-only walk).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',
