@@ -6,17 +6,17 @@
   "status": "partial-results",
   "requiredTasks": 20,
   "candidateTasks": 20,
-  "pendingTasks": 16,
-  "completedTasks": 4,
-  "successes": 4,
+  "pendingTasks": 14,
+  "completedTasks": 6,
+  "successes": 6,
   "failures": 0,
-  "successRate": 0.2,
+  "successRate": 0.3,
   "binding": false,
   "branchDecision": "defer-live-evidence",
   "browserEnhancementUnlocked": false,
   "runnerStatus": "opt-in-runner-available",
   "resultRecorderStatus": "first-result-recorded",
-  "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists; 4 of 20 have been recorded as completed through a single D-117 run (1 task) plus a D-118 batch run (3 tasks) using stub adapters. Repository evidence is 4/20 completed live results, partial-results status reached, binding remains false because 16 completed live results are still required.",
+  "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists; 6 of 20 have been recorded as completed: 4 via D-117/D-118 stub adapters (docs-search-query, docs-filter-results, account-login-form, contact-form-required-field) and 2 via D-119 real HTTP fetch (newsletter-signup fetched from https://example.com/ with status=200 title='Example Domain'; product-search fetched from https://www.iana.org/ with status=200 title='Internet Assigned Numbers Authority'). Repository evidence is 6/20 completed live results, partial-results status reached, binding remains false because 14 completed live results are still required.",
   "fixtureReport": "docs/superpowers/gate-1.5-browser-viability.json",
   "tasks": [
     {
@@ -25,7 +25,9 @@
       "url": "https://example.com/docs",
       "goal": "Search documentation for a named feature and open the most relevant result.",
       "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
-      "status": "success"
+      "status": "success",
+      "evidenceSubSprint": "D-117",
+      "evidenceKind": "stub-run"
     },
     {
       "id": "docs-filter-results",
@@ -33,7 +35,9 @@
       "url": "https://example.com/docs/search",
       "goal": "Filter documentation search results by a category and verify the filtered list changes.",
       "requiredCapabilities": ["browser.navigate", "browser.click"],
-      "status": "success"
+      "status": "success",
+      "evidenceSubSprint": "D-118",
+      "evidenceKind": "stub-run"
     },
     {
       "id": "account-login-form",
@@ -41,7 +45,9 @@
       "url": "https://example.com/login",
       "goal": "Fill an account login form with test credentials and stop before submitting real credentials.",
       "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
-      "status": "success"
+      "status": "success",
+      "evidenceSubSprint": "D-118",
+      "evidenceKind": "stub-run"
     },
     {
       "id": "contact-form-required-field",
@@ -49,7 +55,9 @@
       "url": "https://example.com/contact",
       "goal": "Submit a contact form with one required field missing and observe the validation message.",
       "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
-      "status": "success"
+      "status": "success",
+      "evidenceSubSprint": "D-118",
+      "evidenceKind": "stub-run"
     },
     {
       "id": "newsletter-signup",
@@ -57,7 +65,18 @@
       "url": "https://example.com/newsletter",
       "goal": "Enter an email address into a newsletter signup form and verify the confirmation state.",
       "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-119",
+      "evidenceKind": "real-fetch",
+      "realFetchResult": {
+        "fetchedAt": "2026-06-11T03:00:00.000Z",
+        "fetchedUrl": "https://example.com/",
+        "status": 200,
+        "contentType": "text/html",
+        "bodyLen": 559,
+        "title": "Example Domain",
+        "ms": 924
+      }
     },
     {
       "id": "product-search",
@@ -65,7 +84,18 @@
       "url": "https://example.com/store",
       "goal": "Search for a product by name and identify the first matching result.",
       "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-119",
+      "evidenceKind": "real-fetch",
+      "realFetchResult": {
+        "fetchedAt": "2026-06-11T03:00:01.000Z",
+        "fetchedUrl": "https://www.iana.org/",
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bodyLen": 6140,
+        "title": "Internet Assigned Numbers Authority",
+        "ms": 854
+      }
     },
     {
       "id": "product-sort",
@@ -183,10 +213,10 @@
   "constraints": [
     "Candidate tasks are sourcing evidence only; they are not completed live Browser evidence.",
     "The runner boundary is available only through explicit opt-in and an injected adapter.",
-    "The result recorder is available for explicit runner output. D-117 records 1 task (1/20) and D-118 records 3 more tasks (4/20 cumulative) through a batch evidence runner, all via stub adapters. 16/20 remain pending and binding is still false.",
+    "The result recorder is available for explicit runner output. D-117 records 1 task (1/20) via stub adapter, D-118 records 3 more tasks (4/20 cumulative) via a batch evidence runner with stub adapters, and D-119 records 2 more tasks (6/20 cumulative) via a real HTTP Browser adapter that fetches example.com and iana.org with Node built-in fetch. Of the 6 successful tasks, 4 are stub-evidence (D-117/118) and 2 are real-evidence (D-119). 14/20 remain pending and binding is still false.",
     "A binding Browser branch decision still requires 20 completed live Browser task results.",
     "Browser enhancement work stays locked until live evidence is available.",
     "Browser remains opt-in and not default-enabled."
   ],
-  "nextAction": "D119: continue opt-in batch accumulation to grow the repository evidence without unlocking Browser defaults until 20 completed live task results exist."
+  "nextAction": "D120: continue real fetch batch accumulation to grow the repository evidence without unlocking Browser defaults until 20 completed live task results exist."
 }

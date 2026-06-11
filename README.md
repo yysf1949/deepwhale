@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D118 Gate-1.5 opt-in live Browser evidence batch runner (recordOptInLiveBrowserEvidenceBatch)
+- Current sprint: D119 Gate-1.5 real HTTP Browser evidence adapter (recordRealBrowserEvidence)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -33,7 +33,7 @@
 - Gate-1.5 binding branch decision: defer-live-evidence
 - Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
-- Gate-1.5 live result recorder: 20 candidates queued, 4/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live result recorder: 20 candidates queued, 6/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 
 ### Completed Stabilization Slices
@@ -94,6 +94,7 @@
 - D116 Gate-1.5 live Browser result recorder: 1 new pure recorder + runner integration accepts explicit known task results, ignores unknown/duplicate rows, and keeps repository live evidence at 0/20 until an opt-in Browser run is recorded.
 - D117 Gate-1.5 opt-in live Browser evidence runner: 1 new recordOptInLiveBrowserEvidence async function orchestrates the queue D-114 + runner D-115 + recorder D-116 chain end-to-end and returns a typed evidence record; repository ledger advances 0/20 -> 1/20 with a stub adapter, binding remains false (19/20 still pending), 4 new unit tests.
 - D118 Gate-1.5 opt-in live Browser evidence batch runner: 1 new recordOptInLiveBrowserEvidenceBatch async function calls the D-117 single-run chain `batchSize` times in a loop with the updated ledger between iterations, advancing the repository ledger 1/20 -> 4/20 (3 more) via a single batch call with a stub adapter; binding remains false (16/20 still pending), 4 new unit tests.
+- D119 Gate-1.5 real HTTP Browser evidence adapter: 1 new recordRealBrowserEvidence async function uses Node's built-in `fetch` to record real network-call evidence for 2 candidate tasks (newsletter-signup fetched from example.com, product-search fetched from iana.org), advancing the repository ledger 4/20 -> 6/20 (2 more REAL evidence); of the 6 cumulative completed live results, 4 are stub-evidence and 2 are real-evidence; binding remains false (14/20 still pending); 4 new unit tests; D-119 adds zero new npm deps.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -119,8 +120,8 @@
 
 ### Next Work
 
-1. D118 Gate-1.5 opt-in live Browser evidence batch runner is complete: the batch chain (D-117 single-run looped N times) accumulates 3 additional completed live results; 4/20 repository live results now exist via stub adapters; binding remains false (16/20 still pending).
-2. Next implementation slice: D119 Gate-1.5 opt-in batch accumulation continuation.
+1. D119 Gate-1.5 real HTTP Browser evidence adapter is complete: 2 real network calls were recorded via Node built-in fetch (example.com returned status 200, "Example Domain"; iana.org returned status 200, "Internet Assigned Numbers Authority"); 6/20 repository live results now exist (4 stub + 2 real); binding remains false (14/20 still pending).
+2. Next implementation slice: D120 Gate-1.5 real fetch batch accumulation.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -208,8 +209,9 @@
 - D116 plan: docs/superpowers/plans/2026-06-11-d116-gate15-live-browser-result-recorder.md
 - D117 plan: docs/superpowers/plans/2026-06-11-d117-gate15-opt-in-live-browser-evidence-runner.md
 - D118 plan: docs/superpowers/plans/2026-06-11-d118-gate15-opt-in-live-browser-evidence-batch-runner.md
+- D119 plan: docs/superpowers/plans/2026-06-11-d119-gate15-real-http-browser-evidence-adapter.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D118.
+- Last status hygiene sprint: D119.
 
 <!-- status:current:end -->
 
