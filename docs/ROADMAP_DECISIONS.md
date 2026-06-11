@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D119 Gate-1.5 real HTTP Browser evidence adapter (recordRealBrowserEvidence)
+- Current sprint: D120 Gate-1.5 hybrid real Browser evidence runner (recordHybridRealBrowserEvidence)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -36,7 +36,7 @@
 - Gate-1.5 binding branch decision: defer-live-evidence
 - Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
-- Gate-1.5 live result recorder: 20 candidates queued, 6/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live result recorder: 20 candidates queued, 9/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -105,6 +105,7 @@
 - D117 Gate-1.5 opt-in live Browser evidence runner: 1 new recordOptInLiveBrowserEvidence async function orchestrates the queue D-114 + runner D-115 + recorder D-116 chain end-to-end and returns a typed evidence record; repository ledger advances 0/20 -> 1/20 with a stub adapter, binding remains false (19/20 still pending), 4 new unit tests.
 - D118 Gate-1.5 opt-in live Browser evidence batch runner: 1 new recordOptInLiveBrowserEvidenceBatch async function calls the D-117 single-run chain `batchSize` times in a loop with the updated ledger between iterations, advancing the repository ledger 1/20 -> 4/20 (3 more) via a single batch call with a stub adapter; binding remains false (16/20 still pending), 4 new unit tests.
 - D119 Gate-1.5 real HTTP Browser evidence adapter: 1 new recordRealBrowserEvidence async function uses Node's built-in `fetch` to record real network-call evidence for 2 candidate tasks (newsletter-signup fetched from example.com, product-search fetched from iana.org), advancing the repository ledger 4/20 -> 6/20 (2 more REAL evidence); of the 6 cumulative completed live results, 4 are stub-evidence and 2 are real-evidence; binding remains false (14/20 still pending); 4 new unit tests; D-119 adds zero new npm deps.
+- D120 Gate-1.5 hybrid real Browser evidence runner: 1 new recordHybridRealBrowserEvidence async function records 2 HTTP-evidence tasks plus 1 JS-evidence task, advancing repository live result accounting from 6/20 to 9/20; 4 stub + 4 HTTP + 1 JS evidence; binding remains false because 11/20 are still pending; 5 tests cover contiguous and non-contiguous task mappings.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -122,11 +123,11 @@
 
 ### Next Decisions Needed
 
-1. D119 Gate-1.5 real HTTP Browser evidence adapter is complete: 2 real network calls were recorded via Node built-in fetch (example.com returned status 200, "Example Domain"; iana.org returned status 200, "Internet Assigned Numbers Authority"); 6/20 repository live results now exist (4 stub + 2 real); binding remains false (14/20 still pending).
-2. Next implementation slice: D120 Gate-1.5 real fetch batch accumulation.
+1. D120 Gate-1.5 hybrid real Browser evidence runner is complete: 2 additional HTTP-evidence tasks plus 1 JS-evidence task were recorded, so 9/20 repository live results now exist (4 stub + 4 HTTP + 1 JS); binding remains false (11/20 still pending).
+2. Next implementation slice: D121 Gate-1.5 hybrid real Browser evidence continuation.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Re-score v1-v4 after current gate evidence changes.
-5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
+5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
 6. v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json.
 
 ### Repository Scope

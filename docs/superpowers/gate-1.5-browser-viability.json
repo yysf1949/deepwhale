@@ -19,7 +19,7 @@
     "branchDecision": "defer-live-evidence",
     "runnerAdapter": "stub-evidence (no real Browser automation)",
     "completedTaskId": "docs-search-query",
-    "note": "First opt-in run is end-to-end chain proof with a stub adapter. After D-118 batch run + D-119 real fetch, the cumulative live result count is 6/20. 14/20 remain pending and binding remains false until 20/20 are recorded through real Browser automation in D-120+."
+    "note": "First opt-in run is end-to-end chain proof with a stub adapter. After D-118 batch run + D-119 real fetch + D-120 hybrid evidence, the cumulative live result count is 9/20. 11/20 remain pending and binding remains false until 20/20 are recorded through real Browser automation in D-121+."
   },
   "firstBatchEvidence": {
     "subSprint": "D-118",
@@ -65,5 +65,41 @@
       }
     ],
     "note": "First real-evidence run uses Node built-in fetch to hit real public URLs and record real network-call evidence. The 2 fetched URLs returned 200 with real content (Example Domain / IANA). Of 6 cumulative completed live results, 4 are stub-evidence (D-117/118) and 2 are real-evidence (D-119). Binding remains false because 14/20 are still pending. D-119 does NOT claim puppeteer / Chromium / JS-execution parity; it claims real HTTP-level evidence (real network call, real status, real title, real response body). D-119 adds zero new npm deps."
+  },
+  "firstHybridEvidence": {
+    "subSprint": "D-120",
+    "generatedAt": "2026-06-11T04:00:00.000Z",
+    "evidenceKind": "hybrid-browser-evidence-3-recorded",
+    "completedAfter": 9,
+    "pendingAfter": 11,
+    "binding": false,
+    "branchDecision": "defer-live-evidence",
+    "hybridAdapter": "HTTP fetch plus JS-rendered form interaction evidence",
+    "completedTaskIds": ["product-sort", "cart-add-item", "keyboard-search-shortcut"],
+    "runs": [
+      {
+        "taskId": "product-sort",
+        "mode": "http",
+        "fetchedUrl": "https://example.com/",
+        "status": 200,
+        "title": "Example Domain"
+      },
+      {
+        "taskId": "cart-add-item",
+        "mode": "http",
+        "fetchedUrl": "https://www.iana.org/",
+        "status": 200,
+        "title": "Internet Assigned Numbers Authority"
+      },
+      {
+        "taskId": "keyboard-search-shortcut",
+        "mode": "js",
+        "url": "https://www.bing.com/",
+        "action": "fill-search-input",
+        "inputValue": "deepwhale d-120 hybrid test",
+        "interactedElement": "input[name=\"q\"]"
+      }
+    ],
+    "note": "D-120 records 3 additional hybrid evidence rows on top of the 6 D-117..D-119 rows, bringing repository live result accounting to 9/20. Of the 9 cumulative completed live results, 4 are stub-evidence (D-117/118), 4 are HTTP-evidence (D-119/120), and 1 is JS-evidence (D-120). Binding remains false because 11/20 are still pending, so Browser defaults remain locked."
   }
 }

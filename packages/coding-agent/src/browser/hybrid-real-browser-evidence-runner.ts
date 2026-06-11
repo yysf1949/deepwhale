@@ -148,7 +148,10 @@ export async function recordHybridRealBrowserEvidence(
       break;
     }
     const pendingTask = currentLedger.tasks.find(
-      (task) => task.status === 'pending' && !processedTaskIds.has(task.id),
+      (task) =>
+        task.status === 'pending' &&
+        !processedTaskIds.has(task.id) &&
+        input.taskModes[task.id] !== undefined,
     );
     if (!pendingTask) {
       break;

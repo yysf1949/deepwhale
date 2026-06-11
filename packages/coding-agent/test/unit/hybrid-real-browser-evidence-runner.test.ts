@@ -146,4 +146,40 @@ describe('Gate-1.5 hybrid real Browser evidence runner (HTTP + JS)', () => {
     expect(evidence.skipReason).toBe('no-task-mode-mapping');
     expect(evidence.attemptedRuns).toBe(0);
   });
+
+  it('records explicitly mapped non-contiguous pending tasks after prior evidence exists', async () => {
+    const ledger = buildLiveBrowserTaskLedger({
+      generatedAt: '2026-06-11T00:00:00.000Z',
+      tasks: makeTwentyTasks().map((task, index) =>
+        index < 6 ? { ...task, status: 'success' as const } : task,
+      ),
+    });
+
+    const evidence = await recordHybridRealBrowserEvidence({
+      generatedAt: '2026-06-11T04:00:00.000Z',
+      ledger,
+      optIn: true,
+      taskModes: {
+        'task-7': 'http',
+        'task-8': 'http',
+        'task-17': 'js',
+      },
+      realUrls: {
+        'task-7': 'https://example.com/',
+        'task-8': 'https://www.iana.org/',
+        'task-17': 'https://www.bing.com/',
+      },
+      fetchFn: okFetch(),
+      jsRunnerFn: okJsRunner(),
+    });
+
+    expect(evidence.evidenceKind).toBe('hybrid-browser-evidence');
+    expect(evidence.attemptedRuns).toBe(3);
+    expect(evidence.runs.map((run) => run.taskId)).toEqual(['task-7', 'task-8', 'task-17']);
+    expect(evidence.totalCompletedBefore).toBe(6);
+    expect(evidence.totalCompletedAfter).toBe(9);
+    expect(evidence.totalPendingAfter).toBe(11);
+    expect(evidence.binding).toBe(false);
+    expect(evidence.branchDecision).toBe('defer-live-evidence');
+  });
 });

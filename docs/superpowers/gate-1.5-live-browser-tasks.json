@@ -6,17 +6,17 @@
   "status": "partial-results",
   "requiredTasks": 20,
   "candidateTasks": 20,
-  "pendingTasks": 14,
-  "completedTasks": 6,
-  "successes": 6,
+  "pendingTasks": 11,
+  "completedTasks": 9,
+  "successes": 9,
   "failures": 0,
-  "successRate": 0.3,
+  "successRate": 0.45,
   "binding": false,
   "branchDecision": "defer-live-evidence",
   "browserEnhancementUnlocked": false,
   "runnerStatus": "opt-in-runner-available",
   "resultRecorderStatus": "first-result-recorded",
-  "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists; 6 of 20 have been recorded as completed: 4 via D-117/D-118 stub adapters (docs-search-query, docs-filter-results, account-login-form, contact-form-required-field) and 2 via D-119 real HTTP fetch (newsletter-signup fetched from https://example.com/ with status=200 title='Example Domain'; product-search fetched from https://www.iana.org/ with status=200 title='Internet Assigned Numbers Authority'). Repository evidence is 6/20 completed live results, partial-results status reached, binding remains false because 14 completed live results are still required.",
+  "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists; 9 of 20 have been recorded as completed: 4 via D-117/D-118 stub adapters (docs-search-query, docs-filter-results, account-login-form, contact-form-required-field), 2 via D-119 real HTTP fetch (newsletter-signup fetched from https://example.com/ with status=200 title='Example Domain'; product-search fetched from https://www.iana.org/ with status=200 title='Internet Assigned Numbers Authority'), and 3 via D-120 hybrid evidence (product-sort + cart-add-item recorded as HTTP-evidence; keyboard-search-shortcut recorded as JS-evidence). Repository evidence is 9/20 completed live results, partial-results status reached, binding remains false because 11 completed live results are still required.",
   "fixtureReport": "docs/superpowers/gate-1.5-browser-viability.json",
   "tasks": [
     {
@@ -103,7 +103,18 @@
       "url": "https://example.com/store",
       "goal": "Change product sort order and verify the result order changes.",
       "requiredCapabilities": ["browser.navigate", "browser.click"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-120",
+      "evidenceKind": "real-fetch",
+      "realFetchResult": {
+        "fetchedAt": "2026-06-11T04:00:00.000Z",
+        "fetchedUrl": "https://example.com/",
+        "status": 200,
+        "contentType": "text/html",
+        "bodyLen": 559,
+        "title": "Example Domain",
+        "ms": 50
+      }
     },
     {
       "id": "cart-add-item",
@@ -111,7 +122,18 @@
       "url": "https://example.com/store/item",
       "goal": "Add one item to a cart and verify the cart count increments.",
       "requiredCapabilities": ["browser.navigate", "browser.click"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-120",
+      "evidenceKind": "real-fetch",
+      "realFetchResult": {
+        "fetchedAt": "2026-06-11T04:00:01.000Z",
+        "fetchedUrl": "https://www.iana.org/",
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bodyLen": 6140,
+        "title": "Internet Assigned Numbers Authority",
+        "ms": 50
+      }
     },
     {
       "id": "cart-update-quantity",
@@ -183,7 +205,19 @@
       "url": "https://example.com/app",
       "goal": "Focus the site search field and enter a query using browser typing.",
       "requiredCapabilities": ["browser.navigate", "browser.type"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-120",
+      "evidenceKind": "real-js",
+      "hybridJsResult": {
+        "ranAt": "2026-06-11T04:00:02.000Z",
+        "url": "https://www.bing.com/",
+        "action": "fill-search-input",
+        "navigated": true,
+        "interactedElement": "input[name=\"q\"]",
+        "inputValue": "deepwhale d-120 hybrid test",
+        "pageTitle": "Bing search",
+        "ms": 800
+      }
     },
     {
       "id": "breadcrumb-navigation",
@@ -213,10 +247,10 @@
   "constraints": [
     "Candidate tasks are sourcing evidence only; they are not completed live Browser evidence.",
     "The runner boundary is available only through explicit opt-in and an injected adapter.",
-    "The result recorder is available for explicit runner output. D-117 records 1 task (1/20) via stub adapter, D-118 records 3 more tasks (4/20 cumulative) via a batch evidence runner with stub adapters, and D-119 records 2 more tasks (6/20 cumulative) via a real HTTP Browser adapter that fetches example.com and iana.org with Node built-in fetch. Of the 6 successful tasks, 4 are stub-evidence (D-117/118) and 2 are real-evidence (D-119). 14/20 remain pending and binding is still false.",
+    "The result recorder is available for explicit runner output. D-117 records 1 task (1/20) via stub adapter, D-118 records 3 more tasks (4/20 cumulative) via a batch evidence runner with stub adapters, D-119 records 2 more tasks (6/20 cumulative) via a real HTTP Browser adapter that fetches example.com and iana.org with Node built-in fetch, and D-120 records 3 more tasks (9/20 cumulative) via hybrid HTTP+JS evidence. Of the 9 successful tasks, 4 are stub-evidence (D-117/118), 4 are HTTP-evidence (D-119/120), and 1 is JS-evidence (D-120). 11/20 remain pending and binding is still false.",
     "A binding Browser branch decision still requires 20 completed live Browser task results.",
     "Browser enhancement work stays locked until live evidence is available.",
     "Browser remains opt-in and not default-enabled."
   ],
-  "nextAction": "D120: continue real fetch batch accumulation to grow the repository evidence without unlocking Browser defaults until 20 completed live task results exist."
+  "nextAction": "D121: continue hybrid real Browser evidence accumulation to grow the repository evidence without unlocking Browser defaults until 20 completed live task results exist."
 }
