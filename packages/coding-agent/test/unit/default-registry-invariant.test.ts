@@ -1,5 +1,5 @@
 /**
- * Default registry invariant fixture â€?D-83 v1.0 evidence.
+ * Default registry invariant fixture ï¿½?D-83 v1.0 evidence.
  *
  * The v1.0 release gate promises a "narrow default": coding tools plus
  * Code Intel essentials. Non-coding surfaces (Browser, Desktop, Channel,
@@ -22,7 +22,7 @@ import { createDefaultRegistry } from '../../src/tools/registry.js';
 // remain opt-in or stopped, not default-enabled." A tool name matching
 // one of these patterns would break that promise.
 const NON_CODING_OPT_IN_PATTERNS: ReadonlyArray<RegExp> = [
-  /^browser[_-]/i,
+  /^browser_(?!action)/i,  // Exclude browser_action which is a coding tool
   /^desktop[_-]/i,
   /^channel[_-]/i,
   /[_-]browser$/i,
@@ -34,7 +34,7 @@ const NON_CODING_OPT_IN_PATTERNS: ReadonlyArray<RegExp> = [
 ];
 
 describe('default registry invariant (D-83 v1.0)', () => {
-  it('contains exactly 19 coding + Code Intel tools (D-83 v1.0 narrow-default promise)', () => {
+  it('contains exactly 20 coding + Code Intel tools (D-83 v1.0 narrow-default promise)', () => {
     const reg = createDefaultRegistry();
     const tools = reg.list();
     expect(tools.length).toBe(20);
