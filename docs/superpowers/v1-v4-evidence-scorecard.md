@@ -10,7 +10,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | --- | ---: | --- | --- |
 | v1.0 | 80% | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79); default registry invariant asserted (D-83) | No new public code claims; v1.0 ship ritual (tag, npm publish) is gated on user approval |
 | v1.5 | 70% | Code Intel foundation exists and is labeled heuristic; re-export chain call graph correctness fixture present (D-84) | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename; heuristic mode is explicit, not production-grade |
-| v2.0 | 45% | Memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing, opt-in runner/recorder boundaries, stub evidence, real HTTP evidence, and hybrid real Browser evidence now record 9/20 completed live results; D-121/D-122 improve hybrid accumulation mechanics without increasing the live-result count | Gate-1.5 completed live result evidence and binding branch decision are still incomplete (9/20 done, 11/20 remaining, binding still false) |
+| v2.0 | 45% | Memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing, opt-in runner/recorder boundaries, stub evidence, real HTTP evidence, and hybrid real Browser evidence now record 9/20 completed live results; D-121/D-123 improve hybrid accumulation mechanics without increasing the live-result count | Gate-1.5 completed live result evidence and binding branch decision are still incomplete (9/20 done, 11/20 remaining, binding still false) |
 | v2.5 | 65% | Planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 + D-82); v5 implementation gate reached (v2.5 >= 65%) | Integration is 5 fixtures; a real long-horizon multi-step execution run is still not proven in this scorecard; release gate scenarios are not freshly proven |
 | v3.0 | 55% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes; inclusive 30-50 boundary fixture present (D-85) | Gate-2 is fixture-scoped, not broad production proof; production long-horizon evidence is not yet present |
 | v4.0 | 50% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present (D-78 + D-80 + D-86) | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete; cross-session evidence is deterministic unit-style fixtures, not real cross-platform SIGKILL tests |
@@ -43,6 +43,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D120 adds the hybrid real Browser evidence runner: records 2 additional HTTP-evidence tasks plus 1 JS-evidence task, advancing the repository ledger from 6/20 to 9/20. Cumulative evidence is 4 stub + 4 HTTP + 1 JS result; binding remains false because 11/20 are still pending; Browser defaults stay locked.
 - D121 fixes hybrid evidence accumulation for non-contiguous mapped pending tasks so future runs can skip unmapped pending rows without aborting. Repository evidence remains 9/20 and Browser defaults stay locked.
 - D122 adds optional per-task JS action mapping to `recordHybridRealBrowserEvidence` so remaining JS evidence can distinguish `fill-search-input`, `click-element`, and `extract-text` actions. Repository evidence remains 9/20 and Browser defaults stay locked.
+- D123 makes `recordHybridRealBrowserEvidence` return a recomputed `updatedLedger` and recalculates `binding` / `branchDecision` through the live Browser ledger builder. Repository evidence remains 9/20 and Browser defaults stay locked.
 - D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 - D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
@@ -85,6 +86,6 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 
 ## Next Actions
 
-1. D123: continue hybrid real Browser evidence accumulation with task-specific JS actions to grow repository evidence without unlocking Browser defaults until 20 completed live task results exist.
+1. D124: run the next hybrid live Browser evidence batch using updatedLedger accumulation without unlocking Browser defaults until 20 completed live task results exist.
 2. Continue preferred-100k Gate-1 search only when a local 100K+ target is available.
 3. Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.

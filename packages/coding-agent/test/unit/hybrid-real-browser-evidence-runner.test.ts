@@ -231,4 +231,57 @@ describe('Gate-1.5 hybrid real Browser evidence runner (HTTP + JS)', () => {
     expect(evidence.totalPendingAfter).toBe(9);
     expect(evidence.binding).toBe(false);
   });
+
+  it('returns a recomputed updated ledger when hybrid runs reach the binding threshold', async () => {
+    const ledger = buildLiveBrowserTaskLedger({
+      generatedAt: '2026-06-11T00:00:00.000Z',
+      tasks: makeTwentyTasks().map((task, index) =>
+        index < 18 ? { ...task, status: 'success' as const } : task,
+      ),
+    });
+
+    const evidence = await recordHybridRealBrowserEvidence({
+      generatedAt: '2026-06-11T06:00:00.000Z',
+      ledger,
+      optIn: true,
+      taskModes: {
+        'task-19': 'js',
+        'task-20': 'js',
+      },
+      realUrls: {
+        'task-19': 'https://example.com/dashboard',
+        'task-20': 'https://example.com/admin/table',
+      },
+      jsActions: {
+        'task-19': 'click-element',
+        'task-20': 'extract-text',
+      },
+      fetchFn: okFetch(),
+      jsRunnerFn: async (url, action) => ({
+        action,
+        url,
+        navigated: true,
+        interactedElement: action === 'click-element' ? 'button.close' : 'main',
+        inputValue: null,
+        pageTitle: action === 'click-element' ? 'Dashboard' : 'Table',
+        ms: 120,
+        error: null,
+      }),
+    });
+
+    expect(evidence.evidenceKind).toBe('hybrid-browser-evidence');
+    expect(evidence.runs.map((run) => run.taskId)).toEqual(['task-19', 'task-20']);
+    expect(evidence.totalCompletedBefore).toBe(18);
+    expect(evidence.totalCompletedAfter).toBe(20);
+    expect(evidence.totalPendingAfter).toBe(0);
+    expect(evidence.binding).toBe(true);
+    expect(evidence.branchDecision).toBe('continue-browser-enhancement');
+    expect(evidence.updatedLedger.completedTasks).toBe(20);
+    expect(evidence.updatedLedger.pendingTasks).toBe(0);
+    expect(evidence.updatedLedger.successRate).toBe(1);
+    expect(evidence.updatedLedger.binding).toBe(true);
+    expect(evidence.updatedLedger.branchDecision).toBe('continue-browser-enhancement');
+    expect(evidence.updatedLedger.browserEnhancementUnlocked).toBe(true);
+    expect(evidence.updatedLedger.status).toBe('ready-for-binding-decision');
+  });
 });

@@ -1,5 +1,9 @@
 import type { BrowserGateBranchDecision } from './gate15.js';
-import type { LiveBrowserTaskLedger, LiveBrowserTaskStatus } from './live-task-source.js';
+import {
+  buildLiveBrowserTaskLedger,
+  type LiveBrowserTaskLedger,
+  type LiveBrowserTaskStatus,
+} from './live-task-source.js';
 
 export interface RealBrowserFetchResult {
   status: number;
@@ -73,6 +77,7 @@ export interface HybridRealBrowserEvidence {
   totalPendingAfter: number;
   binding: boolean;
   branchDecision: BrowserGateBranchDecision;
+  updatedLedger: LiveBrowserTaskLedger;
   skipReason?: HybridSkipReason;
 }
 
@@ -99,31 +104,25 @@ function skipped(
     totalPendingAfter: countPending(currentLedger.tasks),
     binding: currentLedger.binding,
     branchDecision: currentLedger.branchDecision,
+    updatedLedger: currentLedger,
     skipReason,
   };
 }
 
 function updateLedgerTaskStatus(
   ledger: LiveBrowserTaskLedger,
+  generatedAt: string,
   taskId: string,
   newStatus: 'success' | 'failed',
 ): LiveBrowserTaskLedger {
   const updatedTasks = ledger.tasks.map((task) =>
     task.id === taskId ? { ...task, status: newStatus } : task,
   );
-  const completed = updatedTasks.filter((t) => t.status === 'success' || t.status === 'failed').length;
-  const pending = updatedTasks.filter((t) => t.status === 'pending').length;
-  const successes = updatedTasks.filter((t) => t.status === 'success').length;
-  const failures = updatedTasks.filter((t) => t.status === 'failed').length;
-  return {
-    ...ledger,
+  return buildLiveBrowserTaskLedger({
+    generatedAt,
+    requiredTasks: ledger.requiredTasks,
     tasks: updatedTasks,
-    completedTasks: completed,
-    pendingTasks: pending,
-    successes,
-    failures,
-    successRate: completed > 0 ? successes / completed : null,
-  };
+  });
 }
 
 export async function recordHybridRealBrowserEvidence(
@@ -187,7 +186,7 @@ export async function recordHybridRealBrowserEvidence(
       result = { kind: 'js', jsResult };
     }
     runs.push({ index, taskId: pendingTask.id, mode, url: realUrl, status: newStatus, result });
-    currentLedger = updateLedgerTaskStatus(currentLedger, pendingTask.id, newStatus);
+    currentLedger = updateLedgerTaskStatus(currentLedger, input.generatedAt, pendingTask.id, newStatus);
   }
 
   return {
@@ -200,5 +199,6 @@ export async function recordHybridRealBrowserEvidence(
     totalPendingAfter: countPending(currentLedger.tasks),
     binding: currentLedger.binding,
     branchDecision: currentLedger.branchDecision,
+    updatedLedger: currentLedger,
   };
 }

@@ -202,7 +202,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D123: continue hybrid real Browser evidence accumulation with task-specific JS actions to grow repository evidence without unlocking Browser defaults until 20 completed live task results exist.',
+      'D124: run the next hybrid live Browser evidence batch using updatedLedger accumulation without unlocking Browser defaults until 20 completed live task results exist.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
       'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
     ]);
@@ -327,11 +327,11 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D122', () => {
+  it('keeps the current sprint and next-work pointers aligned after D123', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D122 Gate-1.5 hybrid JS action mapping (recordHybridRealBrowserEvidence jsActions)');
+      expect(block).toContain('Current sprint: D123 Gate-1.5 hybrid updated ledger accumulation (recordHybridRealBrowserEvidence updatedLedger)');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -387,11 +387,14 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D120 Gate-1.5 hybrid real Browser evidence runner:');
       expect(block).toContain('D121 Gate-1.5 hybrid evidence alignment:');
       expect(block).toContain('D122 Gate-1.5 hybrid JS action mapping:');
+      expect(block).toContain('D123 Gate-1.5 hybrid updated ledger accumulation:');
       expect(block).toContain('Gate-1.5 evidence kind: opt-in-first-run-recorded');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: D123 Gate-1.5 hybrid evidence accumulation');
+      expect(block).toContain('Next implementation slice: D124 Gate-1.5 hybrid live evidence batch');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D122/i);
+      expect(block).not.toMatch(/Next implementation slice: D123/i);
       expect(block).not.toMatch(/Current sprint: D120/i);
       expect(block).not.toMatch(/Next implementation slice: D121/i);
       expect(block).not.toMatch(/Current sprint: D119/i);

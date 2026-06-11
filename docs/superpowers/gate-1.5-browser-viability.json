@@ -19,7 +19,7 @@
     "branchDecision": "defer-live-evidence",
     "runnerAdapter": "stub-evidence (no real Browser automation)",
     "completedTaskId": "docs-search-query",
-    "note": "First opt-in run is end-to-end chain proof with a stub adapter. After D-118 batch run + D-119 real fetch + D-120 hybrid evidence, the cumulative live result count is 9/20. D-121 fixes non-contiguous hybrid task mapping and D-122 adds per-task JS action mapping without increasing the live-result count. 11/20 remain pending and binding remains false until 20/20 are recorded through real Browser automation in D-123+."
+    "note": "First opt-in run is end-to-end chain proof with a stub adapter. After D-118 batch run + D-119 real fetch + D-120 hybrid evidence, the cumulative live result count is 9/20. D-121 fixes non-contiguous hybrid task mapping, D-122 adds per-task JS action mapping, and D-123 makes hybrid evidence return a recomputed updatedLedger without increasing the live-result count. 11/20 remain pending and binding remains false until 20/20 are recorded through real Browser automation in D-124+."
   },
   "firstBatchEvidence": {
     "subSprint": "D-118",
@@ -100,6 +100,6 @@
         "interactedElement": "input[name=\"q\"]"
       }
     ],
-    "note": "D-120 records 3 additional hybrid evidence rows on top of the 6 D-117..D-119 rows, bringing repository live result accounting to 9/20. D-121 fixes non-contiguous hybrid task mapping and D-122 adds per-task JS action mapping for future hybrid evidence runs, without increasing the completed live-result count. Of the 9 cumulative completed live results, 4 are stub-evidence (D-117/118), 4 are HTTP-evidence (D-119/120), and 1 is JS-evidence (D-120). Binding remains false because 11/20 are still pending, so Browser defaults remain locked."
+    "note": "D-120 records 3 additional hybrid evidence rows on top of the 6 D-117..D-119 rows, bringing repository live result accounting to 9/20. D-121 fixes non-contiguous hybrid task mapping, D-122 adds per-task JS action mapping, and D-123 makes hybrid evidence return a recomputed updatedLedger for future hybrid evidence batches, without increasing the completed live-result count. Of the 9 cumulative completed live results, 4 are stub-evidence (D-117/118), 4 are HTTP-evidence (D-119/120), and 1 is JS-evidence (D-120). Binding remains false because 11/20 are still pending, so Browser defaults remain locked."
   }
 }
