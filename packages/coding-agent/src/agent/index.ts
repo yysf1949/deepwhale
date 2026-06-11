@@ -34,5 +34,11 @@ export {
   estimateContextTokens,
   type AgentCompactionConfig,
 } from './agent-compaction.js';
+// D-128: Export runToolLoopWithReview for v3.0/v4.0 integration
+export {
+  runToolLoopWithReview,
+  type RunCommandWithReviewOptions,
+  type RunCommandWithReviewResult,
+} from './tool-loop-policy.js';
 // Re-export core compaction types for caller convenience
 export { CompactionState, type CompactionConfig } from '@deepwhale/core';

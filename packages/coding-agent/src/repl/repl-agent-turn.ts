@@ -42,9 +42,11 @@ import {
   persistToolLoopSteps,
   runToolLoop,
   runToolLoopWithCompaction,
+  runToolLoopWithReview,
   type AgentCompactionConfig,
   type ToolLoopResult,
 } from '../agent/index.js';
+import type { Reviewer, TaskGraphRecorder, Planner, RunCommandWithReviewOptions } from '../agent/tool-loop-policy.js';
 import { staticToolPolicy } from '../policy/static-rules.js';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { formatError } from './repl-format-error.js';
@@ -89,6 +91,11 @@ export async function runAgentTurn(
   // EMA state 透传 (闭包持有). 旧 caller 不传 = 默认 { sampleCount: 0 }, 行为兼容
   // (不显示 avg 段). REPL 路径必传, 跨 turn 累积.
   emaState?: UsageEmaState,
+  // D-128: Optional Reviewer/TaskGraph/Planner for v3.0/v4.0 integration.
+  // When provided, uses runToolLoopWithReview instead of runToolLoop.
+  reviewer?: Reviewer,
+  taskGraph?: TaskGraphRecorder,
+  planner?: Planner,
 ): Promise<void> {
   // 1) 持久化 user 输入
   if (writer) {
@@ -114,7 +121,33 @@ export async function runAgentTurn(
   const resolvedPolicy: ToolPolicy = policy ?? staticToolPolicy;
   let result: ToolLoopResult;
   try {
-    if (compactionConfig !== null && summaryFn !== null) {
+    // D-128: Use runToolLoopWithReview when reviewer/taskGraph/planner are provided.
+    // This integrates v3.0 Reviewer + v4.0 TaskGraph + v2.5 Planner into the main loop.
+    if (reviewer || taskGraph || planner) {
+      const reviewResult = await runToolLoopWithReview({
+        client,
+        messages: turnMessages,
+        registry: createDefaultRegistry({
+          ...(sandboxRunner !== undefined ? { sandboxRunner } : {}),
+        }),
+        onChunk: (chunk: { content?: string }) => {
+          if (chunk.content) out.write(chunk.content);
+        },
+        signal,
+        policy: resolvedPolicy,
+        isInteractive: true,
+        yes: yes ?? false,
+        ...(writer ? { writer } : {}),
+        ...(reviewer ? { reviewer } : {}),
+        ...(taskGraph ? { taskGraph } : {}),
+        ...(planner ? { planner } : {}),
+      });
+      result = {
+        messages: reviewResult.messages,
+        final: reviewResult.final,
+        steps: reviewResult.steps,
+      };
+    } else if (compactionConfig !== null && summaryFn !== null) {
       result = await runToolLoopWithCompaction(
         client,
         turnMessages,
@@ -127,7 +160,7 @@ export async function runAgentTurn(
           },
           signal,
           policy: resolvedPolicy,
-          isInteractive: true, // REPL = 交互模式 (D-13 拍板)
+          isInteractive: true,
           yes: yes ?? false,
           ...(writer ? { writer } : {}),
         },
@@ -144,7 +177,7 @@ export async function runAgentTurn(
         },
         signal,
         policy: resolvedPolicy,
-        isInteractive: true, // REPL = 交互模式 (D-13 拍板)
+        isInteractive: true,
         yes: yes ?? false,
         ...(writer ? { writer } : {}),
       });
