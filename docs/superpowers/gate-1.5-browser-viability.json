@@ -8,5 +8,17 @@
   "binding": false,
   "branchDecision": "defer-live-evidence",
   "interpretation": "Fixture dry-run result is advisory only; collect 20 live browser tasks before changing the Browser roadmap branch.",
-  "fixture": "packages/coding-agent/test/fixtures/browser-gate15/pass.json"
+  "fixture": "packages/coding-agent/test/fixtures/browser-gate15/pass.json",
+  "firstOptInEvidence": {
+    "subSprint": "D-117",
+    "generatedAt": "2026-06-11T01:00:00.000Z",
+    "evidenceKind": "opt-in-first-run-recorded",
+    "completedAfter": 1,
+    "pendingAfter": 19,
+    "binding": false,
+    "branchDecision": "defer-live-evidence",
+    "runnerAdapter": "stub-evidence (no real Browser automation)",
+    "completedTaskId": "docs-search-query",
+    "note": "First opt-in run is end-to-end chain proof with a stub adapter. 1/20 is real evidence; 19/20 remain pending and binding remains false until 20/20 are recorded through real Browser automation in D-118+."
+  }
 }

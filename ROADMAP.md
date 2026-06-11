@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D116 Gate-1.5 live Browser result recorder
+- Current sprint: D117 Gate-1.5 opt-in live Browser evidence runner (recordOptInLiveBrowserEvidence)
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -21,13 +21,13 @@
 - Gate-1 preferred status: minimum-only.
 - Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
 - Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json.
-- Gate-1.5 evidence kind: fixture-dry-run.
-- Gate-1.5 algorithmic decision: continue.
-- Gate-1.5 binding: false.
-- Gate-1.5 binding branch decision: defer-live-evidence.
-- Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json.
-- Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json.
-- Gate-1.5 live result recorder: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=available; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 evidence kind: opt-in-first-run-recorded
+- Gate-1.5 algorithmic decision: continue
+- Gate-1.5 binding: false
+- Gate-1.5 binding branch decision: defer-live-evidence
+- Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
+- Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
+- Gate-1.5 live result recorder: 20 candidates queued, 1/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -92,6 +92,7 @@
 - D114 Gate-1.5 live Browser task sourcing: 1 new pure ledger builder + 2 new unit tests queue 20 pending candidate tasks for opt-in live Browser execution while keeping Gate-1.5 binding=false and Browser enhancement locked.
 - D115 Gate-1.5 opt-in live Browser task runner: 1 new opt-in runner boundary + 3 new unit tests prove no execution without opt-in, no execution without an adapter, and explicit adapter execution updates Gate-1.5 accounting while keeping binding=false.
 - D116 Gate-1.5 live Browser result recorder: 1 new pure recorder + runner integration accepts explicit known task results, ignores unknown/duplicate rows, and keeps repository live evidence at 0/20 until an opt-in Browser run is recorded.
+- D117 Gate-1.5 opt-in live Browser evidence runner: 1 new recordOptInLiveBrowserEvidence async function orchestrates the queue D-114 + runner D-115 + recorder D-116 chain end-to-end and returns a typed evidence record; repository ledger advances 0/20 -> 1/20 with a stub adapter, binding remains false (19/20 still pending), 4 new unit tests.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -117,8 +118,8 @@
 
 ### Next Roadmap Work
 
-1. D116 Gate-1.5 live Browser result recorder is complete: explicit runner output can update ledger accounting through the recorder; 0/20 repository live results still exist; binding remains false.
-2. Next implementation slice: D117 Gate-1.5 opt-in live Browser evidence run.
+1. D117 Gate-1.5 opt-in live Browser evidence runner is complete: the chain (queue + runner + recorder) is exercised end-to-end; 1/20 repository live results now exist via a stub adapter; binding remains false (19/20 still pending).
+2. Next implementation slice: D118 Gate-1.5 opt-in evidence run continuation.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

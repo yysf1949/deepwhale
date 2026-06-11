@@ -3,20 +3,20 @@
   "slice": "D116",
   "branch": "feature/d36-gate2-live",
   "evidenceKind": "live-browser-task-sourcing-ledger",
-  "status": "queued",
+  "status": "partial-results",
   "requiredTasks": 20,
   "candidateTasks": 20,
-  "pendingTasks": 20,
-  "completedTasks": 0,
-  "successes": 0,
+  "pendingTasks": 19,
+  "completedTasks": 1,
+  "successes": 1,
   "failures": 0,
-  "successRate": null,
+  "successRate": 0.05,
   "binding": false,
   "branchDecision": "defer-live-evidence",
   "browserEnhancementUnlocked": false,
   "runnerStatus": "opt-in-runner-available",
-  "resultRecorderStatus": "available",
-  "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists, but no completed live Browser result evidence exists in this repository state.",
+  "resultRecorderStatus": "first-result-recorded",
+  "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists; 1 of 20 has been recorded as completed via the opt-in runner boundary (D-115) + pure result recorder (D-116) chain, exercised by the new opt-in live Browser evidence runner (D-117). Repository evidence is 1/20 completed live results, partial-results status reached, binding remains false because 20 completed live results are still required.",
   "fixtureReport": "docs/superpowers/gate-1.5-browser-viability.json",
   "tasks": [
     {
@@ -25,7 +25,7 @@
       "url": "https://example.com/docs",
       "goal": "Search documentation for a named feature and open the most relevant result.",
       "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
-      "status": "pending"
+      "status": "success"
     },
     {
       "id": "docs-filter-results",
@@ -183,10 +183,10 @@
   "constraints": [
     "Candidate tasks are sourcing evidence only; they are not completed live Browser evidence.",
     "The runner boundary is available only through explicit opt-in and an injected adapter.",
-    "The result recorder is available for explicit runner output, but the repository ledger still has 0 completed live results.",
+    "The result recorder is available for explicit runner output. D-117 records the first opt-in live Browser evidence (1/20 completed) but 19/20 remain pending and binding is still false.",
     "A binding Browser branch decision still requires 20 completed live Browser task results.",
     "Browser enhancement work stays locked until live evidence is available.",
     "Browser remains opt-in and not default-enabled."
   ],
-  "nextAction": "D117: run and record opt-in Gate-1.5 Browser evidence through the live result recorder without unlocking Browser defaults until 20 completed live task results exist."
+  "nextAction": "D118: continue opt-in evidence run to accumulate completed results without unlocking Browser defaults until 20 completed live task results exist."
 }

@@ -71,7 +71,8 @@ describe('status documentation hygiene (D-56)', () => {
     expect(gate1Targets.blocker).toContain(
       `best local target is ${gate1Targets.bestAvailable?.name ?? 'unknown'} with ${gate1Targets.bestAvailable?.loc ?? 0} LOC`,
     );
-    expect(readme).toContain(`Gate-1.5 evidence kind: ${gate15.evidenceKind}`);
+    expect(readme).toContain('Gate-1.5 evidence kind: opt-in-first-run-recorded');
+    expect(gate15.evidenceKind).toBe('fixture-dry-run');
     expect(readme).toContain(`Gate-1.5 algorithmic decision: ${gate15.decision}`);
     expect(readme).toContain(`Gate-1.5 binding: ${String(gate15.binding)}`);
     expect(readme).toContain(`Gate-1.5 binding branch decision: ${gate15.branchDecision}`);
@@ -127,30 +128,34 @@ describe('status documentation hygiene (D-56)', () => {
     const ledgerMd = readRepoFile('docs/superpowers/gate-1.5-live-browser-tasks.md');
 
     expect(ledger.evidenceKind).toBe('live-browser-task-sourcing-ledger');
-    expect(ledger.status).toBe('queued');
+    expect(ledger.status).toBe('partial-results');
     expect(ledger.requiredTasks).toBe(20);
     expect(ledger.candidateTasks).toBe(20);
-    expect(ledger.pendingTasks).toBe(20);
-    expect(ledger.completedTasks).toBe(0);
-    expect(ledger.successes).toBe(0);
+    expect(ledger.pendingTasks).toBe(19);
+    expect(ledger.completedTasks).toBe(1);
+    expect(ledger.successes).toBe(1);
     expect(ledger.failures).toBe(0);
-    expect(ledger.successRate).toBeNull();
+    expect(ledger.successRate).toBe(0.05);
     expect(ledger.binding).toBe(false);
     expect(ledger.branchDecision).toBe('defer-live-evidence');
     expect(ledger.browserEnhancementUnlocked).toBe(false);
     expect(ledger.runnerStatus).toBe('opt-in-runner-available');
-    expect(ledger.resultRecorderStatus).toBe('available');
+    expect(ledger.resultRecorderStatus).toBe('first-result-recorded');
     expect(ledger.reason).toContain('20 candidate live Browser tasks are queued and an opt-in runner boundary exists');
     expect(ledger.fixtureReport).toBe('docs/superpowers/gate-1.5-browser-viability.json');
     expect(ledger.tasks).toHaveLength(20);
-    expect(ledger.tasks.every((task) => task.status === 'pending')).toBe(true);
+    const successTasks = ledger.tasks.filter((task) => task.status === 'success');
+    const pendingTasks = ledger.tasks.filter((task) => task.status === 'pending');
+    expect(successTasks).toHaveLength(1);
+    expect(pendingTasks).toHaveLength(19);
+    expect(successTasks[0]?.id).toBe('docs-search-query');
     expect(ledgerMd).toContain('Live Browser Task Sourcing Queue');
 
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
       expect(block).toContain(
-        'Gate-1.5 live result recorder: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=available; binding=false; Browser enhancement unlocked=false.',
+        'Gate-1.5 live result recorder: 20 candidates queued, 1/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.',
       );
     }
   });
@@ -187,7 +192,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D117: run and record opt-in Gate-1.5 Browser evidence through the live result recorder without unlocking Browser defaults until 20 completed results exist.',
+      'D118: continue opt-in evidence run to accumulate completed results without unlocking Browser defaults until 20 completed live task results exist.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
       'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
     ]);
@@ -306,7 +311,7 @@ describe('status documentation hygiene (D-56)', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D116 Gate-1.5 live Browser result recorder');
+      expect(block).toContain('Current sprint: D117 Gate-1.5 opt-in live Browser evidence runner (recordOptInLiveBrowserEvidence)');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -359,11 +364,13 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D114 Gate-1.5 live Browser task sourcing');
       expect(block).toContain('D115 Gate-1.5 opt-in live Browser task runner');
       expect(block).toContain('D116 Gate-1.5 live Browser result recorder');
-      expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
+      expect(block).toContain('Gate-1.5 evidence kind: opt-in-first-run-recorded');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: D117 Gate-1.5 opt-in live Browser evidence run');
+      expect(block).toContain('Next implementation slice: D118 Gate-1.5 opt-in evidence run continuation');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D116/i);
+      expect(block).not.toMatch(/Next implementation slice: D117 Gate-1\.5 opt-in live Browser evidence run/i);
       expect(block).not.toMatch(/Current sprint: D115/i);
       expect(block).not.toMatch(/Next implementation slice: D116/i);
       expect(block).not.toMatch(/Current sprint: D114/i);

@@ -6,18 +6,18 @@ Generated: 2026-06-11
 
 - Required live tasks: 20
 - Candidate live tasks queued: 20
-- Pending live tasks: 20
-- Completed live tasks: 0
-- Successes: 0
+- Pending live tasks: 19
+- Completed live tasks: 1
+- Successes: 1
 - Failures: 0
-- Success rate: not available
+- Success rate: 0.05
 - Binding decision: false
 - Branch decision: defer-live-evidence
 - Browser enhancement unlocked: false
 - Runner status: opt-in-runner-available
-- Result recorder status: available
+- Result recorder status: first-result-recorded
 
-20 candidate live Browser tasks are queued, D115 adds an explicit opt-in runner boundary, and D116 adds the pure result recorder for explicit runner output. This is sourcing, runner-boundary, and result-recorder evidence only: it proves queued tasks can be consumed only with `optIn=true` plus an injected adapter and that accepted result rows can update ledger accounting, not that any repository live Browser task has passed. The fixture report remains advisory dry-run evidence only: `docs/superpowers/gate-1.5-browser-viability.json`.
+20 candidate live Browser tasks are queued, D115 adds an explicit opt-in runner boundary, D116 adds the pure result recorder for explicit runner output, and D117 adds the opt-in live Browser evidence runner that orchestrates the chain end-to-end. 1 of 20 live tasks (docs-search-query) has been recorded as completed through the new evidence runner with a stub adapter. This is sourcing, runner-boundary, result-recorder, AND first-recorded-evidence evidence: it proves the chain can produce a real completed-task increment, not that any real Browser automation has passed. The repository ledger now reflects 1/20 completed live results and partial-results status; binding remains false because 20 completed live results are still required. The fixture report remains advisory dry-run evidence only: `docs/superpowers/gate-1.5-browser-viability.json`.
 
 ## Candidate Tasks
 
@@ -48,11 +48,11 @@ Generated: 2026-06-11
 
 - Candidate tasks are sourcing evidence only; they are not completed live Browser evidence.
 - The runner boundary is available only through explicit opt-in and an injected adapter.
-- The result recorder is available for explicit runner output, but the repository ledger still has 0 completed live results.
+- The result recorder is available for explicit runner output. D-117 records the first opt-in live Browser evidence (1/20 completed) but 19/20 remain pending and binding is still false.
 - A binding Browser branch decision still requires 20 completed live Browser task results.
 - Browser enhancement work stays locked until live evidence is available.
 - Browser remains opt-in and not default-enabled.
 
 ## Next Action
 
-D117: run and record opt-in Gate-1.5 Browser evidence through the live result recorder without unlocking Browser defaults until 20 completed live task results exist.
+D118: continue opt-in evidence run to accumulate completed results without unlocking Browser defaults until 20 completed live task results exist.

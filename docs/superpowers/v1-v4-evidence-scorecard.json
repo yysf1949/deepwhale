@@ -47,8 +47,8 @@
     },
     {
       "id": "v2.0",
-      "percent": 40,
-      "status": "memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing and opt-in runner boundary exist, but live result evidence is incomplete",
+      "percent": 45,
+      "status": "memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing, an opt-in runner boundary, a pure result recorder, and the first opt-in evidence run that records 1/20 completed live results now exist (D-114 + D-115 + D-116 + D-117)",
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
@@ -57,10 +57,11 @@
         "D73 live Browser task ledger records 0/20 live tasks and binding=false",
         "D114 queues 20 pending candidate live Browser tasks as sourcing evidence only; 0/20 completed live results exist and binding remains false",
         "D115 adds an opt-in live Browser task runner boundary; it runs only with optIn=true plus an injected adapter, and still leaves 0/20 completed live results",
-        "D116 adds a pure live Browser result recorder that accepts known task results, ignores unknown and duplicate rows, and delegates binding to the required 20 completed-result threshold while repository evidence remains 0/20"
+        "D116 adds a pure live Browser result recorder that accepts known task results, ignores unknown and duplicate rows, and delegates binding to the required 20 completed-result threshold while repository evidence remains 0/20",
+        "D117 adds the opt-in live Browser evidence runner that orchestrates the chain end-to-end (queue D-114 + runner D-115 + recorder D-116) and records the first opt-in run with a stub adapter, advancing the repository ledger from 0/20 to 1/20 completed live results; binding remains false because 19/20 are still pending"
       ],
       "blockers": [
-        "Gate-1.5 live 20-task browser result evidence is not complete",
+        "Gate-1.5 live 20-task browser result evidence is not complete (1/20 after D-117, 19/20 remaining)",
         "default registry must remain coding plus Code Intel essentials"
       ]
     },
@@ -121,7 +122,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D117: run and record opt-in Gate-1.5 Browser evidence through the live result recorder without unlocking Browser defaults until 20 completed results exist.",
+    "D118: continue opt-in evidence run to accumulate completed results without unlocking Browser defaults until 20 completed live task results exist.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]
