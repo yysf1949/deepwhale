@@ -1,26 +1,27 @@
 /**
- * browser_action 工具 — D-126 Browser interaction enhancement.
+ * browser_action 工具 — D-132 Browser interaction enhancement.
  *
  * Lightweight browser interaction without puppeteer/playwright.
- * Supports click, type, and submit actions via HTML parsing and form submission.
+ * Supports click, type, submit, scroll, extract, and wait actions.
  */
 
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 
-export type BrowserActionType = 'click' | 'type' | 'submit' | 'scroll';
+export type BrowserActionType = 'click' | 'type' | 'submit' | 'scroll' | 'extract' | 'wait';
 
 export interface BrowserActionInput {
   action: BrowserActionType;
   url?: string;
   selector?: string;
   value?: string;
+  timeout?: number;
 }
 
 export class BrowserActionTool implements Tool {
   readonly name = 'browser_action' as ToolName;
   readonly description =
-    'Interact with a web page: click links/buttons, type into inputs, submit forms. Lightweight HTTP-based.';
+    'Interact with web pages: click, type, submit, scroll, extract content, wait for elements. Lightweight HTTP-based.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
 
   readonly schema: ToolInputSchema = {
@@ -28,28 +29,30 @@ export class BrowserActionTool implements Tool {
     properties: {
       action: {
         type: 'string',
-        enum: ['click', 'type', 'submit', 'scroll'],
+        enum: ['click', 'type', 'submit', 'scroll', 'extract', 'wait'],
         description: 'Action to perform',
       },
-      url: { type: 'string', description: 'URL to interact with (for click/submit)' },
+      url: { type: 'string', description: 'URL to interact with' },
       selector: {
         type: 'string',
-        description: 'CSS-like selector for element (e.g., "a[href=/login]", "input[name=q]")',
+        description: 'CSS-like selector for element (e.g., "a[href=/login]", "input[name=q]", "h1")',
       },
-      value: { type: 'string', description: 'Value to type (for type action)' },
+      value: { type: 'string', description: 'Value to type (for type action) or text to wait for' },
+      timeout: { type: 'number', description: 'Timeout in ms (for wait action, default 5000)' },
     },
     required: ['action'],
   };
 
   async execute(input: Record<string, unknown>): Promise<ToolResult> {
     const action = input['action'];
-    if (typeof action !== 'string' || !['click', 'type', 'submit', 'scroll'].includes(action)) {
-      return { success: false, content: '', error: 'invalid-input: action must be click/type/submit/scroll' };
+    if (typeof action !== 'string' || !['click', 'type', 'submit', 'scroll', 'extract', 'wait'].includes(action)) {
+      return { success: false, content: '', error: 'invalid-input: action must be click/type/submit/scroll/extract/wait' };
     }
 
     const url = input['url'];
     const selector = input['selector'];
     const value = input['value'];
+    const timeout = typeof input['timeout'] === 'number' ? input['timeout'] : 5000;
 
     try {
       switch (action) {
@@ -58,9 +61,13 @@ export class BrowserActionTool implements Tool {
         case 'type':
           return this.handleType(url, selector, value);
         case 'submit':
-          return this.handleSubmit(url, selector);
+          return this.handleSubmit(url, selector, value);
         case 'scroll':
           return this.handleScroll(url);
+        case 'extract':
+          return this.handleExtract(url, selector);
+        case 'wait':
+          return this.handleWait(url, selector, value, timeout);
         default:
           return { success: false, content: '', error: `unknown action: ${action}` };
       }
@@ -143,7 +150,7 @@ export class BrowserActionTool implements Tool {
     };
   }
 
-  private async handleSubmit(url: unknown, selector: unknown): Promise<ToolResult> {
+  private async handleSubmit(url: unknown, selector: unknown, value: unknown): Promise<ToolResult> {
     if (typeof url !== 'string') {
       return { success: false, content: '', error: 'submit requires url' };
     }
@@ -154,15 +161,46 @@ export class BrowserActionTool implements Tool {
     }
 
     const html = await res.text();
-    const formMatch = html.match(/<form[^>]*action="([^"]*)"[^>]*>/i);
+    
+    // Extract form data if provided
+    const formData = typeof value === 'string' ? value : '';
+    const formFields = formData.split('&').map(pair => {
+      const [key, val] = pair.split('=');
+      return { key: key?.trim() ?? '', value: val?.trim() ?? '' };
+    }).filter(f => f.key);
 
+    // Find form action
+    const formMatch = html.match(/<form[^>]*action="([^"]*)"[^>]*>/i);
+    
     if (formMatch && formMatch[1]) {
       const actionUrl = formMatch[1].startsWith('http')
         ? formMatch[1]
         : new URL(formMatch[1], url).href;
+      
+      // If form data provided, submit via POST
+      if (formFields.length > 0) {
+        const postRes = await fetch(actionUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formFields.map(f => `${encodeURIComponent(f.key)}=${encodeURIComponent(f.value)}`).join('&'),
+        });
+        
+        if (!postRes.ok) {
+          return { success: false, content: '', error: `form submission failed: HTTP ${postRes.status}` };
+        }
+        
+        const resultHtml = await postRes.text();
+        const resultTitle = resultHtml.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? '(no title)';
+        return {
+          success: true,
+          content: `Form submitted to: ${actionUrl}\nResult page: ${resultTitle}`,
+          meta: { action: 'submit', url: actionUrl, fields: formFields.length },
+        };
+      }
+      
       return {
         success: true,
-        content: `Form action URL: ${actionUrl}. (Note: HTTP-only mode cannot submit forms with data)`,
+        content: `Form action URL: ${actionUrl}. Use with form data to submit.`,
         meta: { action: 'submit', url: actionUrl },
       };
     }
@@ -193,6 +231,103 @@ export class BrowserActionTool implements Tool {
       success: true,
       content: `Page loaded: ${title}\nBody length: ${bodyLen} chars\n(Scroll is a no-op in HTTP-only mode)`,
       meta: { action: 'scroll', url, title, bodyLen },
+    };
+  }
+
+  private async handleExtract(url: unknown, selector: unknown): Promise<ToolResult> {
+    if (typeof url !== 'string') {
+      return { success: false, content: '', error: 'extract requires url' };
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      return { success: false, content: '', error: `fetch failed: HTTP ${res.status}` };
+    }
+
+    const html = await res.text();
+    const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? '(no title)';
+    
+    // Extract content based on selector
+    let content = '';
+    if (typeof selector === 'string' && selector) {
+      // Try to extract specific element
+      const tagMatch = selector.match(/^(\w+)/);
+      const tag = tagMatch?.[1] ?? 'div';
+      const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+      const match = html.match(regex);
+      content = match?.[1]?.replace(/<[^>]+>/g, '').trim() ?? `(no ${tag} found)`;
+    } else {
+    // Extract all text content
+    content = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 2000);
+    }
+
+    return {
+      success: true,
+      content: `Title: ${title}\n\nContent:\n${content}`,
+      meta: { action: 'extract', url, title, contentLength: content.length },
+    };
+  }
+
+  private async handleWait(url: unknown, selector: unknown, value: unknown, timeout: number): Promise<ToolResult> {
+    if (typeof url !== 'string') {
+      return { success: false, content: '', error: 'wait requires url' };
+    }
+
+    const startTime = Date.now();
+    const maxAttempts = Math.ceil(timeout / 1000);
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          return { success: false, content: '', error: `fetch failed: HTTP ${res.status}` };
+        }
+
+        const html = await res.text();
+        
+        // Check if selector/text exists
+        if (typeof selector === 'string' && selector) {
+          if (html.includes(selector)) {
+            return {
+              success: true,
+              content: `Element/text found after ${Date.now() - startTime}ms`,
+              meta: { action: 'wait', url, selector, durationMs: Date.now() - startTime },
+            };
+          }
+        } else if (typeof value === 'string' && value) {
+          if (html.includes(value)) {
+            return {
+              success: true,
+              content: `Text "${value}" found after ${Date.now() - startTime}ms`,
+              meta: { action: 'wait', url, value, durationMs: Date.now() - startTime },
+            };
+          }
+        } else {
+          // Just wait for page load
+          return {
+            success: true,
+            content: `Page loaded after ${Date.now() - startTime}ms`,
+            meta: { action: 'wait', url, durationMs: Date.now() - startTime },
+          };
+        }
+      } catch {
+        // Continue retrying
+      }
+      
+      if (Date.now() - startTime >= timeout) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    return {
+      success: false,
+      content: '',
+      error: `wait timed out after ${timeout}ms`,
+      meta: { action: 'wait', url, selector, timeout },
     };
   }
 }
