@@ -22,7 +22,7 @@ import { createDefaultRegistry } from '../../src/tools/registry.js';
 // remain opt-in or stopped, not default-enabled." A tool name matching
 // one of these patterns would break that promise.
 const NON_CODING_OPT_IN_PATTERNS: ReadonlyArray<RegExp> = [
-  /^browser_(?!action)/i,  // Exclude browser_action which is a coding tool
+  /^browser_(?!action|js)/i,  // Exclude browser_action and browser_js which are coding tools
   /^desktop[_-]/i,
   /^channel[_-]/i,
   /[_-]browser$/i,
@@ -34,10 +34,10 @@ const NON_CODING_OPT_IN_PATTERNS: ReadonlyArray<RegExp> = [
 ];
 
 describe('default registry invariant (D-83 v1.0)', () => {
-  it('contains exactly 20 coding + Code Intel tools (D-83 v1.0 narrow-default promise)', () => {
+  it('contains exactly 21 coding + Code Intel tools (D-83 v1.0 narrow-default promise)', () => {
     const reg = createDefaultRegistry();
     const tools = reg.list();
-    expect(tools.length).toBe(20);
+    expect(tools.length).toBe(21);
   });
 
   it('contains no non-coding opt-in tools (D-83 v1.0 narrow-default promise)', () => {

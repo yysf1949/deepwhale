@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createDefaultRegistry, createRegistryForProfile } from '../../src/tools/registry.js';
 
 describe('registry (D-32.3.4 â€?+1 smart_search)', () => {
-  it('all profile contains 41 tools', async () => {
+  it('all profile contains 44 tools', async () => {
     const reg = await createRegistryForProfile({ profile: 'all' });
     expect(reg.size()).toBe(42);
   });
