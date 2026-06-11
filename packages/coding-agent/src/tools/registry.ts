@@ -31,6 +31,7 @@ import { CallGraphTool } from './call-graph.js';
 import { RenameSymbolTool } from './rename-symbol.js';
 import { SmartSearchTool } from './smart-search.js';
 import { BrowserActionTool } from './browser-action.js';
+import { BrowserJsTool } from './browser-js.js';
 
 export class ToolRegistry {
   private tools = new Map<ToolName, Tool>();
@@ -202,6 +203,7 @@ function registerCodingTools(reg: ToolRegistry, runner: SandboxRunner): void {
   reg.register(new TodoTool());
   reg.register(new PlanTool());
   reg.register(new BrowserActionTool());
+  reg.register(new BrowserJsTool());
 }
 
 function registerCodeIntelTools(reg: ToolRegistry): void {

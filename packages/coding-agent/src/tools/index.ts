@@ -19,6 +19,8 @@ export { WebExtractTool } from './web-extract.js';
 export { BrowserNavigateTool } from './browser-navigate.js';
 // D-126: Browser interaction tool
 export { BrowserActionTool } from './browser-action.js';
+// D-137: Browser JS rendering tool
+export { BrowserJsTool } from './browser-js.js';
 // D-30.2 (2026-06-07): 5 new tools
 export { PatchTool } from './patch.js';
 export { SearchFilesTool } from './search-files.js';
