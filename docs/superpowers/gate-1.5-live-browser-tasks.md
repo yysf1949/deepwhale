@@ -14,8 +14,9 @@ Generated: 2026-06-11
 - Binding decision: false
 - Branch decision: defer-live-evidence
 - Browser enhancement unlocked: false
+- Runner status: opt-in-runner-available
 
-20 candidate live Browser tasks are queued but not yet executed. This is sourcing evidence only: it proves the Gate-1.5 live task queue now exists, not that any live Browser task has passed. The fixture report remains advisory dry-run evidence only: `docs/superpowers/gate-1.5-browser-viability.json`.
+20 candidate live Browser tasks are queued, and D115 adds an explicit opt-in runner boundary. This is sourcing and runner-boundary evidence only: it proves queued tasks can be consumed only with `optIn=true` and an injected adapter, not that any live Browser task has passed. The fixture report remains advisory dry-run evidence only: `docs/superpowers/gate-1.5-browser-viability.json`.
 
 ## Candidate Tasks
 
@@ -45,10 +46,11 @@ Generated: 2026-06-11
 ## Constraints
 
 - Candidate tasks are sourcing evidence only; they are not completed live Browser evidence.
+- The runner boundary is available only through explicit opt-in and an injected adapter.
 - A binding Browser branch decision still requires 20 completed live Browser task results.
 - Browser enhancement work stays locked until live evidence is available.
 - Browser remains opt-in and not default-enabled.
 
 ## Next Action
 
-D115: run queued tasks with an opt-in live Browser runner and record success or failed results.
+D116: record opt-in runner results into this ledger without unlocking Browser defaults until 20 completed live task results exist.

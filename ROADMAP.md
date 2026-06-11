@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D114 Gate-1.5 live Browser task sourcing
+- Current sprint: D115 Gate-1.5 opt-in live Browser task runner
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -27,7 +27,7 @@
 - Gate-1.5 binding branch decision: defer-live-evidence.
 - Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json.
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json.
-- Gate-1.5 live task sourcing: 20 candidates queued, 0/20 completed; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live task runner: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; binding=false; Browser enhancement unlocked=false.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -90,6 +90,7 @@
 - D112 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new enforceTenantQuota pure function (per-tenant billing/quota: returns QuotaResult with decision 'allow'/'allow-with-warning'/'deny' + utilizationPercent + overage + summary; supports warnAtPercent default 80% + 4 CostDimension types: tokens, requests, storage, compute-seconds) + 1 TenantQuota interface + 1 CostDimension union + 1 QuotaDecision union + 1 QuotaResult interface + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 2 of 3+ COMPLETE. D-112 complements D-111 (rate limit time-windowed) by tracking cumulative usage. D-113 added SSO/OIDC; SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.
 - D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new validateOidcToken pure function (SSO/OIDC integration: validates claim-level invariants (expiry + issuer + audience) + extracts tenantId + subject; trusts caller's pre-decoded claims; NO JWT signature verification yet) + 1 OidcProvider interface + 1 OidcToken interface + 1 OidcAuthResult interface + 1 OidcValidationOptions interface + 1 OidcAuthDecision union + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.
 - D114 Gate-1.5 live Browser task sourcing: 1 new pure ledger builder + 2 new unit tests queue 20 pending candidate tasks for opt-in live Browser execution while keeping Gate-1.5 binding=false and Browser enhancement locked.
+- D115 Gate-1.5 opt-in live Browser task runner: 1 new opt-in runner boundary + 3 new unit tests prove no execution without opt-in, no execution without an adapter, and explicit adapter execution updates Gate-1.5 accounting while keeping binding=false.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -115,8 +116,8 @@
 
 ### Next Roadmap Work
 
-1. D114 Gate-1.5 live Browser task sourcing is complete: 20 candidate live Browser tasks are queued as sourcing evidence only; 0/20 completed live results exist; binding remains false.
-2. Next implementation slice: D115 Gate-1.5 opt-in live Browser task runner.
+1. D115 Gate-1.5 opt-in live Browser task runner is complete: queued tasks can run only with optIn=true and an explicit adapter; 0/20 completed live results still exist; binding remains false.
+2. Next implementation slice: D116 Gate-1.5 live Browser result recorder.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

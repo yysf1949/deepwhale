@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { PersistingAuditLog } from '../../src/observability/persisting-audit-log.js';
 
 describe('PersistingAuditLog (D-89 v5.0 file-backed audit log)', () => {
-  it('persists events across separate instances pointing at the same file (D-89 cross-instance)', () => {
+  it('persists events across separate instances pointing at the same file (D-89 cross-instance)', async () => {
     // Setup: instance A records 2 events, instance B (fresh) loads them.
     const dir = mkdtempSync(join(tmpdir(), 'dw-auditlog-'));
     const file = join(dir, 'audit.jsonl');
@@ -25,12 +25,11 @@ describe('PersistingAuditLog (D-89 v5.0 file-backed audit log)', () => {
       // A new instance, with no in-memory state, must see A's records
       // after load() is called.
       const b = new PersistingAuditLog({ filePath: file });
-      return b.load().then(() => {
-        expect(b.getEvents().map((e) => e.kind)).toEqual(['tool-call', 'tool-result']);
-        // Payloads from the in-memory write propagate to the file.
-        expect(b.getEvents()[0]?.payload).toEqual({ name: 'echo' });
-        expect(b.getEvents()[1]?.payload).toEqual({ name: 'echo', ok: true });
-      });
+      await b.load();
+      expect(b.getEvents().map((e) => e.kind)).toEqual(['tool-call', 'tool-result']);
+      // Payloads from the in-memory write propagate to the file.
+      expect(b.getEvents()[0]?.payload).toEqual({ name: 'echo' });
+      expect(b.getEvents()[1]?.payload).toEqual({ name: 'echo', ok: true });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
