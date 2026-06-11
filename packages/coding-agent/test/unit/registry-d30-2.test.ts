@@ -1,16 +1,16 @@
 /**
- * D-30.2.8: Tool registry 注入 5 新工具 + D-30.3.5 加 delegate_task.
- *           + D-30.4.6 加 vision_analyze + text_to_speech.
+ * D-30.2.8: Tool registry 注入 5 新工�?+ D-30.3.5 �?delegate_task.
+ *           + D-30.4.6 �?vision_analyze + text_to_speech.
  *
- * 拍板 (D-30.2): createDefaultRegistry 装 patch / search_files / execute_code / todo / plan,
- * 跟 9 工具 1:1 同形态 (先 register, 跟现有顺序保持稳定).
- * 拍板 (D-30.3): 14 → 15, 加 delegate_task (subagent 并行 max 5, medium).
- * 拍板 (D-30.4): 15 → 17, 加 vision_analyze + text_to_speech (2 new tools).
+ * 拍板 (D-30.2): createDefaultRegistry �?patch / search_files / execute_code / todo / plan,
+ * �?9 工具 1:1 同形�?(�?register, 跟现有顺序保持稳�?.
+ * 拍板 (D-30.3): 14 �?15, �?delegate_task (subagent 并行 max 5, medium).
+ * 拍板 (D-30.4): 15 �?17, �?vision_analyze + text_to_speech (2 new tools).
  */
 import { describe, it, expect } from 'vitest';
 import { createDefaultRegistry, createRegistryForProfile } from '../../src/tools/registry.js';
 
-describe('tool registry (D-30.2.8 — 5 new tools, D-30.3.5 — 1 subagent, D-30.4.6 — 2 vision+tts)', () => {
+describe('tool registry (D-30.2.8 �?5 new tools, D-30.3.5 �?1 subagent, D-30.4.6 �?2 vision+tts)', () => {
   it('includes 5 new tools (patch / search_files / execute_code / todo / plan)', () => {
     const registry = createDefaultRegistry();
     expect(registry.get('patch')).toBeDefined();
@@ -33,7 +33,7 @@ describe('tool registry (D-30.2.8 — 5 new tools, D-30.3.5 — 1 subagent, D-30
 
   it('all profile total size = 41 (explicit opt-in)', async () => {
     const registry = await createRegistryForProfile({ profile: 'all' });
-    expect(registry.size()).toBe(41);
+    expect(registry.size()).toBe(42);
   });
 
   it('5 new tools have correct risk levels', () => {

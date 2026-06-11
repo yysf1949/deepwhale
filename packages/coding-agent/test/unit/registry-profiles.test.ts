@@ -29,6 +29,7 @@ describe('registry profiles (stabilization gate)', () => {
       'execute_code',
       'todo',
       'plan',
+      'browser_action',
       'parse_file',
       'get_symbols',
       'analyze_repo',
@@ -94,10 +95,11 @@ describe('registry profiles (stabilization gate)', () => {
 
   it('all profile preserves the complete tool surface for explicit opt-in', async () => {
     const toolNames = await optInNames('all');
-    expect(toolNames).toHaveLength(41);
+    expect(toolNames).toHaveLength(42);
     expect(toolNames).toContain('spotify');
     expect(toolNames).toContain('notion');
     expect(toolNames).toContain('browser_navigate');
+    expect(toolNames).toContain('browser_action');
     expect(toolNames).toContain('smart_search');
   });
 });

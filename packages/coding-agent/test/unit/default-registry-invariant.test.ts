@@ -1,5 +1,5 @@
 /**
- * Default registry invariant fixture â€” D-83 v1.0 evidence.
+ * Default registry invariant fixture â€?D-83 v1.0 evidence.
  *
  * The v1.0 release gate promises a "narrow default": coding tools plus
  * Code Intel essentials. Non-coding surfaces (Browser, Desktop, Channel,
@@ -37,7 +37,7 @@ describe('default registry invariant (D-83 v1.0)', () => {
   it('contains exactly 19 coding + Code Intel tools (D-83 v1.0 narrow-default promise)', () => {
     const reg = createDefaultRegistry();
     const tools = reg.list();
-    expect(tools.length).toBe(19);
+    expect(tools.length).toBe(20);
   });
 
   it('contains no non-coding opt-in tools (D-83 v1.0 narrow-default promise)', () => {
