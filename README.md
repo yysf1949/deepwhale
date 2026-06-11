@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D120 Gate-1.5 hybrid real Browser evidence runner (recordHybridRealBrowserEvidence)
+- Current sprint: D122 Gate-1.5 hybrid JS action mapping (recordHybridRealBrowserEvidence jsActions)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -96,6 +96,8 @@
 - D118 Gate-1.5 opt-in live Browser evidence batch runner: 1 new recordOptInLiveBrowserEvidenceBatch async function calls the D-117 single-run chain `batchSize` times in a loop with the updated ledger between iterations, advancing the repository ledger 1/20 -> 4/20 (3 more) via a single batch call with a stub adapter; binding remains false (16/20 still pending), 4 new unit tests.
 - D119 Gate-1.5 real HTTP Browser evidence adapter: 1 new recordRealBrowserEvidence async function uses Node's built-in `fetch` to record real network-call evidence for 2 candidate tasks (newsletter-signup fetched from example.com, product-search fetched from iana.org), advancing the repository ledger 4/20 -> 6/20 (2 more REAL evidence); of the 6 cumulative completed live results, 4 are stub-evidence and 2 are real-evidence; binding remains false (14/20 still pending); 4 new unit tests; D-119 adds zero new npm deps.
 - D120 Gate-1.5 hybrid real Browser evidence runner: 1 new recordHybridRealBrowserEvidence async function records 2 HTTP-evidence tasks plus 1 JS-evidence task, advancing repository live result accounting from 6/20 to 9/20; 4 stub + 4 HTTP + 1 JS evidence; binding remains false because 11/20 are still pending; 5 tests cover contiguous and non-contiguous task mappings.
+- D121 Gate-1.5 hybrid evidence alignment: recordHybridRealBrowserEvidence now skips unmapped pending tasks and records explicitly mapped non-contiguous tasks, keeping the repository ledger at 9/20 and binding=false.
+- D122 Gate-1.5 hybrid JS action mapping: recordHybridRealBrowserEvidence accepts optional per-task jsActions so remaining JS evidence can distinguish fill-search-input, click-element, and extract-text actions without changing the 9/20 live-result count.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -121,8 +123,8 @@
 
 ### Next Work
 
-1. D120 Gate-1.5 hybrid real Browser evidence runner is complete: 2 additional HTTP-evidence tasks plus 1 JS-evidence task were recorded, so 9/20 repository live results now exist (4 stub + 4 HTTP + 1 JS); binding remains false (11/20 still pending).
-2. Next implementation slice: D121 Gate-1.5 hybrid real Browser evidence continuation.
+1. D122 Gate-1.5 hybrid JS action mapping is complete: per-task JS actions can now be recorded for future hybrid Browser evidence runs while repository live results remain 9/20; binding remains false (11/20 still pending).
+2. Next implementation slice: D123 Gate-1.5 hybrid evidence accumulation.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
@@ -213,8 +215,9 @@
 - D119 plan: docs/superpowers/plans/2026-06-11-d119-gate15-real-http-browser-evidence-adapter.md
 - D120 plan: docs/superpowers/plans/2026-06-11-d120-gate15-hybrid-real-browser-evidence-runner.md
 - D121 plan: docs/superpowers/plans/2026-06-11-d121-gate15-hybrid-evidence-alignment.md
+- D122 plan: docs/superpowers/plans/2026-06-11-d122-hybrid-js-action-mapping.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D120.
+- Last status hygiene sprint: D122.
 
 <!-- status:current:end -->
 

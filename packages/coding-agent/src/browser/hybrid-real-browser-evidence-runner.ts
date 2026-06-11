@@ -58,6 +58,7 @@ export interface RecordHybridRealBrowserEvidenceInput {
   optIn: boolean;
   taskModes: Readonly<Record<string, HybridTaskMode>>;
   realUrls: Readonly<Record<string, string>>;
+  jsActions?: Readonly<Record<string, HybridJsAction>>;
   fetchFn: RealBrowserFetchFn;
   jsRunnerFn?: HybridJsRunnerFn;
 }
@@ -180,7 +181,8 @@ export async function recordHybridRealBrowserEvidence(
       if (!jsRunnerFn) {
         return skipped(input, 'js-runner-missing', currentLedger);
       }
-      const jsResult = await jsRunnerFn(realUrl, 'fill-search-input');
+      const jsAction = input.jsActions?.[pendingTask.id] ?? 'fill-search-input';
+      const jsResult = await jsRunnerFn(realUrl, jsAction);
       newStatus = jsResult.error === null ? 'success' : 'failed';
       result = { kind: 'js', jsResult };
     }

@@ -182,4 +182,53 @@ describe('Gate-1.5 hybrid real Browser evidence runner (HTTP + JS)', () => {
     expect(evidence.binding).toBe(false);
     expect(evidence.branchDecision).toBe('defer-live-evidence');
   });
+
+  it('passes task-specific JS actions to the injected JS runner', async () => {
+    const ledger = buildLiveBrowserTaskLedger({
+      generatedAt: '2026-06-11T00:00:00.000Z',
+      tasks: makeTwentyTasks().map((task, index) =>
+        index < 9 ? { ...task, status: 'success' as const } : task,
+      ),
+    });
+
+    const evidence = await recordHybridRealBrowserEvidence({
+      generatedAt: '2026-06-11T05:00:00.000Z',
+      ledger,
+      optIn: true,
+      taskModes: {
+        'task-10': 'js',
+        'task-11': 'js',
+      },
+      realUrls: {
+        'task-10': 'https://example.com/dashboard',
+        'task-11': 'https://example.com/admin/table',
+      },
+      jsActions: {
+        'task-10': 'click-element',
+        'task-11': 'extract-text',
+      },
+      fetchFn: okFetch(),
+      jsRunnerFn: async (url, action) => ({
+        action,
+        url,
+        navigated: true,
+        interactedElement: action === 'click-element' ? 'button.close' : 'main',
+        inputValue: null,
+        pageTitle: action === 'click-element' ? 'Dashboard' : 'Table',
+        ms: 120,
+        error: null,
+      }),
+    });
+
+    const jsActions = evidence.runs.map((run) =>
+      run.result.kind === 'js' ? run.result.jsResult.action : null,
+    );
+    expect(evidence.evidenceKind).toBe('hybrid-browser-evidence');
+    expect(evidence.runs.map((run) => run.taskId)).toEqual(['task-10', 'task-11']);
+    expect(jsActions).toEqual(['click-element', 'extract-text']);
+    expect(evidence.totalCompletedBefore).toBe(9);
+    expect(evidence.totalCompletedAfter).toBe(11);
+    expect(evidence.totalPendingAfter).toBe(9);
+    expect(evidence.binding).toBe(false);
+  });
 });
