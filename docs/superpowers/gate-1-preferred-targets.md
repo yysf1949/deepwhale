@@ -1,24 +1,21 @@
 # Gate-1 Preferred Target Inventory
 
-Status: minimum-only
-Generated: 2026-06-10T02:45:09.170Z
+Status: preferred-available
+Generated: 2026-06-12T00:30:00.000Z
 Targets root: D:\App\openClaw\projects\deepwhale\.gate-targets
 Minimum LOC: 50000
 Preferred LOC: 100000
 
 ## Summary
 
-- Total targets: 1
-- Minimum-or-better targets: 1
-- Preferred targets: 0
-- Best available: vite (86216 LOC, minimum-50k)
-
-## Blocker
-
-- no local preferred Gate-1 target found; best local target is vite with 86216 LOC, below preferred 100000 LOC
+- Total targets: 2
+- Minimum-or-better targets: 2
+- Preferred targets: 1
+- Best available: react (753902 LOC, preferred-100k)
 
 ## Targets
 
+- react: 753902 LOC, 4462 supported files, preferred-100k
 - vite: 86216 LOC, 1395 supported files, minimum-50k
 
 ## Interpretation

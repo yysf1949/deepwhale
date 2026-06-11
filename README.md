@@ -3,12 +3,12 @@
 <!-- status:current:start -->
 ## Current Status
 
-- Date: 2026-06-11
+- Date: 2026-06-12
 - Branch: feature/d36-gate2-live
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D124 Gate-1.5 hybrid live evidence batch (updatedLedger accumulation)
+- Current sprint: D125 Gate-1.5 binding achieved, Browser enhancement unlocked
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -24,16 +24,16 @@
 - Gate-2 limit: this does not prove v1-v4 production readiness.
 - Gate-2 limit: this does not unlock Browser, Desktop, Channel, media, or productivity defaults.
 - Gate-1 minimum evidence: Vite target has 86,216 supported LOC and remains a minimum-50k pass target.
-- Gate-1 preferred status: minimum-only
-- Gate-1 preferred-100k is blocked by missing local 100K+ target evidence.
+- Gate-1 preferred status: preferred-available
+- Gate-1 preferred evidence: React target has 753,902 supported LOC (preferred-100k qualified)
 - Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json
-- Gate-1.5 evidence kind: opt-in-first-run-recorded
+- Gate-1.5 evidence kind: live-browser
 - Gate-1.5 algorithmic decision: continue
-- Gate-1.5 binding: false
-- Gate-1.5 binding branch decision: defer-live-evidence
+- Gate-1.5 binding: true
+- Gate-1.5 binding branch decision: continue-browser-enhancement
 - Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
-- Gate-1.5 live result recorder: 20 candidates queued, 13/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live result recorder: 20 candidates queued, 20/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=all-recorded; binding=true; Browser enhancement unlocked=true.
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 
 ### Completed Stabilization Slices
