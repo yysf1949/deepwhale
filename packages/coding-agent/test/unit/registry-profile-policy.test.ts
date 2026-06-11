@@ -58,6 +58,7 @@ describe('registry profile policy (D-57)', () => {
       'execute_code',
       'todo',
       'plan',
+      'browser_action',
       'parse_file',
       'get_symbols',
       'analyze_repo',
