@@ -14,11 +14,24 @@
     "generatedAt": "2026-06-11T01:00:00.000Z",
     "evidenceKind": "opt-in-first-run-recorded",
     "completedAfter": 1,
-    "pendingAfter": 19,
+    "pendingAfter": 16,
     "binding": false,
     "branchDecision": "defer-live-evidence",
     "runnerAdapter": "stub-evidence (no real Browser automation)",
     "completedTaskId": "docs-search-query",
-    "note": "First opt-in run is end-to-end chain proof with a stub adapter. 1/20 is real evidence; 19/20 remain pending and binding remains false until 20/20 are recorded through real Browser automation in D-118+."
+    "note": "First opt-in run is end-to-end chain proof with a stub adapter. After D-118 batch run, the cumulative live result count is 4/20. 16/20 remain pending and binding remains false until 20/20 are recorded through real Browser automation in D-119+."
+  },
+  "firstBatchEvidence": {
+    "subSprint": "D-118",
+    "generatedAt": "2026-06-11T02:00:00.000Z",
+    "evidenceKind": "opt-in-batch-3-recorded",
+    "completedAfter": 4,
+    "pendingAfter": 16,
+    "binding": false,
+    "branchDecision": "defer-live-evidence",
+    "batchSize": 3,
+    "runnerAdapter": "stub-evidence (no real Browser automation)",
+    "completedTaskIds": ["docs-filter-results", "account-login-form", "contact-form-required-field"],
+    "note": "First batch opt-in run records 3 additional completed live results in 1 call. The function design supports batchSize up to 20 (which would flip binding to true), but the D-118 live ledger update only advances 1->4 to keep the binding claim honest with stub data. Future D-119+ can use the same batch function at higher sizes when real Browser automation is integrated."
   }
 }

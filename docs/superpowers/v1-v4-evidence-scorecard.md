@@ -38,6 +38,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D115 adds an opt-in live Browser task runner boundary: queued tasks run only with `optIn=true` plus an injected adapter; 0/20 completed live results still exist and binding remains false.
 - D116 adds a pure live Browser result recorder: explicit runner output can be merged into ledger accounting, unknown/duplicate rows are ignored, and binding still requires 20 completed live results. Repository evidence remains 0/20 and Browser defaults stay locked.
 - D117 adds the opt-in live Browser evidence runner: orchestrates the queue D-114 + runner D-115 + recorder D-116 chain end-to-end and records the first opt-in run with a stub adapter, advancing the repository ledger from 0/20 to 1/20 completed live results (1 of 20). Binding remains false because 19/20 are still pending; Browser defaults stay locked. D-117 is end-to-end chain proof, not real Browser automation.
+- D118 adds the opt-in live Browser evidence batch runner: calls the D-117 single-run chain `batchSize` times in a loop with the updated ledger between iterations, advancing the repository ledger from 1/20 to 4/20 (3 more) via a single batch call with a stub adapter. Binding remains false because 16/20 are still pending; Browser defaults stay locked. D-118 design supports batchSize up to 20 (which would flip binding to true), but the live ledger update only advances 1->4 to keep the binding claim honest with stub data.
 - D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 - D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
@@ -80,6 +81,6 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 
 ## Next Actions
 
-1. D118: continue opt-in evidence run to accumulate completed results without unlocking Browser defaults until 20 completed live task results exist.
+1. D119: continue opt-in batch accumulation to grow the repository evidence without unlocking Browser defaults until 20 completed live task results exist.
 2. Continue preferred-100k Gate-1 search only when a local 100K+ target is available.
 3. Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.

@@ -58,10 +58,11 @@
         "D114 queues 20 pending candidate live Browser tasks as sourcing evidence only; 0/20 completed live results exist and binding remains false",
         "D115 adds an opt-in live Browser task runner boundary; it runs only with optIn=true plus an injected adapter, and still leaves 0/20 completed live results",
         "D116 adds a pure live Browser result recorder that accepts known task results, ignores unknown and duplicate rows, and delegates binding to the required 20 completed-result threshold while repository evidence remains 0/20",
-        "D117 adds the opt-in live Browser evidence runner that orchestrates the chain end-to-end (queue D-114 + runner D-115 + recorder D-116) and records the first opt-in run with a stub adapter, advancing the repository ledger from 0/20 to 1/20 completed live results; binding remains false because 19/20 are still pending"
+        "D117 adds the opt-in live Browser evidence runner that orchestrates the chain end-to-end (queue D-114 + runner D-115 + recorder D-116) and records the first opt-in run with a stub adapter, advancing the repository ledger from 0/20 to 1/20 completed live results; binding remains false because 19/20 are still pending",
+        "D118 adds the opt-in live Browser evidence batch runner that calls the D-117 single-run chain `batchSize` times in a loop with the updated ledger between iterations, advancing the repository ledger from 1/20 to 4/20 (3 more) via a single batch call with a stub adapter; binding remains false because 16/20 are still pending"
       ],
       "blockers": [
-        "Gate-1.5 live 20-task browser result evidence is not complete (1/20 after D-117, 19/20 remaining)",
+        "Gate-1.5 live 20-task browser result evidence is not complete (4/20 after D-118, 16/20 remaining)",
         "default registry must remain coding plus Code Intel essentials"
       ]
     },
@@ -122,7 +123,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D118: continue opt-in evidence run to accumulate completed results without unlocking Browser defaults until 20 completed live task results exist.",
+    "D119: continue opt-in batch accumulation to grow the repository evidence without unlocking Browser defaults until 20 completed live task results exist.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]

@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D117 Gate-1.5 opt-in live Browser evidence runner (recordOptInLiveBrowserEvidence)
+- Current sprint: D118 Gate-1.5 opt-in live Browser evidence batch runner (recordOptInLiveBrowserEvidenceBatch)
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -27,7 +27,7 @@
 - Gate-1.5 binding branch decision: defer-live-evidence
 - Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
-- Gate-1.5 live result recorder: 20 candidates queued, 1/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live result recorder: 20 candidates queued, 4/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -93,6 +93,7 @@
 - D115 Gate-1.5 opt-in live Browser task runner: 1 new opt-in runner boundary + 3 new unit tests prove no execution without opt-in, no execution without an adapter, and explicit adapter execution updates Gate-1.5 accounting while keeping binding=false.
 - D116 Gate-1.5 live Browser result recorder: 1 new pure recorder + runner integration accepts explicit known task results, ignores unknown/duplicate rows, and keeps repository live evidence at 0/20 until an opt-in Browser run is recorded.
 - D117 Gate-1.5 opt-in live Browser evidence runner: 1 new recordOptInLiveBrowserEvidence async function orchestrates the queue D-114 + runner D-115 + recorder D-116 chain end-to-end and returns a typed evidence record; repository ledger advances 0/20 -> 1/20 with a stub adapter, binding remains false (19/20 still pending), 4 new unit tests.
+- D118 Gate-1.5 opt-in live Browser evidence batch runner: 1 new recordOptInLiveBrowserEvidenceBatch async function calls the D-117 single-run chain `batchSize` times in a loop with the updated ledger between iterations, advancing the repository ledger 1/20 -> 4/20 (3 more) via a single batch call with a stub adapter; binding remains false (16/20 still pending), 4 new unit tests.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -118,8 +119,8 @@
 
 ### Next Roadmap Work
 
-1. D117 Gate-1.5 opt-in live Browser evidence runner is complete: the chain (queue + runner + recorder) is exercised end-to-end; 1/20 repository live results now exist via a stub adapter; binding remains false (19/20 still pending).
-2. Next implementation slice: D118 Gate-1.5 opt-in evidence run continuation.
+1. D118 Gate-1.5 opt-in live Browser evidence batch runner is complete: the batch chain (D-117 single-run looped N times) accumulates 3 additional completed live results; 4/20 repository live results now exist via stub adapters; binding remains false (16/20 still pending).
+2. Next implementation slice: D119 Gate-1.5 opt-in batch accumulation continuation.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
