@@ -7,6 +7,7 @@
 
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export type BrowserActionType = 'click' | 'type' | 'submit' | 'scroll' | 'extract' | 'wait';
 
@@ -23,6 +24,7 @@ export class BrowserActionTool implements Tool {
   readonly description =
     'Interact with web pages: click, type, submit, scroll, extract content, wait for elements. Lightweight HTTP-based.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['network'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

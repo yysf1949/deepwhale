@@ -18,9 +18,9 @@ import { createDefaultRegistry } from '../../src/tools/registry.js';
 import { isToolCapability } from '../../src/governance/tool-capabilities.js';
 
 describe('default tool capabilities (D-92 v5.0 plugin governance 2nd evidence)', () => {
-  it('all 19 default tools have capabilities backfilled (D-92)', () => {
+  it('all 20 default tools have capabilities backfilled (D-92)', () => {
     const tools = createDefaultRegistry().list();
-    expect(tools).toHaveLength(19);
+    expect(tools).toHaveLength(20);
 
     for (const tool of tools) {
       // Every tool must declare capabilities (either [] or non-empty).
