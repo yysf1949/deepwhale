@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization
-- Current sprint: D115 Gate-1.5 opt-in live Browser task runner
+- Current sprint: D116 Gate-1.5 live Browser result recorder
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -27,7 +27,7 @@
 - Gate-1.5 binding branch decision: defer-live-evidence.
 - Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json.
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json.
-- Gate-1.5 live task runner: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live result recorder: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=available; binding=false; Browser enhancement unlocked=false.
 - Gate-2 live evidence: passed_live=true.
 - Gate-2 registryProfile=default.
 - Gate-2 toolCalls=31.
@@ -91,6 +91,7 @@
 - D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new validateOidcToken pure function (SSO/OIDC integration: validates claim-level invariants (expiry + issuer + audience) + extracts tenantId + subject; trusts caller's pre-decoded claims; NO JWT signature verification yet) + 1 OidcProvider interface + 1 OidcToken interface + 1 OidcAuthResult interface + 1 OidcValidationOptions interface + 1 OidcAuthDecision union + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.
 - D114 Gate-1.5 live Browser task sourcing: 1 new pure ledger builder + 2 new unit tests queue 20 pending candidate tasks for opt-in live Browser execution while keeping Gate-1.5 binding=false and Browser enhancement locked.
 - D115 Gate-1.5 opt-in live Browser task runner: 1 new opt-in runner boundary + 3 new unit tests prove no execution without opt-in, no execution without an adapter, and explicit adapter execution updates Gate-1.5 accounting while keeping binding=false.
+- D116 Gate-1.5 live Browser result recorder: 1 new pure recorder + runner integration accepts explicit known task results, ignores unknown/duplicate rows, and keeps repository live evidence at 0/20 until an opt-in Browser run is recorded.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -116,8 +117,8 @@
 
 ### Next Roadmap Work
 
-1. D115 Gate-1.5 opt-in live Browser task runner is complete: queued tasks can run only with optIn=true and an explicit adapter; 0/20 completed live results still exist; binding remains false.
-2. Next implementation slice: D116 Gate-1.5 live Browser result recorder.
+1. D116 Gate-1.5 live Browser result recorder is complete: explicit runner output can update ledger accounting through the recorder; 0/20 repository live results still exist; binding remains false.
+2. Next implementation slice: D117 Gate-1.5 opt-in live Browser evidence run.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Re-score v1-v4 only from current tests and gate artifacts.
 5. Keep v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.

@@ -119,6 +119,7 @@ describe('status documentation hygiene (D-56)', () => {
       branchDecision: string;
       browserEnhancementUnlocked: boolean;
       runnerStatus: string;
+      resultRecorderStatus: string;
       reason: string;
       fixtureReport: string;
       tasks: Array<{ id: string; status: string }>;
@@ -138,6 +139,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(ledger.branchDecision).toBe('defer-live-evidence');
     expect(ledger.browserEnhancementUnlocked).toBe(false);
     expect(ledger.runnerStatus).toBe('opt-in-runner-available');
+    expect(ledger.resultRecorderStatus).toBe('available');
     expect(ledger.reason).toContain('20 candidate live Browser tasks are queued and an opt-in runner boundary exists');
     expect(ledger.fixtureReport).toBe('docs/superpowers/gate-1.5-browser-viability.json');
     expect(ledger.tasks).toHaveLength(20);
@@ -148,7 +150,7 @@ describe('status documentation hygiene (D-56)', () => {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
       expect(block).toContain(
-        'Gate-1.5 live task runner: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; binding=false; Browser enhancement unlocked=false.',
+        'Gate-1.5 live result recorder: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=available; binding=false; Browser enhancement unlocked=false.',
       );
     }
   });
@@ -185,7 +187,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D116: record opt-in Gate-1.5 Browser runner results into the live task ledger without unlocking Browser defaults until 20 completed results exist.',
+      'D117: run and record opt-in Gate-1.5 Browser evidence through the live result recorder without unlocking Browser defaults until 20 completed results exist.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
       'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
     ]);
@@ -300,11 +302,11 @@ describe('status documentation hygiene (D-56)', () => {
     expect(previewMd).toMatch(/Status:.*(Planning preview only|In progress)/);
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D115', () => {
+  it('keeps the current sprint and next-work pointers aligned after D116', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D115 Gate-1.5 opt-in live Browser task runner');
+      expect(block).toContain('Current sprint: D116 Gate-1.5 live Browser result recorder');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -356,11 +358,14 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed:');
       expect(block).toContain('D114 Gate-1.5 live Browser task sourcing');
       expect(block).toContain('D115 Gate-1.5 opt-in live Browser task runner');
+      expect(block).toContain('D116 Gate-1.5 live Browser result recorder');
       expect(block).toContain('Gate-1.5 evidence kind: fixture-dry-run');
       expect(block).toContain('Gate-1.5 binding branch decision: defer-live-evidence');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('Next implementation slice: D116 Gate-1.5 live Browser result recorder');
+      expect(block).toContain('Next implementation slice: D117 Gate-1.5 opt-in live Browser evidence run');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D115/i);
+      expect(block).not.toMatch(/Next implementation slice: D116/i);
       expect(block).not.toMatch(/Current sprint: D114/i);
       expect(block).not.toMatch(/Current sprint: D113/i);
       expect(block).not.toMatch(/Next implementation slice: D114 v6\.0/i);

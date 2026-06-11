@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-06-11T00:00:00.000Z",
-  "slice": "D115",
+  "slice": "D116",
   "branch": "feature/d36-gate2-live",
   "evidenceKind": "live-browser-task-sourcing-ledger",
   "status": "queued",
@@ -15,6 +15,7 @@
   "branchDecision": "defer-live-evidence",
   "browserEnhancementUnlocked": false,
   "runnerStatus": "opt-in-runner-available",
+  "resultRecorderStatus": "available",
   "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists, but no completed live Browser result evidence exists in this repository state.",
   "fixtureReport": "docs/superpowers/gate-1.5-browser-viability.json",
   "tasks": [
@@ -182,9 +183,10 @@
   "constraints": [
     "Candidate tasks are sourcing evidence only; they are not completed live Browser evidence.",
     "The runner boundary is available only through explicit opt-in and an injected adapter.",
+    "The result recorder is available for explicit runner output, but the repository ledger still has 0 completed live results.",
     "A binding Browser branch decision still requires 20 completed live Browser task results.",
     "Browser enhancement work stays locked until live evidence is available.",
     "Browser remains opt-in and not default-enabled."
   ],
-  "nextAction": "D116: record opt-in runner results into this ledger without unlocking Browser defaults until 20 completed live task results exist."
+  "nextAction": "D117: run and record opt-in Gate-1.5 Browser evidence through the live result recorder without unlocking Browser defaults until 20 completed live task results exist."
 }

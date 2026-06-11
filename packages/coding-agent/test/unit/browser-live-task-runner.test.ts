@@ -40,6 +40,8 @@ describe('Gate-1.5 opt-in live Browser task runner', () => {
     expect(calls).toBe(0);
     expect(result.status).toBe('skipped-opt-in-required');
     expect(result.attemptedTasks).toBe(0);
+    expect(result.acceptedResults).toBe(0);
+    expect(result.ignoredResults).toEqual([]);
     expect(result.updatedLedger.pendingTasks).toBe(2);
     expect(result.updatedLedger.completedTasks).toBe(0);
   });
@@ -55,6 +57,8 @@ describe('Gate-1.5 opt-in live Browser task runner', () => {
 
     expect(result.status).toBe('skipped-runner-missing');
     expect(result.attemptedTasks).toBe(0);
+    expect(result.acceptedResults).toBe(0);
+    expect(result.ignoredResults).toEqual([]);
     expect(result.updatedLedger.completedTasks).toBe(0);
   });
 
@@ -73,6 +77,8 @@ describe('Gate-1.5 opt-in live Browser task runner', () => {
 
     expect(result.status).toBe('ran');
     expect(result.attemptedTasks).toBe(2);
+    expect(result.acceptedResults).toBe(2);
+    expect(result.ignoredResults).toEqual([]);
     expect(result.results.map((row) => row.status)).toEqual(['success', 'failed']);
     expect(result.updatedLedger.completedTasks).toBe(2);
     expect(result.updatedLedger.successes).toBe(1);

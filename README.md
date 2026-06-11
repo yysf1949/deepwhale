@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D115 Gate-1.5 opt-in live Browser task runner
+- Current sprint: D116 Gate-1.5 live Browser result recorder
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -33,7 +33,7 @@
 - Gate-1.5 binding branch decision: defer-live-evidence
 - Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
-- Gate-1.5 live task runner: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live result recorder: 20 candidates queued, 0/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=available; binding=false; Browser enhancement unlocked=false.
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 
 ### Completed Stabilization Slices
@@ -91,6 +91,7 @@
 - D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new validateOidcToken pure function (SSO/OIDC integration: validates claim-level invariants (expiry + issuer + audience) + extracts tenantId + subject; trusts caller's pre-decoded claims; NO JWT signature verification yet) + 1 OidcProvider interface + 1 OidcToken interface + 1 OidcAuthResult interface + 1 OidcValidationOptions interface + 1 OidcAuthDecision union + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.
 - D114 Gate-1.5 live Browser task sourcing: 1 new pure ledger builder + 2 new unit tests queue 20 pending candidate tasks for opt-in live Browser execution while keeping Gate-1.5 binding=false and Browser enhancement locked.
 - D115 Gate-1.5 opt-in live Browser task runner: 1 new opt-in runner boundary + 3 new unit tests prove no execution without opt-in, no execution without an adapter, and explicit adapter execution updates Gate-1.5 accounting while keeping binding=false.
+- D116 Gate-1.5 live Browser result recorder: 1 new pure recorder + runner integration accepts explicit known task results, ignores unknown/duplicate rows, and keeps repository live evidence at 0/20 until an opt-in Browser run is recorded.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -116,8 +117,8 @@
 
 ### Next Work
 
-1. D115 Gate-1.5 opt-in live Browser task runner is complete: queued tasks can run only with optIn=true and an explicit adapter; 0/20 completed live results still exist; binding remains false.
-2. Next implementation slice: D116 Gate-1.5 live Browser result recorder.
+1. D116 Gate-1.5 live Browser result recorder is complete: explicit runner output can update ledger accounting through the recorder; 0/20 repository live results still exist; binding remains false.
+2. Next implementation slice: D117 Gate-1.5 opt-in live Browser evidence run.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. Treat v5/v6 as planning-preview-only until v1-v4 gaps are evidence-backed.
@@ -202,8 +203,9 @@
 - D113 plan: docs/superpowers/plans/2026-06-10-d113-v6.0-sso-oidc.md
 - D114 plan: docs/superpowers/plans/2026-06-11-d114-gate15-live-browser-task-sourcing.md
 - D115 plan: docs/superpowers/plans/2026-06-11-d115-gate15-opt-in-live-browser-runner.md
+- D116 plan: docs/superpowers/plans/2026-06-11-d116-gate15-live-browser-result-recorder.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D115.
+- Last status hygiene sprint: D116.
 
 <!-- status:current:end -->
 

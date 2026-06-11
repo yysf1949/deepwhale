@@ -4,6 +4,10 @@ import {
   type LiveBrowserTaskRow,
   type LiveBrowserTaskStatus,
 } from './live-task-source.js';
+import {
+  recordLiveBrowserTaskResults,
+  type IgnoredLiveBrowserTaskResult,
+} from './live-task-result-recorder.js';
 
 export interface LiveBrowserTaskRunResult {
   status: Extract<LiveBrowserTaskStatus, 'success' | 'failed'>;
@@ -35,6 +39,8 @@ export interface LiveBrowserTaskRunRow {
 export interface LiveBrowserTaskRunOutput {
   status: LiveBrowserTaskRunStatus;
   attemptedTasks: number;
+  acceptedResults: number;
+  ignoredResults: ReadonlyArray<IgnoredLiveBrowserTaskResult>;
   results: ReadonlyArray<LiveBrowserTaskRunRow>;
   updatedLedger: LiveBrowserTaskLedger;
 }
@@ -63,11 +69,19 @@ export async function runLiveBrowserTasks(input: RunLiveBrowserTasksInput): Prom
     });
   }
 
+  const recorded = recordLiveBrowserTaskResults({
+    generatedAt: input.generatedAt,
+    ledger: input.ledger,
+    results,
+  });
+
   return {
     status: 'ran',
     attemptedTasks: results.length,
+    acceptedResults: recorded.acceptedResults,
+    ignoredResults: recorded.ignoredResults,
     results,
-    updatedLedger: updateLedger(input, results),
+    updatedLedger: recorded.updatedLedger,
   };
 }
 
@@ -75,6 +89,8 @@ function skipped(status: Exclude<LiveBrowserTaskRunStatus, 'ran'>, input: RunLiv
   return {
     status,
     attemptedTasks: 0,
+    acceptedResults: 0,
+    ignoredResults: [],
     results: [],
     updatedLedger: buildLiveBrowserTaskLedger({
       generatedAt: input.generatedAt,
@@ -82,16 +98,4 @@ function skipped(status: Exclude<LiveBrowserTaskRunStatus, 'ran'>, input: RunLiv
       tasks: input.ledger.tasks,
     }),
   };
-}
-
-function updateLedger(input: RunLiveBrowserTasksInput, results: ReadonlyArray<LiveBrowserTaskRunRow>): LiveBrowserTaskLedger {
-  const byId = new Map(results.map((result) => [result.id, result.status] as const));
-  return buildLiveBrowserTaskLedger({
-    generatedAt: input.generatedAt,
-    requiredTasks: input.ledger.requiredTasks,
-    tasks: input.ledger.tasks.map((task) => ({
-      ...task,
-      status: byId.get(task.id) ?? task.status,
-    })),
-  });
 }
