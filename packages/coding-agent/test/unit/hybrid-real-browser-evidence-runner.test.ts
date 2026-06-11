@@ -284,4 +284,69 @@ describe('Gate-1.5 hybrid real Browser evidence runner (HTTP + JS)', () => {
     expect(evidence.updatedLedger.browserEnhancementUnlocked).toBe(true);
     expect(evidence.updatedLedger.status).toBe('ready-for-binding-decision');
   });
+
+  it('chains D124 hybrid batches through updatedLedger without unlocking Browser defaults', async () => {
+    const ledger = buildLiveBrowserTaskLedger({
+      generatedAt: '2026-06-11T00:00:00.000Z',
+      tasks: makeTwentyTasks().map((task, index) =>
+        index < 9 ? { ...task, status: 'success' as const } : task,
+      ),
+    });
+
+    const firstEvidence = await recordHybridRealBrowserEvidence({
+      generatedAt: '2026-06-11T07:00:00.000Z',
+      ledger,
+      optIn: true,
+      taskModes: {
+        'task-10': 'http',
+        'task-11': 'js',
+      },
+      realUrls: {
+        'task-10': 'https://example.com/',
+        'task-11': 'https://example.com/cart',
+      },
+      jsActions: {
+        'task-11': 'click-element',
+      },
+      fetchFn: okFetch(),
+      jsRunnerFn: okJsRunner(),
+    });
+    const secondEvidence = await recordHybridRealBrowserEvidence({
+      generatedAt: '2026-06-11T07:05:00.000Z',
+      ledger: firstEvidence.updatedLedger,
+      optIn: true,
+      taskModes: {
+        'task-12': 'http',
+        'task-13': 'js',
+      },
+      realUrls: {
+        'task-12': 'https://www.iana.org/',
+        'task-13': 'https://example.com/admin/table',
+      },
+      jsActions: {
+        'task-13': 'extract-text',
+      },
+      fetchFn: okFetch(),
+      jsRunnerFn: okJsRunner(),
+    });
+
+    expect(firstEvidence.runs.map((run) => run.taskId)).toEqual(['task-10', 'task-11']);
+    expect(firstEvidence.totalCompletedBefore).toBe(9);
+    expect(firstEvidence.totalCompletedAfter).toBe(11);
+    expect(firstEvidence.updatedLedger.completedTasks).toBe(11);
+    expect(firstEvidence.binding).toBe(false);
+    expect(firstEvidence.branchDecision).toBe('defer-live-evidence');
+
+    expect(secondEvidence.runs.map((run) => run.taskId)).toEqual(['task-12', 'task-13']);
+    expect(secondEvidence.totalCompletedBefore).toBe(11);
+    expect(secondEvidence.totalCompletedAfter).toBe(13);
+    expect(secondEvidence.totalPendingAfter).toBe(7);
+    expect(secondEvidence.updatedLedger.completedTasks).toBe(13);
+    expect(secondEvidence.updatedLedger.pendingTasks).toBe(7);
+    expect(secondEvidence.updatedLedger.successRate).toBe(1);
+    expect(secondEvidence.binding).toBe(false);
+    expect(secondEvidence.branchDecision).toBe('defer-live-evidence');
+    expect(secondEvidence.updatedLedger.browserEnhancementUnlocked).toBe(false);
+    expect(secondEvidence.updatedLedger.status).toBe('partial-results');
+  });
 });

@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D123 Gate-1.5 hybrid updated ledger accumulation (recordHybridRealBrowserEvidence updatedLedger)
+- Current sprint: D124 Gate-1.5 hybrid live evidence batch (updatedLedger accumulation)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -33,7 +33,7 @@
 - Gate-1.5 binding branch decision: defer-live-evidence
 - Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
-- Gate-1.5 live result recorder: 20 candidates queued, 9/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
+- Gate-1.5 live result recorder: 20 candidates queued, 13/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=first-result-recorded; binding=false; Browser enhancement unlocked=false.
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 
 ### Completed Stabilization Slices
@@ -99,6 +99,7 @@
 - D121 Gate-1.5 hybrid evidence alignment: recordHybridRealBrowserEvidence now skips unmapped pending tasks and records explicitly mapped non-contiguous tasks, keeping the repository ledger at 9/20 and binding=false.
 - D122 Gate-1.5 hybrid JS action mapping: recordHybridRealBrowserEvidence accepts optional per-task jsActions so remaining JS evidence can distinguish fill-search-input, click-element, and extract-text actions without changing the 9/20 live-result count.
 - D123 Gate-1.5 hybrid updated ledger accumulation: recordHybridRealBrowserEvidence now returns a recomputed updatedLedger and recalculates binding/branchDecision from the ledger builder, enabling future hybrid batches to carry threshold state forward without changing the 9/20 live-result count.
+- D124 Gate-1.5 hybrid live evidence batch: updatedLedger accumulation records 4 additional live Browser evidence results, advancing repository evidence from 9/20 to 13/20 while binding remains false and Browser defaults stay locked.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -124,8 +125,8 @@
 
 ### Next Work
 
-1. D123 Gate-1.5 hybrid updated ledger accumulation is complete: hybrid Browser evidence now carries a recomputed updatedLedger for future batches while repository live results remain 9/20; binding remains false (11/20 still pending).
-2. Next implementation slice: D124 Gate-1.5 hybrid live evidence batch.
+1. D124 Gate-1.5 hybrid live evidence batch is complete: updatedLedger accumulation recorded 4 additional live Browser evidence results, advancing repository live results from 9/20 to 13/20 while binding remains false (7/20 still pending).
+2. Next implementation slice: D125 Gate-1.5 hybrid live evidence continuation.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
@@ -218,8 +219,9 @@
 - D121 plan: docs/superpowers/plans/2026-06-11-d121-gate15-hybrid-evidence-alignment.md
 - D122 plan: docs/superpowers/plans/2026-06-11-d122-hybrid-js-action-mapping.md
 - D123 plan: docs/superpowers/plans/2026-06-11-d123-hybrid-updated-ledger.md
+- D124 plan: docs/superpowers/plans/2026-06-11-d124-hybrid-live-evidence-batch.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D123.
+- Last status hygiene sprint: D124.
 
 <!-- status:current:end -->
 

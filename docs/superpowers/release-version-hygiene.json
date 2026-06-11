@@ -24,5 +24,5 @@
     "Future release claims must cite a machine-readable report or verified command output.",
     "v1-v4 remain capability milestones until gate evidence proves completion."
   ],
-  "nextAction": "D124: run the next hybrid live Browser evidence batch using updatedLedger accumulation without unlocking Browser defaults until 20 completed live task results exist."
+  "nextAction": "D125: continue hybrid live Browser evidence accumulation without unlocking Browser defaults until 20 completed live task results exist."
 }

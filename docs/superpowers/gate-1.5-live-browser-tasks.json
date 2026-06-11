@@ -1,22 +1,22 @@
 {
-  "generatedAt": "2026-06-11T00:00:00.000Z",
-  "slice": "D123",
+  "generatedAt": "2026-06-11T07:00:00.000Z",
+  "slice": "D124",
   "branch": "feature/d36-gate2-live",
   "evidenceKind": "live-browser-task-sourcing-ledger",
   "status": "partial-results",
   "requiredTasks": 20,
   "candidateTasks": 20,
-  "pendingTasks": 11,
-  "completedTasks": 9,
-  "successes": 9,
+  "pendingTasks": 7,
+  "completedTasks": 13,
+  "successes": 13,
   "failures": 0,
-  "successRate": 0.45,
+  "successRate": 1,
   "binding": false,
   "branchDecision": "defer-live-evidence",
   "browserEnhancementUnlocked": false,
   "runnerStatus": "opt-in-runner-available",
   "resultRecorderStatus": "first-result-recorded",
-  "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists; 9 of 20 have been recorded as completed: 4 via D-117/D-118 stub adapters (docs-search-query, docs-filter-results, account-login-form, contact-form-required-field), 2 via D-119 real HTTP fetch (newsletter-signup fetched from https://example.com/ with status=200 title='Example Domain'; product-search fetched from https://www.iana.org/ with status=200 title='Internet Assigned Numbers Authority'), and 3 via D-120 hybrid evidence (product-sort + cart-add-item recorded as HTTP-evidence; keyboard-search-shortcut recorded as JS-evidence). D-121 fixes non-contiguous hybrid task mapping, D-122 adds per-task JS action mapping, and D-123 makes hybrid evidence return a recomputed updatedLedger for future evidence batches, but none increases the completed live-result count. Repository evidence is 9/20 completed live results, partial-results status reached, binding remains false because 11 completed live results are still required.",
+  "reason": "20 candidate live Browser tasks are queued and an opt-in runner boundary exists; 13 of 20 have been recorded as completed: 4 via D-117/D-118 stub adapters (docs-search-query, docs-filter-results, account-login-form, contact-form-required-field), 4 via D-119/D-120 real HTTP fetch (newsletter-signup, product-search, product-sort, cart-add-item), 1 via D-120 JS evidence (keyboard-search-shortcut), and D-124 added 4 live evidence results: cart-update-quantity (real-fetch from https://example.com/), checkout-address-validation (real-js click-element on https://example.com/), table-filter (real-fetch from https://www.iana.org/), and table-pagination (real-js extract-text on https://www.iana.org/). D-121 fixes non-contiguous hybrid task mapping, D-122 adds per-task JS action mapping, and D-123 makes hybrid evidence return a recomputed updatedLedger for future evidence batches, and D-124 advances the cumulative live-result count by 4 through updatedLedger accumulation. Repository evidence is 13/20 completed live results, partial-results status reached, binding remains false because 7 completed live results are still required.",
   "fixtureReport": "docs/superpowers/gate-1.5-browser-viability.json",
   "tasks": [
     {
@@ -141,7 +141,18 @@
       "url": "https://example.com/cart",
       "goal": "Update an item quantity in a cart and verify the subtotal updates.",
       "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-124",
+      "evidenceKind": "real-fetch",
+      "realFetchResult": {
+        "fetchedAt": "2026-06-11T07:00:00.000Z",
+        "fetchedUrl": "https://example.com/",
+        "status": 200,
+        "contentType": "text/html",
+        "bodyLen": 559,
+        "title": "Example Domain",
+        "ms": 973
+      }
     },
     {
       "id": "checkout-address-validation",
@@ -149,7 +160,20 @@
       "url": "https://example.com/checkout",
       "goal": "Enter an incomplete shipping address and observe the validation message.",
       "requiredCapabilities": ["browser.navigate", "browser.type", "browser.click"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-124",
+      "evidenceKind": "real-js",
+      "hybridJsResult": {
+        "ranAt": "2026-06-11T07:00:01.000Z",
+        "url": "https://example.com/",
+        "action": "click-element",
+        "navigated": true,
+        "interactedElement": "a[href]",
+        "inputValue": null,
+        "pageTitle": "Example Domain",
+        "ms": 1005,
+        "textSample": "Example Domain\n\nThis domain is for use in documentation examples without needing"
+      }
     },
     {
       "id": "table-filter",
@@ -157,7 +181,18 @@
       "url": "https://example.com/admin/table",
       "goal": "Filter a data table by text and verify non-matching rows disappear.",
       "requiredCapabilities": ["browser.navigate", "browser.type"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-124",
+      "evidenceKind": "real-fetch",
+      "realFetchResult": {
+        "fetchedAt": "2026-06-11T07:00:02.000Z",
+        "fetchedUrl": "https://www.iana.org/",
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bodyLen": 6140,
+        "title": "Internet Assigned Numbers Authority",
+        "ms": 1091
+      }
     },
     {
       "id": "table-pagination",
@@ -165,7 +200,20 @@
       "url": "https://example.com/admin/table",
       "goal": "Move to the next page of a paginated table and verify the page indicator changes.",
       "requiredCapabilities": ["browser.navigate", "browser.click"],
-      "status": "pending"
+      "status": "success",
+      "evidenceSubSprint": "D-124",
+      "evidenceKind": "real-js",
+      "hybridJsResult": {
+        "ranAt": "2026-06-11T07:00:03.000Z",
+        "url": "https://www.iana.org/",
+        "action": "extract-text",
+        "navigated": true,
+        "interactedElement": "body",
+        "inputValue": null,
+        "pageTitle": "Internet Assigned Numbers Authority",
+        "ms": 8029,
+        "textSample": "Domain Names\n\nManagement of the DNS Root Zone (assignments of ccTLDs and gTLDs) along with other functions such as the ."
+      }
     },
     {
       "id": "settings-toggle",
@@ -247,10 +295,10 @@
   "constraints": [
     "Candidate tasks are sourcing evidence only; they are not completed live Browser evidence.",
     "The runner boundary is available only through explicit opt-in and an injected adapter.",
-    "The result recorder is available for explicit runner output. D-117 records 1 task (1/20) via stub adapter, D-118 records 3 more tasks (4/20 cumulative) via a batch evidence runner with stub adapters, D-119 records 2 more tasks (6/20 cumulative) via a real HTTP Browser adapter that fetches example.com and iana.org with Node built-in fetch, and D-120 records 3 more tasks (9/20 cumulative) via hybrid HTTP+JS evidence. D-121 fixes non-contiguous hybrid task mapping, D-122 adds per-task JS action mapping for future hybrid evidence runs, and D-123 makes hybrid evidence return a recomputed updatedLedger for future batches. Of the 9 successful tasks, 4 are stub-evidence (D-117/118), 4 are HTTP-evidence (D-119/120), and 1 is JS-evidence (D-120). 11/20 remain pending and binding is still false.",
+    "The result recorder is available for explicit runner output. D-117 records 1 task (1/20) via stub adapter, D-118 records 3 more tasks (4/20 cumulative) via a batch evidence runner with stub adapters, D-119 records 2 more tasks (6/20 cumulative) via a real HTTP Browser adapter that fetches example.com and iana.org with Node built-in fetch, D-120 records 3 more tasks (9/20 cumulative) via hybrid HTTP+JS evidence, and D-124 records 4 more tasks (13/20 cumulative) via updatedLedger accumulation through recordHybridRealBrowserEvidence. D-121 fixes non-contiguous hybrid task mapping, D-122 adds per-task JS action mapping for future hybrid evidence runs, D-123 makes hybrid evidence return a recomputed updatedLedger for future batches, and D-124 consumes that updatedLedger to advance the cumulative count from 9/20 to 13/20. Of the 13 successful tasks, 4 are stub-evidence (D-117/118), 6 are HTTP-evidence (D-119/120/124), and 3 are JS-evidence (D-120/124). 7/20 remain pending and binding is still false.",
     "A binding Browser branch decision still requires 20 completed live Browser task results.",
     "Browser enhancement work stays locked until live evidence is available.",
     "Browser remains opt-in and not default-enabled."
   ],
-  "nextAction": "D124: run the next hybrid live Browser evidence batch using updatedLedger accumulation without unlocking Browser defaults until 20 completed live task results exist."
+  "nextAction": "D125: continue hybrid live Browser evidence accumulation without unlocking Browser defaults until 20 completed live task results exist."
 }

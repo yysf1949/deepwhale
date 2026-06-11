@@ -48,7 +48,7 @@
     {
       "id": "v2.0",
       "percent": 45,
-      "status": "memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing, opt-in runner/recorder boundaries, stub evidence, real HTTP evidence, and hybrid real Browser evidence now record 9/20 completed live results; D-121/D-123 improve hybrid accumulation mechanics without increasing the live-result count",
+      "status": "memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing, opt-in runner/recorder boundaries, stub evidence, real HTTP evidence, hybrid real Browser evidence, and D-124 updatedLedger accumulation now record 13/20 completed live results; D-121/D-123 improve hybrid accumulation mechanics and D-124 consumes that machinery to advance the cumulative live-result count",
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
@@ -64,10 +64,11 @@
         "D120 adds the hybrid real Browser evidence runner that records 2 additional HTTP-evidence tasks plus 1 JS-evidence task, advancing the repository ledger from 6/20 to 9/20; cumulative evidence is 4 stub + 4 HTTP + 1 JS result, and binding remains false because 11/20 are still pending",
         "D121 fixes hybrid evidence accumulation for non-contiguous mapped pending tasks so future runs can skip unmapped pending rows without aborting; this keeps repository evidence at 9/20 and binding=false",
         "D122 adds optional per-task JS action mapping to recordHybridRealBrowserEvidence so remaining JS evidence can distinguish fill-search-input, click-element, and extract-text actions; this keeps repository evidence at 9/20 and binding=false",
-        "D123 makes recordHybridRealBrowserEvidence return a recomputed updatedLedger and recalculates binding/branchDecision through the live Browser ledger builder; this keeps repository evidence at 9/20 and binding=false"
+        "D123 makes recordHybridRealBrowserEvidence return a recomputed updatedLedger and recalculates binding/branchDecision through the live Browser ledger builder; this keeps repository evidence at 9/20 and binding=false",
+        "D124 chains two updatedLedger accumulation runs of recordHybridRealBrowserEvidence to record 4 additional live evidence results (cart-update-quantity as HTTP-evidence from https://example.com/, checkout-address-validation as JS click-element on https://example.com/, table-filter as HTTP-evidence from https://www.iana.org/, and table-pagination as JS extract-text on https://www.iana.org/), advancing the repository ledger from 9/20 to 13/20; cumulative evidence is 4 stub + 6 HTTP + 3 JS, and binding remains false because 7/20 are still pending"
       ],
       "blockers": [
-        "Gate-1.5 live 20-task browser result evidence is not complete (9/20 after D-123, 11/20 remaining)",
+        "Gate-1.5 live 20-task browser result evidence is not complete (13/20 after D-124, 7/20 remaining)",
         "default registry must remain coding plus Code Intel essentials"
       ]
     },
@@ -128,7 +129,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D124: run the next hybrid live Browser evidence batch using updatedLedger accumulation without unlocking Browser defaults until 20 completed live task results exist.",
+    "D125: continue hybrid live Browser evidence accumulation without unlocking Browser defaults until 20 completed live task results exist.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]
