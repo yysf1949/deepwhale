@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
 
-describe('registry (D-32.1.7 â€?4 code-intel tools)', () => {
+describe('registry (D-32.1.7 code-intel tools)', () => {
   it('default profile contains coding + code-intel essentials only', () => {
     const reg = createDefaultRegistry();
-    expect(reg.size()).toBe(20);
+    expect(reg.size()).toBe(21);
   });
 
   it('code-intel profile registers parse_file / get_symbols / analyze_repo / find_definition', () => {

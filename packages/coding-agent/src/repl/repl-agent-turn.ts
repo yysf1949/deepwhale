@@ -46,7 +46,7 @@ import {
   type AgentCompactionConfig,
   type ToolLoopResult,
 } from '../agent/index.js';
-import type { Reviewer, TaskGraphRecorder, Planner, RunCommandWithReviewOptions } from '../agent/tool-loop-policy.js';
+import type { Reviewer, TaskGraphRecorder, Planner } from '../agent/tool-loop-policy.js';
 import { staticToolPolicy } from '../policy/static-rules.js';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { formatError } from './repl-format-error.js';

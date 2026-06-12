@@ -4,7 +4,7 @@ import { createRegistryForProfile } from '../../src/tools/registry.js';
 describe('registry engineering profile (legacy opt-in)', () => {
   it('keeps the all profile at the explicit full surface count', async () => {
     const reg = await createRegistryForProfile({ profile: 'all' });
-    expect(reg.size()).toBe(42);
+    expect(reg.size()).toBe(43);
   });
 
   it('registers GitHub PR workflow only when engineering is explicitly selected', async () => {

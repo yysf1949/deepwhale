@@ -17,7 +17,7 @@ import type { ToolPolicy } from '../policy/types.js';
 import { createDefaultRegistry } from '../tools/registry.js';
 import { runToolLoop, type ToolLoopResult } from '../agent/tool-loop.js';
 import { TaskGraphStore, type TaskGraphNode } from './taskgraph.js';
-import type { Plan, PlannedTask } from '../planner/planner.js';
+import type { Plan } from '../planner/planner.js';
 
 export interface OrchestratorOptions {
   readonly client: LLMClient;

@@ -28,7 +28,7 @@ describe('ToolRegistry.listByCapability (D-93 v5.0 plugin governance 3rd evidenc
   it('returns the correct subset of default tools for code-execute (D-93)', () => {
     const registry = createDefaultRegistry();
     const tools = registry.listByCapability('code-execute');
-    expect(tools.map((t) => t.name)).toEqual(['execute_code']);
+    expect(tools.map((t) => t.name)).toEqual(['execute_code', 'browser_js']);
   });
 
   it('returns the 4 read+modify tools for file-write (D-93)', () => {

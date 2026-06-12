@@ -30,6 +30,7 @@ describe('registry profiles (stabilization gate)', () => {
       'todo',
       'plan',
       'browser_action',
+      'browser_js',
       'parse_file',
       'get_symbols',
       'analyze_repo',
@@ -95,7 +96,7 @@ describe('registry profiles (stabilization gate)', () => {
 
   it('all profile preserves the complete tool surface for explicit opt-in', async () => {
     const toolNames = await optInNames('all');
-    expect(toolNames).toHaveLength(42);
+    expect(toolNames).toHaveLength(43);
     expect(toolNames).toContain('spotify');
     expect(toolNames).toContain('notion');
     expect(toolNames).toContain('browser_navigate');
