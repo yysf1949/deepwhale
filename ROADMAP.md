@@ -7,8 +7,8 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
-- Roadmap mode: gate-driven stabilization
-- Current sprint: D125 Gate-1.5 hybrid live evidence continuation (updatedLedger accumulation)
+- Roadmap mode: gate-driven stabilization + v2.0 Tier-1 implementation
+- Current sprint: D126 Browser Tier-1 foundation implementation
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -101,6 +101,7 @@
 - D123 Gate-1.5 hybrid updated ledger accumulation: recordHybridRealBrowserEvidence now returns a recomputed updatedLedger and recalculates binding/branchDecision from the ledger builder, enabling future hybrid batches to carry threshold state forward without changing the 9/20 live-result count.
 - D124 Gate-1.5 hybrid live evidence batch: updatedLedger accumulation records 4 additional live Browser evidence results, advancing repository evidence from 9/20 to 13/20 while binding remains false and Browser defaults stay locked.
 - D125 Gate-1.5 hybrid live evidence continuation: final 7 tasks recorded via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20; binding=true, Browser enhancement unlocked.
+- D126 Browser Tier-1 foundation: pure TypeScript helpers now provide richer semantic DOM extraction, structured page summaries, deterministic element ranking with reasons/scores, bounded action history, repeated-action detection, and planner repeat avoidance while keeping Browser defaults narrow.
 - D129 v5.0 3rd-cycle depth: audit correlationId + policy-snapshot CLI command.
 - D130 v6.0 enterprise cross-bridge + distributed coordination seed: EnterprisePolicySnapshot + LeaderElector.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
@@ -110,7 +111,7 @@
 | --- | --- | --- |
 | v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (Gate-2 production proof, cross-platform Desktop, cross-platform SIGKILL) |
 | v1.5 | Code Intel foundation exists; preferred 100K Gate-1 evidence via React target (753K LOC) | rename_symbol is heuristic, not IDE-grade |
-| v2.0 | Gate-1.5 binding achieved at 20/20; Browser enhancement unlocked | v2.0 Tier-1 implementation not started |
+| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history | Memory Ranking and Code Intelligence enhancement remain; D126 is not production Browser automation proof |
 | v2.5 | Planner, task DAG, and plan cache exist | Main-loop integration is limited |
 | v3.0 | Reviewer and Gate-2 live runner exist | Long-horizon proof must remain reproducible and scoped |
 | v4.0 | Researcher, TaskGraph, memory, and channel foundations exist | Agent OS orchestration, Desktop, and channels are not production-complete |
@@ -128,8 +129,8 @@
 
 ### Next Roadmap Work
 
-1. D125 Gate-1.5 hybrid live evidence continuation is complete: final 7 tasks recorded, advancing repository live results from 13/20 to 20/20; binding=true, Browser enhancement unlocked.
-2. Next implementation slice: D126 v2.0 Tier-1 Browser Agent foundation implementation.
+1. D126 Browser Tier-1 foundation is complete at the pure-function layer: observation, summary, ranking, and history tests cover the new behavior.
+2. Next implementation slice: D127 v2.0 Tier-1 Memory Ranking and Code Intelligence enhancement.
 3. Gate-1 preferred-100K evidence remains blocked by missing local 100K+ target.
 4. Gate-2 production long-horizon proof remains a separate future blocker.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.

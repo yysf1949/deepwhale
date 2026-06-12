@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D125 Gate-1.5 hybrid live evidence continuation (updatedLedger accumulation)
+- Current sprint: D126 Browser Tier-1 foundation implementation
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -111,6 +111,7 @@
 - D123 Gate-1.5 hybrid updated ledger accumulation: recordHybridRealBrowserEvidence now returns a recomputed updatedLedger and recalculates binding/branchDecision from the ledger builder, enabling future hybrid batches to carry threshold state forward without changing the 9/20 live-result count.
 - D124 Gate-1.5 hybrid live evidence batch: updatedLedger accumulation records 4 additional live Browser evidence results, advancing repository evidence from 9/20 to 13/20 while binding remains false and Browser defaults stay locked.
 - D125 Gate-1.5 hybrid live evidence continuation: final 7 tasks recorded via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20; binding=true, Browser enhancement unlocked.
+- D126 Browser Tier-1 foundation: pure TypeScript helpers now provide richer semantic DOM extraction, structured page summaries, deterministic element ranking with reasons/scores, bounded action history, repeated-action detection, and planner repeat avoidance while keeping Browser defaults narrow.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -128,10 +129,10 @@
 
 ### Next Decisions Needed
 
-1. D124 Gate-1.5 hybrid live evidence batch is complete: updatedLedger accumulation recorded 4 additional live Browser evidence results, advancing repository live results from 9/20 to 13/20 while binding remains false (7/20 still pending).
-2. Next implementation slice: D126 v2.0 Tier-1 Browser Agent foundation implementation.
-3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
-4. Re-score v1-v4 after current gate evidence changes.
+1. D126 Browser Tier-1 foundation is complete at the pure-function layer: observation, summary, ranking, and history tests cover the new behavior.
+2. Next implementation slice: D127 v2.0 Tier-1 Memory Ranking and Code Intelligence enhancement.
+3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
+4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
 6. v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json.
 

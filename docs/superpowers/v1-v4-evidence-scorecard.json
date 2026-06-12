@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-11T00:00:00.000Z",
+  "generatedAt": "2026-06-12T00:00:00.000Z",
   "basis": {
     "branch": "feature/d36-gate2-live",
     "packageVersionLine": "2.3.0",
@@ -47,8 +47,8 @@
     },
     {
       "id": "v2.0",
-      "percent": 55,
-      "status": "memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D-125 completes the final 7 tasks via real HTTP fetch evidence",
+      "percent": 60,
+      "status": "memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D126 adds Browser Tier-1 pure-function foundation for DOM understanding, element ranking, page summary, and action history",
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
@@ -66,10 +66,13 @@
         "D122 adds optional per-task JS action mapping to recordHybridRealBrowserEvidence so remaining JS evidence can distinguish fill-search-input, click-element, and extract-text actions; this keeps repository evidence at 9/20 and binding=false",
         "D123 makes recordHybridRealBrowserEvidence return a recomputed updatedLedger and recalculates binding/branchDecision through the live Browser ledger builder; this keeps repository evidence at 9/20 and binding=false",
         "D124 chains two updatedLedger accumulation runs of recordHybridRealBrowserEvidence to record 4 additional live evidence results (cart-update-quantity as HTTP-evidence from https://example.com/, checkout-address-validation as JS click-element on https://example.com/, table-filter as HTTP-evidence from https://www.iana.org/, and table-pagination as JS extract-text on https://www.iana.org/), advancing the repository ledger from 9/20 to 13/20; cumulative evidence is 4 stub + 6 HTTP + 3 JS, and binding remains false because 7/20 are still pending",
-        "D125 completes the final 7 live Browser tasks (settings-toggle, profile-edit, modal-open-close, tabs-switch, breadcrumb-navigation, download-link-detection, error-page-recovery) via real HTTP fetch evidence, advancing the repository ledger from 13/20 to 20/20; binding becomes true and browserEnhancementUnlocked becomes true"
+        "D125 completes the final 7 live Browser tasks (settings-toggle, profile-edit, modal-open-close, tabs-switch, breadcrumb-navigation, download-link-detection, error-page-recovery) via real HTTP fetch evidence, advancing the repository ledger from 13/20 to 20/20; binding becomes true and browserEnhancementUnlocked becomes true",
+        "D126 implements the first Browser Tier-1 foundation slice as pure TypeScript helpers: richer semantic DOM extraction, pageSummary, deterministic rankElementsForIntent candidates with reasons/scores, bounded action history, repeated-action detection, and planner selection that avoids repeating the same target when alternatives exist (verified by Browser unit tests)"
       ],
       "blockers": [
-        "default registry must remain coding plus Code Intel essentials"
+        "default registry must remain coding plus Code Intel essentials",
+        "Memory Ranking and Code Intelligence enhancement are still required for full v2.0 Tier-1 completion",
+        "D126 is pure foundation evidence, not a production Browser automation or visual-grounding proof"
       ]
     },
     {
@@ -129,7 +132,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D126: Gate-1.5 binding achieved, Browser enhancement unlocked. Proceed to v2.0 Tier-1 implementation.",
+    "D127: continue v2.0 Tier-1 with Memory Ranking and Code Intelligence enhancement, keeping Browser default exposure narrow.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]

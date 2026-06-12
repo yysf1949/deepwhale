@@ -1,4 +1,11 @@
-import type { Observation, VisibleElement } from './observation.js';
+import {
+  describeElementTarget,
+  isRepeatedAction,
+  rankElementsForIntent,
+  type Observation,
+  type RankedElement,
+  type SemanticKind,
+} from './observation.js';
 
 export interface PlanBrowserActionInput {
   userIntent: string;
@@ -8,6 +15,18 @@ export interface PlanBrowserActionInput {
 export interface BrowserActionPlan {
   type: 'click' | 'type' | 'navigate' | 'noop';
   target: string;
+  reason?: string;
+  rankedTargets?: BrowserActionCandidate[];
+  repeated?: boolean;
+}
+
+export interface BrowserActionCandidate {
+  target: string;
+  semanticKind?: SemanticKind;
+  selector?: string;
+  score: number;
+  repeated: boolean;
+  reason: string;
 }
 
 const TYPE_KEYWORDS = ['type', 'enter', 'input', 'fill'];
@@ -22,17 +41,66 @@ function classify(intent: string): BrowserActionPlan['type'] {
   return 'noop';
 }
 
-function pickTarget(intent: string, elements: ReadonlyArray<VisibleElement>): string {
-  const lower = intent.toLowerCase();
-  for (const el of elements) {
-    if (el.text && lower.includes(el.text.toLowerCase())) return el.text;
-    if (el.ariaLabel && lower.includes(el.ariaLabel.toLowerCase())) return el.ariaLabel;
+function toCandidate(ranked: RankedElement): BrowserActionCandidate {
+  const candidate: BrowserActionCandidate = {
+    target: ranked.target,
+    score: ranked.score,
+    repeated: ranked.repeated,
+    reason: ranked.reason,
+  };
+  if (ranked.element.semanticKind !== undefined) {
+    candidate.semanticKind = ranked.element.semanticKind;
   }
-  return elements[0]?.text ?? elements[0]?.ariaLabel ?? '';
+  if (ranked.element.selector !== undefined) {
+    candidate.selector = ranked.element.selector;
+  }
+  return candidate;
+}
+
+function pickRankedTarget(
+  type: BrowserActionPlan['type'],
+  ranked: ReadonlyArray<RankedElement>,
+  history: Observation['actionHistory'],
+): { selected?: RankedElement; rankedTargets: BrowserActionCandidate[]; repeated: boolean } {
+  const candidates = ranked.filter((item) => item.target.length > 0);
+  const rankedTargets = candidates.slice(0, 5).map(toCandidate);
+  if (type === 'noop') {
+    return { rankedTargets, repeated: false };
+  }
+
+  const selected = candidates.find((item) => !item.repeated) ?? candidates[0];
+  if (!selected) {
+    return { rankedTargets, repeated: false };
+  }
+
+  const target = describeElementTarget(selected.element);
+  return {
+    selected,
+    rankedTargets,
+    repeated: isRepeatedAction(history, type, target),
+  };
 }
 
 export function planBrowserAction(input: PlanBrowserActionInput): BrowserActionPlan {
   const type = classify(input.userIntent);
-  const target = pickTarget(input.userIntent, input.observation.visibleElements);
-  return { type, target };
+  const ranked = rankElementsForIntent({
+    type,
+    userIntent: input.userIntent,
+    elements: input.observation.visibleElements,
+    actionHistory: input.observation.actionHistory,
+  });
+  const { selected, rankedTargets, repeated } = pickRankedTarget(
+    type,
+    ranked,
+    input.observation.actionHistory,
+  );
+  const target = selected?.target ?? '';
+  const plan: BrowserActionPlan = {
+    type,
+    target,
+    reason: selected ? `ranked: ${selected.reason}` : 'no ranked target',
+    rankedTargets,
+    repeated,
+  };
+  return plan;
 }

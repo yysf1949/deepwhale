@@ -224,7 +224,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D126: Gate-1.5 binding achieved, Browser enhancement unlocked. Proceed to v2.0 Tier-1 implementation.',
+      'D127: continue v2.0 Tier-1 with Memory Ranking and Code Intelligence enhancement, keeping Browser default exposure narrow.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
       'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
     ]);
@@ -258,6 +258,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecardMd).toContain('Aggregate evidence-backed progress: 65%');
     expect(scorecardMd).toContain('D67 rename_symbol exposes hashline edit hunks');
     expect(scorecardMd).toContain('D71 covers TypeScript combined default-plus-named import references');
+    expect(scorecardMd).toContain('D126 implements the first Browser Tier-1 foundation slice');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
@@ -349,13 +350,11 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D125', () => {
+  it('keeps the current sprint and next-work pointers aligned after D126', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain(
-        'Current sprint: D125 Gate-1.5 hybrid live evidence continuation (updatedLedger accumulation)',
-      );
+      expect(block).toContain('Current sprint: D126 Browser Tier-1 foundation implementation');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -414,11 +413,14 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D123 Gate-1.5 hybrid updated ledger accumulation:');
       expect(block).toContain('D124 Gate-1.5 hybrid live evidence batch:');
       expect(block).toContain('D125 Gate-1.5 hybrid live evidence continuation:');
-      expect(block).toContain('Next implementation slice: D126');
+      expect(block).toContain('D126 Browser Tier-1 foundation:');
+      expect(block).toContain('Next implementation slice: D127');
       expect(block).toContain('Gate-1.5 evidence kind: live-browser');
       expect(block).toContain('Gate-1.5 binding: true');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D125/i);
+      expect(block).not.toMatch(/Next implementation slice: D126/i);
       expect(block).not.toMatch(/Current sprint: D124/i);
       expect(block).not.toMatch(/Next implementation slice: D125/i);
       expect(block).not.toMatch(/Current sprint: D123/i);

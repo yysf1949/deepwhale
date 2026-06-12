@@ -1,6 +1,6 @@
 # V1-V4 Evidence Scorecard
 
-Generated: 2026-06-11
+Generated: 2026-06-12
 
 Aggregate evidence-backed progress: 65%
 
@@ -9,8 +9,8 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | Milestone | Percent | Evidence-backed status | Main blockers |
 | --- | ---: | --- | --- |
 | v1.0 | 80% | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79); default registry invariant asserted (D-83) | No new public code claims; v1.0 ship ritual (tag, npm publish) is gated on user approval |
-| v1.5 | 70% | Code Intel foundation exists and is labeled heuristic; re-export chain call graph correctness fixture present (D-84) | Preferred 100K Gate-1 evidence is blocked; rename is not IDE-grade AST rename; heuristic mode is explicit, not production-grade |
-| v2.0 | 45% | Memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing, opt-in runner/recorder boundaries, stub evidence, real HTTP evidence, hybrid real Browser evidence, and D-124 updatedLedger accumulation now record 13/20 completed live results; D-121/D-123 improve hybrid accumulation mechanics and D-124 consumes that machinery to advance the cumulative live-result count | Gate-1.5 completed live result evidence and binding branch decision are still incomplete (13/20 done, 7/20 remaining, binding still false) |
+| v1.5 | 80% | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 evidence achieved via React target (753,902 LOC); re-export chain call graph correctness fixture present (D-84) | rename_symbol is reference-guided lexical rewrite with hashline edit hunks, not IDE-grade AST rename |
+| v2.0 | 60% | Memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks; D126 adds Browser Tier-1 pure-function foundation for DOM understanding, element ranking, page summary, and action history | Memory Ranking and Code Intelligence enhancement are still required for full v2.0 Tier-1; D126 is pure foundation evidence, not production Browser automation or visual-grounding proof |
 | v2.5 | 65% | Planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 + D-82); v5 implementation gate reached (v2.5 >= 65%) | Integration is 5 fixtures; a real long-horizon multi-step execution run is still not proven in this scorecard; release gate scenarios are not freshly proven |
 | v3.0 | 55% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes; inclusive 30-50 boundary fixture present (D-85) | Gate-2 is fixture-scoped, not broad production proof; production long-horizon evidence is not yet present |
 | v4.0 | 50% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present (D-78 + D-80 + D-86) | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete; cross-session evidence is deterministic unit-style fixtures, not real cross-platform SIGKILL tests |
@@ -45,6 +45,8 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D122 adds optional per-task JS action mapping to `recordHybridRealBrowserEvidence` so remaining JS evidence can distinguish `fill-search-input`, `click-element`, and `extract-text` actions. Repository evidence remains 9/20 and Browser defaults stay locked.
 - D123 makes `recordHybridRealBrowserEvidence` return a recomputed `updatedLedger` and recalculates `binding` / `branchDecision` through the live Browser ledger builder. Repository evidence remains 9/20 and Browser defaults stay locked.
 - D124 chains two `updatedLedger` accumulation runs of `recordHybridRealBrowserEvidence` to record 4 additional live evidence results (cart-update-quantity as HTTP-evidence from `https://example.com/`, checkout-address-validation as JS `click-element` on `https://example.com/`, table-filter as HTTP-evidence from `https://www.iana.org/`, and table-pagination as JS `extract-text` on `https://www.iana.org/`), advancing the repository ledger from 9/20 to 13/20. Cumulative evidence is 4 stub + 6 HTTP + 3 JS, and binding remains false because 7/20 are still pending. Browser defaults stay locked.
+- D125 completes the final 7 live Browser tasks via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20. Gate-1.5 binding is true and Browser enhancement is unlocked, but Browser defaults stay narrow.
+- D126 implements the first Browser Tier-1 foundation slice as pure TypeScript helpers: richer semantic DOM extraction, structured page summary, deterministic `rankElementsForIntent` candidates with reasons/scores, bounded action history, repeated-action detection, and planner selection that avoids repeating the same target when alternatives exist. Browser unit tests cover observation, ranking, planner behavior, and default-registry exclusion.
 - D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 - D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
@@ -87,6 +89,6 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 
 ## Next Actions
 
-1. D125: continue hybrid live Browser evidence accumulation without unlocking Browser defaults until 20 completed live task results exist.
+1. D127: continue v2.0 Tier-1 with Memory Ranking and Code Intelligence enhancement while keeping Browser default exposure narrow.
 2. Continue preferred-100k Gate-1 search only when a local 100K+ target is available.
 3. Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.
