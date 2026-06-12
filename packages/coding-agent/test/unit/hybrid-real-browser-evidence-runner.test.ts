@@ -349,4 +349,54 @@ describe('Gate-1.5 hybrid real Browser evidence runner (HTTP + JS)', () => {
     expect(secondEvidence.updatedLedger.browserEnhancementUnlocked).toBe(false);
     expect(secondEvidence.updatedLedger.status).toBe('partial-results');
   });
+
+  it('continues D125 hybrid accumulation to 17 completed tasks without unlocking Browser defaults', async () => {
+    const ledger = buildLiveBrowserTaskLedger({
+      generatedAt: '2026-06-12T00:00:00.000Z',
+      tasks: makeTwentyTasks().map((task, index) =>
+        index < 13 ? { ...task, status: 'success' as const } : task,
+      ),
+    });
+
+    const evidence = await recordHybridRealBrowserEvidence({
+      generatedAt: '2026-06-12T02:00:00.000Z',
+      ledger,
+      optIn: true,
+      taskModes: {
+        'task-14': 'http',
+        'task-15': 'js',
+        'task-16': 'js',
+        'task-17': 'http',
+      },
+      realUrls: {
+        'task-14': 'https://example.com/',
+        'task-15': 'https://example.com/',
+        'task-16': 'https://www.iana.org/',
+        'task-17': 'https://www.iana.org/',
+      },
+      jsActions: {
+        'task-15': 'click-element',
+        'task-16': 'extract-text',
+      },
+      fetchFn: okFetch(),
+      jsRunnerFn: okJsRunner(),
+    });
+
+    expect(evidence.runs.map((run) => run.taskId)).toEqual([
+      'task-14',
+      'task-15',
+      'task-16',
+      'task-17',
+    ]);
+    expect(evidence.totalCompletedBefore).toBe(13);
+    expect(evidence.totalCompletedAfter).toBe(17);
+    expect(evidence.totalPendingAfter).toBe(3);
+    expect(evidence.updatedLedger.completedTasks).toBe(17);
+    expect(evidence.updatedLedger.pendingTasks).toBe(3);
+    expect(evidence.updatedLedger.successRate).toBe(1);
+    expect(evidence.binding).toBe(false);
+    expect(evidence.branchDecision).toBe('defer-live-evidence');
+    expect(evidence.updatedLedger.browserEnhancementUnlocked).toBe(false);
+    expect(evidence.updatedLedger.status).toBe('partial-results');
+  });
 });

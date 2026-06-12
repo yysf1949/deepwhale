@@ -103,6 +103,7 @@ describe('status documentation hygiene (D-56)', () => {
 
   it('keeps Gate-1.5 live Browser task evidence deferred until 20 live tasks exist', () => {
     const ledger = JSON.parse(readRepoFile('docs/superpowers/gate-1.5-live-browser-tasks.json')) as {
+      slice: string;
       evidenceKind: string;
       status: string;
       requiredTasks: number;
@@ -118,12 +119,14 @@ describe('status documentation hygiene (D-56)', () => {
       runnerStatus: string;
       resultRecorderStatus: string;
       reason: string;
+      nextAction: string;
       fixtureReport: string;
-      tasks: Array<{ id: string; status: string }>;
+      tasks: Array<{ id: string; status: string; evidenceSubSprint?: string }>;
     };
     const ledgerMd = readRepoFile('docs/superpowers/gate-1.5-live-browser-tasks.md');
 
     expect(ledger.evidenceKind).toBe('live-browser-task-sourcing-ledger');
+    expect(ledger.slice).toBe('D125');
     expect(ledger.status).toBe('ready-for-binding-decision');
     expect(ledger.requiredTasks).toBe(20);
     expect(ledger.candidateTasks).toBe(20);
@@ -138,6 +141,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(ledger.runnerStatus).toBe('opt-in-runner-available');
     expect(ledger.resultRecorderStatus).toBe('all-recorded');
     expect(ledger.reason).toContain('20 candidate live Browser tasks are queued and all 20 have been recorded as completed');
+    expect(ledger.nextAction).toContain('Gate-1.5 binding achieved');
     expect(ledger.fixtureReport).toBe('docs/superpowers/gate-1.5-browser-viability.json');
     expect(ledger.tasks).toHaveLength(20);
     const successTasks = ledger.tasks.filter((task) => task.status === 'success');
@@ -165,6 +169,17 @@ describe('status documentation hygiene (D-56)', () => {
       'breadcrumb-navigation',
       'download-link-detection',
       'error-page-recovery',
+    ]);
+    expect(pendingTasks.map((t) => t.id)).toEqual([]);
+    const d125Tasks = successTasks.filter((t) => t.evidenceSubSprint === 'D-125');
+    expect(d125Tasks.map((t) => t.id).sort()).toEqual([
+      'breadcrumb-navigation',
+      'download-link-detection',
+      'error-page-recovery',
+      'modal-open-close',
+      'profile-edit',
+      'settings-toggle',
+      'tabs-switch',
     ]);
     expect(ledgerMd).toContain('Live Browser Task Sourcing Queue');
 
@@ -204,12 +219,12 @@ describe('status documentation hygiene (D-56)', () => {
     };
     const scorecardMd = readRepoFile('docs/superpowers/v1-v4-evidence-scorecard.md');
 
-    expect(scorecard.aggregatePercent).toBe(65);
+    expect(scorecard.aggregatePercent).toBe(70);
     expect(scorecard.milestones.map((m) => m.id)).toEqual(['v1.0', 'v1.5', 'v2.0', 'v2.5', 'v3.0', 'v4.0']);
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D125: continue hybrid live Browser evidence accumulation without unlocking Browser defaults until 20 completed live task results exist.',
+      'D126: Gate-1.5 binding achieved, Browser enhancement unlocked. Proceed to v2.0 Tier-1 implementation.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
       'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
     ]);
@@ -334,11 +349,13 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D124', () => {
+  it('keeps the current sprint and next-work pointers aligned after D125', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D125 Gate-1.5 binding achieved, Browser enhancement unlocked');
+      expect(block).toContain(
+        'Current sprint: D125 Gate-1.5 hybrid live evidence continuation (updatedLedger accumulation)',
+      );
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -396,11 +413,14 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D122 Gate-1.5 hybrid JS action mapping:');
       expect(block).toContain('D123 Gate-1.5 hybrid updated ledger accumulation:');
       expect(block).toContain('D124 Gate-1.5 hybrid live evidence batch:');
+      expect(block).toContain('D125 Gate-1.5 hybrid live evidence continuation:');
+      expect(block).toContain('Next implementation slice: D126');
       expect(block).toContain('Gate-1.5 evidence kind: live-browser');
-      expect(block).toContain('Gate-1.5 binding branch decision: continue-browser-enhancement');
+      expect(block).toContain('Gate-1.5 binding: true');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
-      expect(block).toContain('D125 Gate-1.5 binding achieved, Browser enhancement unlocked');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D124/i);
+      expect(block).not.toMatch(/Next implementation slice: D125/i);
       expect(block).not.toMatch(/Current sprint: D123/i);
       expect(block).not.toMatch(/Next implementation slice: D124/i);
       expect(block).not.toMatch(/Current sprint: D122/i);

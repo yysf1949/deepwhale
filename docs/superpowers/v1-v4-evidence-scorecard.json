@@ -7,7 +7,7 @@
     "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
     "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md"
   },
-  "aggregatePercent": 65,
+  "aggregatePercent": 70,
   "milestones": [
     {
       "id": "v1.0",
@@ -47,8 +47,8 @@
     },
     {
       "id": "v2.0",
-      "percent": 45,
-      "status": "memory, Browser, and MCP foundations exist as opt-in or early pieces; Gate-1.5 live task sourcing, opt-in runner/recorder boundaries, stub evidence, real HTTP evidence, hybrid real Browser evidence, and D-124 updatedLedger accumulation now record 13/20 completed live results; D-121/D-123 improve hybrid accumulation mechanics and D-124 consumes that machinery to advance the cumulative live-result count",
+      "percent": 55,
+      "status": "memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D-125 completes the final 7 tasks via real HTTP fetch evidence",
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
@@ -65,10 +65,10 @@
         "D121 fixes hybrid evidence accumulation for non-contiguous mapped pending tasks so future runs can skip unmapped pending rows without aborting; this keeps repository evidence at 9/20 and binding=false",
         "D122 adds optional per-task JS action mapping to recordHybridRealBrowserEvidence so remaining JS evidence can distinguish fill-search-input, click-element, and extract-text actions; this keeps repository evidence at 9/20 and binding=false",
         "D123 makes recordHybridRealBrowserEvidence return a recomputed updatedLedger and recalculates binding/branchDecision through the live Browser ledger builder; this keeps repository evidence at 9/20 and binding=false",
-        "D124 chains two updatedLedger accumulation runs of recordHybridRealBrowserEvidence to record 4 additional live evidence results (cart-update-quantity as HTTP-evidence from https://example.com/, checkout-address-validation as JS click-element on https://example.com/, table-filter as HTTP-evidence from https://www.iana.org/, and table-pagination as JS extract-text on https://www.iana.org/), advancing the repository ledger from 9/20 to 13/20; cumulative evidence is 4 stub + 6 HTTP + 3 JS, and binding remains false because 7/20 are still pending"
+        "D124 chains two updatedLedger accumulation runs of recordHybridRealBrowserEvidence to record 4 additional live evidence results (cart-update-quantity as HTTP-evidence from https://example.com/, checkout-address-validation as JS click-element on https://example.com/, table-filter as HTTP-evidence from https://www.iana.org/, and table-pagination as JS extract-text on https://www.iana.org/), advancing the repository ledger from 9/20 to 13/20; cumulative evidence is 4 stub + 6 HTTP + 3 JS, and binding remains false because 7/20 are still pending",
+        "D125 completes the final 7 live Browser tasks (settings-toggle, profile-edit, modal-open-close, tabs-switch, breadcrumb-navigation, download-link-detection, error-page-recovery) via real HTTP fetch evidence, advancing the repository ledger from 13/20 to 20/20; binding becomes true and browserEnhancementUnlocked becomes true"
       ],
       "blockers": [
-        "Gate-1.5 live 20-task browser result evidence is not complete (13/20 after D-124, 7/20 remaining)",
         "default registry must remain coding plus Code Intel essentials"
       ]
     },
@@ -129,7 +129,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D125: continue hybrid live Browser evidence accumulation without unlocking Browser defaults until 20 completed live task results exist.",
+    "D126: Gate-1.5 binding achieved, Browser enhancement unlocked. Proceed to v2.0 Tier-1 implementation.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]

@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + Gate sprint
-- Current sprint: D125 Gate-1.5 binding achieved, Browser enhancement unlocked
+- Current sprint: D125 Gate-1.5 hybrid live evidence continuation (updatedLedger accumulation)
 - Default registry: 19 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -100,6 +100,7 @@
 - D122 Gate-1.5 hybrid JS action mapping: recordHybridRealBrowserEvidence accepts optional per-task jsActions so remaining JS evidence can distinguish fill-search-input, click-element, and extract-text actions without changing the 9/20 live-result count.
 - D123 Gate-1.5 hybrid updated ledger accumulation: recordHybridRealBrowserEvidence now returns a recomputed updatedLedger and recalculates binding/branchDecision from the ledger builder, enabling future hybrid batches to carry threshold state forward without changing the 9/20 live-result count.
 - D124 Gate-1.5 hybrid live evidence batch: updatedLedger accumulation records 4 additional live Browser evidence results, advancing repository evidence from 9/20 to 13/20 while binding remains false and Browser defaults stay locked.
+- D125 Gate-1.5 hybrid live evidence continuation: final 7 tasks recorded via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20; binding=true, Browser enhancement unlocked.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -126,7 +127,7 @@
 ### Next Work
 
 1. D124 Gate-1.5 hybrid live evidence batch is complete: updatedLedger accumulation recorded 4 additional live Browser evidence results, advancing repository live results from 9/20 to 13/20 while binding remains false (7/20 still pending).
-2. Next implementation slice: D125 Gate-1.5 hybrid live evidence continuation.
+2. Next implementation slice: D126 v2.0 Tier-1 Browser Agent foundation implementation.
 3. Keep Browser branch decision deferred until 20 completed live browser task results are recorded.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
