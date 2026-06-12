@@ -108,8 +108,8 @@
 
 | Milestone | Evidence-backed status | Main blocker |
 | --- | --- | --- |
-| v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (preferred-100k Gate-1, Gate-2 production proof, cross-platform Desktop, cross-platform SIGKILL) |
-| v1.5 | Code Intel foundation exists | Preferred 100K Gate-1 evidence remains blocked |
+| v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (Gate-2 production proof, cross-platform Desktop, cross-platform SIGKILL) |
+| v1.5 | Code Intel foundation exists; preferred 100K Gate-1 evidence via React target (753K LOC) | rename_symbol is heuristic, not IDE-grade |
 | v2.0 | Gate-1.5 binding achieved at 20/20; Browser enhancement unlocked | v2.0 Tier-1 implementation not started |
 | v2.5 | Planner, task DAG, and plan cache exist | Main-loop integration is limited |
 | v3.0 | Reviewer and Gate-2 live runner exist | Long-horizon proof must remain reproducible and scoped |
