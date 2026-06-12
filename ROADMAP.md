@@ -101,14 +101,16 @@
 - D123 Gate-1.5 hybrid updated ledger accumulation: recordHybridRealBrowserEvidence now returns a recomputed updatedLedger and recalculates binding/branchDecision from the ledger builder, enabling future hybrid batches to carry threshold state forward without changing the 9/20 live-result count.
 - D124 Gate-1.5 hybrid live evidence batch: updatedLedger accumulation records 4 additional live Browser evidence results, advancing repository evidence from 9/20 to 13/20 while binding remains false and Browser defaults stay locked.
 - D125 Gate-1.5 hybrid live evidence continuation: final 7 tasks recorded via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20; binding=true, Browser enhancement unlocked.
+- D129 v5.0 3rd-cycle depth: audit correlationId + policy-snapshot CLI command.
+- D130 v6.0 enterprise cross-bridge + distributed coordination seed: EnterprisePolicySnapshot + LeaderElector.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
 | Milestone | Evidence-backed status | Main blocker |
 | --- | --- | --- |
-| v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (preferred-100k Gate-1, 20 real browser tasks, Gate-2 production, cross-platform Desktop, cross-platform SIGKILL) |
+| v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (preferred-100k Gate-1, Gate-2 production proof, cross-platform Desktop, cross-platform SIGKILL) |
 | v1.5 | Code Intel foundation exists | Preferred 100K Gate-1 evidence remains blocked |
-| v2.0 | Browser, MCP, and memory foundations exist as opt-in/early pieces | Gate-1.5 evidence and full integration are not complete |
+| v2.0 | Gate-1.5 binding achieved at 20/20; Browser enhancement unlocked | v2.0 Tier-1 implementation not started |
 | v2.5 | Planner, task DAG, and plan cache exist | Main-loop integration is limited |
 | v3.0 | Reviewer and Gate-2 live runner exist | Long-horizon proof must remain reproducible and scoped |
 | v4.0 | Researcher, TaskGraph, memory, and channel foundations exist | Agent OS orchestration, Desktop, and channels are not production-complete |
