@@ -12,7 +12,12 @@ import { closeSync, fsyncSync, openSync, promises as fs, renameSync } from 'node
 import { join } from 'node:path';
 
 export type MemoryScope = 'user' | 'project' | 'session';
-export type MemorySource = 'auto_extracted' | 'user_explicit' | 'project_fact';
+export type MemorySource =
+  | 'auto_extracted'
+  | 'user_explicit'
+  | 'project_fact'
+  | 'user_preference'
+  | 'workspace';
 
 export interface PersistentMemoryItem {
   readonly id: string;

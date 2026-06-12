@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + v2.0 Tier-1 implementation sprint
-- Current sprint: D126 Browser Tier-1 foundation implementation
+- Current sprint: D127 Memory Ranking and Code Intelligence enhancement
 - Default registry: 21 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -102,6 +102,7 @@
 - D124 Gate-1.5 hybrid live evidence batch: updatedLedger accumulation records 4 additional live Browser evidence results, advancing repository evidence from 9/20 to 13/20 while binding remains false and Browser defaults stay locked.
 - D125 Gate-1.5 hybrid live evidence continuation: final 7 tasks recorded via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20; binding=true, Browser enhancement unlocked.
 - D126 Browser Tier-1 foundation: pure TypeScript helpers now provide richer semantic DOM extraction, structured page summaries, deterministic element ranking with reasons/scores, bounded action history, repeated-action detection, and planner repeat avoidance while keeping Browser defaults narrow.
+- D127 Memory Ranking and Code Intelligence enhancement: memory ranking now exposes score factors and reasons, MemoryStore.rank returns active ranked memories, semantic-index results include token evidence and stable tie-breaking, and smart_search local/all adds heuristic semantic_fallback results for free-text queries while keeping exact symbol matches higher priority.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -110,7 +111,7 @@
 | --- | --- | --- |
 | v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | v1.0 ship ritual remains gated on user approval; other v1-v4 blockers remain separate |
 | v1.5 | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 evidence exists via React target | rename_symbol remains heuristic, not IDE-grade |
-| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history | Memory Ranking and Code Intelligence enhancement remain; D126 is not production Browser automation proof |
+| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence | Remaining v2.0 release-gate hardening, production Browser automation/visual grounding proof, and Tier-2 blockers remain |
 | v2.5 | Planner/DAG/cache modules exist | Integration into the main agent loop is still limited |
 | v3.0 | Reviewer and Gate-2 harness exist; current Gate-2 live evidence passes | Long-horizon evidence must stay honest and reproducible |
 | v4.0 | Researcher, TaskGraph, memory, channel foundations exist | Agent OS, Desktop, channels, and production orchestration are not complete |
@@ -120,15 +121,15 @@
 - Keep the default tool surface narrow.
 - Do not add media, productivity, channel, Browser, Desktop, or marketplace tools to the default profile.
 - Do not weaken Gate-1 or Gate-2 thresholds.
-- Treat Code Intel rename, reference, and call graph behavior as heuristic unless tests prove stronger semantics.
+- Treat Code Intel rename, reference, call graph, and smart search behavior as heuristic unless tests prove stronger semantics.
 - Keep live Gate reports separate from mock reports.
 - Keep generated state and local target directories out of commits.
 - Preserve unrelated untracked plan files unless a task explicitly adopts them.
 
 ### Next Work
 
-1. D126 Browser Tier-1 foundation is complete at the pure-function layer: observation, summary, ranking, and history tests cover the new behavior.
-2. Next implementation slice: D127 v2.0 Tier-1 Memory Ranking and Code Intelligence enhancement.
+1. D127 Memory Ranking and Code Intelligence enhancement is complete at the deterministic-helper layer: ranking evidence, MemoryStore integration, semantic-index evidence, and smart_search semantic_fallback tests cover the new behavior.
+2. Next implementation slice: D128 v2.0 Tier-1 release-gate hardening without expanding Browser default exposure.
 3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.

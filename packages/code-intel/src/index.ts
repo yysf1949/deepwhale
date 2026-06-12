@@ -46,6 +46,7 @@ export {
   type SemanticIndex,
   type SemanticIndexChunk,
   type SemanticSearchOptions,
+  type SemanticSearchResult,
   type CreateSemanticIndexOptions,
 } from './semantic-index.js';
 

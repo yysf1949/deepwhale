@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import type { MemoryItem } from './ranking.js';
+import { rankMemoriesWithScores, type MemoryItem, type RankOptions, type RankedMemory } from './ranking.js';
 
 export interface MemoryStoreOptions {
   path: string;
@@ -34,6 +34,11 @@ export class MemoryStore {
     const all = await this.loadAll();
     if (filter?.includeArchived) return all;
     return all.filter((m) => !m.archived);
+  }
+
+  async rank(options: RankOptions): Promise<RankedMemory[]> {
+    const active = await this.list({ includeArchived: false });
+    return rankMemoriesWithScores(active, options);
   }
 
   private async loadAll(): Promise<StoredMemory[]> {

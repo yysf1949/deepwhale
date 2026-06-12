@@ -19,7 +19,12 @@ import { runToolLoop, type ToolLoopOptions, type ToolLoopResult } from './tool-l
 import type { ChatMessage, LLMClient } from '@deepwhale/llm';
 
 export type MemoryScope = 'user' | 'project' | 'session';
-export type MemorySource = 'auto_extracted' | 'user_explicit' | 'project_fact';
+export type MemorySource =
+  | 'auto_extracted'
+  | 'user_explicit'
+  | 'project_fact'
+  | 'user_preference'
+  | 'workspace';
 
 export interface MemoryStore {
   put(input: { id: string; scope: MemoryScope; source: MemorySource; content: string; importance?: number }): Promise<void>;

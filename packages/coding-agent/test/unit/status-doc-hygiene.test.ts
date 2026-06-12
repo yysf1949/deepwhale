@@ -219,15 +219,16 @@ describe('status documentation hygiene (D-56)', () => {
     };
     const scorecardMd = readRepoFile('docs/superpowers/v1-v4-evidence-scorecard.md');
 
-    expect(scorecard.aggregatePercent).toBe(65);
+    expect(scorecard.aggregatePercent).toBe(66);
     expect(scorecard.milestones.map((m) => m.id)).toEqual(['v1.0', 'v1.5', 'v2.0', 'v2.5', 'v3.0', 'v4.0']);
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D127: continue v2.0 Tier-1 with Memory Ranking and Code Intelligence enhancement, keeping Browser default exposure narrow.',
+      'D128: continue v2.0 Tier-1 release-gate hardening without expanding Browser default exposure.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
       'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
     ]);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D127:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D113:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D96:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D95:/m);
@@ -255,10 +256,11 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D70:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D68:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D69:/m);
-    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 65%');
+    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 66%');
     expect(scorecardMd).toContain('D67 rename_symbol exposes hashline edit hunks');
     expect(scorecardMd).toContain('D71 covers TypeScript combined default-plus-named import references');
     expect(scorecardMd).toContain('D126 implements the first Browser Tier-1 foundation slice');
+    expect(scorecardMd).toContain('D127 adds explainable Memory Ranking and deterministic Code Intel semantic fallback evidence');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
@@ -350,11 +352,11 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D126', () => {
+  it('keeps the current sprint and next-work pointers aligned after D127', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D126 Browser Tier-1 foundation implementation');
+      expect(block).toContain('Current sprint: D127 Memory Ranking and Code Intelligence enhancement');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -414,11 +416,14 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D124 Gate-1.5 hybrid live evidence batch:');
       expect(block).toContain('D125 Gate-1.5 hybrid live evidence continuation:');
       expect(block).toContain('D126 Browser Tier-1 foundation:');
-      expect(block).toContain('Next implementation slice: D127');
+      expect(block).toContain('D127 Memory Ranking and Code Intelligence enhancement:');
+      expect(block).toContain('Next implementation slice: D128');
       expect(block).toContain('Gate-1.5 evidence kind: live-browser');
       expect(block).toContain('Gate-1.5 binding: true');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D126/i);
+      expect(block).not.toMatch(/Next implementation slice: D127/i);
       expect(block).not.toMatch(/Current sprint: D125/i);
       expect(block).not.toMatch(/Next implementation slice: D126/i);
       expect(block).not.toMatch(/Current sprint: D124/i);

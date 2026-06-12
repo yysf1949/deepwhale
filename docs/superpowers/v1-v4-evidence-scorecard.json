@@ -7,7 +7,7 @@
     "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
     "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md"
   },
-  "aggregatePercent": 65,
+  "aggregatePercent": 66,
   "milestones": [
     {
       "id": "v1.0",
@@ -47,8 +47,8 @@
     },
     {
       "id": "v2.0",
-      "percent": 60,
-      "status": "memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D126 adds Browser Tier-1 pure-function foundation for DOM understanding, element ranking, page summary, and action history",
+      "percent": 62,
+      "status": "memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence",
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
@@ -67,12 +67,13 @@
         "D123 makes recordHybridRealBrowserEvidence return a recomputed updatedLedger and recalculates binding/branchDecision through the live Browser ledger builder; this keeps repository evidence at 9/20 and binding=false",
         "D124 chains two updatedLedger accumulation runs of recordHybridRealBrowserEvidence to record 4 additional live evidence results (cart-update-quantity as HTTP-evidence from https://example.com/, checkout-address-validation as JS click-element on https://example.com/, table-filter as HTTP-evidence from https://www.iana.org/, and table-pagination as JS extract-text on https://www.iana.org/), advancing the repository ledger from 9/20 to 13/20; cumulative evidence is 4 stub + 6 HTTP + 3 JS, and binding remains false because 7/20 are still pending",
         "D125 completes the final 7 live Browser tasks (settings-toggle, profile-edit, modal-open-close, tabs-switch, breadcrumb-navigation, download-link-detection, error-page-recovery) via real HTTP fetch evidence, advancing the repository ledger from 13/20 to 20/20; binding becomes true and browserEnhancementUnlocked becomes true",
-        "D126 implements the first Browser Tier-1 foundation slice as pure TypeScript helpers: richer semantic DOM extraction, pageSummary, deterministic rankElementsForIntent candidates with reasons/scores, bounded action history, repeated-action detection, and planner selection that avoids repeating the same target when alternatives exist (verified by Browser unit tests)"
+        "D126 implements the first Browser Tier-1 foundation slice as pure TypeScript helpers: richer semantic DOM extraction, pageSummary, deterministic rankElementsForIntent candidates with reasons/scores, bounded action history, repeated-action detection, and planner selection that avoids repeating the same target when alternatives exist (verified by Browser unit tests)",
+        "D127 adds explainable Memory Ranking and deterministic Code Intel semantic fallback evidence: rankMemoriesWithScores and MemoryStore.rank expose score factors/reasons, semantic-index results expose matched tokens/coverage/reason/stable tie-breaking, and smart_search local/all reports heuristic semantic_fallback results for free-text queries while exact symbol matches remain higher priority"
       ],
       "blockers": [
         "default registry must remain coding plus Code Intel essentials",
-        "Memory Ranking and Code Intelligence enhancement are still required for full v2.0 Tier-1 completion",
-        "D126 is pure foundation evidence, not a production Browser automation or visual-grounding proof"
+        "D127 covers deterministic helper-layer Memory Ranking and semantic fallback evidence, but full v2.0 still requires release-gate hardening and production Browser automation/visual-grounding proof",
+        "Tier-2 v2.0 blockers remain tracked separately"
       ]
     },
     {
@@ -132,7 +133,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D127: continue v2.0 Tier-1 with Memory Ranking and Code Intelligence enhancement, keeping Browser default exposure narrow.",
+    "D128: continue v2.0 Tier-1 release-gate hardening without expanding Browser default exposure.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]
