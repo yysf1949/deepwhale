@@ -1,0 +1,125 @@
+{
+  "slice": "D128",
+  "generatedAt": "2026-06-12T00:00:00.000Z",
+  "milestone": "v2.0",
+  "tier": "Tier-1",
+  "passed": false,
+  "summary": "v2.0 Tier-1 helper evidence is present, but v2.0 is not release-ready.",
+  "completedChecks": 4,
+  "blockingChecks": 3,
+  "checks": [
+    {
+      "id": "browser-tier1-foundation",
+      "label": "Browser Tier-1 helper foundation",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/browser/observation.ts",
+        "packages/coding-agent/src/browser/planner.ts",
+        "packages/coding-agent/test/unit/browser-observation.test.ts",
+        "packages/coding-agent/test/unit/browser-planner.test.ts"
+      ],
+      "caveat": "Helper-layer evidence only; not live production automation."
+    },
+    {
+      "id": "memory-ranking",
+      "label": "Explainable Memory Ranking",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/memory/ranking.ts",
+        "packages/coding-agent/src/memory/store.ts",
+        "packages/coding-agent/test/unit/memory-ranking.test.ts",
+        "packages/coding-agent/test/unit/memory-store.test.ts"
+      ],
+      "caveat": "Deterministic local ranking evidence; not a full long-term memory system."
+    },
+    {
+      "id": "code-intel-semantic-fallback",
+      "label": "Code Intel semantic fallback",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/code-intel/src/semantic-index.ts",
+        "packages/coding-agent/src/tools/smart-search.ts",
+        "packages/code-intel/test/unit/semantic-index.test.ts",
+        "packages/coding-agent/test/unit/smart-search-semantic.test.ts"
+      ],
+      "caveat": "Heuristic lexical fallback; not embedding or LSP-grade semantics."
+    },
+    {
+      "id": "default-exposure",
+      "label": "Default registry exposure invariant",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/tools/registry.ts",
+        "packages/coding-agent/test/unit/default-registry-invariant.test.ts"
+      ],
+      "caveat": "Narrow default must remain coding plus Code Intel essentials."
+    },
+    {
+      "id": "production-browser-automation",
+      "label": "Production Browser automation proof",
+      "status": "blocked",
+      "requiredForRelease": true,
+      "blocker": "production Browser automation proof is still missing",
+      "caveat": "Release-blocking production Browser automation proof is absent."
+    },
+    {
+      "id": "visual-grounding",
+      "label": "Visual grounding proof",
+      "status": "blocked",
+      "requiredForRelease": true,
+      "blocker": "visual grounding proof is still missing",
+      "caveat": "Release-blocking visual grounding proof is absent."
+    },
+    {
+      "id": "tier2-blockers",
+      "label": "v2.0 Tier-2 blockers",
+      "status": "blocked",
+      "requiredForRelease": true,
+      "blocker": "Tier-2 v2.0 blockers remain tracked separately",
+      "caveat": "Tier-2 blockers remain separate and unresolved."
+    }
+  ],
+  "blockers": [
+    "production Browser automation proof is still missing",
+    "visual grounding proof is still missing",
+    "Tier-2 v2.0 blockers remain tracked separately"
+  ],
+  "defaultExposure": {
+    "toolCount": 21,
+    "expectedToolCount": 21,
+    "nonCodingDefaultEnabled": false,
+    "allowedDefaultToolNames": [
+      "read_file",
+      "write_file",
+      "edit_file",
+      "bash",
+      "find",
+      "grep",
+      "patch",
+      "search_files",
+      "execute_code",
+      "todo",
+      "plan",
+      "browser_action",
+      "browser_js",
+      "parse_file",
+      "get_symbols",
+      "analyze_repo",
+      "find_definition",
+      "find_references",
+      "call_graph",
+      "rename_symbol",
+      "smart_search"
+    ],
+    "caveat": "browser_action and browser_js are coding-surface helpers in the default registry, not production Browser completion proof."
+  },
+  "nextActions": [
+    "D129: prove production Browser automation and visual-grounding behavior without expanding default exposure.",
+    "Keep Tier-2 v2.0 blockers separate from helper-layer evidence.",
+    "Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure."
+  ]
+}

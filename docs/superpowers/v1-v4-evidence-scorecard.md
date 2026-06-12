@@ -2,7 +2,7 @@
 
 Generated: 2026-06-12
 
-Aggregate evidence-backed progress: 66%
+Aggregate evidence-backed progress: 67%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
@@ -10,7 +10,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 | --- | ---: | --- | --- |
 | v1.0 | 80% | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79); default registry invariant asserted (D-83) | No new public code claims; v1.0 ship ritual (tag, npm publish) is gated on user approval |
 | v1.5 | 80% | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 evidence achieved via React target (753,902 LOC); re-export chain call graph correctness fixture present (D-84) | rename_symbol is reference-guided lexical rewrite with hashline edit hunks, not IDE-grade AST rename |
-| v2.0 | 62% | Memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence | Full v2.0 still requires release-gate hardening, production Browser automation/visual-grounding proof, and separate Tier-2 blockers |
+| v2.0 | 64% | Memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence; D128 adds a machine-readable Tier-1 precheck | Full v2.0 still requires production Browser automation/visual-grounding proof and separate Tier-2 blockers |
 | v2.5 | 65% | Planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 + D-82); v5 implementation gate reached (v2.5 >= 65%) | Integration is 5 fixtures; a real long-horizon multi-step execution run is still not proven in this scorecard; release gate scenarios are not freshly proven |
 | v3.0 | 55% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes; inclusive 30-50 boundary fixture present (D-85) | Gate-2 is fixture-scoped, not broad production proof; production long-horizon evidence is not yet present |
 | v4.0 | 50% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present (D-78 + D-80 + D-86) | Agent OS orchestration, Desktop, channels, and real cross-platform SIGKILL evidence are still incomplete; cross-session evidence is deterministic unit-style fixtures, not real cross-platform SIGKILL tests |
@@ -48,6 +48,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D125 completes the final 7 live Browser tasks via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20. Gate-1.5 binding is true and Browser enhancement is unlocked, but Browser defaults stay narrow.
 - D126 implements the first Browser Tier-1 foundation slice as pure TypeScript helpers: richer semantic DOM extraction, structured page summary, deterministic `rankElementsForIntent` candidates with reasons/scores, bounded action history, repeated-action detection, and planner selection that avoids repeating the same target when alternatives exist. Browser unit tests cover observation, ranking, planner behavior, and default-registry exclusion.
 - D127 adds explainable Memory Ranking and deterministic Code Intel semantic fallback evidence: `rankMemoriesWithScores` and `MemoryStore.rank` expose score factors/reasons, semantic-index results expose matched tokens/coverage/reason/stable tie-breaking, and `smart_search` local/all reports heuristic `semantic_fallback` results for free-text queries while exact symbol matches remain higher priority.
+- D128 adds a machine-readable v2.0 Tier-1 precheck: Browser helper evidence, Memory Ranking evidence, Code Intel semantic fallback evidence, and default-exposure invariants pass; production Browser automation, visual grounding, and Tier-2 blockers remain blocked.
 - D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 - D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
@@ -90,6 +91,6 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 
 ## Next Actions
 
-1. D128: continue v2.0 Tier-1 release-gate hardening without expanding Browser default exposure.
+1. D129: prove production Browser automation and visual-grounding behavior without expanding default exposure.
 2. Continue preferred-100k Gate-1 search only when a local 100K+ target is available.
 3. Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.

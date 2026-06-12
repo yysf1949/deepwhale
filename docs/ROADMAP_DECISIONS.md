@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D127 Memory Ranking and Code Intelligence enhancement
+- Current sprint: D128 v2.0 Tier-1 release-gate hardening
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -44,6 +44,7 @@
 - Gate-2 interpretation: default-profile invoice fixture passed the live runner conditions.
 - Gate-2 limit: it does not unlock Browser, Desktop, Channel, media, or productivity defaults.
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
+- v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json
 
 ### Completed Stabilization Slices
 
@@ -113,6 +114,7 @@
 - D125 Gate-1.5 hybrid live evidence continuation: final 7 tasks recorded via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20; binding=true, Browser enhancement unlocked.
 - D126 Browser Tier-1 foundation: pure TypeScript helpers now provide richer semantic DOM extraction, structured page summaries, deterministic element ranking with reasons/scores, bounded action history, repeated-action detection, and planner repeat avoidance while keeping Browser defaults narrow.
 - D127 Memory Ranking and Code Intelligence enhancement: memory ranking now exposes score factors and reasons, MemoryStore.rank returns active ranked memories, semantic-index results include token evidence and stable tie-breaking, and smart_search local/all adds heuristic semantic_fallback results for free-text queries while keeping exact symbol matches higher priority.
+- D128 v2.0 Tier-1 release-gate hardening: a deterministic precheck now verifies D126 Browser helper evidence, D127 Memory Ranking evidence, D127 Code Intel semantic fallback evidence, and default-exposure invariants while keeping v2.0 blocked on production Browser automation, visual grounding, and Tier-2 proof.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -130,8 +132,8 @@
 
 ### Next Decisions Needed
 
-1. D127 Memory Ranking and Code Intelligence enhancement is complete at the deterministic-helper layer: ranking evidence, MemoryStore integration, semantic-index evidence, and smart_search semantic_fallback tests cover the new behavior.
-2. Next implementation slice: D128 v2.0 Tier-1 release-gate hardening without expanding Browser default exposure.
+1. D128 v2.0 Tier-1 release-gate hardening is complete at the precheck layer: helper evidence and default exposure are machine-readable, while release blockers remain explicit.
+2. Next implementation slice: D129 production Browser automation and visual-grounding proof without expanding default exposure.
 3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
