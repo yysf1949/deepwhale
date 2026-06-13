@@ -1,19 +1,18 @@
 {
-  "passed": false,
-  "failureReasons": [
-    "loc-below-minimum: 43041 < 50000"
-  ],
-  "repoPath": "D:\\App\\openClaw\\projects\\deepwhale",
+  "passed": true,
+  "failureReasons": [],
+  "repoPath": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\react",
+  "locQualification": "preferred-100k",
   "metrics": {
-    "loc": 43041,
-    "supportedFiles": 336,
-    "filesIndexed": 336,
-    "symbolsIndexed": 2596,
-    "referencesIndexed": 15133,
-    "callEdges": 2606,
-    "elapsedMs": 1219,
-    "graphBuildMs": 1039,
-    "callGraphMs": 99,
+    "loc": 753902,
+    "supportedFiles": 4462,
+    "filesIndexed": 4462,
+    "symbolsIndexed": 36171,
+    "referencesIndexed": 143068,
+    "callEdges": 9021550,
+    "elapsedMs": 71937,
+    "graphBuildMs": 9663,
+    "callGraphMs": 2677,
     "minLoc": 50000,
     "preferredLoc": 100000,
     "timeboxMs": 1200000
@@ -21,29 +20,25 @@
   "evidence": {
     "callChain": [
       {
-        "caller": "packages/coding-agent/src/repl/repl-agent-turn.ts:runAgentTurn",
-        "callee": "packages/coding-agent/src/tools/registry.ts:createDefaultRegistry",
-        "line": 122,
-        "file": "packages/coding-agent/src/repl/repl-agent-turn.ts"
-      },
-      {
-        "caller": "packages/coding-agent/src/repl/repl-agent-turn.ts:runAgentTurn",
-        "callee": "packages/coding-agent/src/tools/registry.ts:createDefaultRegistry",
-        "line": 139,
-        "file": "packages/coding-agent/src/repl/repl-agent-turn.ts"
+        "caller": "packages/react/src/jsx/ReactJSXElement.js:createElement",
+        "callee": "packages/react/src/jsx/ReactJSXElement.js:ReactElement",
+        "line": 735,
+        "file": "packages/react/src/jsx/ReactJSXElement.js"
       }
     ],
     "entry": {
-      "file": "packages/coding-agent/src/tools/registry.ts",
-      "symbol": "createDefaultRegistry",
-      "line": 123,
+      "id": "packages/react/src/jsx/ReactJSXElement.js:createElement",
+      "file": "packages/react/src/jsx/ReactJSXElement.js",
+      "symbol": "createElement",
+      "line": 610,
       "col": 7,
       "kind": "declaration"
     },
     "modificationPoint": {
-      "file": "packages/coding-agent/src/tools/registry.ts",
-      "symbol": "createDefaultRegistry",
-      "line": 123,
+      "id": "packages/react/src/jsx/ReactJSXElement.js:createElement",
+      "file": "packages/react/src/jsx/ReactJSXElement.js",
+      "symbol": "createElement",
+      "line": 610,
       "col": 7,
       "kind": "declaration"
     }

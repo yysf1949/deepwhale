@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { createDefaultRegistry } from '../../src/tools/registry.js';
 
-describe('registry (D-32.2.2 — +1 cross-file tool)', () => {
+describe('registry (D-32.2.2 find_references)', () => {
   it('default profile contains coding + code-intel essentials only', () => {
     const reg = createDefaultRegistry();
-    expect(reg.size()).toBe(19);
+    expect(reg.size()).toBe(21);
   });
 
   it('code-intel profile registers find_references', () => {

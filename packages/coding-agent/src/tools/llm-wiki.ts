@@ -20,6 +20,7 @@ import { createRequire } from 'node:module';
 import initSqlJs from 'sql.js-fts5';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import { deepwhaleRoot } from '../util/deepwhale-paths.js';
 
 type SqlDatabase = {
   exec(sql: string, params?: unknown[]): { columns: string[]; values: unknown[][] }[];
@@ -173,5 +174,5 @@ export class LlmWikiTool implements Tool {
 }
 
 export const llmWiki = new LlmWikiTool({
-  dbPath: join(process.env.HOME || process.env.USERPROFILE || '.', '.deepwhale', 'wiki.db'),
+  dbPath: join(deepwhaleRoot(), 'wiki.db'),
 });

@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-06-10T14:01:32.000Z",
+  "branch": "feature/d36-gate2-live",
+  "baseCommit": "9b7890a",
+  "subSprint": "D-79 v1.0 fresh release gate proof",
+  "packageVersionBefore": "2.2.0",
+  "packageVersionAfter": "2.3.0",
+  "verificationMatrix": {
+    "typecheck": { "command": "tsc -b", "exitCode": 0, "result": "pass" },
+    "lint": { "command": "eslint . --max-warnings 0", "exitCode": 0, "result": "pass" },
+    "test": {
+      "command": "vitest run",
+      "exitCode": 0,
+      "passingTests": 1200,
+      "failingTests": 1,
+      "skippedTests": 4,
+      "failingTestIds": [
+        "verify-runner.test.ts (D-11) pre-existing spawn-error status assertion"
+      ],
+      "result": "pass with documented pre-existing fail"
+    },
+    "build": { "command": "pnpm build", "exitCode": 0, "result": "pass" },
+    "diffCheck": { "command": "git diff --check", "exitCode": 0, "result": "pass" }
+  },
+  "fiveRedLines": {
+    "scope": "packages/coding-agent/src/repl/ + packages/coding-agent/src/modes/tui.ts + packages/coding-agent/src/agent/tool-loop.ts",
+    "diffFromBase": "empty",
+    "preserved": true
+  },
+  "defaultRegistry": "unchanged (19 tools, coding + Code Intel essentials only)",
+  "caveats": [
+    "Package version 2.3.0 is a package line, not roadmap v2.3 maturity proof.",
+    "Fresh release gate proof does NOT prove v1-v4 100% completion. Scorecard advances 55 -> 56% (+1 for v1.0 fresh release evidence).",
+    "v1-v4 aggregate remains below 100% due to other gate blockers: preferred-100k Gate-1 target, 20 real browser tasks, Gate-2 production, cross-platform Desktop, cross-platform SIGKILL."
+  ]
+}

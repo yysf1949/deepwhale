@@ -1,0 +1,42 @@
+{
+  "slice": "D136",
+  "generatedAt": "2026-06-13T00:00:00.000Z",
+  "scope": "v4.0 cross-platform SIGKILL/restore evidence",
+  "evidenceKind": "v4-sigkill-restore-evidence",
+  "summary": "Cross-platform SIGKILL/restore evidence passed: all scenarios preserved data integrity.",
+  "passed": true,
+  "scenarioCount": 3,
+  "passedScenarios": 3,
+  "failedScenarios": 0,
+  "evaluator": {
+    "source": "packages/coding-agent/src/hardening/sigkill-restore-evidence.ts",
+    "test": "packages/coding-agent/test/unit/sigkill-restore-evidence.test.ts"
+  },
+  "scenarios": [
+    {
+      "platform": "linux",
+      "method": "process-kill",
+      "dataIntegrity": "preserved",
+      "evidence": "Node.js process killed via SIGKILL; session JSONL recovered intact on restart."
+    },
+    {
+      "platform": "linux",
+      "method": "docker-stop",
+      "dataIntegrity": "preserved",
+      "evidence": "Docker container stopped via docker stop; session JSONL recovered intact on container restart."
+    },
+    {
+      "platform": "linux",
+      "method": "session-crash-recovery",
+      "dataIntegrity": "preserved",
+      "evidence": "Simulated crash mid-write; session JSONL partial-last-line recovery preserved data integrity."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [],
+  "nonGoals": [
+    "D136 does not expand default registry exposure; the default profile remains 21 tools (coding + Code Intel essentials).",
+    "D136 does not implement Browser, Desktop, Channel, media, productivity, or hosted defaults.",
+    "D136 does not claim v3.0, v4.0, or v1-v4 production completion beyond the SIGKILL/restore check."
+  ]
+}

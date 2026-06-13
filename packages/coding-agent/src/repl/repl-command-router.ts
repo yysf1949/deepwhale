@@ -115,6 +115,11 @@ export interface SlashContext {
    */
   enterPlanMode?: () => void
   /**
+   * D-130: /plan <goal> executes a plan using LLMPlanner + TaskOrchestrator.
+   * Returns the orchestration result or throws on failure.
+   */
+  executePlan?: (goal: string) => Promise<{ completed: number; failed: number; tasks: number }>
+  /**
    * D-31.3.7: /profile 触发, caller 提供 profile-store 注入.
    * - listProfiles:    无 arg 列出所有 profile
    * - currentProfile:  /profile current 显当前
@@ -445,6 +450,21 @@ export async function dispatchSlashBuiltin(
     return { handled: true }
   }
   if (line === '/plan' || line.startsWith('/plan ')) {
+    const arg = line.slice('/plan'.length).trim()
+    // D-130: If goal provided and executePlan wired, execute the plan
+    if (arg && ctx.executePlan) {
+      ctx.out.write(`Planning: ${arg}\n`)
+      ctx.executePlan(arg)
+        .then((result) => {
+          ctx.out.write(`\nPlan executed: ${result.completed}/${result.tasks} tasks completed, ${result.failed} failed\n\n`)
+          ctx.prompt()
+        })
+        .catch((err) => {
+          ctx.err.write(`Plan execution failed: ${err instanceof Error ? err.message : String(err)}\n\n`)
+          ctx.prompt()
+        })
+      return { handled: true }
+    }
     // D-30.1δ.14: /plan 走 enterPlanMode 副作用 (TUI Plan mode D-30.2 接).
     ctx.enterPlanMode?.()
     ctx.out.write('plan mode: enter\n\n')

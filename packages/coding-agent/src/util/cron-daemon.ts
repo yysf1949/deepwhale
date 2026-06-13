@@ -1,11 +1,8 @@
 /**
- * @deepwhale/coding-agent — Cron daemon stub (D-30.3.4, 2026-06-07).
+ * Cron daemon timer boundary.
  *
- * 拍板 (D-30.3): CronDaemon.start(60_000) tick 调 store.list(), 对每个
- *   enabled job 调 onTick(job). 拍板 stub, 实调 (跑 prompt, 调 LLM) 留 D-30.4.
- * - onTick 失败 catch 住, 继续下一个 job
- * - timer.unref() 防止 daemon 阻进程退出
- * - 0 改业务, 5 红线 0 触碰
+ * CronDaemon lists jobs on each tick and calls the injected handler for enabled
+ * jobs. D132 AutomationRuntime provides the prompt execution boundary above it.
  */
 
 import type { CronJob, CronStore } from './cron-store.js';
@@ -36,9 +33,7 @@ export class CronDaemon {
   }
 
   /**
-   * 拍板: 暴露 fireOnce 给单测 (fake-timer 跟 async chain 难串). 生产路径
-   *   start() 内部 setInterval 回调调, 跟 fireOnce 行为 1:1.
-   * - 0 改业务 (5 红线 0 触碰)
+   * Exposes one tick for tests; start() uses the same behavior from setInterval.
    */
   async fireOnce(): Promise<void> {
     let jobs: CronJob[];
@@ -51,7 +46,7 @@ export class CronDaemon {
       try {
         await this.onTick(job);
       } catch {
-        // 拍板 stub: 单 job 失败不影响兄弟. 实调留 D-30.4 接 log.
+        // A single job failure must not block later enabled jobs.
       }
     }
   }

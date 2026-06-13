@@ -37,6 +37,23 @@ const TOOLS = [
 
 const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
 
+function ghCommandConfig() {
+  const command = process.env.DEEPWHALE_GH_COMMAND || 'gh';
+  const prefixArgsRaw = process.env.DEEPWHALE_GH_ARGS_JSON;
+  if (!prefixArgsRaw) {
+    return { command, prefixArgs: [] };
+  }
+  try {
+    const parsed = JSON.parse(prefixArgsRaw);
+    if (Array.isArray(parsed) && parsed.every((value) => typeof value === 'string')) {
+      return { command, prefixArgs: parsed };
+    }
+  } catch {
+    // Fall through to the default gh command without prefix args.
+  }
+  return { command, prefixArgs: [] };
+}
+
 rl.on('line', async (line) => {
   if (!line.trim()) return;
   let msg;
@@ -70,7 +87,9 @@ rl.on('line', async (line) => {
         if (typeof query !== 'string' || query.length === 0) {
           throw new Error('invalid-input: query required');
         }
-        const { stdout } = await execFile('gh', [
+        const { command, prefixArgs } = ghCommandConfig();
+        const { stdout } = await execFile(command, [
+          ...prefixArgs,
           'search', 'code', query,
           '--limit', String(limit),
           '--json', 'path,repository,textMatches',

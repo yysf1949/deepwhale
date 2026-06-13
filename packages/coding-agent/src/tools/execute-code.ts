@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 const TIMEOUT_MS = 30_000;
 
@@ -23,6 +24,7 @@ export class ExecuteCodeTool implements Tool {
   readonly description =
     'Execute code in a subprocess with 30s timeout. Supports Python (python3) and JavaScript (node). Medium risk (runs arbitrary code).';
   readonly risk: 'low' | 'medium' | 'high' = 'medium';
+  readonly capabilities: readonly ToolCapability[] = ['code-execute'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

@@ -40,18 +40,41 @@ export {
   type Reference,
 } from './symbol-graph.js';
 
+// D-33.3.2 (2026-06-09): semantic search lexical fallback interface
+export {
+  createSemanticIndex,
+  type SemanticIndex,
+  type SemanticIndexChunk,
+  type SemanticSearchOptions,
+  type SemanticSearchResult,
+  type CreateSemanticIndexOptions,
+} from './semantic-index.js';
+
 // Stabilization Gate-1 runner: machine-verifiable large-repo Code Intel gate.
 export {
   runGate1,
+  countSupportedLoc,
   readGate1Scenario,
   parseGate1Args,
   loadGate1CliConfig,
   formatGate1Markdown,
+  type Gate1LocStats,
   type Gate1Options,
   type Gate1CliConfig,
   type Gate1ParsedArgs,
   type Gate1Metrics,
+  type Gate1LocQualification,
   type Gate1Evidence,
   type Gate1SymbolEvidence,
   type Gate1Result,
 } from './gate1.js';
+
+export {
+  inventoryGate1Targets,
+  renderGate1TargetInventoryMarkdown,
+  writeGate1TargetInventoryReport,
+  type Gate1TargetInventoryOptions,
+  type Gate1TargetInventoryReport,
+  type Gate1TargetInventoryStatus,
+  type Gate1TargetSummary,
+} from './gate1-targets.js';

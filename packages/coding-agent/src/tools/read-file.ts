@@ -10,12 +10,14 @@
 import { promises as fs } from 'node:fs';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export class ReadFileTool implements Tool {
   readonly name = 'read_file' as ToolName;
   readonly description =
     'Read a local file. Returns file content with line numbers. Use offset/limit to read a slice.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

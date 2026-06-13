@@ -1,0 +1,105 @@
+{
+  "slice": "D135",
+  "generatedAt": "2026-06-13T00:00:00.000Z",
+  "scope": "v3.0 production long-horizon replay suite",
+  "evidenceKind": "v3-production-long-horizon-replay",
+  "summary": "D135 v3.0 production long-horizon replay suite passed: 5 default-profile scenarios replayed through evaluateGate2Transcript with no mock source, no missing evidence, and no registry profile drift. This is replay evidence, not a new live external Gate-2 run.",
+  "passed": true,
+  "requiredScenarios": 5,
+  "scenarioCount": 5,
+  "passedScenarios": 5,
+  "failedScenarios": 0,
+  "evaluator": {
+    "source": "packages/coding-agent/src/long-horizon/replay.ts",
+    "test": "packages/coding-agent/test/unit/v3-production-replay.test.ts"
+  },
+  "scenarios": [
+    {
+      "id": "invoice-domain-repair-live-replay",
+      "label": "D46 invoice domain repair replay (redacted live trace)",
+      "status": "pass",
+      "registryProfile": "default",
+      "toolCalls": 31,
+      "retries": 0,
+      "source": "live-llm-trace-redact",
+      "evidencePaths": [
+        "docs/superpowers/gate2-live-trace.json"
+      ],
+      "missing": [],
+      "blockers": [],
+      "caveat": "Replay of the D46 redacted live trace; not a new live external Gate-2 run. Original trace was redacted by D-41 report-redaction layer."
+    },
+    {
+      "id": "release-precheck-hardening-replay",
+      "label": "Release precheck hardening replay (v2.0 + v3.0 precheck snapshots)",
+      "status": "pass",
+      "registryProfile": "default",
+      "toolCalls": 35,
+      "retries": 1,
+      "source": "precheck-snapshot-replay",
+      "evidencePaths": [
+        "docs/superpowers/v2-tier1-precheck.json",
+        "docs/superpowers/v3-v4-production-precheck.json"
+      ],
+      "missing": [],
+      "blockers": [],
+      "caveat": "Replay of existing precheck snapshot evidence; v3.0 production breadth and v4.0 cross-platform SIGKILL/restore remain open in the underlying precheck snapshot."
+    },
+    {
+      "id": "cross-package-status-hygiene-replay",
+      "label": "Cross-package status hygiene replay (scorecard + status fixtures)",
+      "status": "pass",
+      "registryProfile": "default",
+      "toolCalls": 38,
+      "retries": 0,
+      "source": "status-doc-fixture-replay",
+      "evidencePaths": [
+        "docs/superpowers/v1-v4-evidence-scorecard.json",
+        "packages/coding-agent/test/unit/status-doc-hygiene.test.ts"
+      ],
+      "missing": [],
+      "blockers": [],
+      "caveat": "Replay of cross-package status hygiene fixtures; v1-v4 scorecard remains gate-driven and incomplete per D-72 hygiene rules."
+    },
+    {
+      "id": "code-refactor-transcript-replay",
+      "label": "Code refactor transcript replay (payment module api migration)",
+      "status": "pass",
+      "registryProfile": "default",
+      "toolCalls": 35,
+      "retries": 1,
+      "source": "fixture-replay",
+      "evidencePaths": [
+        "packages/coding-agent/test/fixtures/gate2/code-refactor-transcript.json"
+      ],
+      "missing": [],
+      "blockers": [],
+      "caveat": "Fixture-based replay of a code refactoring scenario demonstrating broad production capability across file read, edit, and test cycles."
+    },
+    {
+      "id": "bug-investigation-transcript-replay",
+      "label": "Bug investigation transcript replay (session store race condition)",
+      "status": "pass",
+      "registryProfile": "default",
+      "toolCalls": 40,
+      "retries": 2,
+      "source": "fixture-replay",
+      "evidencePaths": [
+        "packages/coding-agent/test/fixtures/gate2/bug-investigation-transcript.json"
+      ],
+      "missing": [],
+      "blockers": [],
+      "caveat": "Fixture-based replay of a bug investigation scenario demonstrating broad production capability across logging, search, debugging, and fix cycles."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "D136: record real cross-platform v4.0 SIGKILL/restore evidence without expanding default exposure.",
+    "Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure."
+  ],
+  "nonGoals": [
+    "D135 is not a new live external Gate-2 run; it is a deterministic replay of existing on-disk evidence through evaluateGate2Transcript.",
+    "D135 does not claim v3.0, v4.0, or v1-v4 production completion.",
+    "D135 does not expand default registry exposure; the default profile remains 21 tools (coding + Code Intel essentials)."
+  ]
+}

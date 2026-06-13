@@ -1,11 +1,11 @@
 /**
  * smart_search 工具 — 3 action (D-32.3.1, 2026-06-08).
  *
- * 拍板: 走 @deepwhale/code-intel 智能 search (symbol-aware) + gh CLI 远端
+ * 拍板: 走 @deepwhale/code-intel 智能 search (symbol-aware) + 显式 gh CLI 远端
  *   search (公开 repo code search). 3 action:
  *     local  — 只走 code-intel findReferences (symbol-like query)
  *     remote — 只走 gh search code (公开 GitHub code search)
- *     all    — try local first, fall back to remote (default)
+ *     all    — local aggregate search only; never invokes gh
  *
  * 0 业务改业务, 5 红线 0 触碰. risk: low (read-only).
  */
@@ -15,15 +15,18 @@ import { promisify } from 'node:util';
 import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
-import { buildSymbolGraph, findReferences } from '@deepwhale/code-intel';
+import { buildSymbolGraph, createSemanticIndex, findReferences } from '@deepwhale/code-intel';
+import type { SymbolGraph } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 const execFile = promisify(execFileCb);
 const REMOTE_SEARCH_TIMEOUT_MS = 2_000;
 
 export class SmartSearchTool implements Tool {
   readonly name = 'smart_search' as ToolName;
-  readonly description = 'Heuristic code search with symbol-aware local matches and optional gh remote search; local results are not IDE-grade/type-aware. 3 actions: local / remote / all. Low risk (read-only).';
+  readonly description = 'Heuristic code search with symbol-aware local matches. Remote GitHub search is explicit opt-in via action=remote; local/all results are not IDE-grade/type-aware. Low risk (read-only).';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',
@@ -50,15 +53,26 @@ export class SmartSearchTool implements Tool {
         const local = await localSearch(query, repoPath, maxResults);
         results.push(...local);
       }
-      if ((action === 'remote' || action === 'all') && results.length === 0) {
+      const remoteEnabled = action === 'remote';
+      if (remoteEnabled) {
         const remote = await remoteSearch(query, maxResults);
         results.push(...remote);
       }
-      const content = formatResults(results, query, action as string);
+      const content = formatResults(results, query, action as string, remoteEnabled);
       return {
         success: true,
         content,
-        meta: { query, action, count: results.length, localCount: results.filter((r) => r.source === 'local').length, remoteCount: results.filter((r) => r.source === 'remote').length },
+        meta: {
+          query,
+          action,
+          count: results.length,
+          localCount: results.filter((r) => r.source === 'local').length,
+          remoteCount: results.filter((r) => r.source === 'remote').length,
+          semanticCount: results.filter((r) => r.matchMode === 'semantic_fallback').length,
+          matchModes: [...new Set(results.map((r) => r.matchMode))],
+          remoteEnabled,
+          heuristic: true,
+        },
       };
     } catch (e) {
       return { success: false, content: '', error: `smart_search error: ${e instanceof Error ? e.message : String(e)}` };
@@ -74,6 +88,8 @@ interface SearchResult {
   snippet: string;
   kind?: string;
   score: number;
+  matchMode: 'symbol_reference' | 'semantic_fallback' | 'remote';
+  reason?: string;
 }
 
 async function localSearch(query: string, repoPath: string, maxResults: number): Promise<SearchResult[]> {
@@ -90,12 +106,14 @@ async function localSearch(query: string, repoPath: string, maxResults: number):
         snippet: `${r.kind}\t${r.file}:${r.line}:${r.col}${r.scope ? ` (scope=${r.scope})` : ''}`,
         kind: r.kind,
         score: 100, // exact symbol match, high score
+        matchMode: 'symbol_reference',
       });
     }
+    out.push(...await semanticFallbackSearch(graph, query, maxResults));
   } catch {
     // ignore — local search is best-effort
   }
-  return out.slice(0, maxResults);
+  return dedupeAndRank(out).slice(0, maxResults);
 }
 
 async function remoteSearch(query: string, maxResults: number): Promise<SearchResult[]> {
@@ -118,6 +136,7 @@ async function remoteSearch(query: string, maxResults: number): Promise<SearchRe
         col,
         snippet: firstMatch?.fragment?.slice(0, 120) ?? '(no fragment)',
         score: 50, // remote match, medium score
+        matchMode: 'remote',
       });
     }
   } catch {
@@ -126,13 +145,101 @@ async function remoteSearch(query: string, maxResults: number): Promise<SearchRe
   return out;
 }
 
-function formatResults(results: SearchResult[], query: string, action: string): string {
+interface SemanticChunkDetail {
+  file: string;
+  line: number;
+  col: number;
+  kind: string;
+  snippet: string;
+}
+
+async function semanticFallbackSearch(
+  graph: SymbolGraph,
+  query: string,
+  maxResults: number,
+): Promise<SearchResult[]> {
+  const index = createSemanticIndex({ embeddingProvider: null });
+  const details = new Map<string, SemanticChunkDetail>();
+
+  for (const [filePath, fileSymbols] of graph.files) {
+    for (const symbol of fileSymbols.symbols) {
+      if (symbol.name.length === 0) continue;
+      const symbolId = `${filePath}:${symbol.scope ? `${symbol.scope}.` : ''}${symbol.name}`;
+      const expandedName = splitIdentifier(symbol.name).join(' ');
+      const expandedScope = symbol.scope ? splitIdentifier(symbol.scope).join(' ') : '';
+      const content = [
+        symbol.name,
+        expandedName,
+        symbol.kind,
+        filePath,
+        symbol.scope,
+        expandedScope,
+      ].filter((part): part is string => typeof part === 'string' && part.length > 0).join(' ');
+      await index.addChunk({ id: symbolId, content, symbolId });
+      details.set(symbolId, {
+        file: filePath,
+        line: symbol.line,
+        col: symbol.col,
+        kind: symbol.kind,
+        snippet: `${symbol.kind}\t${symbol.name}${symbol.scope ? ` (scope=${symbol.scope})` : ''}`,
+      });
+    }
+  }
+
+  const semantic = await index.search(query, { maxResults });
+  return semantic.flatMap((match) => {
+    const detail = details.get(match.id);
+    if (!detail) return [];
+    const result: SearchResult = {
+      source: 'local',
+      file: detail.file,
+      line: detail.line,
+      col: detail.col,
+      snippet: detail.snippet,
+      kind: detail.kind,
+      score: 40 + match.score,
+      matchMode: 'semantic_fallback',
+    };
+    if (match.reason !== undefined) result.reason = match.reason;
+    return [result];
+  });
+}
+
+function splitIdentifier(identifier: string): string[] {
+  return identifier
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .split(/[^a-zA-Z0-9]+/u)
+    .map((part) => part.toLowerCase())
+    .filter(Boolean);
+}
+
+function dedupeAndRank(results: SearchResult[]): SearchResult[] {
+  const byKey = new Map<string, SearchResult>();
+  for (const result of results) {
+    const key = `${result.file}:${result.line}:${result.col}:${result.matchMode}`;
+    const existing = byKey.get(key);
+    if (!existing || result.score > existing.score) byKey.set(key, result);
+  }
+  return [...byKey.values()].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const fileCompare = a.file.localeCompare(b.file);
+    if (fileCompare !== 0) return fileCompare;
+    if (a.line !== b.line) return a.line - b.line;
+    if (a.col !== b.col) return a.col - b.col;
+    return a.matchMode.localeCompare(b.matchMode);
+  });
+}
+
+function formatResults(results: SearchResult[], query: string, action: string, remoteEnabled: boolean): string {
   if (results.length === 0) {
-    return `(no results for '${query}' in ${action} search)`;
+    const mode = remoteEnabled ? action : `${action} local-only`;
+    return `(no results for '${query}' in ${mode} search)`;
   }
   const lines = results.map((r) => {
     const src = r.source === 'local' ? 'L' : 'R';
-    return `[${src}] score=${String(r.score).padStart(3)}  ${r.file}:${r.line}:${r.col}  ${r.snippet}`;
+    const reason = r.reason ? `  ${r.reason}` : '';
+    return `[${src}] ${r.matchMode} score=${String(r.score).padStart(3)}  ${r.file}:${r.line}:${r.col}  ${r.snippet}${reason}`;
   });
   return `Found ${results.length} results for '${query}':\n${lines.join('\n')}`;
 }

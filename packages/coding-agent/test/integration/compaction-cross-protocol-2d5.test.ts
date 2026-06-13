@@ -301,7 +301,13 @@ describe('coding-agent mode layer — 1c-revive-2-D-5-3 跨协议 16 turn (DeepS
         const result = await runToolLoopWithCompaction(
           client,
           baseMessages,
-          { registry, maxSteps: 5 },
+          {
+            registry,
+            // Live LLMs may make a few extra tool calls before converging. Keep the
+            // behavioral assertions below strict; this budget only prevents false
+            // negatives from iteration-count variance.
+            maxSteps: 10,
+          },
           compactionConfig,
           summaryFn,
         );

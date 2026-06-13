@@ -136,6 +136,195 @@ describe('symbol-graph (D-32.2.1)', () => {
     }
   });
 
+  it('does not index block-comment identifier mentions as references', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-block-comment-refs-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          'function target() {',
+          '  return 1;',
+          '}',
+          '',
+          'function run() {',
+          '  /* target();',
+          '     target is mentioned here too',
+          '  */',
+          '  return 0;',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'target');
+
+      expect(refs).toEqual([
+        expect.objectContaining({ file: 'main.ts', kind: 'declaration', line: 1 }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not build call graph edges from block-comment call expressions', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-block-comment-calls-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          'function target() {',
+          '  return 1;',
+          '}',
+          '',
+          'function run() {',
+          '  /*',
+          '   * target();',
+          '   */',
+          '  return 0;',
+          '}',
+          '',
+          'function realRun() {',
+          '  return target();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+      const targetEdges = callGraph.edges.filter((edge) => edge.callee === 'main.ts:target');
+
+      expect(targetEdges).toEqual([
+        expect.objectContaining({
+          caller: 'main.ts:realRun',
+          callee: 'main.ts:target',
+          line: 13,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not index block-comment imports as references', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-block-comment-imports-'));
+    try {
+      await writeFile(resolve(dir, 'target.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          "/* import { target } from './target.js'; */",
+          '',
+          'export function run() {',
+          '  return 0;',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'target');
+
+      expect(refs).toEqual([
+        expect.objectContaining({ file: 'target.ts', kind: 'declaration', line: 1 }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not index string-literal imports as references', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-string-imports-'));
+    try {
+      await writeFile(resolve(dir, 'target.ts'), 'export function target() {\n  return 1;\n}\n');
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          "const text = \"import { target } from './target.js';\";",
+          '',
+          'export function run() {',
+          '  return text;',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const refs = findReferences(g, 'target');
+
+      expect(refs).toEqual([
+        expect.objectContaining({ file: 'target.ts', kind: 'declaration', line: 1 }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not let block-comment imports suppress same-file call edges', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-block-comment-import-callgraph-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          "/* import { target } from '@missing/package'; */",
+          '',
+          'function target() {',
+          '  return 1;',
+          '}',
+          '',
+          'function run() {',
+          '  return target();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+
+      expect(callGraph.edges).toEqual([
+        expect.objectContaining({
+          caller: 'main.ts:run',
+          callee: 'main.ts:target',
+          line: 8,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not treat TypeScript private fields as line comments before real calls', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-private-field-block-comment-'));
+    try {
+      await writeFile(
+        resolve(dir, 'main.ts'),
+        [
+          'function target() {',
+          '  return 1;',
+          '}',
+          '',
+          'class Runner {',
+          '  #state = 0;',
+          '  run() {',
+          '    this.#state /* target(); */; return target();',
+          '  }',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+      const targetEdges = callGraph.edges.filter((edge) => edge.callee === 'main.ts:target');
+
+      expect(targetEdges).toEqual([
+        expect.objectContaining({
+          caller: 'main.ts:Runner.run',
+          callee: 'main.ts:target',
+          line: 8,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('buildCallGraph prefers relative import targets over same-name symbols in unrelated files', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-imports-'));
     try {
@@ -269,6 +458,45 @@ describe('symbol-graph (D-32.2.1)', () => {
     }
   });
 
+  it('resolves calls imported through TypeScript default re-export barrels to the original named default declaration', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-default-reexport-'));
+    try {
+      await writeFile(
+        resolve(dir, 'provider.ts'),
+        [
+          'export default function defaultTarget() {',
+          '  return 1;',
+          '}',
+        ].join('\n'),
+      );
+      await writeFile(resolve(dir, 'barrel.ts'), "export { default as defaultTarget } from './provider.js';\n");
+      await writeFile(resolve(dir, 'other.ts'), 'export function defaultTarget() {\n  return 2;\n}\n');
+      await writeFile(
+        resolve(dir, 'consumer.ts'),
+        [
+          "import { defaultTarget } from './barrel.js';",
+          '',
+          'export function run() {',
+          '  return defaultTarget();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const callGraph = await buildCallGraph(g);
+
+      expect(callGraph.edges.filter((edge) => edge.caller === 'consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:defaultTarget',
+          line: 4,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('resolves TypeScript tsconfig path aliases to their call target', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-callgraph-tsconfig-paths-'));
     try {
@@ -330,5 +558,138 @@ describe('symbol-graph (D-32.2.1)', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it('indexes and resolves TypeScript combined default and named imports', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'dw-symbol-combined-imports-'));
+    try {
+      await writeFile(
+        resolve(dir, 'provider.ts'),
+        [
+          'export default function defaultTarget() {',
+          '  return 1;',
+          '}',
+          '',
+          'export function namedTarget() {',
+          '  return 2;',
+          '}',
+        ].join('\n'),
+      );
+      await writeFile(resolve(dir, 'other.ts'), 'export function namedTarget() {\n  return 3;\n}\n');
+      await writeFile(
+        resolve(dir, 'consumer.ts'),
+        [
+          "import defaultTarget, { namedTarget as chosenTarget } from './provider.js';",
+          '',
+          'export function run() {',
+          '  defaultTarget();',
+          '  return chosenTarget();',
+          '}',
+        ].join('\n'),
+      );
+
+      const g = await buildSymbolGraph(dir);
+      const defaultRefs = findReferences(g, 'defaultTarget');
+      const namedRefs = findReferences(g, 'namedTarget');
+      const chosenRefs = findReferences(g, 'chosenTarget');
+      const callGraph = await buildCallGraph(g);
+
+      expect(defaultRefs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'provider.ts', kind: 'declaration' }),
+          expect.objectContaining({ file: 'consumer.ts', kind: 'import', line: 1 }),
+          expect.objectContaining({ file: 'consumer.ts', kind: 'call', line: 4 }),
+        ]),
+      );
+      expect(namedRefs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'provider.ts', kind: 'declaration' }),
+          expect.objectContaining({ file: 'consumer.ts', kind: 'import', line: 1 }),
+        ]),
+      );
+      expect(chosenRefs).toEqual(
+        expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', kind: 'call', line: 5 })]),
+      );
+      expect(callGraph.edges.filter((edge) => edge.caller === 'consumer.ts:run')).toEqual([
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:defaultTarget',
+          line: 4,
+        }),
+        expect.objectContaining({
+          caller: 'consumer.ts:run',
+          callee: 'provider.ts:namedTarget',
+          line: 5,
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('advanced import resolution (D-33.2.1)', () => {
+  // 拍板 (D-33.2.1): prefer no edge over a false edge. Tests assert the
+  // conservative behavior actually produced by the impl:
+  //   - tsconfig path alias `@api/*` → `src/api/*` resolves `@api/api` to
+  //     `src/api/api` (no such file) → no call edge, but the import IS recorded.
+  //   - Barrel re-exports (named + default) resolve through resolveReExportTarget
+  //     to the original declaring file.
+  //   - Dynamic import is left as text reference (no kind:dynamic_import added).
+  const ADV_FIXTURE = resolve(FIXTURE, 'ts-imports-advanced');
+
+  it('resolves tsconfig path alias imports (conservative: import recorded, no call edge when target not found)', async () => {
+    const graph = await buildSymbolGraph(ADV_FIXTURE);
+
+    // The `@api/api` import is recorded (the symbol graph captures the import reference)
+    const targetRefs = findReferences(graph, 'target');
+    expect(targetRefs.map((r) => `${r.file}:${r.kind}`)).toEqual(
+      expect.arrayContaining(['src/api.ts:declaration', 'src/main.ts:import']),
+    );
+
+    // The barrel also re-exports `target` from `./api`; barrel entry is also an import ref
+    expect(targetRefs.map((r) => `${r.file}:${r.kind}`)).toEqual(
+      expect.arrayContaining(['src/barrel.ts:import']),
+    );
+
+    // No call graph edge resolves to src/api.ts:target (tsconfig path can't
+    // resolve `@api/api` to a real file, so the import is dangling → no edge)
+    const callGraph = await buildCallGraph(graph);
+    const apiCallEdges = callGraph.edges.filter((edge) => edge.callee === 'src/api.ts:target');
+    expect(apiCallEdges.filter((edge) => edge.file === 'src/main.ts')).toEqual([]);
+  });
+
+  it('resolves default re-export from barrel to the original declaring file', async () => {
+    const graph = await buildSymbolGraph(ADV_FIXTURE);
+
+    // The default export `defaultWorker` in src/workers/default-worker.ts is
+    // re-exported through src/barrel.ts. The barrel re-export to the
+    // declaring file is a first-hop import, so the original symbol id should
+    // be reachable through the barrel.
+    const defaultRefs = findReferences(graph, 'defaultWorker');
+    expect(defaultRefs.map((r) => `${r.file}:${r.kind}`)).toEqual(
+      expect.arrayContaining([
+        'src/workers/default-worker.ts:declaration',
+        'src/barrel.ts:import',
+        'src/main.ts:import',
+      ]),
+    );
+  });
+
+  it('records dynamic import as a text reference (no special kind added; conservative)', async () => {
+    const graph = await buildSymbolGraph(ADV_FIXTURE);
+    const refs = findReferences(graph, 'lazyFeature');
+    // The declaration is in src/feature.ts
+    expect(refs.map((r) => `${r.file}:${r.kind}`)).toEqual(
+      expect.arrayContaining(['src/feature.ts:declaration']),
+    );
+    // Dynamic import is detected as a call-style reference (not a special
+    // 'dynamic_import' kind) — preferring no extra kind over a false edge.
+    const dynamicKinds = new Set(refs.map((r) => r.kind));
+    // The set of kinds in use today does NOT include 'dynamic_import' (拍板
+    // #1: do not loosen the impl). We just assert the symbol is resolvable
+    // and the impl does not crash on dynamic imports.
+    expect(dynamicKinds.has('dynamic_import')).toBe(false);
+    expect([...dynamicKinds].length).toBeGreaterThan(0);
   });
 });

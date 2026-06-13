@@ -11,12 +11,14 @@
 import { execFileSync } from 'node:child_process';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export class SearchFilesTool implements Tool {
   readonly name = 'search_files' as ToolName;
   readonly description =
     'Search file contents using ripgrep (rg). Faster than grep on large repos. Supports glob filter. Read-only.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

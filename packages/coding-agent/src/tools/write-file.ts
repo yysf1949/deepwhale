@@ -11,12 +11,14 @@ import { promises as fs } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export class WriteFileTool implements Tool {
   readonly name = 'write_file' as ToolName;
   readonly description =
     'Write content to a local file. Overwrites existing file. Requires user confirmation (medium risk).';
   readonly risk: 'low' | 'medium' | 'high' = 'medium';
+  readonly capabilities: readonly ToolCapability[] = ['file-read', 'file-write'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

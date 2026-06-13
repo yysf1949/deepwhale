@@ -1,16 +1,12 @@
 /**
- * D-30.2.8: Tool registry 注入 5 新工具 + D-30.3.5 加 delegate_task.
- *           + D-30.4.6 加 vision_analyze + text_to_speech.
- *
- * 拍板 (D-30.2): createDefaultRegistry 装 patch / search_files / execute_code / todo / plan,
- * 跟 9 工具 1:1 同形态 (先 register, 跟现有顺序保持稳定).
- * 拍板 (D-30.3): 14 → 15, 加 delegate_task (subagent 并行 max 5, medium).
- * 拍板 (D-30.4): 15 → 17, 加 vision_analyze + text_to_speech (2 new tools).
+ * D-30 registry expansion coverage: coding tools stay in the default surface,
+ * while delegate_task, vision_analyze, and text_to_speech remain explicit
+ * opt-in through the all profile.
  */
 import { describe, it, expect } from 'vitest';
-import { createDefaultRegistry } from '../../src/tools/registry.js';
+import { createDefaultRegistry, createRegistryForProfile } from '../../src/tools/registry.js';
 
-describe('tool registry (D-30.2.8 — 5 new tools, D-30.3.5 — 1 subagent, D-30.4.6 — 2 vision+tts)', () => {
+describe('tool registry D-30 expansion coverage', () => {
   it('includes 5 new tools (patch / search_files / execute_code / todo / plan)', () => {
     const registry = createDefaultRegistry();
     expect(registry.get('patch')).toBeDefined();
@@ -20,20 +16,20 @@ describe('tool registry (D-30.2.8 — 5 new tools, D-30.3.5 — 1 subagent, D-30
     expect(registry.get('plan')).toBeDefined();
   });
 
-  it('includes delegate_task (D-30.3.5)', () => {
-    const registry = createDefaultRegistry({ profile: 'all' });
+  it('includes delegate_task (D-30.3.5)', async () => {
+    const registry = await createRegistryForProfile({ profile: 'all' });
     expect(registry.get('delegate_task')).toBeDefined();
   });
 
-  it('includes vision_analyze + text_to_speech (D-30.4.6)', () => {
-    const registry = createDefaultRegistry({ profile: 'all' });
+  it('includes vision_analyze + text_to_speech (D-30.4.6)', async () => {
+    const registry = await createRegistryForProfile({ profile: 'all' });
     expect(registry.get('vision_analyze')).toBeDefined();
     expect(registry.get('text_to_speech')).toBeDefined();
   });
 
-  it('all profile total size = 41 (explicit opt-in)', () => {
-    const registry = createDefaultRegistry({ profile: 'all' });
-    expect(registry.size()).toBe(41);
+  it('all profile total size = 43 (explicit opt-in)', async () => {
+    const registry = await createRegistryForProfile({ profile: 'all' });
+    expect(registry.size()).toBe(43);
   });
 
   it('5 new tools have correct risk levels', () => {
@@ -45,13 +41,13 @@ describe('tool registry (D-30.2.8 — 5 new tools, D-30.3.5 — 1 subagent, D-30
     expect(registry.get('plan')?.risk).toBe('low');
   });
 
-  it('delegate_task has risk=medium', () => {
-    const registry = createDefaultRegistry({ profile: 'all' });
+  it('delegate_task has risk=medium', async () => {
+    const registry = await createRegistryForProfile({ profile: 'all' });
     expect(registry.get('delegate_task')?.risk).toBe('medium');
   });
 
-  it('vision_analyze + text_to_speech have risk=medium (D-30.4.6)', () => {
-    const registry = createDefaultRegistry({ profile: 'all' });
+  it('vision_analyze + text_to_speech have risk=medium (D-30.4.6)', async () => {
+    const registry = await createRegistryForProfile({ profile: 'all' });
     expect(registry.get('vision_analyze')?.risk).toBe('medium');
     expect(registry.get('text_to_speech')?.risk).toBe('medium');
   });

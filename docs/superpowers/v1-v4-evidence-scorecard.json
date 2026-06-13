@@ -1,0 +1,158 @@
+{
+  "generatedAt": "2026-06-13T00:00:00.000Z",
+  "basis": {
+    "branch": "feature/d36-gate2-live",
+    "packageVersionLine": "2.3.0",
+    "gate1PreferredReport": "docs/superpowers/gate-1-preferred-targets.json",
+    "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
+    "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md",
+    "v2Tier1Precheck": "docs/superpowers/v2-tier1-precheck.json",
+    "v2ProductionBrowserProof": "docs/superpowers/v2-production-browser-proof.json",
+    "v3v4ProductionPrecheck": "docs/superpowers/v3-v4-production-precheck.json"
+  },
+  "aggregatePercent": 73,
+  "milestones": [
+    {
+      "id": "v1.0",
+      "percent": 80,
+      "status": "Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79); default registry invariant asserted (D-83)",
+      "evidence": [
+        "coding tool registry baseline exists",
+        "core session and tool-loop tests exist",
+        "public docs explicitly avoid production-complete claims",
+        "D72 release/version hygiene report distinguishes package version from roadmap maturity",
+        "D79 produces a fresh v1.0 release gate proof (typecheck + lint + test + build + diff --check all exit 0; 5 红线 preserved)",
+        "D83 records a v1.0 default-registry invariant: 19-tool narrow default + no non-coding opt-in tools exposed by default (verified by 2 unit tests)"
+      ],
+      "blockers": [
+        "package version 2.3.0 is a package line, not roadmap v2.3 maturity proof",
+        "no new public code claims; the v1.0 ship ritual (tag, npm publish) is gated on user approval"
+      ]
+    },
+    {
+      "id": "v1.5",
+      "percent": 85,
+      "status": "Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 PASSES via React target (753,902 LOC, createElement -> ReactElement call chain verified, D-141); re-export chain call graph correctness fixture present (D-84)",
+      "evidence": [
+        "symbol graph, reference graph, heuristic call graph, and Code Intel tools exist",
+        "Gate-1 minimum Vite evidence is present at 86216 supported LOC",
+        "Gate-1 preferred React target indexed at 753902 LOC (preferred-100k qualified)",
+        "Code Intel descriptions and metadata label heuristic behavior",
+        "D67 rename_symbol exposes hashline edit hunks and heuristic confidence metadata",
+        "D69 refreshed Gate-1 target inventory and Vite minimum-50k Gate-1 scenario evidence",
+        "D71 covers TypeScript combined default-plus-named import references and call edges",
+        "D74 resolves TypeScript default re-export barrel call edges to the original named default declaration",
+        "D84 records a v1.5 Code Intel re-export chain call-graph fixture: the heuristic correctly recognizes transitive callers across a caller -> intermediate re-exporter -> target boundary (verified by 1 new test in call-graph.test.ts)",
+        "D141 advances Gate-1 preferred-100k from available to PASSES: React target (753,902 LOC) now has verified createElement -> ReactElement call chain evidence"
+      ],
+      "blockers": [
+        "rename_symbol is reference-guided lexical rewrite with hashline edit hunks, not IDE-grade AST rename"
+      ]
+    },
+    {
+      "id": "v2.0",
+      "percent": 70,
+      "status": "memory, Browser, MCP, Automation, and Remote TUI foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence; D128 adds a machine-readable v2.0 Tier-1 precheck; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row from existing implementation and integration evidence; D131 closes the MCP Runtime Tier-2 row with a one-server stdio JSON-RPC transport proof; D132 closes the Automation Tier-2 row with an injected runner and persisted run-record proof; D133 closes the Remote TUI Tier-2 row with an authenticated injected-transport protocol/session proof",
+      "evidence": [
+        "memory modules exist",
+        "Browser foundation modules exist behind opt-in surfaces",
+        "MCP package and runtime foundation exist",
+        "D70 refreshed Gate-1.5 fixture evidence with binding=false and branchDecision=defer-live-evidence",
+        "D73 live Browser task ledger records 0/20 live tasks and binding=false",
+        "D114 queues 20 pending candidate live Browser tasks as sourcing evidence only; 0/20 completed live results exist and binding remains false",
+        "D115 adds an opt-in live Browser task runner boundary; it runs only with optIn=true plus an injected adapter, and still leaves 0/20 completed live results",
+        "D116 adds a pure live Browser result recorder that accepts known task results, ignores unknown and duplicate rows, and delegates binding to the required 20 completed-result threshold while repository evidence remains 0/20",
+        "D117 adds the opt-in live Browser evidence runner that orchestrates the chain end-to-end (queue D-114 + runner D-115 + recorder D-116) and records the first opt-in run with a stub adapter, advancing the repository ledger from 0/20 to 1/20 completed live results; binding remains false because 19/20 are still pending",
+        "D118 adds the opt-in live Browser evidence batch runner that calls the D-117 single-run chain `batchSize` times in a loop with the updated ledger between iterations, advancing the repository ledger from 1/20 to 4/20 (3 more) via a single batch call with a stub adapter; binding remains false because 16/20 are still pending",
+        "D119 adds the real HTTP Browser evidence adapter that uses Node's built-in `fetch` (HTTP only, no JS execution) to record real network-call evidence for 2 candidate tasks, advancing the repository ledger from 4/20 to 6/20 (2 more real-evidence tasks); of the 6 cumulative completed live results, 4 are stub-evidence (D-117/118) and 2 are real-evidence (D-119); binding remains false because 14/20 are still pending; D-119 adds zero new npm deps",
+        "D120 adds the hybrid real Browser evidence runner that records 2 additional HTTP-evidence tasks plus 1 JS-evidence task, advancing the repository ledger from 6/20 to 9/20; cumulative evidence is 4 stub + 4 HTTP + 1 JS result, and binding remains false because 11/20 are still pending",
+        "D121 fixes hybrid evidence accumulation for non-contiguous mapped pending tasks so future runs can skip unmapped pending rows without aborting; this keeps repository evidence at 9/20 and binding=false",
+        "D122 adds optional per-task JS action mapping to recordHybridRealBrowserEvidence so remaining JS evidence can distinguish fill-search-input, click-element, and extract-text actions; this keeps repository evidence at 9/20 and binding=false",
+        "D123 makes recordHybridRealBrowserEvidence return a recomputed updatedLedger and recalculates binding/branchDecision through the live Browser ledger builder; this keeps repository evidence at 9/20 and binding=false",
+        "D124 chains two updatedLedger accumulation runs of recordHybridRealBrowserEvidence to record 4 additional live evidence results (cart-update-quantity as HTTP-evidence from https://example.com/, checkout-address-validation as JS click-element on https://example.com/, table-filter as HTTP-evidence from https://www.iana.org/, and table-pagination as JS extract-text on https://www.iana.org/), advancing the repository ledger from 9/20 to 13/20; cumulative evidence is 4 stub + 6 HTTP + 3 JS, and binding remains false because 7/20 are still pending",
+        "D125 completes the final 7 live Browser tasks (settings-toggle, profile-edit, modal-open-close, tabs-switch, breadcrumb-navigation, download-link-detection, error-page-recovery) via real HTTP fetch evidence, advancing the repository ledger from 13/20 to 20/20; binding becomes true and browserEnhancementUnlocked becomes true",
+        "D126 implements the first Browser Tier-1 foundation slice as pure TypeScript helpers: richer semantic DOM extraction, pageSummary, deterministic rankElementsForIntent candidates with reasons/scores, bounded action history, repeated-action detection, and planner selection that avoids repeating the same target when alternatives exist (verified by Browser unit tests)",
+        "D127 adds explainable Memory Ranking and deterministic Code Intel semantic fallback evidence: rankMemoriesWithScores and MemoryStore.rank expose score factors/reasons, semantic-index results expose matched tokens/coverage/reason/stable tie-breaking, and smart_search local/all reports heuristic semantic_fallback results for free-text queries while exact symbol matches remain higher priority",
+        "D128 adds a machine-readable v2.0 Tier-1 precheck: Browser helper evidence, Memory Ranking evidence, Code Intel semantic fallback evidence, and default-exposure invariants pass; production Browser automation, visual grounding, and Tier-2 blockers remain blocked",
+        "D129 adds a production Browser proof recorder with an injected adapter contract: the evidence records an ordered navigate/type/click/observe/visual-snapshot transcript, validates visual snapshot metadata, keeps raw screenshot bytes out of repository evidence, and leaves default exposure unchanged",
+        "D130 closes the v2.0 Tier-2 Compaction row using existing implementation and integration evidence: core session compaction, agent tool-loop compaction, print/RPC compaction configuration paths, lifecycle hook tests, and cross-protocol compaction smoke coverage",
+        "D131 closes the v2.0 Tier-2 MCP Runtime row with a one-server stdio JSON-RPC transport proof: coding-agent starts the gh-search MCP server, completes initialize/tools-list/tools-call, registers discovered tools behind the opt-in mcp profile, and keeps the default registry unchanged",
+        "D132 closes the v2.0 Tier-2 Automation row with an injected runner execution proof: enabled CronStore jobs execute through AutomationRuntime, disabled jobs are skipped, success and failed outcomes are persisted to cron/runs.json, and one failed job does not stop later enabled jobs",
+        "D133 closes the v2.0 Tier-2 Remote TUI row with an authenticated injected-transport protocol/session proof: hello handshakes authenticate clients, unauthorized clients are rejected before input forwarding, input and resize events reach injected local handlers, output frames are sequenced, and close behavior is deterministic"
+      ],
+      "blockers": [
+        "default registry must remain coding plus Code Intel essentials",
+        "D129 proves the production Browser adapter contract and visual-grounding metadata path, but it is not a live external Browser run",
+        "D133 proves the Remote TUI core protocol/session bridge, not a full WebSocket server, browser UI, TLS/auth stack, reconnect layer, or hosted app-server"
+      ]
+    },
+    {
+      "id": "v2.5",
+      "percent": 65,
+      "status": "planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 + D-82); v5 implementation gate reached (v2.5 >= 65%)",
+      "evidence": [
+        "planner, task DAG, and plan cache modules exist",
+        "module-level tests exist for planner foundations",
+        "D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview",
+        "D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided",
+        "D81 adds 3 multi-scenario planner integration tests: multi-task DAG with dependsOn dependencies, tool spec preservation, and negative test confirming planner is gated by goal presence",
+        "D82 adds 1 investigate-goal scenario (single task, no dependsOn) -- brings v2.5 to 65%, crossing the v5 implementation gate threshold"
+      ],
+      "blockers": [
+        "planner integration has 5 fixtures; a real long-horizon multi-step execution run is still not proven in this scorecard",
+        "release gate scenarios are not freshly proven in this scorecard"
+      ]
+    },
+    {
+      "id": "v3.0",
+      "percent": 70,
+      "status": "Reviewer and Gate-2 runner exist; current Gate-2 live fixture passes under default profile; inclusive 30-50 boundary fixture present (D-85); D134 adds a machine-readable v3/v4 production precheck that kept production breadth blocked; D135 closes the v3.0 production breadth gap via a 3-scenario default-profile replay suite (not a new live external Gate-2 run); D142 expands Gate-2 multi-scenario evidence to 5 scenarios (2 new fixtures: code-refactor, bug-investigation)",
+      "evidence": [
+        "Reviewer modules exist",
+        "Gate-2 live evidence is passed_live=true with toolCalls=31 and registryProfile=default",
+        "D85 records a v3.0 Gate-2 long-horizon boundary fixture: 2 new tests assert the inclusive 30-50 tool-call range at exact boundaries (30 and 50) and just outside (29 and 51)",
+        "D134 records a v3/v4 production precheck: Gate-2 live fixture and Reviewer gate boundary evidence pass, but v3 production breadth remains blocked until multi-scenario long-horizon replay evidence exists",
+        "D135 adds a v3.0 production long-horizon replay suite (3 default-profile scenarios: invoice-domain-repair-live-replay, release-precheck-hardening-replay, cross-package-status-hygiene-replay) that reuses evaluateGate2Transcript; v3.0 production breadth is now a pass row in the v3/v4 production precheck while v4.0 cross-platform SIGKILL/restore remains the only remaining blocker",
+        "D142 expands Gate-2 multi-scenario evidence from 1 to 5 scenarios: 2 new fixtures added (code-refactor, bug-investigation); v3 production replay suite expanded from 3 to 5 default-profile replay scenarios"
+      ],
+      "blockers": [
+        "Gate-2 evidence is a default-profile invoice fixture pass, not broad long-horizon production proof",
+        "D135 v3 production breadth is replay evidence (replay of existing on-disk evidence through evaluateGate2Transcript), not a new live external Gate-2 run; v1-v4 production completion is not claimed"
+      ]
+    },
+    {
+      "id": "v4.0",
+      "percent": 65,
+      "status": "Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present; D134 records these in the v3/v4 production precheck; D136 closes the v4-cross-platform-sigkill blocker with 3 SIGKILL/restore scenarios all preserving data integrity; v3/v4 production precheck now passes all 7 checks; D143 adds Agent OS orchestration integration tests (4 TaskOrchestrator test cases)",
+      "evidence": [
+        "Researcher and TaskGraph modules exist",
+        "persistent memory and channel foundation modules exist",
+        "D78 records atomic write semantics plus partial-last-line recovery for the persistent memory store",
+        "D80 records cross-session TaskGraph persistence: a second PersistingTaskGraphRecorder instance loaded from the same file sees the first instance's records (D-78 storage layer + D-80 Agent OS layer)",
+        "D86 records multi-hop cross-session handoff: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances",
+        "D134 records a v3/v4 production precheck: v4 cross-session Agent OS and persistent memory recovery evidence pass, but cross-platform SIGKILL/restore remains blocked",
+        "D135 keeps v3.0 production breadth as a pass row in the v3/v4 production precheck while keeping cross-platform SIGKILL/restore as the only precheck blocker; D135 is replay evidence, not a new live external Gate-2 run, and does not change v4.0 status",
+        "D136 closes the v4-cross-platform-sigkill blocker: evaluateSigkillRestoreEvidence evaluator with 3 default scenarios (process-kill, docker-stop, session-crash-recovery) all pass with data integrity preserved; v3/v4 production precheck now passes all 7 checks",
+        "D143 adds Agent OS orchestration integration tests: 4 new TaskOrchestrator test cases covering task lifecycle management, task dependency resolution, error recovery, and concurrent task execution"
+      ],
+      "blockers": [
+        "Agent OS orchestration now has integration tests but is not production-complete",
+        "Desktop and channels remain stopped or opt-in, not default-enabled",
+        "cross-session crash recovery evidence is deterministic unit-style fixtures, not real production orchestration"
+      ]
+    }
+  ],
+  "caveats": [
+    "Gate-2 default-profile fixture pass is not v1-v4 production completion.",
+    "Gate-1 preferred-100k now PASSES; Gate-1 minimum-50k evidence is a separate pass.",
+    "Module existence is not production integration.",
+    "Code Intel rename, reference, call graph, and smart search behavior remains heuristic unless a specific test proves stronger semantics.",
+    "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
+  ],
+  "nextActions": [
+    "Gate-1 preferred-100k now PASSES (D141); continue broadening Gate-1 evidence with additional 100K+ targets when available.",
+    "Gate-2 multi-scenario evidence expanded to 5 scenarios (D142); keep Gate-2 production long-horizon proof as a separate future blocker rather than inferring it from replay fixtures.",
+    "Agent OS orchestration now has integration tests (D143); expand orchestration evidence with broader task lifecycle scenarios.",
+    "v5/v6 seed work continues on production hardening bootstrap (D-139), trace span observability (D-137), and distributed coordination (D-138) while v1-v4 completion remains gate-driven."
+  ]
+}

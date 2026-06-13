@@ -32,10 +32,15 @@ describe('smart_search (D-32.3.1)', () => {
     // gh may or may not be installed; tool should not throw
   });
 
-  it('all action falls back to remote when local has 0 results', async () => {
+  it('all action stays local-only when local has 0 results', async () => {
     const r = await tool.execute({ action: 'all', query: 'totally-unknown-symbol-zzz', path: REPO });
     expect(r.success).toBe(true);
-    // Either has remote results OR (no results) is acceptable
+    expect(r.content).toContain('local-only');
+    expect(r.meta).toEqual(expect.objectContaining({
+      action: 'all',
+      remoteEnabled: false,
+      remoteCount: 0,
+    }));
   });
 
   it('returns error for missing query', async () => {

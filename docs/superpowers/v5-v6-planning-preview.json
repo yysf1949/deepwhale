@@ -1,0 +1,100 @@
+{
+  "generatedAt": "2026-06-10T00:00:00.000Z",
+  "status": "in-progress",
+  "implementationAllowed": true,
+  "firstEvidenceSubSprint": "D-87",
+  "firstEvidenceDate": "2026-06-10",
+  "firstEvidence": "AuditLog minimal seed (in-memory, append-only, deterministic timestamps via injected clock)",
+  "basis": {
+    "v1v4Scorecard": "docs/superpowers/v1-v4-evidence-scorecard.json",
+    "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md"
+  },
+  "gates": [
+    "v1-v4 evidence gaps must remain explicit while v5/v6 seed implementation proceeds",
+    "default registry must remain coding plus Code Intel essentials unless a later explicit release gate changes it",
+    "Gate-1 preferred-100k, Gate-1.5, and production long-horizon evidence must not be inferred from fixture/module existence",
+    "v5.0 implementation allowed only when v1-v4 scorecard aggregate >= 65% AND v2.5 percent >= 65%"
+  ],
+  "gateStatus": {
+    "v1v4AggregatePercent": 65,
+    "v2.5Percent": 65,
+    "v2.5GateReached": true,
+    "aggregateGateReached": true,
+    "note": "BOTH gates reached 2026-06-10: v1-v4 aggregate 65% (D-86) AND v2.5 65% (D-82). v5.0 implementation is now UNLOCKED. Implementation remains gated only on explicit user kickoff direction (the v5 plan doc lists the v5.0 themes: production hardening, plugin governance, distribution/upgrade flow, observability/auditability)."
+  },
+  "phases": [
+    {
+      "id": "v5.0",
+      "name": "Production Hardening And Distribution",
+      "implementationAllowed": true,
+      "firstEvidence": "D-87 (AuditLog minimal seed)",
+      "evidence": [
+        "D-87 (AuditLog minimal seed): in-memory, append-only, deterministic timestamps via injected clock",
+        "D-88 (AuditLog wired into runToolLoop): 3 emit points (tool-call, tool-result, loop-end) with optional auditLog parameter; first v5.0 sub-sprint to modify a 5 红线 file (additive, optional)",
+        "D-89 (AuditLog file-backed persistence): PersistingAuditLog extends AuditLog with JSONL atomic write + partial-line recovery; cross-instance fixture present (mirror D-78 + D-80 pattern)",
+        "D-90 (AuditLog reader): standalone async readAuditLog function with partial-line recovery + ENOENT handling; completes the v5 observability quartet (write D-87/88/89 + read D-90)",
+        "D-91 (Plugin governance minimal seed): ToolCapability type + toolCapabilities helper + isToolCapability type guard + 3 unit tests. Optional capabilities field on Tool (additive, backward-compatible). The plugin-governance theme starts here.",
+        "D-92 (Plugin governance 2nd evidence: default tool capability backfill): all 19 default tools now declare accurate capabilities; 2 new unit tests verify completeness + accuracy. Plugin-governance theme now has real evidence (vocabulary D-91 + actual usage D-92).",
+        "D-93 (Plugin governance 3rd evidence: ToolRegistry.listByCapability): registry-level filter composes D-91 toolCapabilities helper with existing list(); 3 new unit tests assert correct subset for shell-exec / code-execute / file-write. Plugin-governance theme 1st cycle complete (vocabulary + actual usage + query).",
+        "D-94 (Distribution/upgrade flow 1st evidence: DistributionManifest): typed single-source-of-truth constant + structural validator + 3 unit tests. The 3rd v5.0 theme (distribution/upgrade flow) starts here; future D-95+ can build on this manifest (upgrade check, capability matrix, changelog generator).",
+        "D-95 (Distribution/upgrade flow 2nd evidence: compareVersions): pure upgrade-check function + UpgradeCheckResult type + UpgradeSeverity union + 4 unit tests. The 2nd evidence piece of the theme; D-94 + D-95 form the distribution/upgrade flow 1st cycle (manifest description + upgrade decision).",
+        "D-96 (Production hardening 1st evidence: fatal-error formatter): formatFatalError pure defensive formatter + recordFatalEvent cross-theme bridge into v5.0 AuditLog (D-87) + FatalErrorEvent interface + 4 unit tests. The 4th and final v5.0 theme (production hardening) starts here; future D-97+ can build on this formatter (SIGINT/SIGTERM handler, uncaught exception hook, graceful shutdown sequence).",
+        "D-97 (Production hardening 2nd evidence: installSignalHandlers): SIGINT + SIGTERM wired to v5.0 AuditLog via 'fatal-signal' events, idempotent cleanup, optional onSignal callback. Production-hardening 1st cycle complete (format D-96 + handle D-97).",
+        "D-98 (Production hardening 3rd evidence: installProcessUncaughtHandlers): uncaughtException + unhandledRejection wired to v5.0 AuditLog via 'fatal-uncaught' events, idempotent cleanup, optional onUncaught callback (default process.exit(1) for non-zero failure exit). Production-hardening 3-event taxonomy: format D-96 + signal D-97 + uncaught D-98.",
+        "D-99 (Production hardening 4th evidence: gracefulShutdown): 3-step sequence (beforeExit -> auditLog record -> onComplete) with full defensive error handling; 'graceful-shutdown' events into v5.0 AuditLog; ShutdownResult returns beforeExitInvoked/onCompleteInvoked flags. Production-hardening 4-step protocol COMPLETE: format D-96 + signal D-97 + uncaught D-98 + drain D-99.",
+        "D-100 (Plugin governance 2nd cycle: buildCapabilityMatrix): cross-theme bridge between D-91 ToolCapability vocabulary and D-94 DistributionManifest; pure function returning CapabilityMatrix with entries (capability -> providers + declared), undeclaredToolCapabilities (drift signal), and toolsWithoutCapabilities (legacy detection). Plugin-governance theme 1st cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100.",
+        "D-101 (Distribution/upgrade flow 2nd cycle: generateChangelog): pure function comparing 2 DistributionManifests; returns ChangelogDocument with structured entries (version + capability-added/removed + channel + node-engine + supported-upgrade-origin). Distribution/upgrade flow theme 2nd cycle COMPLETE: manifest D-94 + compareVersions D-95 + changelog generator D-101.",
+        "D-102 (Observability+auditability 2nd cycle: dumpAuditLog): async function reading via D-90 readAuditLog + applying eventKinds/sinceTimestamp filters + rendering text or JSON output. Observability+auditability theme 2nd cycle COMPLETE: write D-87/88/89 + read D-90 + render D-102.",
+        "D-103 (Plugin governance 2nd cycle: enforceProfilePolicy): pure function reusing D-100 buildCapabilityMatrix + emitting undeclared-capability + missing-capability violations. Plugin-governance theme 2nd cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100 + enforcement D-103.",
+        "D-104 (Production hardening 5th evidence: evaluateCrossInstanceRollback): async function reading via D-90 readAuditLog + checking last event kind + freshness window; emits proceed / rollback / no-evidence decision. Production-hardening 5-evidence set COMPLETE: format D-96 + signal D-97 + uncaught D-98 + drain D-99 + cross-instance recovery D-104.",
+        "D-105 (Cross-theme bridge: buildPolicySnapshot): async orchestration layer reusing D-100 buildCapabilityMatrix + D-101 generateChangelog + D-103 enforceProfilePolicy + D-104 evaluateCrossInstanceRollback; returns PolicySnapshot with capabilityMatrix + changelog + policyEnforcement + crossInstance + summary. v5.0 3-theme cross-bridge COMPLETE: plugin governance + distribution/upgrade + production hardening tied into 1 unified status struct.",
+        "D-129 (v5.0 3rd-cycle depth: audit correlationId + policy snapshot CLI): AuditLog gains optional correlationId field + queryByCorrelationId method + 3 unit tests; policy-snapshot CLI command created + test. v5.0 3rd-cycle depth complete.",
+        "D-106 (v6.0 master plan): docs/superpowers/v6.0-master-plan.md with 4 themes (multi-agent safety + hosted/enterprise opt-in gates + distributed cross-instance coordination + advanced observability), entry criteria checklist (5/6 prereqs checked), and first sub-sprint design (multi-agent safety seed). v6.0 plan promoted from 'planning preview only' to 'executable plan'.",
+        "D-107 (v6.0 multi-agent safety seed part 1: registerSubAgent): SubAgentId branded type + SubAgent interface + SubAgentRegistry class (in-memory map-based, register/unregister/get/list/listByParent/size/clear + asSubAgentId + isSubAgentId helpers). v6.0 Theme 1 (multi-agent safety) 1st-cycle seed start. D-108 + D-109 will add enforceSubAgentPolicy and rollbackSubAgent.",
+        "D-108 (v6.0 multi-agent safety seed part 2: enforceSubAgentPolicy): thin wrapper reusing D-103 enforceProfilePolicy + D-107 SubAgent + D-94 DistributionManifest; returns SubAgentPolicyEvaluation with subAgentId + parentAgentId + decision (allow/deny) + summary. v6.0 Theme 1 (multi-agent safety) seed part 2 of 3 COMPLETE: enforcement layer. D-109 will add rollback.",
+        "D-109 (v6.0 multi-agent safety seed part 3: rollbackSubAgent): pure function identifying sub-agent-owned events via event.payload.subAgentId + marking with rolledBackAt + rollbackReason + emitting new 'sub-agent-rollback' event; supports dryRun mode. v6.0 Theme 1 (multi-agent safety) SEED-COMPLETE: 3 of 3 sub-sprints (D-107 + D-108 + D-109) shipped.",
+        "D-110 (v6.0 multi-agent safety 2nd cycle cross-bridge: buildSubAgentPolicySnapshot): async orchestration layer reusing D-108 enforceSubAgentPolicy + D-109 rollbackSubAgent; returns SubAgentPolicySnapshot with policy + rollback + summary; canRun = policy.allow && rollback !== rolled-back. v6.0 Theme 1 (multi-agent safety) 2nd cycle cross-bridge COMPLETE. Mirrors v5.0 D-105 buildPolicySnapshot pattern. v6.0 Theme 1 SEED + CROSS-BRIDGE COMPLETE: 4 sub-sprints (D-107 + D-108 + D-109 + D-110) shipped.",
+        "D-111 (v6.0 Theme 2 seed: enforceRateLimit): pure per-tenant rate limiting function with TenantId branded type + RateLimitPolicy + decision allow/warn/deny + utilizationPercent + retryAfterMs. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed STARTED. D-112+ will add billing/quota, SSO/OIDC, SIEM integration.",
+        "D-112 (v6.0 Theme 2 seed: enforceTenantQuota): pure per-tenant billing/quota function with TenantQuota + CostDimension (tokens/requests/storage/compute-seconds) + decision allow/warn/deny + utilizationPercent + overage. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 2 of 3+ COMPLETE. D-113 added SSO/OIDC. SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.",
+        "D-113 (v6.0 Theme 2 seed: validateOidcToken): pure SSO/OIDC validation function (claim-level invariants: expiry + issuer + audience + extract tenantId + subject; trusts caller's pre-decoded claims; NO JWT signature verification). v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 3 of 3+ COMPLETE. SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.",
+        "D-129 (v5.0 3rd-cycle depth: audit correlationId + policy snapshot CLI): AuditLog gains optional correlationId field + queryByCorrelationId method + 3 unit tests; policy-snapshot CLI command created + test. v5.0 3rd-cycle depth complete.",
+        "D-130 (v6.0 enterprise cross-bridge + distributed coordination seed): EnterprisePolicySnapshot cross-bridges rate limit + quota + SSO/OIDC + 4 unit tests; LeaderElector lease-based seed + 6 unit tests. v6.0 Theme 2 cross-bridge + Theme 3 seed complete."
+      ],
+      "themes": [
+        "production hardening",
+        "plugin governance",
+        "distribution and upgrade flow",
+        "observability and auditability"
+      ],
+      "entryCriteria": [
+        "v1-v4 scorecard has explicit evidence for remaining gate gaps",
+        "Gate-1 preferred or blocker is freshly documented",
+        "Gate-1.5 and Gate-2 interpretations remain honest"
+      ]
+    },
+    {
+      "id": "v6.0",
+      "name": "Collaborative Agent Operations",
+      "implementationAllowed": true,
+      "status": "seed implementation started; broader v6 remains gate-disciplined and opt-in",
+      "firstEvidence": "D-106 (v6.0 master plan)",
+      "evidence": [
+        "D-106 (v6.0 master plan): executable plan with 4 themes and first multi-agent safety seed designed",
+        "D-107 through D-110 (multi-agent safety): SubAgent identity/registry, policy enforcement, rollback, and policy snapshot shipped",
+        "D-111 through D-113 (hosted/enterprise opt-in gates): per-tenant rate limiting, quota, and SSO/OIDC seed functions shipped",
+        "D-130 (enterprise cross-bridge + distributed coordination seed): EnterprisePolicySnapshot + LeaderElector shipped"
+      ],
+      "themes": [
+        "multi-agent safety",
+        "hosted/enterprise opt-in gates",
+        "distributed cross-instance coordination",
+        "advanced observability"
+      ],
+      "entryCriteria": [
+        "v5 production hardening has shipped with verification evidence",
+        "multi-agent safety, audit, and rollback policies are tested",
+        "hosted or enterprise surfaces have explicit opt-in and policy gates"
+      ]
+    }
+  ]
+}

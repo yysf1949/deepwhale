@@ -36,14 +36,22 @@ export { MemoryStore } from './memory-store.js';
 // Sprint 1c-revive-3-D-30.1δ.8 (2026-06-07): skill store.
 export { SkillStore } from './skill-store.js';
 // Sprint 1c-revive-3-D-30.1δ.9 (2026-06-07): cron store.
+// D132 (2026-06-13): persisted cron run records.
 export { CronStore } from './cron-store.js';
-export type { CronJob } from './cron-store.js';
+export type { CronJob, CronRunRecord, CronRunStatus } from './cron-store.js';
 // Sprint 1c-revive-3-D-30.1δ.10 (2026-06-07): JSON 兜底 sessions-index (替 FTS5).
 export { SessionIndex } from './session-index.js';
 export type { SessionEntry } from './session-index.js';
 // D-30.3.3 (2026-06-07): skill auto-load (启动时 detect ~/.deepwhale/skills).
 export { SkillLoader } from './skill-loader.js';
 export type { LoadedSkill } from './skill-loader.js';
-// D-30.3.4 (2026-06-07): cron daemon stub (setInterval tick → onTick).
+// D-30.3.4 (2026-06-07): cron daemon timer boundary (setInterval tick -> onTick).
 export { CronDaemon } from './cron-daemon.js';
 export type { CronTickHandler } from './cron-daemon.js';
+// D132 (2026-06-13): injected runner automation runtime.
+export { AutomationRuntime } from './automation-runtime.js';
+export type {
+  AutomationRunner,
+  AutomationRunnerResult,
+  AutomationRuntimeOptions,
+} from './automation-runtime.js';

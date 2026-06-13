@@ -16,9 +16,12 @@ const defaultOptions = {
   preferredLoc: 100_000,
   timeboxMs: 20 * 60 * 1000,
   entrySymbol: 'createDefaultRegistry',
+  entryFile: 'packages/coding-agent/src/tools/registry.ts',
   requiredCall: {
     callerSymbol: 'runAgentTurn',
+    callerFile: 'packages/coding-agent/src/agent/tool-loop.ts',
     calleeSymbol: 'createDefaultRegistry',
+    calleeFile: 'packages/coding-agent/src/tools/registry.ts',
   },
   modificationPoint: {
     file: 'packages/coding-agent/src/tools/registry.ts',

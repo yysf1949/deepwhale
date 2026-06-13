@@ -87,6 +87,16 @@ export interface CallGraph {
   byCallee: Map<string, CallEdge[]>;
 }
 
+interface LexicalScanState {
+  inBlockComment: boolean;
+}
+
+interface LexicalScanOptions {
+  readonly blockComments: boolean;
+  readonly slashLineComments: boolean;
+  readonly hashLineComments: boolean;
+}
+
 // ── buildSymbolGraph ──────────────────────────────────────────────────────
 
 export async function buildSymbolGraph(repoPath: string, options: { maxDepth?: number } = {}): Promise<SymbolGraph> {
@@ -135,7 +145,7 @@ export async function buildSymbolGraph(repoPath: string, options: { maxDepth?: n
           });
         }
       }
-      indexTextReferences(byName, parsed.source, rel, symbols, imports);
+      indexTextReferences(byName, parsed.source, rel, symbols, imports, lang as LanguageId);
     } catch {
       // skip files that fail to parse
     }
@@ -180,9 +190,12 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
       const endLine = (sym as unknown as { endLine?: number }).endLine ?? start + 50;
       const end = Math.min(lines.length, endLine);
       const importTargets = buildImportTargetMap(filePath, fileSym, graph);
+      const lexicalState: LexicalScanState = { inBlockComment: false };
+      const lexicalOptions = lexicalOptionsForLanguage(fileSym.language);
       for (let ln = start; ln < end; ln++) {
         const line = lines[ln] ?? '';
-        for (const call of scanCallExpressions(line)) {
+        const scanLine = maskComments(line, lexicalState, lexicalOptions);
+        for (const call of scanCallExpressions(scanLine, lexicalOptions)) {
           const namespaceTarget = call.qualifier
             ? resolveNamespaceMemberTarget(filePath, fileSym, call.qualifier, call.name, graph)
             : undefined;
@@ -190,6 +203,16 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
             continue;
           }
           const importTarget = namespaceTarget ?? importTargets.get(call.name);
+          // 拍板 (D-33.2.1): prefer no edge over a false edge. If the file
+          // imports a name that could not be resolved (e.g. tsconfig path
+          // alias `@api/api` → `src/api/api` no such file), skip the
+          // name-based fallback — the call may be a local var or a dangling
+          // import, and we should not guess. If the file has no import of
+          // the name at all, this is likely a same-file function call, so
+          // allow the fallback.
+          if (!importTarget && hasUnresolvedImportOfName(fileSym, call.name)) {
+            continue;
+          }
           const targetName = importTarget?.split(':').slice(1).join(':') ?? call.name;
           const calleeIds = nameToIds.get(targetName);
           if (!calleeIds) continue;
@@ -215,7 +238,7 @@ export async function buildCallGraph(graph: SymbolGraph): Promise<CallGraph> {
 
 function extractImports(source: string, lang: LanguageId): Import[] {
   if (lang === 'typescript' || lang === 'tsx' || lang === 'javascript') {
-    return extractTsLikeImports(source);
+    return extractTsLikeImports(source, lexicalOptionsForLanguage(lang));
   }
   if (lang === 'python') {
     return extractPythonImports(source);
@@ -270,7 +293,7 @@ function pushEdge(map: Map<string, CallEdge[]>, key: string, edge: CallEdge): vo
   map.set(key, arr);
 }
 
-function scanCallExpressions(line: string): Array<{ name: string; qualifier?: string }> {
+function scanCallExpressions(line: string, options: LexicalScanOptions): Array<{ name: string; qualifier?: string }> {
   const calls: Array<{ name: string; qualifier?: string }> = [];
   const re = /(?:(\b[A-Za-z_$][\w$]*)\s*\.\s*)?(\b[A-Za-z_$][\w$]*)\b\s*\(/g;
   let match: RegExpExecArray | null;
@@ -279,7 +302,7 @@ function scanCallExpressions(line: string): Array<{ name: string; qualifier?: st
     const name = match[2];
     if (!name) continue;
     const col = match.index;
-    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) continue;
+    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col, options)) continue;
     const call: { name: string; qualifier?: string } = { name };
     if (qualifier) call.qualifier = qualifier;
     calls.push(call);
@@ -315,6 +338,29 @@ function isNamespaceImportQualifier(fileSym: FileSymbols, qualifier: string): bo
   return fileSym.imports.some((imp) => imp.namespace && imp.local === qualifier);
 }
 
+function hasUnresolvedImportOfName(fileSym: FileSymbols, name: string): boolean {
+  // An import is "unresolved" if it declares the name but the import map
+  // (which is built by buildCallGraph) couldn't find a target file for it.
+  // buildCallGraph will only have placed it in the importTargets map when
+  // resolveImportedSymbolTarget succeeded, so we approximate by checking
+  // that the file has an import whose local name matches AND the from path
+  // is not a relative or namespace import that the resolver can handle.
+  return fileSym.imports.some((imp) => {
+    if (imp.local !== name) return false;
+    // Names resolved through namespace imports / barrels / relative paths
+    // ARE in the importTargets map. The remaining "unresolved" cases are
+    // bare specifiers (tsconfig aliases, node modules) that the relative
+    // resolver defers to resolvePathAliasImportFile. We can't fully
+    // distinguish them here without re-running the resolver, so we only
+    // signal "unresolved" when the import's `from` looks like a tsconfig
+    // alias prefix (i.e. starts with an `@`-style alias) or is a node
+    // module style specifier without a leading `./` or `../`.
+    if (imp.from.startsWith('.')) return false;
+    if (imp.namespace) return false;
+    return true;
+  });
+}
+
 function resolveImportedSymbolTarget(
   filePath: string,
   imp: Import,
@@ -340,6 +386,10 @@ function resolveReExportTarget(
   const fileSym = graph.files.get(filePath);
   if (!fileSym) return undefined;
   if (fileSym.symbols.some((symbol) => symbol.name === symbolName)) return key;
+  if (symbolName === 'default') {
+    const defaultTarget = findDefaultExportTarget(filePath, fileSym);
+    if (defaultTarget) return defaultTarget;
+  }
 
   for (const imp of fileSym.imports) {
     if (imp.local !== symbolName) continue;
@@ -354,6 +404,14 @@ function resolveReExportTarget(
     if (target) return target;
   }
   return undefined;
+}
+
+function findDefaultExportTarget(filePath: string, fileSym: FileSymbols): string | undefined {
+  const defaultSymbols = fileSym.symbols.filter((symbol) => symbol.defaultExport && symbol.name.length > 0);
+  if (defaultSymbols.length !== 1) return undefined;
+  const symbol = defaultSymbols[0];
+  if (!symbol) return undefined;
+  return `${filePath}:${symbol.scope ? symbol.scope + '.' : ''}${symbol.name}`;
 }
 
 function resolveRelativeImportFile(filePath: string, from: string, graph: SymbolGraph): string | undefined {
@@ -488,6 +546,7 @@ function indexTextReferences(
   file: string,
   symbols: ReadonlyArray<Symbol>,
   imports: ReadonlyArray<Import>,
+  lang: LanguageId,
 ): void {
   const names = new Set<string>();
   for (const symbol of symbols) {
@@ -508,20 +567,23 @@ function indexTextReferences(
   );
 
   const lines = source.split('\n');
+  const lexicalState: LexicalScanState = { inBlockComment: false };
+  const lexicalOptions = lexicalOptionsForLanguage(lang);
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? '';
-    for (const token of scanIdentifierTokens(line)) {
+    const scanLine = maskComments(line, lexicalState, lexicalOptions);
+    for (const token of scanIdentifierTokens(scanLine, lexicalOptions)) {
       if (!names.has(token.text)) continue;
       const lineNo = lineIdx + 1;
       const key = positionKey(lineNo, token.col);
       if (
         isWithinDeclarationRange(lineNo, token.col, declarationRanges) ||
-        isDeclarationIdentifier(line, token.col, token.text, symbols) ||
+        isDeclarationIdentifier(scanLine, token.col, token.text, symbols) ||
         importPositions.has(key)
       ) {
         continue;
       }
-      const next = line.slice(token.col + token.text.length).trimStart();
+      const next = scanLine.slice(token.col + token.text.length).trimStart();
       pushRef(byName, token.text, {
         file,
         line: lineNo,
@@ -532,19 +594,22 @@ function indexTextReferences(
   }
 }
 
-function extractTsLikeImports(source: string): Import[] {
+function extractTsLikeImports(source: string, lexicalOptions: LexicalScanOptions): Import[] {
+  const sourceForImports = maskSourceComments(source, lexicalOptions);
   const imports: Import[] = [];
   const exportAllRe = /\bexport\s+\*\s+from\s+['"]([^'"]+)['"]/g;
   let exportAllMatch: RegExpExecArray | null;
-  while ((exportAllMatch = exportAllRe.exec(source)) !== null) {
+  while ((exportAllMatch = exportAllRe.exec(sourceForImports)) !== null) {
+    if (isOffsetInsideString(sourceForImports, exportAllMatch.index)) continue;
     const from = exportAllMatch[1] ?? '';
-    const pos = offsetToLineCol(source, exportAllMatch.index);
+    const pos = offsetToLineCol(sourceForImports, exportAllMatch.index);
     imports.push({ local: '*', from, line: pos.line, col: pos.col, exportAll: true });
   }
 
   const namedImportRe = /\b(?:import|export)\s+(?:type\s+)?\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"]/g;
   let namedMatch: RegExpExecArray | null;
-  while ((namedMatch = namedImportRe.exec(source)) !== null) {
+  while ((namedMatch = namedImportRe.exec(sourceForImports)) !== null) {
+    if (isOffsetInsideString(sourceForImports, namedMatch.index)) continue;
     const body = namedMatch[1] ?? '';
     const from = namedMatch[2] ?? '';
     const bodyOffset = namedMatch.index + (namedMatch[0].indexOf(body));
@@ -555,13 +620,41 @@ function extractTsLikeImports(source: string): Import[] {
       const local = specifier[2] ?? imported;
       if (local && imported && isIdentifierName(local) && isIdentifierName(imported)) {
         const localOffset = bodyOffset + specifier.index + specifier[0].lastIndexOf(local);
-        const pos = offsetToLineCol(source, localOffset);
+        const pos = offsetToLineCol(sourceForImports, localOffset);
         imports.push({ local, imported, from, line: pos.line, col: pos.col });
       }
     }
   }
 
-  const lines = source.split('\n');
+  const combinedImportRe =
+    /\bimport\s+([A-Za-z_$][\w$]*)\s*,\s*\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"]/g;
+  let combinedMatch: RegExpExecArray | null;
+  while ((combinedMatch = combinedImportRe.exec(sourceForImports)) !== null) {
+    if (isOffsetInsideString(sourceForImports, combinedMatch.index)) continue;
+    const defaultLocal = combinedMatch[1] ?? '';
+    const body = combinedMatch[2] ?? '';
+    const from = combinedMatch[3] ?? '';
+    const defaultOffset = combinedMatch.index + combinedMatch[0].indexOf(defaultLocal);
+    const defaultPos = offsetToLineCol(sourceForImports, defaultOffset);
+    if (isIdentifierName(defaultLocal)) {
+      imports.push({ local: defaultLocal, from, line: defaultPos.line, col: defaultPos.col });
+    }
+
+    const bodyOffset = combinedMatch.index + combinedMatch[0].indexOf(body);
+    const specifierRe = /([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?/g;
+    let specifier: RegExpExecArray | null;
+    while ((specifier = specifierRe.exec(body)) !== null) {
+      const imported = specifier[1];
+      const local = specifier[2] ?? imported;
+      if (local && imported && isIdentifierName(local) && isIdentifierName(imported)) {
+        const localOffset = bodyOffset + specifier.index + specifier[0].lastIndexOf(local);
+        const pos = offsetToLineCol(sourceForImports, localOffset);
+        imports.push({ local, imported, from, line: pos.line, col: pos.col });
+      }
+    }
+  }
+
+  const lines = sourceForImports.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
     if (/^\s*import\s+(?:type\s+)?\{/.test(line)) continue;
@@ -651,7 +744,7 @@ function extractRustImports(source: string): Import[] {
     const useLine = line.match(/^\s*use\s+(.+);/);
     if (!useLine) continue;
     const from = useLine[1] ?? '';
-    for (const token of scanIdentifierTokens(from)) {
+    for (const token of scanIdentifierTokens(from, lexicalOptionsForLanguage('rust'))) {
       imports.push({ local: token.text, from, line: i + 1, col: line.indexOf(token.text) });
     }
   }
@@ -662,17 +755,90 @@ function extractBashImports(_source: string): Import[] {
   return [];
 }
 
-function scanIdentifierTokens(line: string): Array<{ text: string; col: number }> {
+function scanIdentifierTokens(line: string, options: LexicalScanOptions): Array<{ text: string; col: number }> {
   const tokens: Array<{ text: string; col: number }> = [];
   const re = /[A-Za-z_$][\w$]*/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(line)) !== null) {
     const text = match[0];
     const col = match.index;
-    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col)) continue;
+    if (isLikelyInsideString(line, col) || isAfterLineComment(line, col, options)) continue;
     tokens.push({ text, col });
   }
   return tokens;
+}
+
+function maskSourceComments(source: string, options: LexicalScanOptions): string {
+  const state: LexicalScanState = { inBlockComment: false };
+  return source
+    .split('\n')
+    .map((line) => maskComments(line, state, options))
+    .join('\n');
+}
+
+function maskComments(line: string, state: LexicalScanState, options: LexicalScanOptions): string {
+  const chars = line.split('');
+  let i = 0;
+  while (options.blockComments && i < chars.length) {
+    if (state.inBlockComment) {
+      const end = line.indexOf('*/', i);
+      const until = end >= 0 ? end + 2 : chars.length;
+      for (let j = i; j < until; j++) chars[j] = ' ';
+      state.inBlockComment = end < 0;
+      i = until;
+      continue;
+    }
+
+    const start = line.indexOf('/*', i);
+    if (start < 0) break;
+    if (isLikelyInsideString(line, start) || isAfterLineComment(chars.join(''), start, options)) {
+      i = start + 2;
+      continue;
+    }
+
+    const end = line.indexOf('*/', start + 2);
+    const until = end >= 0 ? end + 2 : chars.length;
+    for (let j = start; j < until; j++) chars[j] = ' ';
+    state.inBlockComment = end < 0;
+    i = until;
+  }
+  maskLineComment(chars, chars.join(''), options);
+  return chars.join('');
+}
+
+function maskLineComment(chars: string[], line: string, options: LexicalScanOptions): void {
+  const commentStart = lineCommentStart(line, options);
+  if (commentStart < 0) return;
+  for (let i = commentStart; i < chars.length; i++) chars[i] = ' ';
+}
+
+function lineCommentStart(line: string, options: LexicalScanOptions): number {
+  const starts: number[] = [];
+  if (options.slashLineComments) {
+    const slash = firstCommentTokenOutsideString(line, '//');
+    if (slash >= 0) starts.push(slash);
+  }
+  if (options.hashLineComments) {
+    const hash = firstCommentTokenOutsideString(line, '#');
+    if (hash >= 0) starts.push(hash);
+  }
+  return starts.length > 0 ? Math.min(...starts) : -1;
+}
+
+function firstCommentTokenOutsideString(line: string, token: string): number {
+  let index = line.indexOf(token);
+  while (index >= 0) {
+    if (!isLikelyInsideString(line, index)) return index;
+    index = line.indexOf(token, index + token.length);
+  }
+  return -1;
+}
+
+function lexicalOptionsForLanguage(lang: LanguageId | string): LexicalScanOptions {
+  if (lang === 'python' || lang === 'bash') {
+    return { blockComments: false, slashLineComments: false, hashLineComments: true };
+  }
+  return { blockComments: true, slashLineComments: true, hashLineComments: false };
 }
 
 function isIdentifierName(name: string): boolean {
@@ -687,11 +853,15 @@ function isLikelyInsideString(line: string, col: number): boolean {
   return singleQuotes % 2 === 1 || doubleQuotes % 2 === 1 || backticks % 2 === 1;
 }
 
-function isAfterLineComment(line: string, col: number): boolean {
-  const before = line.slice(0, col);
-  const slash = before.indexOf('//');
-  const hash = before.indexOf('#');
-  return slash >= 0 || hash >= 0;
+function isOffsetInsideString(source: string, offset: number): boolean {
+  const before = source.slice(0, offset);
+  const lineStart = before.lastIndexOf('\n') + 1;
+  return isLikelyInsideString(source.slice(lineStart, offset), offset - lineStart);
+}
+
+function isAfterLineComment(line: string, col: number, options: LexicalScanOptions): boolean {
+  const start = lineCommentStart(line.slice(0, col), options);
+  return start >= 0;
 }
 
 function countUnescaped(text: string, char: string): number {

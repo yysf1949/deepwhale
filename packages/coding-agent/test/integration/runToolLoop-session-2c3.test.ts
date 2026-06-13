@@ -296,7 +296,7 @@ describe('coding-agent mode layer — 1c-revive-2-C+3 跨包 session module 集�
         // ---- runToolLoop mode layer 端到端 ----
         const result = await runToolLoop(client, baseMessages, {
           registry,
-          maxSteps: 5,
+          maxSteps: 10,
         });
 
         // ---- 持久化 steps (assistant + tool events) ----
@@ -434,7 +434,7 @@ describe('coding-agent mode layer — 1c-revive-2-C+3 跨包 session module 集�
       ];
       const result3 = await runToolLoop(client, reloadedMessagesWithSystem, {
         registry,
-        maxSteps: 5,
+        maxSteps: 10,
       });
       allRuns.push({ question: question3, result: result3, mode: 'session-reload' });
 

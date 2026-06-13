@@ -81,4 +81,28 @@ describe('deepwhale-paths (D-30.1δ.1)', () => {
   it('sessions db = root/sessions.db', () => {
     expect(deepwhaleSessionsDbPath('/tmp/h')).toBe(join('/tmp/h', '.deepwhale', 'sessions.db'));
   });
+
+  it('regression: never returns a path containing the literal substring "undefined" (D-33.0.2)', () => {
+    // Worst case: all env vars deleted AND no homeOverride.
+    // resolveDeepwhaleHome() must fall through to homedir() which never returns the
+    // string "undefined". This guards the historical bug where tui-history got
+    // written to <cwd>/undefined/.deepwhale/tui-history.
+    delete process.env.HOME;
+    delete process.env.USERPROFILE;
+    delete process.env.DEEPWHALE_HOME;
+    const root = deepwhaleRoot();
+    expect(root.replaceAll('\\', '/')).not.toContain('/undefined/');
+    expect(root.replaceAll('\\', '/')).not.toContain('undefined/.deepwhale');
+  });
+
+  it('rejects literal undefined/null env home values (D-55)', () => {
+    process.env.HOME = 'undefined';
+    process.env.USERPROFILE = 'null';
+    process.env.DEEPWHALE_HOME = 'undefined';
+    const root = deepwhaleRoot().replaceAll('\\', '/');
+    expect(root).not.toContain('/undefined/');
+    expect(root).not.toContain('/null/');
+    expect(root).not.toContain('undefined/.deepwhale');
+    expect(root).toContain('/.deepwhale');
+  });
 });

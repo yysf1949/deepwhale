@@ -17,8 +17,10 @@ describe('browser_navigate tool stub (D-30.1γ.3)', () => {
   it('navigates to URL and returns page snapshot', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
+      url: 'https://example.com',
       text: async () =>
         '<html><head><title>Test Page</title></head><body><a href="/foo">link</a></body></html>',
+      headers: { getSetCookie: () => [] },
     }) as unknown as typeof fetch;
 
     const tool = new BrowserNavigateTool();
@@ -27,14 +29,16 @@ describe('browser_navigate tool stub (D-30.1γ.3)', () => {
     if (result.success) {
       expect(result.content).toContain('Test Page');
       expect(result.content).toContain('https://example.com');
-      expect(result.content).toContain('Links:');
+      expect(result.content).toContain('Links');
     }
   });
 
   it('handles no-title page', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
+      url: 'https://example.com',
       text: async () => '<html><body>no title here</body></html>',
+      headers: { getSetCookie: () => [] },
     }) as unknown as typeof fetch;
 
     const tool = new BrowserNavigateTool();
@@ -49,6 +53,8 @@ describe('browser_navigate tool stub (D-30.1γ.3)', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
+      statusText: 'Internal Server Error',
+      headers: { getSetCookie: () => [] },
     }) as unknown as typeof fetch;
 
     const tool = new BrowserNavigateTool();

@@ -5,7 +5,7 @@ import { WriteFileTool } from '../src/tools/write-file.js';
 import { BashTool } from '../src/tools/bash.js';
 import { FindTool } from '../src/tools/find.js';
 import { GrepTool } from '../src/tools/grep.js';
-import { ToolRegistry, createDefaultRegistry } from '../src/tools/registry.js';
+import { ToolRegistry, createRegistryForProfile } from '../src/tools/registry.js';
 import { computeLineHashes } from '@deepwhale/edit-engine';
 import { promises as fs, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,9 +13,9 @@ import { join } from 'node:path';
 
 describe('Sprint 0.2: 6 tools (v1.0 MVP) + explicit opt-in expansion profiles', () => {
   describe('ToolRegistry', () => {
-    it('createDefaultRegistry({ profile: all }) registers the complete 41-tool surface', () => {
-      const reg = createDefaultRegistry({ profile: 'all' });
-      expect(reg.size()).toBe(41);
+    it('createRegistryForProfile({ profile: all }) registers the complete 43-tool surface', async () => {
+      const reg = await createRegistryForProfile({ profile: 'all' });
+      expect(reg.size()).toBe(43);
       expect(reg.get('read_file')?.name).toBe('read_file');
       expect(reg.get('write_file')?.name).toBe('write_file');
       expect(reg.get('edit_file')?.name).toBe('edit_file');
@@ -26,6 +26,10 @@ describe('Sprint 0.2: 6 tools (v1.0 MVP) + explicit opt-in expansion profiles', 
       expect(reg.get('web_search')?.name).toBe('web_search');
       expect(reg.get('web_extract')?.name).toBe('web_extract');
       expect(reg.get('browser_navigate')?.name).toBe('browser_navigate');
+      // D-126: Browser interaction tool
+      expect(reg.get('browser_action')?.name).toBe('browser_action');
+      // D-137: Browser JS rendering tool
+      expect(reg.get('browser_js')?.name).toBe('browser_js');
       // D-30.2 (2026-06-07): 5 new tools
       expect(reg.get('patch')?.name).toBe('patch');
       expect(reg.get('search_files')?.name).toBe('search_files');

@@ -14,6 +14,7 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import { deepwhaleRoot } from '../util/deepwhale-paths.js';
 
 export type SubTaskRunner = (prompt: string) => Promise<string>;
 const defaultRunner: SubTaskRunner = async (p) => `[kanban-stub] ${p}`;
@@ -143,5 +144,5 @@ export class KanbanOrchestratorTool implements Tool {
 }
 
 export const kanbanOrchestrator = new KanbanOrchestratorTool({
-  boardDir: join(process.env.HOME || process.env.USERPROFILE || '.', '.deepwhale', 'kanban'),
+  boardDir: join(deepwhaleRoot(), 'kanban'),
 });

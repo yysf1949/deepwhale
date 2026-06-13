@@ -1,12 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { createDefaultRegistry } from '../../src/tools/registry.js';
+import { describe, expect, it } from 'vitest';
+import { createRegistryForProfile } from '../../src/tools/registry.js';
 
-describe('registry (D-31.2.6 + D-31.3.5 + D-32.1.7 + D-32.1.7)', () => {
-  it('all profile contains 41 tools', () => {
-    expect(createDefaultRegistry({ profile: 'all' }).size()).toBe(41);
+describe('registry research profile (legacy opt-in)', () => {
+  it('keeps the all profile at the explicit full surface count', async () => {
+    expect((await createRegistryForProfile({ profile: 'all' })).size()).toBe(43);
   });
-  it('research profile registers arxiv / blogwatcher / llm_wiki / polymarket', () => {
-    const reg = createDefaultRegistry({ profile: 'research' });
+
+  it('registers research tools only when research is explicitly selected', async () => {
+    const reg = await createRegistryForProfile({ profile: 'research' });
     expect(reg.get('arxiv')).toBeDefined();
     expect(reg.get('blogwatcher')).toBeDefined();
     expect(reg.get('llm_wiki')).toBeDefined();

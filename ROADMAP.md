@@ -1,3 +1,188 @@
+# deepwhale Roadmap
+
+<!-- status:current:start -->
+## Current Status
+
+- Date: 2026-06-13
+- Branch: feature/d36-gate2-live
+- Package version line: 2.3.0
+- Release/version hygiene report: docs/superpowers/release-version-hygiene.json
+- Roadmap mode: gate-driven stabilization + v3/v4 production evidence + v5/v6 seed deepening
+- Current sprint: D136-D143 complete (SIGKILL/restore, trace spans, distributed seed, hardening bootstrap, scorecard update, Gate-1 preferred pass, Gate-2 multi-scenario, Agent OS orchestration tests)
+- Current policy: freeze default non-coding expansion
+- Default registry: coding plus Code Intel essentials only
+- Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
+- v1-v4 are capability milestones, not a production-complete claim.
+
+### Gate Snapshot
+
+- Gate-1 minimum status: Vite target has 86,216 supported LOC.
+- Gate-1 minimum qualification: minimum-50k.
+- Gate-1 preferred status: preferred-passed.
+- Gate-1 preferred evidence: React target has 753,902 supported LOC (preferred-100k qualified, createElement -> ReactElement call chain verified, D-141).
+- Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json.
+- Gate-1.5 evidence kind: live-browser
+- Gate-1.5 algorithmic decision: continue
+- Gate-1.5 binding: true
+- Gate-1.5 binding branch decision: continue-browser-enhancement
+- Gate-1.5 report: docs/superpowers/gate-1.5-browser-viability.json
+- Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
+- Gate-1.5 live result recorder: 20 candidates queued, 20/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=all-recorded; binding=true; Browser enhancement unlocked=true.
+- Gate-2 live evidence: passed_live=true.
+- Gate-2 registryProfile=default.
+- Gate-2 toolCalls=31.
+- Gate-2 report: docs/superpowers/gate-2-long-horizon-live.json.
+- Gate-2 interpretation: a default-profile live fixture pass, not a blanket v1-v4 completion proof.
+- Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
+- v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json
+- v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json
+- v3/v4 production precheck: docs/superpowers/v3-v4-production-precheck.json
+- v3 production replay evidence: docs/superpowers/v3-production-long-horizon-replay.json
+
+### Completed Stabilization Slices
+
+- D60 rename scanner truthfulness: rename_symbol scanner behavior is more honest around comments, strings, block comments, and TS private identifiers.
+- D61 Gate-2 drift prompt hardening: nested tool args are checked for outside-workspace paths and the live task prompt supports task-directed verification.
+- D62 status/doc hygiene after D61: public current-status blocks are aligned to current evidence and stale D56-D59 next-work pointers are removed.
+- D63 Code Intel heuristic metadata: find_references exposes heuristic metadata in success results.
+- D64 registry opt-in loading isolation: default registry loading stays narrow and opt-in profiles load through an async boundary.
+- D65 Code Intel truthfulness metadata: smart_search and rename_symbol no-op paths expose heuristic metadata.
+- D67 rename edit hunks: rename_symbol dry-run/apply now exposes hashline edit hunks and heuristic confidence metadata.
+- D68 status and v5/v6 planning preview: public status blocks now link planning-preview-only v5/v6 evidence.
+- D69 Gate-1 preferred blocker refresh: refreshed local target inventory keeps Vite at minimum-50k and preferred-100k blocked.
+- D70 Gate-1.5 Browser decision hygiene: refreshed fixture evidence is advisory only and keeps Browser branch decision deferred pending 20 live tasks.
+- D71 Code Intel combined import correctness: TypeScript combined default-plus-named imports are indexed and resolved in the heuristic symbol graph and call graph.
+- D72 release/version hygiene report: package version and historical release badges are explicitly quarantined from roadmap maturity claims.
+- D73 Gate-1.5 live browser task ledger: no 20-task live evidence exists, so Browser branch decision remains deferred and enhancement stays locked.
+- D74 Code Intel default re-export call graph correctness: calls imported through default re-export barrels resolve to the original named default declaration.
+- D75 TaskGraph goal recording integration evidence: runToolLoopWithReview records the latest user goal when a TaskGraphRecorder is provided.
+- D77 planner main-loop evidence fixture: runToolLoopWithReview calls planner.plan with the latest user goal and records the resulting tasks into the task graph when a Planner is provided.
+- D78 cross-session memory crash/reload evidence: PersistentMemoryStore now uses temp-file + fsync + rename for atomic writes and load() recovers from a partial last line.
+- D79 v1.0 fresh release gate proof + version bump: docs/superpowers/v1.0-fresh-release-gate.{json,md} capture typecheck + lint + test + build + diff --check all exit 0; package version line 2.2.0 -> 2.3.0 (line-only, per D-72 hygiene).
+- D80 TaskGraph cross-session persistence evidence: PersistingTaskGraphRecorder mirrors the PersistentMemoryStore pattern (JSONL + atomic-rename + partial-line recovery); cross-session integration test records in instance A, then verifies instance B (same file) sees A's entries.
+- D81 v2.5 multi-scenario planner evidence: 3 new planner integration scenarios (multi-task DAG with dependsOn dependencies, tool spec preservation, and negative test confirming planner is gated by goal presence) advance the v2.5 blocker from 'single-fixture proof' to 'multi-scenario evidence'.
+- D82 v2.5 investigate-goal scenario fixture: 1 new planner integration scenario (single-task investigation, no dependsOn) advances v2.5 to 65% and crosses the v5 implementation gate threshold (>=65%).
+- D83 v1.0 default registry invariant fixture: 2 new unit tests assert the default registry contains exactly 19 tools (coding + Code Intel essentials) and no non-coding opt-in tools are exposed by default.
+- D84 v1.5 Code Intel re-export chain call graph fixture: 1 new test asserts the call-graph heuristic follows a caller -> intermediate re-exporter -> target chain, recognizing transitive callers across a re-export boundary.
+- D85 v3.0 Gate-2 long-horizon boundary fixture: 2 new unit tests assert the inclusive 30-50 tool-call range at the exact boundaries (30 and 50) and just outside (29 and 51).
+- D86 v4.0 cross-session multi-hop handoff fixture: 1 new test extends D-80 from 2-instance to 3-instance handoffs (A writes 3, B writes 2, C reads all 5 in order), completing v4.0 multi-hop cross-session coverage.
+- D87 v5.0 observability+auditability minimal seed: 1 new AuditLog class (in-memory, append-only, deterministic timestamps via injected clock) + 1 new unit test. This is the first v5.0 evidence fixture.
+- D88 v5.0 observability+auditability tool-loop integration: 1 new unit test verifies that runToolLoop emits tool-call, tool-result, and loop-end events into a provided AuditLog. After D-88, the v5 audit log captures real tool-loop activity, not just synthetic events.
+- D89 v5.0 observability+auditability file-backed persistence: 1 new PersistingAuditLog class extends AuditLog with JSONL + atomic-rename + partial-line recovery (mirror D-78 + D-80 pattern) + 2 new unit tests (cross-instance + partial-line recovery). Audit events now survive process restarts.
+- D90 v5.0 observability+auditability query side: 1 new readAuditLog function (standalone async, JSONL reader with partial-line recovery + ENOENT handling) + 3 new unit tests (round-trip + ENOENT + partial-line). Completes the v5 audit log quartet: write (D-87/88/89) + read (D-90).
+- D91 v5.0 plugin governance minimal seed: 1 new ToolCapability type + 1 toolCapabilities helper + 1 isToolCapability type guard + 1 optional capabilities field on Tool (additive, backward-compatible) + 3 new unit tests. The v5.0 plugin-governance theme starts here; future D-92+ can backfill capabilities on specific tools and add a registry filter.
+- D92 v5.0 plugin governance 2nd evidence: 19 default tool files backfilled with accurate capabilities (BashTool -> shell-exec+network, ReadFileTool -> file-read, WriteFileTool/EditFileTool/PatchTool/RenameSymbolTool -> file-read+file-write, ExecuteCodeTool -> code-execute, 11 read-only tools -> file-read, TodoTool/PlanTool -> [] in-memory); 2 new unit tests verify all-19 invariant + 5 high-risk tool assertions. v5.0 plugin-governance theme has real evidence: vocabulary (D-91) + actual usage (D-92).
+- D93 v5.0 plugin governance 3rd evidence: ToolRegistry.listByCapability(cap) method added (composes D-91 toolCapabilities helper with existing list()) + 3 new unit tests assert correct subset for shell-exec / code-execute / file-write. Plugin-governance theme complete 1st cycle: vocabulary (D-91) + actual usage (D-92) + query (D-93).
+- D94 v5.0 distribution/upgrade flow 1st evidence: 1 new DistributionManifest type + 1 DISTRIBUTION_MANIFEST constant + 1 isValidDistributionManifest validator + 3 new unit tests. The 3rd v5.0 theme (distribution/upgrade flow) starts here; future D-95+ can build on this manifest (upgrade check, capability matrix, changelog generator).
+- D95 v5.0 distribution/upgrade flow 2nd evidence: 1 new compareVersions function (pure, no I/O, no external semver dep) + 1 UpgradeCheckResult interface + 1 UpgradeSeverity union + 4 new unit tests. The 2nd evidence piece of the distribution/upgrade flow theme: D-94 manifest answers "what am I?"; D-95 compareVersions answers "do I need to upgrade?"; together they form the v5.0 distribution/upgrade flow 1st cycle (description + decision).
+- D96 v5.0 production hardening 1st evidence: 1 new formatFatalError function (pure, defensive, never throws) + 1 recordFatalEvent helper (cross-theme bridge into v5.0 AuditLog from D-87) + 1 FatalErrorEvent interface + 4 new unit tests. The 4th and final v5.0 theme (production hardening) starts here; future D-97+ can build on this formatter (SIGINT/SIGTERM handler, uncaught exception hook, graceful shutdown sequence).
+- D97 v5.0 production hardening 2nd evidence: 1 new installSignalHandlers function (SIGINT + SIGTERM, cross-theme bridge into v5.0 AuditLog via 'fatal-signal' events, idempotent cleanup) + 1 SignalHandlerOptions interface + 4 new unit tests. Production-hardening 1st cycle complete: format fatal errors (D-96) + handle process signals (D-97).
+- D98 v5.0 production hardening 3rd evidence: 1 new installProcessUncaughtHandlers function (uncaughtException + unhandledRejection, cross-theme bridge into v5.0 AuditLog via 'fatal-uncaught' events, idempotent cleanup, default-onUncaught uses process.exit(1) for non-zero failure exit) + 1 ProcessUncaughtHandlerOptions interface + 1 NormalizedUncaughtPayload interface + 4 new unit tests. Production-hardening theme now covers a 3-event taxonomy: format fatal errors (D-96) + handle process signals (D-97) + catch unhandled exceptions (D-98).
+- D99 v5.0 production hardening 4th evidence: 1 new gracefulShutdown async function (sequences beforeExit -> auditLog record -> onComplete in 3 ordered steps; cross-theme bridge into v5.0 AuditLog via 'graceful-shutdown' events; defensive: errors at any step are caught and surfaced via ShutdownResult) + 1 GracefulShutdownOptions interface + 1 ShutdownResult interface + 1 ShutdownTrigger union + 4 new unit tests. Production-hardening 4-step protocol COMPLETE: format fatal errors (D-96) + handle process signals (D-97) + catch unhandled exceptions (D-98) + drain pending work (D-99).
+- D100 v5.0 plugin governance 2nd cycle: 1 new buildCapabilityMatrix pure function (cross-theme bridge: D-91 ToolCapability vocabulary + D-94 DistributionManifest; returns CapabilityMatrix with entries + undeclaredToolCapabilities + toolsWithoutCapabilities) + 1 CapabilityMatrix interface + 1 CapabilityMatrixEntry interface + 1 UndeclaredToolCapability interface + 4 new unit tests. Plugin-governance theme 1st cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100.
+- D101 v5.0 distribution/upgrade flow 2nd cycle: 1 new generateChangelog pure function (compares 2 DistributionManifests, returns ChangelogDocument with version + capability-added/removed + channel + node-engine + supported-upgrade-origin entries) + 1 ChangelogDocument interface + 1 ChangelogEntry interface + 1 ChangelogChangeKind union + 4 new unit tests. Distribution/upgrade flow theme 2nd cycle COMPLETE: manifest D-94 + compareVersions D-95 + changelog generator D-101.
+- D102 v5.0 observability+auditability 2nd cycle: 1 new dumpAuditLog async function (reads via D-90 readAuditLog + applies eventKinds + sinceTimestamp filters + renders text or JSON format) + 1 AuditDumpResult interface + 1 AuditDumpOptions interface + 1 AuditDumpFormat union + 4 new unit tests. Observability+auditability theme 2nd cycle COMPLETE: write D-87/88/89 + read D-90 + render D-102.
+- D103 v5.0 plugin governance 2nd cycle: 1 new enforceProfilePolicy pure function (reuses D-100 buildCapabilityMatrix + emits undeclared-capability + missing-capability violations) + 1 PolicyEnforcementResult interface + 1 PolicyViolation interface + 1 PolicyViolationKind union + 4 new unit tests. Plugin-governance theme 2nd cycle COMPLETE: vocabulary D-91 + usage D-92 + query D-93 + cross-theme bridge D-100 + enforcement D-103.
+- D104 v5.0 production hardening 5th evidence: 1 new evaluateCrossInstanceRollback async function (cross-instance decision: read prior audit log via D-90 + check last event kind + freshness window; emit proceed / rollback / no-evidence decision) + 1 RollbackEvaluation interface + 1 RollbackEvaluationOptions interface + 1 RollbackDecision union + 4 new unit tests. Production-hardening 5-evidence set COMPLETE: format D-96 + signal D-97 + uncaught D-98 + drain D-99 + cross-instance recovery D-104.
+- D105 v5.0 cross-theme bridge: 1 new buildPolicySnapshot async function (orchestration layer: reuses D-100 buildCapabilityMatrix + D-101 generateChangelog + D-103 enforceProfilePolicy + D-104 evaluateCrossInstanceRollback; returns PolicySnapshot with capabilityMatrix + changelog + policyEnforcement + crossInstance + summary) + 1 PolicySnapshot interface + 1 PolicySnapshotSummary interface + 1 BuildPolicySnapshotInput interface + 4 new unit tests. v5.0 3-theme cross-bridge COMPLETE: plugin governance + distribution/upgrade + production hardening tied into 1 unified status struct.
+- D106 v6.0 master plan: 1 new docs/superpowers/v6.0-master-plan.md (4 themes: multi-agent safety + hosted/enterprise gates + distributed coordination + advanced observability; entry criteria checklist; first sub-sprint multi-agent safety seed designed) + 1 v6-plan-exists.test.ts (3 doc-existence tests) + 4 new entries. v6.0 plan promoted from 'planning preview only' to 'executable plan' (5/6 entry criteria checked).
+- D107 v6.0 multi-agent safety seed: 1 new SubAgentId branded type + 1 SubAgent interface + 1 SubAgentRegistry class (in-memory map-based, register/unregister/get/list/listByParent/size/clear + asSubAgentId + isSubAgentId helpers) + 1 new file + 1 new test file + 4 new unit tests. Multi-agent safety seed part 1 of 3 COMPLETE: foundational type system. D-108 will add enforceSubAgentPolicy; D-109 will add rollbackSubAgent.
+- D108 v6.0 multi-agent safety seed: 1 new enforceSubAgentPolicy thin wrapper function (reuses D-103 enforceProfilePolicy + D-107 SubAgent + D-94 DistributionManifest; returns SubAgentPolicyEvaluation with subAgentId + parentAgentId + decision (allow/deny) + summary) + 1 SubAgentPolicyEvaluation interface + 1 SubAgentPolicyDecision union + 4 new unit tests. Multi-agent safety seed part 2 of 3 COMPLETE: enforcement layer. D-109 will add rollbackSubAgent.
+- D109 v6.0 multi-agent safety seed: 1 new rollbackSubAgent pure function (identifies sub-agent-owned events via event.payload.subAgentId + marks with rolledBackAt + rollbackReason + emits new 'sub-agent-rollback' event; supports dryRun mode for preview) + 1 SubAgentRollbackResult interface + 1 SubAgentRollbackOptions interface + 1 SubAgentRollbackOutcome union + 4 new unit tests. Multi-agent safety seed part 3 of 3 COMPLETE: rollback side. v6.0 Theme 1 (multi-agent safety) SEED-COMPLETE: 3 of 3 sub-sprints (D-107 + D-108 + D-109) shipped.
+- D110 v6.0 multi-agent safety 2nd cycle cross-bridge: 1 new buildSubAgentPolicySnapshot async function (orchestration layer: reuses D-108 enforceSubAgentPolicy + D-109 rollbackSubAgent + D-94 DistributionManifest; returns SubAgentPolicySnapshot with policy + rollback + summary; canRun = policy.allow && rollback !== rolled-back) + 1 SubAgentPolicySnapshot interface + 1 SubAgentPolicySnapshotSummary interface + 1 BuildSubAgentPolicySnapshotInput interface + 4 new unit tests. v6.0 Theme 1 (multi-agent safety) 2nd cycle cross-bridge COMPLETE: mirrors v5.0 D-105 buildPolicySnapshot pattern. v6.0 Theme 1 SEED + CROSS-BRIDGE COMPLETE: 4 sub-sprints (D-107 + D-108 + D-109 + D-110) shipped.
+- D111 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new enforceRateLimit pure function (per-tenant rate limiting: returns RateLimitResult with decision 'allow'/'allow-with-warning'/'deny' + utilizationPercent + retryAfterMs + summary; supports warnAtPercent default 80%) + 1 TenantId branded type + 1 asTenantId + 1 isTenantId + 1 RateLimitPolicy interface + 1 RateLimitDecision union + 1 RateLimitResult interface + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed start: per-tenant rate limiting foundational types + enforcement function. D-112+ will add billing/quota, SSO/OIDC, SIEM integration.
+- D112 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new enforceTenantQuota pure function (per-tenant billing/quota: returns QuotaResult with decision 'allow'/'allow-with-warning'/'deny' + utilizationPercent + overage + summary; supports warnAtPercent default 80% + 4 CostDimension types: tokens, requests, storage, compute-seconds) + 1 TenantQuota interface + 1 CostDimension union + 1 QuotaDecision union + 1 QuotaResult interface + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 2 of 3+ COMPLETE. D-112 complements D-111 (rate limit time-windowed) by tracking cumulative usage. D-113 added SSO/OIDC; SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.
+- D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed: 1 new validateOidcToken pure function (SSO/OIDC integration: validates claim-level invariants (expiry + issuer + audience) + extracts tenantId + subject; trusts caller's pre-decoded claims; NO JWT signature verification yet) + 1 OidcProvider interface + 1 OidcToken interface + 1 OidcAuthResult interface + 1 OidcValidationOptions interface + 1 OidcAuthDecision union + 4 new unit tests. v6.0 Theme 2 (hosted/enterprise opt-in gates) seed part 3 of 3+ COMPLETE. D-113 adds per-tenant authentication to complement D-111 (rate limit) + D-112 (billing/quota). SIEM integration and Theme 2 cross-bridge are deferred past the Gate-1.5 D114/D115 work.
+- D114 Gate-1.5 live Browser task sourcing: 1 new pure ledger builder + 2 new unit tests queue 20 pending candidate tasks for opt-in live Browser execution while keeping Gate-1.5 binding=false and Browser enhancement locked.
+- D115 Gate-1.5 opt-in live Browser task runner: 1 new opt-in runner boundary + 3 new unit tests prove no execution without opt-in, no execution without an adapter, and explicit adapter execution updates Gate-1.5 accounting while keeping binding=false.
+- D116 Gate-1.5 live Browser result recorder: 1 new pure recorder + runner integration accepts explicit known task results, ignores unknown/duplicate rows, and keeps repository live evidence at 0/20 until an opt-in Browser run is recorded.
+- D117 Gate-1.5 opt-in live Browser evidence runner: 1 new recordOptInLiveBrowserEvidence async function orchestrates the queue D-114 + runner D-115 + recorder D-116 chain end-to-end and returns a typed evidence record; repository ledger advances 0/20 -> 1/20 with a stub adapter, binding remains false (19/20 still pending), 4 new unit tests.
+- D118 Gate-1.5 opt-in live Browser evidence batch runner: 1 new recordOptInLiveBrowserEvidenceBatch async function calls the D-117 single-run chain `batchSize` times in a loop with the updated ledger between iterations, advancing the repository ledger 1/20 -> 4/20 (3 more) via a single batch call with a stub adapter; binding remains false (16/20 still pending), 4 new unit tests.
+- D119 Gate-1.5 real HTTP Browser evidence adapter: 1 new recordRealBrowserEvidence async function uses Node's built-in `fetch` to record real network-call evidence for 2 candidate tasks (newsletter-signup fetched from example.com, product-search fetched from iana.org), advancing the repository ledger 4/20 -> 6/20 (2 more REAL evidence); of the 6 cumulative completed live results, 4 are stub-evidence and 2 are real-evidence; binding remains false (14/20 still pending); 4 new unit tests; D-119 adds zero new npm deps.
+- D120 Gate-1.5 hybrid real Browser evidence runner: 1 new recordHybridRealBrowserEvidence async function records 2 HTTP-evidence tasks plus 1 JS-evidence task, advancing repository live result accounting from 6/20 to 9/20; 4 stub + 4 HTTP + 1 JS evidence; binding remains false because 11/20 are still pending; 5 tests cover contiguous and non-contiguous task mappings.
+- D121 Gate-1.5 hybrid evidence alignment: recordHybridRealBrowserEvidence now skips unmapped pending tasks and records explicitly mapped non-contiguous tasks, keeping the repository ledger at 9/20 and binding=false.
+- D122 Gate-1.5 hybrid JS action mapping: recordHybridRealBrowserEvidence accepts optional per-task jsActions so remaining JS evidence can distinguish fill-search-input, click-element, and extract-text actions without changing the 9/20 live-result count.
+- D123 Gate-1.5 hybrid updated ledger accumulation: recordHybridRealBrowserEvidence now returns a recomputed updatedLedger and recalculates binding/branchDecision from the ledger builder, enabling future hybrid batches to carry threshold state forward without changing the 9/20 live-result count.
+- D124 Gate-1.5 hybrid live evidence batch: updatedLedger accumulation records 4 additional live Browser evidence results, advancing repository evidence from 9/20 to 13/20 while binding remains false and Browser defaults stay locked.
+- D125 Gate-1.5 hybrid live evidence continuation: final 7 tasks recorded via real HTTP fetch evidence, advancing repository live results from 13/20 to 20/20; binding=true, Browser enhancement unlocked.
+- D126 Browser Tier-1 foundation: pure TypeScript helpers now provide richer semantic DOM extraction, structured page summaries, deterministic element ranking with reasons/scores, bounded action history, repeated-action detection, and planner repeat avoidance while keeping Browser defaults narrow.
+- D127 Memory Ranking and Code Intelligence enhancement: memory ranking now exposes score factors and reasons, MemoryStore.rank returns active ranked memories, semantic-index results include token evidence and stable tie-breaking, and smart_search local/all adds heuristic semantic_fallback results for free-text queries while keeping exact symbol matches higher priority.
+- D128 v2.0 Tier-1 release-gate hardening: a deterministic precheck now verifies D126 Browser helper evidence, D127 Memory Ranking evidence, D127 Code Intel semantic fallback evidence, and default-exposure invariants while keeping v2.0 blocked on production Browser automation, visual grounding, and Tier-2 proof.
+- D129 production Browser proof: a pure injected adapter contract now records an ordered Browser automation transcript plus visual snapshot metadata proof, moving production Browser automation and visual grounding to Tier-1 pass while keeping Tier-2 blockers explicit and defaults narrow.
+- D130 v2.0 Tier-2 Compaction closure: Compaction is now a pass row in the v2.0 precheck using core/session compaction, agent tool-loop compaction, print/RPC configuration paths, lifecycle hook tests, and cross-protocol smoke evidence while Automation, Remote TUI, and MCP Runtime remain blocked.
+- D131 v2.0 Tier-2 MCP Runtime closure: MCP Runtime is now a pass row in the v2.0 precheck using a one-server stdio JSON-RPC transport proof against the gh-search MCP server, opt-in capability registration, and client/server roundtrip tests while Automation and Remote TUI remain blocked.
+- D132 v2.0 Tier-2 Automation closure: Automation is now a pass row in the v2.0 precheck using an injected runner execution proof, persisted cron run records, and runtime/store/daemon tests.
+- D133 v2.0 Tier-2 Remote TUI closure: Remote TUI now has an authenticated injected-transport protocol/session proof covering handshake, unauthorized rejection, input/resize forwarding, output sequencing, and deterministic close behavior; this is not a full WebSocket/app-server implementation.
+- D134 v3/v4 production precheck: machine-readable v3/v4 evidence matrix added; production breadth and cross-platform SIGKILL remain blockers.
+- D135 v3 production replay evidence: multi-scenario default-profile long-horizon replay suite added; v4 cross-platform SIGKILL remains blocked.
+- D136 v4 cross-platform SIGKILL/restore evidence: evaluateSigkillRestoreEvidence evaluator with 3 scenarios (process-kill, docker-stop, session-crash-recovery) all pass with data integrity preserved; v3/v4 production precheck now passes all 7 checks; does not touch default registry or expand exposure.
+- D137 v5.0 observability 3rd cycle trace span seed: TraceSpanStore class with startSpan/endSpan/getSpan/getSpansByTrace/getSpansByParent/list/size/clear + TraceSpanId branded type + TraceSpan interface with OpenTelemetry-compatible fields + 4 unit tests. Observability+auditability theme now covers write + read + render + trace spans.
+- D138 v6.0 Theme 3 distributed coordination seed: DistributedLockManager (lease-based, in-memory, acquire/release/renew with TTL expiry) + DistributedEventAggregator (merges audit logs from multiple instances with conflict detection) + branded types + 2 test files.
+- D139 v5.0 production hardening bootstrap: bootstrapHardening function wires D-96/D-97/D-98/D-99 into a single idempotent call with HardeningBootstrapOptions/Result interfaces; wired into REPL bootstrap path.
+- D141 Gate-1 preferred-100k pass: React target (753,902 LOC) now has verified createElement -> ReactElement call chain evidence; Gate-1 preferred status advances from available to passed.
+- D142 Gate-2 multi-scenario evidence: 2 new fixtures added (code-refactor, bug-investigation); v3 production replay suite expanded from 3 to 5 default-profile replay scenarios; Gate-2 multi-scenario evidence now covers 5 scenarios.
+- D143 Agent OS orchestration integration tests: 4 new TaskOrchestrator test cases covering task lifecycle management, task dependency resolution, error recovery, and concurrent task execution.
+- Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
+### Milestone Status
+
+| Milestone | Evidence-backed status | Main blocker |
+| --- | --- | --- |
+| v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (Gate-2 production proof, cross-platform Desktop, cross-platform SIGKILL) |
+| v1.5 | Code Intel foundation exists; preferred 100K Gate-1 PASSES via React target (753K LOC, D-141) | rename_symbol is heuristic, not IDE-grade |
+| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence; D128 precheck makes Tier-1 status machine-readable; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row; D131 closes the MCP Runtime Tier-2 row; D132 closes the Automation Tier-2 row; D133 closes the Remote TUI Tier-2 row | D133 Remote TUI is an injected-transport protocol/session proof, not a full WebSocket/app-server implementation |
+| v2.5 | Planner, task DAG, and plan cache exist | Main-loop integration is limited |
+| v3.0 | Reviewer and Gate-2 live runner exist; D134 adds a v3/v4 production precheck; D135 adds multi-scenario default-profile replay evidence; D142 expands Gate-2 multi-scenario evidence to 5 scenarios | D135/D142 replay evidence is not a new live external Gate-2 run; v1-v4 production completion is not claimed |
+| v4.0 | Researcher, TaskGraph, memory, and channel foundations exist; D136 closes the v4-cross-platform-sigkill blocker; v3/v4 production precheck passes all 7 checks; D143 adds Agent OS orchestration integration tests (4 TaskOrchestrator cases) | Agent OS orchestration now has integration tests but is not production-complete; Desktop and channels are not production-complete |
+
+### Gate Policy
+
+- Do not weaken Gate-1 minimum or preferred LOC thresholds.
+- Do not count target inventory as a Gate-1 pass.
+- Do not count minimum-50k evidence as preferred-100k evidence.
+- Do not count fixture-only Gate-1.5 evidence as a binding Browser branch decision.
+- Do not count mock Gate-2 evidence as live evidence.
+- Do not unlock default Browser, Desktop, Channel, media, or productivity tools from Gate-2 alone.
+- Do not describe heuristic Code Intel as IDE-grade.
+- Do not claim v1-v4 completion from module existence alone.
+
+### Next Roadmap Work
+
+1. D136-D143 complete: v4 cross-platform SIGKILL/restore evidence (D136), v5 trace span observability (D137), v6 distributed coordination seed (D138), v5 hardening bootstrap (D139), scorecard and docs update (D140), Gate-1 preferred pass (D141), Gate-2 multi-scenario evidence (D142), Agent OS orchestration tests (D143).
+2. v5/v6 seed work continues: production hardening bootstrap is wired, trace spans seed exists, distributed coordination seed exists. Next v5 sub-sprints expand each theme.
+3. Gate-1 preferred-100K now PASSES (D141); continue broadening Gate-1 evidence with additional 100K+ targets.
+4. Gate-2 multi-scenario evidence expanded to 5 scenarios (D142); keep production long-horizon proof as a separate future blocker.
+5. Agent OS orchestration has integration tests (D143); expand orchestration evidence with broader task lifecycle scenarios.
+6. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
+
+### V5/V6 Planning Boundary
+
+- v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
+- v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json.
+- v5 planning covers production hardening (D-96 through D-99 + D-104 + D-139), plugin governance (D-91 through D-93 + D-100 + D-103), distribution (D-94 + D-95 + D-101), and observability (D-87 through D-90 + D-102 + D-137).
+- v6 planning covers multi-agent safety (D-107 through D-110), hosted/enterprise gates (D-111 through D-113), distributed coordination (D-138), and advanced observability.
+- v5/v6 plans must inherit the same gate discipline: evidence first, no overclaiming.
+
+### Status Hygiene Rules
+
+- Prefer this block over older historical status text below.
+- Older roadmap text below is retained as history until a later cleanup sprint.
+- Any future release claim must cite a machine-readable report or a verified command output.
+- Package version 2.3.0 is a package line, not roadmap v2.3 maturity proof.
+- Existing modules in src/ are foundations unless the main runtime and tests prove integration.
+- This block is intentionally ASCII-only for automated checks.
+
+### Repository Scope
+
+- Worktree: D:\App\openClaw\projects\deepwhale.
+- Ignore D:\App\openClaw\projects\openclaw-github.
+- Preserve unrelated untracked plan files unless explicitly adopted.
+- Keep generated target directories and runtime state out of commits.
+- Current branch remains feature/d36-gate2-live.
+
+<!-- status:current:end -->
+
+## Historical Roadmap
+
 # 🗺 deepwhale ROADMAP
 
 > ## 🔒 ROADMAP LOCKED（2026-06-03 用户拍板）
@@ -1053,3 +1238,4 @@ deepwhale>
 **下次更新**：v0.1 release 时
 **架构详情**：[docs/ARCHITECTURE.md](./ARCHITECTURE.md)
 **总报告**：[docs/research/MASTER_RESEARCH.md](./docs/research/MASTER_RESEARCH.md)
+- v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json

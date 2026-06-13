@@ -6,10 +6,18 @@
  *   - USER.md: 用户身份 / 角色 / 项目背景, 列表追加格式 (`- <text>`)
  *   - 缺文件时首次读返空, 自动 mkdir -p 落 0 字节占位
  *   - 0 改业务, 5 红线 0 触碰
+ *
+ * D-126: Memory ranking — relevance scoring for memory retrieval.
  */
 
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
+
+export interface MemoryEntry {
+  readonly timestamp: string
+  readonly content: string
+  readonly score: number
+}
 
 export class MemoryStore {
   constructor(private readonly rootDir: string) {}
@@ -77,4 +85,52 @@ export class MemoryStore {
     await this.ensureDir()
     await fs.writeFile(this.userPath, '')
   }
+
+  /**
+   * Search memory entries by query, returning ranked results.
+   * Uses simple TF scoring: counts query term occurrences in each entry.
+   */
+  async searchMemory(query: string, options?: { limit?: number }): Promise<MemoryEntry[]> {
+    const content = await this.readMemory()
+    if (!content.trim()) return []
+
+    const entries = parseMemoryEntries(content)
+    const queryTerms = query.toLowerCase().split(/\s+/).filter(Boolean)
+
+    const scored = entries.map((entry) => {
+      const lowerContent = entry.content.toLowerCase()
+      let score = 0
+      for (const term of queryTerms) {
+        const matches = lowerContent.split(term).length - 1
+        score += matches
+      }
+      // Recency boost: newer entries get slight advantage
+      const ageMs = Date.now() - new Date(entry.timestamp).getTime()
+      const ageBoost = Math.max(0, 1 - ageMs / (30 * 24 * 60 * 60 * 1000)) * 0.1
+      return { ...entry, score: score + ageBoost }
+    })
+
+    return scored
+      .filter((e) => e.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, options?.limit ?? 10)
+  }
+}
+
+function parseMemoryEntries(content: string): Array<{ timestamp: string; content: string }> {
+  const entries: Array<{ timestamp: string; content: string }> = []
+  const blocks = content.split(/^## /m).filter(Boolean)
+
+  for (const block of blocks) {
+    const lines = block.split('\n')
+    const timestampMatch = lines[0]?.match(/^(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s*$/)
+    if (timestampMatch && timestampMatch[1]) {
+      entries.push({
+        timestamp: timestampMatch[1],
+        content: lines.slice(1).join('\n').trim(),
+      })
+    }
+  }
+
+  return entries
 }

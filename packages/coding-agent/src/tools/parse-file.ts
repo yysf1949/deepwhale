@@ -14,11 +14,13 @@ import { resolve } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { parseFile, extractSymbols, displayName, type LanguageId } from '@deepwhale/code-intel';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export class ParseFileTool implements Tool {
   readonly name = 'parse_file' as ToolName;
   readonly description = 'Parse a source file via web-tree-sitter (WASM, 6 languages). 3 modes: summary / ast / symbols. Low risk.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

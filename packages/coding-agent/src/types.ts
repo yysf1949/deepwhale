@@ -46,6 +46,12 @@ export interface Tool {
   readonly description: string;
   readonly risk: 'low' | 'medium' | 'high';
   readonly schema: ToolInputSchema;
+  /**
+   * D-91 v5.0 plugin governance: optional declared capabilities. Tools
+   * that do not declare capabilities default to `[]` (no capabilities
+   * claimed). The vocabulary is defined in `governance/tool-capabilities.ts`.
+   */
+  readonly capabilities?: readonly import('./governance/tool-capabilities.js').ToolCapability[];
   execute(input: Record<string, unknown>): Promise<ToolResult>;
 }
 

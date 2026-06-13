@@ -15,6 +15,7 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import { deepwhaleRoot } from '../util/deepwhale-paths.js';
 
 export type Fetcher = (url: string) => Promise<string>;
 const defaultFetcher: Fetcher = async () => { throw new Error('blogwatcher: no fetcher'); };
@@ -134,5 +135,5 @@ export class BlogwatcherTool implements Tool {
 }
 
 export const blogwatcher = new BlogwatcherTool({
-  rootDir: process.env.HOME || process.env.USERPROFILE || '.',
+  rootDir: deepwhaleRoot(),
 });

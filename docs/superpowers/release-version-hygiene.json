@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-06-10T00:00:00.000Z",
+  "slice": "D72",
+  "branch": "feature/d36-gate2-live",
+  "packageVersionLine": "2.3.0",
+  "sourceOfTruth": {
+    "packageFile": "package.json",
+    "currentStatusDocs": [
+      "README.md",
+      "ROADMAP.md",
+      "docs/ROADMAP_DECISIONS.md"
+    ],
+    "scorecard": "docs/superpowers/v1-v4-evidence-scorecard.json"
+  },
+  "interpretation": {
+    "packageVersion": "package-line-only",
+    "historicalReleaseBadges": "historical-context-only",
+    "currentRoadmapMaturity": "not-production-complete",
+    "freshReleaseGate": "proven-2026-06-10 (D-79)"
+  },
+  "constraints": [
+    "Package version 2.3.0 is not roadmap v2.3 maturity proof.",
+    "Historical README release badges do not override the current-status block.",
+    "Future release claims must cite a machine-readable report or verified command output.",
+    "v1-v4 remain capability milestones until gate evidence proves completion."
+  ],
+  "nextAction": "D125: continue hybrid live Browser evidence accumulation without unlocking Browser defaults until 20 completed live task results exist."
+}

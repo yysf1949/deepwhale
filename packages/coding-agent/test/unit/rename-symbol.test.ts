@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { RenameSymbolTool } from '../../src/tools/rename-symbol.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,6 +48,12 @@ describe('rename_symbol (D-32.2.4)', () => {
     expect(r.content).toMatch(/no-op/i);
   });
 
+  it('marks no-op success results as heuristic metadata', async () => {
+    const r = await tool.execute({ oldName: 'foo', newName: 'foo', path: tmpDir });
+    expect(r.success).toBe(true);
+    expect(r.meta).toMatchObject({ heuristic: true });
+  });
+
   it('returns (no changes) for unknown symbol', async () => {
     const r = await tool.execute({ oldName: 'nonexistent_xyz_abc', newName: 'newone', path: tmpDir });
     expect(r.success).toBe(true);
@@ -86,5 +92,331 @@ describe('rename_symbol (D-32.2.4)', () => {
     expect(content).toContain('// foo should stay in this comment');
     expect(content).toContain('"foo should stay in this string"');
     expect(content).toContain('return baz();');
+  });
+});
+
+describe('rename_symbol conservative mode (D-33.2.2)', () => {
+  // 拍板 (D-33.2.2): default = reference-limited (no comment/string rewrite).
+  // allow_textual_fallback=true is an OPT-IN to also rewrite occurrences in
+  // comments and strings, using a word-boundary regex over the whole file.
+  let tool: RenameSymbolTool;
+  let tmpDir: string;
+  beforeAll(() => {
+    tool = new RenameSymbolTool();
+  });
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'rename-sym-d332-'));
+    writeFileSync(
+      join(tmpDir, 'a.ts'),
+      [
+        'export function target() { return 1; }',
+        'export function caller() { return target(); }',
+        "const text = 'target';",
+        '// target is documentation only',
+      ].join('\n'),
+    );
+    writeFileSync(join(tmpDir, 'b.ts'), 'function target() { return 2; }\n');
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not rewrite comments, strings, unrelated locals, or unrelated files by default', async () => {
+    // apply=true so we can inspect the actual on-disk file content (the
+    // dry-run output header itself contains the literal newName, which
+    // would defeat a string-substring check on the dry-run content).
+    const result = await tool.execute({
+      path: tmpDir,
+      oldName: 'target',
+      newName: 'renamedTarget',
+      apply: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/ambiguous-symbol/);
+    }
+    expect(readFileSync(join(tmpDir, 'a.ts'), 'utf8')).toContain('export function target()');
+    expect(readFileSync(join(tmpDir, 'b.ts'), 'utf8')).toContain('function target()');
+  });
+
+  it('renames only the selected declaration file when targetFile disambiguates same-name declarations', async () => {
+    const result = await tool.execute({
+      path: tmpDir,
+      oldName: 'target',
+      newName: 'renamedTarget',
+      targetFile: 'a.ts',
+      apply: true,
+    });
+
+    expect(result.success).toBe(true);
+    const aContent = readFileSync(join(tmpDir, 'a.ts'), 'utf8');
+    const bContent = readFileSync(join(tmpDir, 'b.ts'), 'utf8');
+    // Identifier references in code ARE rewritten
+    expect(aContent).toContain('export function renamedTarget()');
+    expect(aContent).toContain('return renamedTarget()');
+    expect(bContent).toContain('function target()');
+    expect(bContent).not.toContain('renamedTarget');
+    // But string and comment occurrences are NOT rewritten (conservative default)
+    expect(aContent).toContain("'target'");
+    expect(aContent).toContain('// target is documentation only');
+  });
+
+  it('requires allow_textual_fallback=true to do broad textual replacement', async () => {
+    // Use apply=true on a fresh fixture so we can compare on-disk file
+    // content for both the safe (default) and the broad (opt-in) paths.
+    const safeDir = mkdtempSync(join(tmpdir(), 'rename-sym-d332-safe-'));
+    const broadDir = mkdtempSync(join(tmpdir(), 'rename-sym-d332-broad-'));
+    for (const root of [safeDir, broadDir]) {
+      mkdirSync(join(root, 'src'), { recursive: true });
+      writeFileSync(
+        join(root, 'src', 'a.ts'),
+        [
+          'export function target() { return 1; }',
+          "const text = 'target';",
+        ].join('\n'),
+      );
+    }
+
+    const safeResult = await tool.execute({
+      path: safeDir,
+      oldName: 'target',
+      newName: 'renamedTarget',
+      apply: true,
+    });
+    const broadResult = await tool.execute({
+      path: broadDir,
+      oldName: 'target',
+      newName: 'renamedTarget',
+      apply: true,
+      allow_textual_fallback: true,
+    });
+
+    expect(safeResult.success).toBe(true);
+    expect(broadResult.success).toBe(true);
+
+    // Safe (default): string NOT rewritten
+    const safeContent = readFileSync(join(safeDir, 'src', 'a.ts'), 'utf8');
+    expect(safeContent).toContain("'target'");
+    // Broad (opt-in): string IS rewritten
+    const broadContent = readFileSync(join(broadDir, 'src', 'a.ts'), 'utf8');
+    expect(broadContent).toContain("'renamedTarget'");
+
+    rmSync(safeDir, { recursive: true, force: true });
+    rmSync(broadDir, { recursive: true, force: true });
+  });
+
+  it('reports heuristic selector metadata and skipped cross-file alias references', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d48-alias-'));
+    try {
+      writeFileSync(join(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      writeFileSync(join(dir, 'other.ts'), 'export function target() {\n  return 2;\n}\n');
+      writeFileSync(
+        join(dir, 'consumer.ts'),
+        "import { target as chosen } from './provider.js';\nexport function run() {\n  return chosen();\n}\n",
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+        targetFile: 'provider.ts',
+        apply: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.meta).toMatchObject({
+        heuristic: true,
+        selector: { targetFile: 'provider.ts' },
+        ambiguousDeclarations: 2,
+        changedReferences: expect.any(Number),
+        skippedReferences: expect.any(Number),
+      });
+      expect(result.meta?.skippedReferenceDetails).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            file: 'consumer.ts',
+            reason: expect.stringMatching(/cross-file/),
+          }),
+        ]),
+      );
+      expect(readFileSync(join(dir, 'provider.ts'), 'utf8')).toContain('function renamedTarget()');
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('target as chosen');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports namespace member references as skipped instead of claiming full rename safety', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d48-namespace-'));
+    try {
+      writeFileSync(join(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      writeFileSync(
+        join(dir, 'consumer.ts'),
+        "import * as api from './provider.js';\nexport function run() {\n  return api.target();\n}\n",
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+        targetFile: 'provider.ts',
+        apply: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.meta).toMatchObject({
+        heuristic: true,
+        skippedReferences: expect.any(Number),
+      });
+      expect(result.meta?.skippedReferenceDetails).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            file: 'consumer.ts',
+            reason: expect.stringMatching(/cross-file|namespace/),
+          }),
+        ]),
+      );
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('api.target()');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('dry-run reports hashline edit hunks and heuristic confidence metadata', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d67-hunks-'));
+    try {
+      writeFileSync(
+        join(dir, 'provider.ts'),
+        [
+          'export function target() {',
+          '  return target();',
+          '}',
+          'function helper() {',
+          '  return 1;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toContain('Confidence: heuristic');
+      expect(result.content).toContain('@@');
+      expect(result.meta).toMatchObject({
+        heuristic: true,
+        confidence: 'heuristic',
+        editEngine: 'hashline',
+        dryRun: true,
+      });
+      expect(result.meta?.editHunks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            file: 'provider.ts',
+            line: 1,
+            kind: 'declaration',
+            engine: 'hashline',
+            confidence: 'heuristic',
+            oldText: 'export function target() {',
+            newText: 'export function renamedTarget() {',
+          }),
+          expect.objectContaining({
+            file: 'provider.ts',
+            line: 2,
+            oldText: '  return target();',
+            newText: '  return renamedTarget();',
+          }),
+        ]),
+      );
+      expect(readFileSync(join(dir, 'provider.ts'), 'utf8')).toContain('export function target()');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('renames a real TypeScript call after a private field on the same line', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d60-private-field-'));
+    try {
+      writeFileSync(
+        join(dir, 'provider.ts'),
+        [
+          'export function target() {',
+          '  return 1;',
+          '}',
+          'export class Box {',
+          '  #state = 0;',
+          '  run() { this.#state += 1; return target(); }',
+          '}',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+        apply: true,
+      });
+
+      expect(result.success).toBe(true);
+      const content = readFileSync(join(dir, 'provider.ts'), 'utf8');
+      expect(content).toContain('export function renamedTarget()');
+      expect(content).toContain('return renamedTarget();');
+      expect(content).toContain('this.#state += 1');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not report comments, strings, or TS private identifiers as skipped cross-file references', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rename-sym-d60-skipped-scan-'));
+    try {
+      writeFileSync(join(dir, 'provider.ts'), 'export function target() {\n  return 1;\n}\n');
+      writeFileSync(join(dir, 'other.ts'), 'export function target() {\n  return 2;\n}\n');
+      writeFileSync(
+        join(dir, 'consumer.ts'),
+        [
+          "import { target as chosen } from './provider.js';",
+          '/* target is docs only and must not be counted */',
+          'const label = "target is a string only";',
+          'class Box {',
+          '  #target = 1;',
+          '  run() { return this.#target + chosen(); }',
+          '}',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await tool.execute({
+        path: dir,
+        oldName: 'target',
+        newName: 'renamedTarget',
+        targetFile: 'provider.ts',
+        apply: true,
+      });
+
+      expect(result.success).toBe(true);
+      const details = result.meta?.skippedReferenceDetails;
+      expect(details).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'consumer.ts', line: 1 }),
+          expect.objectContaining({ file: 'other.ts', line: 1 }),
+        ]),
+      );
+      expect(details).not.toEqual(expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', line: 2 })]));
+      expect(details).not.toEqual(expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', line: 3 })]));
+      expect(details).not.toEqual(expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', line: 5 })]));
+      expect(details).not.toEqual(expect.arrayContaining([expect.objectContaining({ file: 'consumer.ts', line: 6 })]));
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('/* target is docs only');
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('"target is a string only"');
+      expect(readFileSync(join(dir, 'consumer.ts'), 'utf8')).toContain('#target');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

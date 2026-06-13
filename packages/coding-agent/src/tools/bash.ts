@@ -18,6 +18,7 @@ import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import type { SandboxRunner, SandboxRunRequest } from '../sandbox/types.js';
 import { LocalSandboxRunner } from '../sandbox/local-runner.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 const ALLOWED_COMMANDS = new Set([
   'ls',
@@ -103,6 +104,7 @@ export class BashTool implements Tool {
   readonly description =
     'Execute a whitelisted shell command. v1.0 command allowlist; dangerous patterns (rm -rf /, sudo, curl|sh) are blocked.';
   readonly risk: 'low' | 'medium' | 'high' = 'high';
+  readonly capabilities: readonly ToolCapability[] = ['shell-exec', 'network'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

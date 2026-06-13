@@ -12,6 +12,7 @@ import { readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
 import { resolve, join, relative } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 const MAX_RESULTS_DEFAULT = 100;
 const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB 文本上限（Sprint 0.2 简化：大文件直接跳过）
@@ -21,6 +22,7 @@ export class GrepTool implements Tool {
   readonly description =
     'Search for a text pattern in files. Cross-platform Node implementation (no shell). Supports include glob for file filtering.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = ['file-read'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

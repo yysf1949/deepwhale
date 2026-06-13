@@ -2,7 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseGate1Args, readGate1Scenario, runGate1 } from '../../src/gate1.js';
+import { formatGate1Markdown, parseGate1Args, readGate1Scenario, runGate1 } from '../../src/gate1.js';
 
 describe('Gate-1 runner', () => {
   it('fails explicitly when the repository is below the formal LOC floor', async () => {
@@ -20,6 +20,7 @@ describe('Gate-1 runner', () => {
 
       expect(result.passed).toBe(false);
       expect(result.failureReasons).toContain('loc-below-minimum: 16 < 50000');
+      expect(result.locQualification).toBe('below-minimum');
       expect(result.metrics.loc).toBe(16);
       expect(result.evidence.entry?.file).toBe('src/registry.ts');
     } finally {
@@ -42,6 +43,7 @@ describe('Gate-1 runner', () => {
 
       expect(result.passed).toBe(true);
       expect(result.failureReasons).toEqual([]);
+      expect(result.locQualification).toBe('preferred-100k');
       expect(result.metrics.loc).toBe(16);
       expect(result.evidence.entry).toEqual(
         expect.objectContaining({ file: 'src/registry.ts', symbol: 'createDefaultRegistry' }),
@@ -62,6 +64,122 @@ describe('Gate-1 runner', () => {
     }
   });
 
+  it('does not pass when the required call reaches a same-name symbol in the wrong file', async () => {
+    const dir = await makeWrongFileCallFixtureRepo();
+    try {
+      const result = await runGate1({
+        repoPath: dir,
+        minLoc: 10,
+        preferredLoc: 12,
+        timeboxMs: 20 * 60 * 1000,
+        entrySymbol: 'createDefaultRegistry',
+        entryFile: 'src/registry.ts',
+        requiredCall: {
+          callerSymbol: 'startApp',
+          callerFile: 'src/app.ts',
+          calleeSymbol: 'createDefaultRegistry',
+          calleeFile: 'src/registry.ts',
+        },
+        modificationPoint: { file: 'src/registry.ts', symbol: 'createDefaultRegistry' },
+      });
+
+      expect(result.passed).toBe(false);
+      expect(result.failureReasons).toContain(
+        'call-chain-not-found: src/app.ts:startApp -> src/registry.ts:createDefaultRegistry',
+      );
+      expect(result.evidence.callChain).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails ambiguous entry symbols without an entryFile selector', async () => {
+    const dir = await makeWrongFileCallFixtureRepo();
+    try {
+      const result = await runGate1({
+        repoPath: dir,
+        minLoc: 10,
+        preferredLoc: 12,
+        timeboxMs: 20 * 60 * 1000,
+        entrySymbol: 'createDefaultRegistry',
+        requiredCall: {
+          callerSymbol: 'startApp',
+          callerFile: 'src/app.ts',
+          calleeSymbol: 'createDefaultRegistry',
+          calleeFile: 'src/fake.ts',
+        },
+        modificationPoint: { file: 'src/registry.ts', symbol: 'createDefaultRegistry' },
+      });
+
+      expect(result.passed).toBe(false);
+      expect(result.failureReasons).toContain(
+        'entry-ambiguous: createDefaultRegistry has 2 declarations; pass entryFile',
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('marks a minimum LOC pass that does not reach preferred maturity', async () => {
+    const dir = await makeFixtureRepo();
+    try {
+      const result = await runGate1({
+        repoPath: dir,
+        minLoc: 10,
+        preferredLoc: 100,
+        timeboxMs: 20 * 60 * 1000,
+        entrySymbol: 'createDefaultRegistry',
+        requiredCall: { callerSymbol: 'startApp', calleeSymbol: 'createDefaultRegistry' },
+        modificationPoint: { file: 'src/registry.ts', symbol: 'createDefaultRegistry' },
+      });
+
+      expect(result.passed).toBe(true);
+      expect(result.locQualification).toBe('minimum-50k');
+      expect(formatGate1Markdown(result)).toContain('LOC qualification: minimum-50k');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('serializes LOC qualification into Gate-1 JSON evidence', async () => {
+    const dir = await makeFixtureRepo();
+    try {
+      const result = await runGate1({
+        repoPath: dir,
+        minLoc: 10,
+        preferredLoc: 100,
+        timeboxMs: 20 * 60 * 1000,
+        entrySymbol: 'createDefaultRegistry',
+        requiredCall: { callerSymbol: 'startApp', calleeSymbol: 'createDefaultRegistry' },
+        modificationPoint: { file: 'src/registry.ts', symbol: 'createDefaultRegistry' },
+      });
+
+      const parsed = JSON.parse(JSON.stringify(result)) as { locQualification?: string };
+      expect(parsed.locQualification).toBe('minimum-50k');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('renders below-minimum LOC qualification in markdown evidence', async () => {
+    const dir = await makeFixtureRepo();
+    try {
+      const result = await runGate1({
+        repoPath: dir,
+        minLoc: 50_000,
+        preferredLoc: 100_000,
+        timeboxMs: 20 * 60 * 1000,
+        entrySymbol: 'createDefaultRegistry',
+        requiredCall: { callerSymbol: 'startApp', calleeSymbol: 'createDefaultRegistry' },
+        modificationPoint: { file: 'src/registry.ts', symbol: 'createDefaultRegistry' },
+      });
+
+      expect(formatGate1Markdown(result)).toContain('LOC qualification: below-minimum');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('reads scenario JSON into Gate-1 options', async () => {
     const dir = await makeFixtureRepo();
     try {
@@ -76,9 +194,12 @@ describe('Gate-1 runner', () => {
             timeboxMs: 1200000,
             maxDepth: 6,
             entrySymbol: 'createDefaultRegistry',
+            entryFile: 'src/registry.ts',
             requiredCall: {
               callerSymbol: 'startApp',
+              callerFile: 'src/app.ts',
               calleeSymbol: 'createDefaultRegistry',
+              calleeFile: 'src/registry.ts',
             },
             modificationPoint: {
               file: 'src/registry.ts',
@@ -99,9 +220,12 @@ describe('Gate-1 runner', () => {
         timeboxMs: 1200000,
         maxDepth: 6,
         entrySymbol: 'createDefaultRegistry',
+        entryFile: 'src/registry.ts',
         requiredCall: {
           callerSymbol: 'startApp',
+          callerFile: 'src/app.ts',
           calleeSymbol: 'createDefaultRegistry',
+          calleeFile: 'src/registry.ts',
         },
         modificationPoint: {
           file: 'src/registry.ts',
@@ -152,10 +276,16 @@ describe('Gate-1 runner', () => {
       'C:/work/repo',
       '--entry',
       'createDefaultRegistry',
+      '--entry-file',
+      'packages/coding-agent/src/tools/registry.ts',
       '--caller',
       'runAgentTurn',
+      '--caller-file',
+      'packages/coding-agent/src/agent/tool-loop.ts',
       '--callee',
       'createDefaultRegistry',
+      '--callee-file',
+      'packages/coding-agent/src/tools/registry.ts',
       '--mod-file',
       'packages/coding-agent/src/tools/registry.ts',
       '--mod-symbol',
@@ -178,9 +308,12 @@ describe('Gate-1 runner', () => {
       options: {
         repoPath: resolve('C:/work/repo'),
         entrySymbol: 'createDefaultRegistry',
+        entryFile: 'packages/coding-agent/src/tools/registry.ts',
         requiredCall: {
           callerSymbol: 'runAgentTurn',
+          callerFile: 'packages/coding-agent/src/agent/tool-loop.ts',
           calleeSymbol: 'createDefaultRegistry',
+          calleeFile: 'packages/coding-agent/src/tools/registry.ts',
         },
         modificationPoint: {
           file: 'packages/coding-agent/src/tools/registry.ts',
@@ -229,6 +362,45 @@ async function makeFixtureRepo(): Promise<string> {
       '',
       'export function unrelated() {',
       '  return 1;',
+      '}',
+    ].join('\n'),
+  );
+  return dir;
+}
+
+async function makeWrongFileCallFixtureRepo(): Promise<string> {
+  const dir = await mkdir(resolve(tmpdir(), `dw-gate1-wrong-call-${Date.now()}-${Math.random().toString(16).slice(2)}`), {
+    recursive: true,
+  });
+  const src = resolve(dir, 'src');
+  await mkdir(src, { recursive: true });
+  await writeFile(
+    resolve(src, 'registry.ts'),
+    [
+      'export function createDefaultRegistry() {',
+      "  return ['read_file'];",
+      '}',
+      '',
+      'export function intendedCaller() {',
+      '  return createDefaultRegistry();',
+      '}',
+    ].join('\n'),
+  );
+  await writeFile(
+    resolve(src, 'fake.ts'),
+    [
+      'export function createDefaultRegistry() {',
+      "  return ['fake'];",
+      '}',
+    ].join('\n'),
+  );
+  await writeFile(
+    resolve(src, 'app.ts'),
+    [
+      "import { createDefaultRegistry } from './fake.js';",
+      '',
+      'export function startApp() {',
+      '  return createDefaultRegistry().length;',
       '}',
     ].join('\n'),
   );

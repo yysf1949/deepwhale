@@ -1,0 +1,55 @@
+{
+  "generatedAt": "2026-06-12T00:30:00.000Z",
+  "targetsRoot": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets",
+  "minimumLoc": 50000,
+  "preferredLoc": 100000,
+  "status": "preferred-passed",
+  "targets": [
+    {
+      "name": "react",
+      "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\react",
+      "loc": 753902,
+      "supportedFiles": 4462,
+      "locQualification": "preferred-100k"
+    },
+    {
+      "name": "vite",
+      "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\vite",
+      "loc": 86216,
+      "supportedFiles": 1395,
+      "locQualification": "minimum-50k"
+    }
+  ],
+  "preferredTargets": [
+    {
+      "name": "react",
+      "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\react",
+      "loc": 753902,
+      "supportedFiles": 4462,
+      "locQualification": "preferred-100k"
+    }
+  ],
+  "minimumTargets": [
+    {
+      "name": "react",
+      "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\react",
+      "loc": 753902,
+      "supportedFiles": 4462,
+      "locQualification": "preferred-100k"
+    },
+    {
+      "name": "vite",
+      "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\vite",
+      "loc": 86216,
+      "supportedFiles": 1395,
+      "locQualification": "minimum-50k"
+    }
+  ],
+  "bestAvailable": {
+    "name": "react",
+    "path": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets\\react",
+    "loc": 753902,
+    "supportedFiles": 4462,
+    "locQualification": "preferred-100k"
+  }
+}

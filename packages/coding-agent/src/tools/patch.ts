@@ -10,12 +10,14 @@
 import { promises as fs } from 'node:fs';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export class PatchTool implements Tool {
   readonly name = 'patch' as ToolName;
   readonly description =
     'Find and replace a unique string in a file. oldString must match exactly once. Medium risk (overwrites file).';
   readonly risk: 'low' | 'medium' | 'high' = 'medium';
+  readonly capabilities: readonly ToolCapability[] = ['file-read', 'file-write'] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

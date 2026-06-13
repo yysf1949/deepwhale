@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import type { ToolName } from '@deepwhale/core';
 import type { Tool, ToolInputSchema, ToolResult } from '../types.js';
 import { deepwhaleRoot } from '../util/deepwhale-paths.js';
+import type { ToolCapability } from '../governance/tool-capabilities.js';
 
 export interface PlanStep {
   no: number;
@@ -92,6 +93,7 @@ export class PlanTool implements Tool {
   readonly description =
     'Plan mode (enter / exit / add_step). Persists to ~/.deepwhale/plan/current.json. Low risk.';
   readonly risk: 'low' | 'medium' | 'high' = 'low';
+  readonly capabilities: readonly ToolCapability[] = [] as const;
 
   readonly schema: ToolInputSchema = {
     type: 'object',

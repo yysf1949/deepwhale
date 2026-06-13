@@ -38,6 +38,7 @@ import { computeArgsDigest } from '../policy/args-digest.js';
 import { sanitizeReason } from '../policy/sanitize-reason.js';
 import { appendPolicyDecisionEvent } from './session-adapter.js';
 import type { SessionWriter } from '@deepwhale/core';
+import type { AuditLog } from '../observability/audit-log.js';
 
 /** Sprint 1a 默认：跟 LLM 来回 5 轮（够用 coding agent 短任务，长任务 caller 调高）。 */
 export const TOOL_LOOP_DEFAULT_MAX_STEPS = 5;
@@ -65,6 +66,10 @@ export interface ToolLoopOptions {
   yes?: boolean;
   /** Sprint 1c-revive-3-D-13: session writer 注入 (写 policy_decision event 用). */
   writer?: SessionWriter | null;
+  /** D-88 v5.0 observability+auditability: optional audit log sink. When set,
+   *  runToolLoop emits tool-call, tool-result, and loop-end events into the log.
+   *  When unset (default), no observability side effects occur. */
+  auditLog?: AuditLog | null;
 }
 
 export type ToolLoopStep =
@@ -192,6 +197,10 @@ export async function runToolLoop(
     // 3) 如果没 tool_calls → 收敛,return
     const tcs = lastResult.tool_calls;
     if (!tcs || tcs.length === 0) {
+      options.auditLog?.record({
+        kind: 'loop-end',
+        payload: { toolCalls: steps.filter((s) => s.kind === 'tool').length },
+      });
       return { messages: working, final: lastResult, steps };
     }
 
@@ -200,6 +209,7 @@ export async function runToolLoop(
       if (options.signal?.aborted) {
         throw new LLMUnknownError('Tool loop aborted by caller', { cause: options.signal.reason });
       }
+      options.auditLog?.record({ kind: 'tool-call', payload: { name: tc.name } });
       const toolResult = await executeToolCall(registry, tc, toolTimeoutMs, options.signal, {
         ...(options.policy !== undefined ? { policy: options.policy } : {}),
         ...(options.isInteractive !== undefined ? { isInteractive: options.isInteractive } : {}),
@@ -220,12 +230,18 @@ export async function runToolLoop(
         result: toolResult,
         duration_ms: (toolResult.meta?.['duration_ms'] as number) ?? 0,
       });
+      options.auditLog?.record({ kind: 'tool-result', payload: { name: tc.name, ok: toolResult.success } });
     }
   }
 
   // 5) 触顶
   steps.push({ kind: 'limit', ts: Date.now(), steps: maxSteps, lastResult });
-  throw new ToolLoopLimitError(maxSteps, lastResult);
+  const limitErr = new ToolLoopLimitError(maxSteps, lastResult);
+  // Attach the captured steps so callers (e.g. the tool-loop-policy wrapper)
+  // can build a partial result with the actual tool-call count, not just a
+  // synthetic "limit" sentinel.
+  Object.defineProperty(limitErr, 'partialSteps', { value: steps, enumerable: false });
+  throw limitErr;
 }
 
 // ============================================================================
@@ -527,4 +543,138 @@ async function runStreamStep(
     }
     throw err;
   }
+}
+
+// ============================================================================
+// v2.5 runTaskLoop — Executor role with pre-decomposed tasks
+// ============================================================================
+
+/**
+ * v2.5 runTaskLoop — Executor that runs a pre-decomposed list of tasks
+ * in dependency order. The Planner (separate role) decomposes goals; the
+ * Executor (this function) runs them.
+ *
+ * Contract (D-33.4.2):
+ *   - Tasks are NOT decomposed here. Calling `runTaskLoop` is the Executor.
+ *   - If a task has no `tool` field, it is recorded as skipped (success=true,
+ *     summary='no-tool-attached'). This is a deliberate "executor cannot
+ *     decompose" boundary — the Planner must have attached a tool.
+ *   - Stops on first failure (any tool returning success=false).
+ *   - Tasks whose dependencies failed/skipped are themselves skipped.
+ *
+ * v1.0 contract (runToolLoop) is NOT modified — this is a NEW export.
+ */
+export interface RunTaskLoopTask {
+  id: string;
+  goal: string;
+  dependsOn: ReadonlyArray<string>;
+  tool?: { name: string; input: Record<string, unknown> };
+}
+
+export interface RunTaskLoopOptions {
+  tasks: ReadonlyArray<RunTaskLoopTask>;
+  registry: ToolRegistry;
+  signal?: AbortSignal;
+}
+
+export interface RunTaskLoopResult {
+  results: Array<{
+    taskId: string;
+    success: boolean;
+    summary?: string;
+    error?: string;
+  }>;
+}
+
+export async function runTaskLoop(options: RunTaskLoopOptions): Promise<RunTaskLoopResult> {
+  const { tasks, registry, signal } = options;
+  const results: RunTaskLoopResult['results'] = [];
+  const status = new Map<string, 'pending' | 'running' | 'done' | 'failed' | 'skipped'>();
+  for (const t of tasks) status.set(t.id, 'pending');
+
+  // Process ready tasks in id order, repeatedly, until all done or a failure blocks progress.
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const task of tasks) {
+      if (status.get(task.id) !== 'pending') continue;
+      // Check if all dependencies are done.
+      const allDepsDone = task.dependsOn.every((d) => status.get(d) === 'done');
+      if (!allDepsDone) {
+        // If any dep is failed or skipped, this task is blocked → skip.
+        const anyBlocked = task.dependsOn.some(
+          (d) => status.get(d) === 'failed' || status.get(d) === 'skipped',
+        );
+        if (anyBlocked) {
+          status.set(task.id, 'skipped');
+          results.push({
+            taskId: task.id,
+            success: false,
+            summary: 'skipped: dependency failed or skipped',
+          });
+          progressed = true;
+        }
+        continue;
+      }
+
+      if (signal?.aborted) {
+        status.set(task.id, 'failed');
+        results.push({ taskId: task.id, success: false, error: 'aborted' });
+        return { results };
+      }
+
+      status.set(task.id, 'running');
+
+      if (!task.tool) {
+        // Executor cannot decompose — Planner must attach a tool.
+        status.set(task.id, 'done');
+        results.push({ taskId: task.id, success: true, summary: 'no-tool-attached' });
+        progressed = true;
+        continue;
+      }
+
+      const tool = registry.get(task.tool.name);
+      if (!tool) {
+        status.set(task.id, 'failed');
+        results.push({
+          taskId: task.id,
+          success: false,
+          error: `tool-not-found: '${task.tool.name}'`,
+        });
+        return { results };
+      }
+
+      let toolResult;
+      try {
+        toolResult = await tool.execute(task.tool.input);
+      } catch (err) {
+        toolResult = {
+          success: false,
+          content: '',
+          error: `tool-threw: ${err instanceof Error ? err.message : String(err)}`,
+        } as ToolResult;
+      }
+
+      if (toolResult.success) {
+        status.set(task.id, 'done');
+        results.push({
+          taskId: task.id,
+          success: true,
+          summary: toolResult.content.slice(0, 200),
+        });
+        progressed = true;
+      } else {
+        status.set(task.id, 'failed');
+        results.push({
+          taskId: task.id,
+          success: false,
+          error: toolResult.error ?? 'tool failed',
+        });
+        // Stop on first failure.
+        return { results };
+      }
+    }
+  }
+
+  return { results };
 }

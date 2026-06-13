@@ -144,4 +144,24 @@ describe('tui-history util (D-25 B4)', () => {
     // 截断 (不超 max) 0 丢
     expect(tuiHistoryTruncate(all)).toEqual(all)
   })
+
+  it('regression: tuiHistoryPath never resolves below a string-typed "undefined" dir (D-33.0.2)', () => {
+    delete process.env.HOME;
+    delete process.env.USERPROFILE;
+    delete process.env.DEEPWHALE_HOME;
+    const path = tuiHistoryPath().replaceAll('\\', '/');
+    expect(path).not.toContain('/undefined/');
+    expect(path).not.toContain('undefined/.deepwhale');
+  })
+
+  it('regression: tuiHistoryPath rejects literal undefined/null env home values (D-55)', () => {
+    process.env.HOME = 'undefined'
+    process.env.USERPROFILE = 'null'
+    process.env.DEEPWHALE_HOME = 'undefined'
+    const path = tuiHistoryPath().replaceAll('\\', '/')
+    expect(path).not.toContain('/undefined/')
+    expect(path).not.toContain('/null/')
+    expect(path).not.toContain('undefined/.deepwhale')
+    expect(path).toContain('/.deepwhale')
+  })
 })

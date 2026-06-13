@@ -1,0 +1,180 @@
+{
+  "slice": "D133",
+  "generatedAt": "2026-06-13T00:00:00.000Z",
+  "milestone": "v2.0",
+  "tier": "Tier-1",
+  "passed": true,
+  "summary": "v2.0 Tier-1 precheck passed with Tier-2 Automation, Remote TUI, Compaction, and MCP Runtime evidence rows closed at their stated caveat boundaries.",
+  "completedChecks": 10,
+  "blockingChecks": 0,
+  "checks": [
+    {
+      "id": "browser-tier1-foundation",
+      "label": "Browser Tier-1 helper foundation",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/browser/observation.ts",
+        "packages/coding-agent/src/browser/planner.ts",
+        "packages/coding-agent/test/unit/browser-observation.test.ts",
+        "packages/coding-agent/test/unit/browser-planner.test.ts"
+      ],
+      "caveat": "Helper-layer evidence only; not live production automation."
+    },
+    {
+      "id": "memory-ranking",
+      "label": "Explainable Memory Ranking",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/memory/ranking.ts",
+        "packages/coding-agent/src/memory/store.ts",
+        "packages/coding-agent/test/unit/memory-ranking.test.ts",
+        "packages/coding-agent/test/unit/memory-store.test.ts"
+      ],
+      "caveat": "Deterministic local ranking evidence; not a full long-term memory system."
+    },
+    {
+      "id": "code-intel-semantic-fallback",
+      "label": "Code Intel semantic fallback",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/code-intel/src/semantic-index.ts",
+        "packages/coding-agent/src/tools/smart-search.ts",
+        "packages/code-intel/test/unit/semantic-index.test.ts",
+        "packages/coding-agent/test/unit/smart-search-semantic.test.ts"
+      ],
+      "caveat": "Heuristic lexical fallback; not embedding or LSP-grade semantics."
+    },
+    {
+      "id": "default-exposure",
+      "label": "Default registry exposure invariant",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/tools/registry.ts",
+        "packages/coding-agent/test/unit/default-registry-invariant.test.ts"
+      ],
+      "caveat": "Narrow default must remain coding plus Code Intel essentials."
+    },
+    {
+      "id": "production-browser-automation",
+      "label": "Production Browser automation proof",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/browser/production-proof.ts",
+        "packages/coding-agent/test/unit/production-browser-proof.test.ts",
+        "docs/superpowers/v2-production-browser-proof.json"
+      ],
+      "caveat": "Adapter-contract proof with transcript evidence; not default Browser exposure."
+    },
+    {
+      "id": "visual-grounding",
+      "label": "Visual grounding proof",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/browser/production-proof.ts",
+        "packages/coding-agent/test/unit/production-browser-proof.test.ts",
+        "docs/superpowers/v2-production-browser-proof.json"
+      ],
+      "caveat": "Visual snapshot metadata proof; raw screenshot bytes are not stored in repository evidence."
+    },
+    {
+      "id": "tier2-automation",
+      "label": "Tier-2 Automation",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/util/automation-runtime.ts",
+        "packages/coding-agent/src/util/cron-store.ts",
+        "packages/coding-agent/src/util/cron-daemon.ts",
+        "packages/coding-agent/test/unit/automation-runtime.test.ts",
+        "packages/coding-agent/test/unit/cron-store.test.ts",
+        "packages/coding-agent/test/unit/cron-daemon.test.ts"
+      ],
+      "caveat": "Injected runner plus persisted run-record proof; not a full hosted/no-agent automation service."
+    },
+    {
+      "id": "tier2-remote-tui",
+      "label": "Tier-2 Remote TUI",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/remote-tui/session.ts",
+        "packages/coding-agent/src/remote-tui/index.ts",
+        "packages/coding-agent/test/unit/remote-tui-session.test.ts"
+      ],
+      "caveat": "Authenticated injected-transport protocol/session proof only; not a full WebSocket server, browser UI, TLS/auth stack, reconnect layer, or hosted app-server."
+    },
+    {
+      "id": "tier2-compaction",
+      "label": "Tier-2 Compaction",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/core/src/session/compaction.ts",
+        "packages/coding-agent/src/agent/agent-compaction.ts",
+        "packages/coding-agent/src/modes/print.ts",
+        "packages/coding-agent/src/modes/rpc.ts",
+        "packages/core/test/session-compaction.test.ts",
+        "packages/coding-agent/test/agent-compaction-2d6.test.ts",
+        "packages/core/test/session-compaction-hook.test.ts",
+        "packages/coding-agent/test/integration/compaction-cross-protocol-2d5.test.ts"
+      ],
+      "caveat": "Compaction has implementation and integration evidence, but this does not complete v2.0."
+    },
+    {
+      "id": "tier2-mcp-runtime",
+      "label": "Tier-2 MCP Runtime",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/mcp/client.ts",
+        "packages/coding-agent/src/mcp/runtime.ts",
+        "packages/coding-agent/test/unit/mcp-client.test.ts",
+        "packages/coding-agent/test/unit/mcp-runtime.test.ts",
+        "packages/mcp-servers/gh-search/bin/gh-search-mcp.mjs",
+        "packages/mcp-servers/gh-search/test/server.test.mjs"
+      ],
+      "caveat": "One-server stdio JSON-RPC transport proof; not a full multiplexed MCP runtime with auth, reconnect, HTTP/SSE, resources, prompts, or subscriptions."
+    }
+  ],
+  "blockers": [],
+  "defaultExposure": {
+    "toolCount": 21,
+    "expectedToolCount": 21,
+    "nonCodingDefaultEnabled": false,
+    "allowedDefaultToolNames": [
+      "read_file",
+      "write_file",
+      "edit_file",
+      "bash",
+      "find",
+      "grep",
+      "patch",
+      "search_files",
+      "execute_code",
+      "todo",
+      "plan",
+      "browser_action",
+      "browser_js",
+      "parse_file",
+      "get_symbols",
+      "analyze_repo",
+      "find_definition",
+      "find_references",
+      "call_graph",
+      "rename_symbol",
+      "smart_search"
+    ],
+    "caveat": "browser_action and browser_js are coding-surface helpers in the default registry, not production Browser completion proof."
+  },
+  "nextActions": [
+    "D134: advance v3.0/v4.0 production gate evidence without expanding default exposure.",
+    "Keep Remote TUI caveated as an authenticated injected-transport protocol/session proof until a full WebSocket/app-server implementation exists.",
+    "Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure."
+  ]
+}

@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultRegistry, type ToolRegistryProfile } from '../../src/tools/registry.js';
+import {
+  createDefaultRegistry,
+  createRegistryForProfile,
+  type OptInToolRegistryProfile,
+  type SynchronousToolRegistryProfile,
+} from '../../src/tools/registry.js';
 
-function names(profile?: ToolRegistryProfile): string[] {
+function names(profile?: SynchronousToolRegistryProfile): string[] {
   return createDefaultRegistry(profile === undefined ? {} : { profile }).list().map((t) => t.name);
+}
+
+async function optInNames(profile: OptInToolRegistryProfile): Promise<string[]> {
+  return (await createRegistryForProfile({ profile })).list().map((t) => t.name);
 }
 
 describe('registry profiles (stabilization gate)', () => {
@@ -20,6 +29,8 @@ describe('registry profiles (stabilization gate)', () => {
       'execute_code',
       'todo',
       'plan',
+      'browser_action',
+      'browser_js',
       'parse_file',
       'get_symbols',
       'analyze_repo',
@@ -68,12 +79,12 @@ describe('registry profiles (stabilization gate)', () => {
     ]);
   });
 
-  it('domain profiles are explicit opt-in', () => {
-    expect(names('research')).toEqual(['arxiv', 'blogwatcher', 'llm_wiki', 'polymarket']);
-    expect(names('productivity')).toEqual(['notion', 'linear', 'airtable', 'ocr_and_documents']);
-    expect(names('media')).toEqual(['spotify', 'youtube_content']);
-    expect(names('web')).toEqual(['web_search', 'web_extract', 'browser_navigate']);
-    expect(names('engineering')).toEqual([
+  it('domain profiles are explicit opt-in', async () => {
+    expect(await optInNames('research')).toEqual(['arxiv', 'blogwatcher', 'llm_wiki', 'polymarket']);
+    expect(await optInNames('productivity')).toEqual(['notion', 'linear', 'airtable', 'ocr_and_documents']);
+    expect(await optInNames('media')).toEqual(['spotify', 'youtube_content']);
+    expect(await optInNames('web')).toEqual(['web_search', 'web_extract', 'browser_navigate']);
+    expect(await optInNames('engineering')).toEqual([
       'github_pr_workflow',
       'github_issues',
       'github_code_review',
@@ -83,12 +94,13 @@ describe('registry profiles (stabilization gate)', () => {
     ]);
   });
 
-  it('all profile preserves the complete tool surface for explicit opt-in', () => {
-    const toolNames = names('all');
-    expect(toolNames).toHaveLength(41);
+  it('all profile preserves the complete tool surface for explicit opt-in', async () => {
+    const toolNames = await optInNames('all');
+    expect(toolNames).toHaveLength(43);
     expect(toolNames).toContain('spotify');
     expect(toolNames).toContain('notion');
     expect(toolNames).toContain('browser_navigate');
+    expect(toolNames).toContain('browser_action');
     expect(toolNames).toContain('smart_search');
   });
 });

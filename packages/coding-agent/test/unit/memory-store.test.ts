@@ -1,53 +1,64 @@
-/**
- * D-30.1δ.1: memory store — MEMORY.md / USER.md 读写 + 追加.
- */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MemoryStore } from '../../src/util/memory-store.js';
+import { describe, expect, it } from 'vitest';
+import type { RankedMemory } from '../../src/memory/ranking.js';
+import { MemoryStore } from '../../src/memory/store.js';
 
-describe('memory store (D-30.1δ.1)', () => {
-  let dir: string;
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'dw-mem-'));
-  });
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it('creates MEMORY.md and USER.md on first read', async () => {
-    const store = new MemoryStore(dir);
-    expect(await store.readMemory()).toBe('');
-    expect(await store.readUser()).toBe('');
-    // Files should now exist as 0-byte placeholders
-    expect(readFileSync(join(dir, 'memory', 'MEMORY.md'), 'utf8')).toBe('');
-    expect(readFileSync(join(dir, 'memory', 'USER.md'), 'utf8')).toBe('');
+describe('MemoryStore (D-33.3.1)', () => {
+  it('appends, lists, and archives memories', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'dw-mem-'));
+    const store = new MemoryStore({ path: join(tmp, 'memories.json') });
+    await store.append({ id: 'a', content: 'first', importance: 0.5, scope: 'session', source: 'auto_extracted' });
+    await store.append({ id: 'b', content: 'second', importance: 0.7, scope: 'project', source: 'user_explicit' });
+    const all = await store.list();
+    expect(all).toHaveLength(2);
+    await store.archive('a');
+    const active = await store.list({ includeArchived: false });
+    expect(active.map((m) => m.id)).toEqual(['b']);
+    await rm(tmp, { recursive: true, force: true });
   });
 
-  it('appends to MEMORY.md with timestamp block', async () => {
-    const store = new MemoryStore(dir);
-    await store.appendMemory('user prefers concise answers');
-    const content = await store.readMemory();
-    expect(content).toContain('user prefers concise answers');
-    expect(content).toMatch(/^## \d{4}-\d{2}-\d{2}T/m);
-  });
+  it('ranks active memories with explainable score evidence', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'dw-mem-'));
+    const store = new MemoryStore({ path: join(tmp, 'memories.json') });
+    const now = 1_000;
 
-  it('appends to USER.md in list format', async () => {
-    const store = new MemoryStore(dir);
-    await store.appendUser('frontend engineer');
-    await store.appendUser('works on AI agents');
-    const content = await store.readUser();
-    expect(content).toContain('- frontend engineer');
-    expect(content).toContain('- works on AI agents');
-  });
+    await store.append({
+      id: 'archived',
+      content: 'status bar legacy note',
+      importance: 0.9,
+      lastAccessedAt: now,
+      scope: 'user',
+      source: 'user_explicit',
+    });
+    await store.append({
+      id: 'preference',
+      content: 'prefer compact status bar layout',
+      importance: 0.7,
+      lastAccessedAt: now,
+      scope: 'user',
+      source: 'user_preference',
+    });
+    await store.append({
+      id: 'project',
+      content: 'project status bar decision',
+      importance: 0.7,
+      lastAccessedAt: now,
+      scope: 'project',
+      source: 'project_fact',
+    });
 
-  it('multiple memory appends accumulate', async () => {
-    const store = new MemoryStore(dir);
-    await store.appendMemory('first fact');
-    await store.appendMemory('second fact');
-    const content = await store.readMemory();
-    expect(content).toContain('first fact');
-    expect(content).toContain('second fact');
+    await store.archive('archived');
+
+    const ranked = await store.rank({ now, halfLifeMs: 1_000, limit: 5, query: 'status bar' });
+
+    expect(ranked.map((entry) => entry.memory.id)).toEqual(['preference', 'project']);
+    const first: RankedMemory = ranked[0]!;
+    expect(first.reason).toContain('query');
+    expect(first.factors.queryMatchScore).toBeGreaterThan(0);
+    expect(first.factors.sourceWeight).toBeGreaterThan(0);
+
+    await rm(tmp, { recursive: true, force: true });
   });
 });
