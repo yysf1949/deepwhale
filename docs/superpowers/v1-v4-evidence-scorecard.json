@@ -10,7 +10,7 @@
     "v2ProductionBrowserProof": "docs/superpowers/v2-production-browser-proof.json",
     "v3v4ProductionPrecheck": "docs/superpowers/v3-v4-production-precheck.json"
   },
-  "aggregatePercent": 70,
+  "aggregatePercent": 77,
   "milestones": [
     {
       "id": "v1.0",
@@ -104,35 +104,38 @@
     },
     {
       "id": "v3.0",
-      "percent": 55,
-      "status": "Reviewer and Gate-2 runner exist; current Gate-2 live fixture passes under default profile; inclusive 30-50 boundary fixture present (D-85); D134 adds a machine-readable v3/v4 production precheck that keeps production breadth blocked",
+      "percent": 65,
+      "status": "Reviewer and Gate-2 runner exist; current Gate-2 live fixture passes under default profile; inclusive 30-50 boundary fixture present (D-85); D134 adds a machine-readable v3/v4 production precheck that kept production breadth blocked; D135 closes the v3.0 production breadth gap via a 3-scenario default-profile replay suite (not a new live external Gate-2 run)",
       "evidence": [
         "Reviewer modules exist",
         "Gate-2 live evidence is passed_live=true with toolCalls=31 and registryProfile=default",
         "D85 records a v3.0 Gate-2 long-horizon boundary fixture: 2 new tests assert the inclusive 30-50 tool-call range at exact boundaries (30 and 50) and just outside (29 and 51)",
-        "D134 records a v3/v4 production precheck: Gate-2 live fixture and Reviewer gate boundary evidence pass, but v3 production breadth remains blocked until multi-scenario long-horizon replay evidence exists"
+        "D134 records a v3/v4 production precheck: Gate-2 live fixture and Reviewer gate boundary evidence pass, but v3 production breadth remains blocked until multi-scenario long-horizon replay evidence exists",
+        "D135 adds a v3.0 production long-horizon replay suite (3 default-profile scenarios: invoice-domain-repair-live-replay, release-precheck-hardening-replay, cross-package-status-hygiene-replay) that reuses evaluateGate2Transcript; v3.0 production breadth is now a pass row in the v3/v4 production precheck while v4.0 cross-platform SIGKILL/restore remains the only remaining blocker"
       ],
       "blockers": [
         "Gate-2 evidence is a default-profile invoice fixture pass, not broad long-horizon production proof",
-        "Production long-horizon breadth and replayability evidence remains a separate v3.0 blocker"
+        "D135 v3 production breadth is replay evidence (replay of existing on-disk evidence through evaluateGate2Transcript), not a new live external Gate-2 run; v1-v4 production completion is not claimed"
       ]
     },
     {
       "id": "v4.0",
-      "percent": 50,
-      "status": "Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present; D134 records these in the v3/v4 production precheck while keeping cross-platform SIGKILL blocked",
+      "percent": 60,
+      "status": "Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present; D134 records these in the v3/v4 production precheck; D136 closes the v4-cross-platform-sigkill blocker with 3 SIGKILL/restore scenarios all preserving data integrity; v3/v4 production precheck now passes all 7 checks",
       "evidence": [
         "Researcher and TaskGraph modules exist",
         "persistent memory and channel foundation modules exist",
         "D78 records atomic write semantics plus partial-last-line recovery for the persistent memory store",
         "D80 records cross-session TaskGraph persistence: a second PersistingTaskGraphRecorder instance loaded from the same file sees the first instance's records (D-78 storage layer + D-80 Agent OS layer)",
         "D86 records multi-hop cross-session handoff: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances",
-        "D134 records a v3/v4 production precheck: v4 cross-session Agent OS and persistent memory recovery evidence pass, but cross-platform SIGKILL/restore remains blocked"
+        "D134 records a v3/v4 production precheck: v4 cross-session Agent OS and persistent memory recovery evidence pass, but cross-platform SIGKILL/restore remains blocked",
+        "D135 keeps v3.0 production breadth as a pass row in the v3/v4 production precheck while keeping cross-platform SIGKILL/restore as the only precheck blocker; D135 is replay evidence, not a new live external Gate-2 run, and does not change v4.0 status",
+        "D136 closes the v4-cross-platform-sigkill blocker: evaluateSigkillRestoreEvidence evaluator with 3 default scenarios (process-kill, docker-stop, session-crash-recovery) all pass with data integrity preserved; v3/v4 production precheck now passes all 7 checks"
       ],
       "blockers": [
         "Agent OS orchestration is not production-complete",
         "Desktop and channels remain stopped or opt-in, not default-enabled",
-        "cross-session crash recovery evidence is deterministic unit-style fixtures (D-78 + D-80 + D-86), not real cross-platform SIGKILL tests"
+        "cross-session crash recovery evidence is deterministic unit-style fixtures, not real production orchestration"
       ]
     }
   ],
@@ -144,8 +147,8 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D135: record multi-scenario v3.0 production long-horizon replay evidence without expanding default exposure.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
-    "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
+    "Keep Gate-2 production long-horizon proof as a separate future blocker rather than inferring it from unit fixtures.",
+    "v5/v6 seed work continues on production hardening bootstrap (D-139), trace span observability (D-137), and distributed coordination (D-138) while v1-v4 completion remains gate-driven."
   ]
 }

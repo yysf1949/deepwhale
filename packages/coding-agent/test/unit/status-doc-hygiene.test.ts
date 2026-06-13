@@ -219,15 +219,16 @@ describe('status documentation hygiene (D-56)', () => {
     };
     const scorecardMd = readRepoFile('docs/superpowers/v1-v4-evidence-scorecard.md');
 
-    expect(scorecard.aggregatePercent).toBe(70);
+    expect(scorecard.aggregatePercent).toBe(77);
     expect(scorecard.milestones.map((m) => m.id)).toEqual(['v1.0', 'v1.5', 'v2.0', 'v2.5', 'v3.0', 'v4.0']);
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D135: record multi-scenario v3.0 production long-horizon replay evidence without expanding default exposure.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
-      'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
+      'Keep Gate-2 production long-horizon proof as a separate future blocker rather than inferring it from unit fixtures.',
+      'v5/v6 seed work continues on production hardening bootstrap (D-139), trace span observability (D-137), and distributed coordination (D-138) while v1-v4 completion remains gate-driven.',
     ]);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D135:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D134:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D131:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D130:/m);
@@ -261,7 +262,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D70:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D68:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D69:/m);
-    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 70%');
+    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 77%');
     expect(scorecardMd).toContain('D67 rename_symbol exposes hashline edit hunks');
     expect(scorecardMd).toContain('D71 covers TypeScript combined default-plus-named import references');
     expect(scorecardMd).toContain('D126 implements the first Browser Tier-1 foundation slice');
@@ -273,12 +274,18 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecardMd).toContain('D132 closes the v2.0 Tier-2 Automation row');
     expect(scorecardMd).toContain('D133 closes the v2.0 Tier-2 Remote TUI row');
     expect(scorecardMd).toContain('D134 adds a machine-readable v3/v4 production precheck');
+    expect(scorecardMd).toContain('D135 v3 production breadth replay evidence');
+    expect(scorecardMd).toContain('D136 closes the v4-cross-platform-sigkill blocker');
+    expect(scorecardMd).toContain('D137 adds v5.0 observability 3rd cycle trace span seed');
+    expect(scorecardMd).toContain('D138 adds v6.0 Theme 3 (distributed coordination) seed');
+    expect(scorecardMd).toContain('D139 adds v5.0 production hardening bootstrap');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
       expect(block).toContain('v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json');
       expect(block).toContain('v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json');
       expect(block).toContain('v3/v4 production precheck: docs/superpowers/v3-v4-production-precheck.json');
+      expect(block).toContain('v3 production replay evidence: docs/superpowers/v3-production-long-horizon-replay.json');
     }
   });
 
@@ -367,11 +374,11 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D134', () => {
+  it('keeps the current sprint and next-work pointers aligned after D136-D140', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D134 v3/v4 production precheck');
+      expect(block).toContain('Current sprint: D136-D140 complete');
       expect(block).not.toMatch(/v2\.0 Tier-1 implementation/i);
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
@@ -420,6 +427,8 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D107 v6.0 multi-agent safety seed:');
       expect(block).toContain('D108 v6.0 multi-agent safety seed:');
       expect(block).toContain('D109 v6.0 multi-agent safety seed:');
+      expect(block).toContain('D110 v6.0 multi-agent safety 2nd cycle cross-bridge:');
+      expect(block).toContain('D111 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed:');
       expect(block).toContain('D112 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed:');
       expect(block).toContain('D113 v6.0 Theme 2 (hosted/enterprise opt-in gates) seed:');
       expect(block).toContain('D114 Gate-1.5 live Browser task sourcing');
@@ -440,14 +449,21 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D132 v2.0 Tier-2 Automation closure:');
       expect(block).toContain('D133 v2.0 Tier-2 Remote TUI closure:');
       expect(block).toContain('D134 v3/v4 production precheck:');
-      expect(block).toContain('Next implementation slice: D135');
+      expect(block).toContain('D135 v3 production replay evidence:');
+      expect(block).toContain('D136 v4 cross-platform SIGKILL/restore evidence:');
+      expect(block).toContain('D137 v5.0 observability 3rd cycle trace span seed:');
+      expect(block).toContain('D138 v6.0 Theme 3 distributed coordination seed:');
+      expect(block).toContain('D139 v5.0 production hardening bootstrap:');
       expect(block).toContain('Gate-1.5 evidence kind: live-browser');
       expect(block).toContain('Gate-1.5 binding: true');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
       expect(block).toContain('v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json');
       expect(block).toContain('v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json');
       expect(block).toContain('v3/v4 production precheck: docs/superpowers/v3-v4-production-precheck.json');
+      expect(block).toContain('v3 production replay evidence: docs/superpowers/v3-production-long-horizon-replay.json');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/^-\s*Current sprint: D134/im);
+      expect(block).not.toMatch(/Next implementation slice: D135 record/i);
       expect(block).not.toMatch(/Current sprint: D133/i);
       expect(block).not.toMatch(/Next implementation slice: D134 advance/i);
       expect(block).not.toMatch(/Current sprint: D132/i);

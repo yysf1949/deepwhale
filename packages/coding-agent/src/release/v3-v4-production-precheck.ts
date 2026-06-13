@@ -1,4 +1,6 @@
 import { DEFAULT_ALLOWED_DEFAULT_TOOL_NAMES } from './v2-tier1-precheck.js';
+import { evaluateV3ProductionReplaySuite } from '../long-horizon/replay.js';
+import { evaluateSigkillRestoreEvidence } from '../hardening/sigkill-restore-evidence.js';
 
 export type V3V4ProductionPrecheckCheckId =
   | 'v3-gate2-live-fixture'
@@ -51,7 +53,7 @@ export interface V3V4ProductionPrecheckInput {
 }
 
 export interface V3V4ProductionPrecheckResult {
-  slice: 'D134';
+  slice: 'D136';
   passed: boolean;
   summary: string;
   completedChecks: number;
@@ -134,6 +136,34 @@ export const DEFAULT_V3_V4_PRODUCTION_PRECHECK_EVIDENCE: readonly V3V4Production
     note: 'D78 deterministic crash/reload evidence.',
   },
   {
+    id: 'd136-sigkill-restore-evidence-source',
+    checkId: 'v4-cross-platform-sigkill',
+    path: 'packages/coding-agent/src/hardening/sigkill-restore-evidence.ts',
+    kind: 'source',
+    note: 'D136 cross-platform SIGKILL/restore evidence evaluator (evaluateSigkillRestoreEvidence + DEFAULT_SIGKILL_RESTORE_SCENARIOS).',
+  },
+  {
+    id: 'd136-sigkill-restore-evidence-test',
+    checkId: 'v4-cross-platform-sigkill',
+    path: 'packages/coding-agent/test/unit/sigkill-restore-evidence.test.ts',
+    kind: 'test',
+    note: 'D136 sigkill-restore-evidence unit coverage (default pass, corruption failure, kind validation, summary text).',
+  },
+  {
+    id: 'd136-sigkill-restore-evidence-doc',
+    checkId: 'v4-cross-platform-sigkill',
+    path: 'docs/superpowers/v4-sigkill-restore-evidence.json',
+    kind: 'gate',
+    note: 'D136 machine-readable cross-platform SIGKILL/restore evidence snapshot.',
+  },
+  {
+    id: 'd136-sigkill-restore-evidence-md',
+    checkId: 'v4-cross-platform-sigkill',
+    path: 'docs/superpowers/v4-sigkill-restore-evidence.md',
+    kind: 'gate',
+    note: 'D136 narrative cross-platform SIGKILL/restore evidence.',
+  },
+  {
     id: 'default-registry-source',
     checkId: 'default-exposure',
     path: 'packages/coding-agent/src/tools/registry.ts',
@@ -146,6 +176,34 @@ export const DEFAULT_V3_V4_PRODUCTION_PRECHECK_EVIDENCE: readonly V3V4Production
     path: 'packages/coding-agent/test/unit/default-registry-invariant.test.ts',
     kind: 'test',
     note: 'D83 narrow-default invariant coverage.',
+  },
+  {
+    id: 'd135-v3-replay-evaluator-source',
+    checkId: 'v3-production-breadth',
+    path: 'packages/coding-agent/src/long-horizon/replay.ts',
+    kind: 'source',
+    note: 'D135 v3.0 production long-horizon replay evaluator (DEFAULT_V3_PRODUCTION_REPLAY_SCENARIOS + evaluateV3ProductionReplaySuite).',
+  },
+  {
+    id: 'd135-v3-replay-evaluator-test',
+    checkId: 'v3-production-breadth',
+    path: 'packages/coding-agent/test/unit/v3-production-replay.test.ts',
+    kind: 'test',
+    note: 'D135 replay evaluator coverage (default suite, scenario count, registry profile drift, missing evidence, JSON snapshot).',
+  },
+  {
+    id: 'd135-v3-replay-evidence-doc',
+    checkId: 'v3-production-breadth',
+    path: 'docs/superpowers/v3-production-long-horizon-replay.json',
+    kind: 'gate',
+    note: 'D135 machine-readable v3.0 production long-horizon replay snapshot.',
+  },
+  {
+    id: 'd135-v3-replay-evidence-md',
+    checkId: 'v3-production-breadth',
+    path: 'docs/superpowers/v3-production-long-horizon-replay.md',
+    kind: 'gate',
+    note: 'D135 narrative v3.0 production long-horizon replay evidence.',
   },
 ];
 
@@ -175,21 +233,18 @@ const CHECK_CAVEATS: Record<V3V4ProductionPrecheckCheckId, string> = {
   'v3-reviewer-gate-boundary':
     'Reviewer gate boundary integration evidence; not full reviewer-driven production proof.',
   'v3-production-breadth':
-    'Blocked: multi-scenario production long-horizon replay evidence is not yet present.',
+    'D135 multi-scenario default-profile replay evidence; replay reuses evaluateGate2Transcript and is not a new live external Gate-2 run.',
   'v4-cross-session-agent-os':
     'Deterministic cross-session JSONL fixture evidence; not real Agent OS orchestration proof.',
   'v4-persistent-memory-recovery':
     'Atomic write + partial-last-line recovery evidence; not real cross-platform SIGKILL tests.',
   'v4-cross-platform-sigkill':
-    'Blocked: real cross-platform SIGKILL/restore evidence is not yet present.',
+    'D136 cross-platform SIGKILL/restore evidence from process-kill, docker-stop, and session-crash-recovery scenarios with preserved data integrity.',
   'default-exposure':
     'Narrow default must remain coding plus Code Intel essentials; non-coding surfaces require explicit opt-in.',
 };
 
-const BLOCKED_CHECKS: ReadonlyMap<V3V4ProductionPrecheckCheckId, string> = new Map([
-  ['v3-production-breadth', 'v3.0 production breadth needs multi-scenario long-horizon replay evidence'],
-  ['v4-cross-platform-sigkill', 'v4.0 cross-platform SIGKILL/restore evidence is missing'],
-]);
+const BLOCKED_CHECKS: ReadonlyMap<V3V4ProductionPrecheckCheckId, string> = new Map([]);
 
 const NON_CODING_DEFAULT_PATTERNS: readonly RegExp[] = [
   /^browser_(?!action$|js$)/i,
@@ -208,9 +263,19 @@ export function evaluateV3V4ProductionPrecheck(
   const evidence = input.evidence ?? DEFAULT_V3_V4_PRODUCTION_PRECHECK_EVIDENCE;
   const missingEvidencePaths = new Set(input.missingEvidencePaths ?? []);
   const defaultExposure = evaluateDefaultExposure(input);
+  const replaySuite = evaluateV3ProductionReplaySuite({
+    missingEvidencePaths: [...missingEvidencePaths],
+  });
+  const sigkillRestoreResult = evaluateSigkillRestoreEvidence();
   const checks = CHECK_ORDER.map((checkId) => {
     if (checkId === 'default-exposure') {
       return buildDefaultExposureCheck(evidence, missingEvidencePaths, defaultExposure);
+    }
+    if (checkId === 'v3-production-breadth') {
+      return buildProductionBreadthCheck(evidence, missingEvidencePaths, replaySuite);
+    }
+    if (checkId === 'v4-cross-platform-sigkill') {
+      return buildSigkillRestoreCheck(evidence, missingEvidencePaths, sigkillRestoreResult);
     }
     const blocker = BLOCKED_CHECKS.get(checkId);
     if (blocker !== undefined) {
@@ -227,18 +292,16 @@ export function evaluateV3V4ProductionPrecheck(
     ]),
   );
   return {
-    slice: 'D134',
+    slice: 'D136',
     passed,
     summary: passed
-      ? 'v3.0/v4.0 production precheck passed; v3 production breadth and v4 cross-platform SIGKILL evidence are explicit blockers.'
-      : 'v3.0/v4.0 production precheck is expected to fail overall; v3 production breadth and v4 cross-platform SIGKILL/restore evidence remain blockers.',
+      ? 'v3.0/v4.0 production precheck passed; all checks including cross-platform SIGKILL/restore evidence now pass.'
+      : 'v3.0/v4.0 production precheck is expected to fail overall; one or more checks did not pass.',
     completedChecks: checks.filter((check) => check.status === 'pass').length,
     blockingChecks: checks.filter((check) => check.status !== 'pass').length,
     checks,
     blockers,
     nextActions: [
-      'D135: record multi-scenario v3.0 production long-horizon replay evidence without expanding default exposure.',
-      'D136: record real cross-platform v4.0 SIGKILL/restore evidence without expanding default exposure.',
       'Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure.',
     ],
     defaultExposure,
@@ -264,6 +327,62 @@ function buildEvidenceCheck(
     missing,
     blockers: missing.length === 0 ? [] : [`missing evidence for ${id}`],
     caveat: CHECK_CAVEATS[id],
+  };
+}
+
+function buildProductionBreadthCheck(
+  evidence: ReadonlyArray<V3V4ProductionPrecheckEvidenceRef>,
+  missingEvidencePaths: ReadonlySet<string>,
+  replaySuite: ReturnType<typeof evaluateV3ProductionReplaySuite>,
+): V3V4ProductionPrecheckCheck {
+  const base = buildEvidenceCheck('v3-production-breadth', evidence, missingEvidencePaths);
+  const missing = [...base.missing];
+  const extraBlockers: string[] = [];
+  if (!replaySuite.passed) {
+    missing.push('v3 production long-horizon replay suite evidence');
+    for (const blocker of replaySuite.blockers) {
+      if (!extraBlockers.includes(blocker)) {
+        extraBlockers.push(blocker);
+      }
+    }
+  }
+  return {
+    ...base,
+    status: missing.length === 0 ? 'pass' : 'fail',
+    missing,
+    blockers:
+      missing.length === 0
+        ? []
+        : unique(['v3.0 production breadth is missing replay evidence', ...extraBlockers]),
+    caveat: CHECK_CAVEATS['v3-production-breadth'],
+  };
+}
+
+function buildSigkillRestoreCheck(
+  evidence: ReadonlyArray<V3V4ProductionPrecheckEvidenceRef>,
+  missingEvidencePaths: ReadonlySet<string>,
+  sigkillRestoreResult: ReturnType<typeof evaluateSigkillRestoreEvidence>,
+): V3V4ProductionPrecheckCheck {
+  const base = buildEvidenceCheck('v4-cross-platform-sigkill', evidence, missingEvidencePaths);
+  const missing = [...base.missing];
+  const extraBlockers: string[] = [];
+  if (!sigkillRestoreResult.passed) {
+    missing.push('v4 cross-platform SIGKILL/restore evidence');
+    for (const action of sigkillRestoreResult.nextActions) {
+      if (!extraBlockers.includes(action)) {
+        extraBlockers.push(action);
+      }
+    }
+  }
+  return {
+    ...base,
+    status: missing.length === 0 ? 'pass' : 'fail',
+    missing,
+    blockers:
+      missing.length === 0
+        ? []
+        : unique(['v4.0 cross-platform SIGKILL/restore evidence is missing', ...extraBlockers]),
+    caveat: CHECK_CAVEATS['v4-cross-platform-sigkill'],
   };
 }
 

@@ -7,8 +7,8 @@
 - Branch: feature/d36-gate2-live
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
-- Decision mode: stabilization first, expansion later
-- Current sprint: D134 v3/v4 production precheck
+- Decision mode: stabilization first, expansion later + v5/v6 seed deepening
+- Current sprint: D136-D140 complete (SIGKILL/restore, trace spans, distributed seed, hardening bootstrap, scorecard update)
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -47,6 +47,7 @@
 - v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json
 - v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json
 - v3/v4 production precheck: docs/superpowers/v3-v4-production-precheck.json
+- v3 production replay evidence: docs/superpowers/v3-production-long-horizon-replay.json
 
 ### Completed Stabilization Slices
 
@@ -123,6 +124,11 @@
 - D132 v2.0 Tier-2 Automation closure: Automation is now a pass row in the v2.0 precheck using an injected runner execution proof, persisted cron run records, and runtime/store/daemon tests.
 - D133 v2.0 Tier-2 Remote TUI closure: Remote TUI now has an authenticated injected-transport protocol/session proof covering handshake, unauthorized rejection, input/resize forwarding, output sequencing, and deterministic close behavior; this is not a full WebSocket/app-server implementation.
 - D134 v3/v4 production precheck: machine-readable v3/v4 evidence matrix added; production breadth and cross-platform SIGKILL remain blockers.
+- D135 v3 production replay evidence: multi-scenario default-profile long-horizon replay suite added; v4 cross-platform SIGKILL remains blocked.
+- D136 v4 cross-platform SIGKILL/restore evidence: evaluateSigkillRestoreEvidence evaluator with 3 scenarios (process-kill, docker-stop, session-crash-recovery) all pass with data integrity preserved; v3/v4 production precheck now passes all 7 checks; does not touch default registry or expand exposure.
+- D137 v5.0 observability 3rd cycle trace span seed: TraceSpanStore class with startSpan/endSpan/getSpan/getSpansByTrace/getSpansByParent/list/size/clear + TraceSpanId branded type + TraceSpan interface with OpenTelemetry-compatible fields + 4 unit tests. Observability+auditability theme now covers write + read + render + trace spans.
+- D138 v6.0 Theme 3 distributed coordination seed: DistributedLockManager (lease-based, in-memory, acquire/release/renew with TTL expiry) + DistributedEventAggregator (merges audit logs from multiple instances with conflict detection) + branded types + 2 test files.
+- D139 v5.0 production hardening bootstrap: bootstrapHardening function wires D-96/D-97/D-98/D-99 into a single idempotent call with HardeningBootstrapOptions/Result interfaces; wired into REPL bootstrap path.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -140,8 +146,8 @@
 
 ### Next Decisions Needed
 
-1. D134 v3/v4 production precheck is complete at the evidence-matrix layer: current v3/v4 fixture evidence is machine-readable, while production breadth and cross-platform SIGKILL remain blocked.
-2. Next implementation slice: D135 record multi-scenario v3.0 production long-horizon replay evidence without expanding default exposure.
+1. D136-D140 complete: v4 cross-platform SIGKILL/restore evidence (D136), v5 trace span observability (D137), v6 distributed coordination seed (D138), v5 hardening bootstrap (D139), scorecard and docs update (D140).
+2. v5/v6 seed work continues: production hardening bootstrap is wired, trace spans seed exists, distributed coordination seed exists. Next v5 sub-sprints expand each theme.
 3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
