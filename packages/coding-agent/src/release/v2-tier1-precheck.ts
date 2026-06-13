@@ -51,7 +51,7 @@ export interface V2Tier1PrecheckInput {
 }
 
 export interface V2Tier1PrecheckResult {
-  slice: 'D128';
+  slice: 'D129';
   milestone: 'v2.0';
   tier: 'Tier-1';
   passed: boolean;
@@ -201,6 +201,54 @@ export const DEFAULT_V2_TIER1_PRECHECK_EVIDENCE: readonly V2Tier1EvidenceRef[] =
     layer: 'release-gate',
     note: 'Narrow-default invariant coverage.',
   },
+  {
+    id: 'd129-production-browser-proof-source',
+    checkId: 'production-browser-automation',
+    path: 'packages/coding-agent/src/browser/production-proof.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D129 injected production Browser adapter contract and transcript proof recorder.',
+  },
+  {
+    id: 'd129-production-browser-proof-test',
+    checkId: 'production-browser-automation',
+    path: 'packages/coding-agent/test/unit/production-browser-proof.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D129 automation transcript coverage for opt-in, success, and failed-step paths.',
+  },
+  {
+    id: 'd129-production-browser-proof-evidence',
+    checkId: 'production-browser-automation',
+    path: 'docs/superpowers/v2-production-browser-proof.json',
+    kind: 'gate',
+    layer: 'release-gate',
+    note: 'D129 machine-readable production Browser proof snapshot.',
+  },
+  {
+    id: 'd129-visual-grounding-source',
+    checkId: 'visual-grounding',
+    path: 'packages/coding-agent/src/browser/production-proof.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D129 visual snapshot metadata validation for dimensions, hash, non-blank ratio, and target rects.',
+  },
+  {
+    id: 'd129-visual-grounding-test',
+    checkId: 'visual-grounding',
+    path: 'packages/coding-agent/test/unit/production-browser-proof.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D129 visual-grounding success and invalid-snapshot coverage.',
+  },
+  {
+    id: 'd129-visual-grounding-evidence',
+    checkId: 'visual-grounding',
+    path: 'docs/superpowers/v2-production-browser-proof.json',
+    kind: 'gate',
+    layer: 'release-gate',
+    note: 'D129 machine-readable visual-grounding proof snapshot.',
+  },
 ];
 
 const CHECK_ORDER: readonly V2Tier1PrecheckCheckId[] = [
@@ -228,14 +276,14 @@ const CHECK_CAVEATS: Record<V2Tier1PrecheckCheckId, string> = {
   'memory-ranking': 'Deterministic local ranking evidence; not a full long-term memory system.',
   'code-intel-semantic-fallback': 'Heuristic lexical fallback; not embedding or LSP-grade semantics.',
   'default-exposure': 'Narrow default must remain coding plus Code Intel essentials.',
-  'production-browser-automation': 'Release-blocking production Browser automation proof is absent.',
-  'visual-grounding': 'Release-blocking visual grounding proof is absent.',
+  'production-browser-automation':
+    'Adapter-contract proof with transcript evidence; not default Browser exposure.',
+  'visual-grounding':
+    'Visual snapshot metadata proof; raw screenshot bytes are not stored in repository evidence.',
   'tier2-blockers': 'Tier-2 blockers remain separate and unresolved.',
 };
 
 const BLOCKED_CHECKS: ReadonlyMap<V2Tier1PrecheckCheckId, string> = new Map([
-  ['production-browser-automation', 'production Browser automation proof is still missing'],
-  ['visual-grounding', 'visual grounding proof is still missing'],
   ['tier2-blockers', 'Tier-2 v2.0 blockers remain tracked separately'],
 ]);
 
@@ -273,19 +321,19 @@ export function evaluateV2Tier1Precheck(input: V2Tier1PrecheckInput = {}): V2Tie
     ]),
   );
   return {
-    slice: 'D128',
+    slice: 'D129',
     milestone: 'v2.0',
     tier: 'Tier-1',
     passed,
     summary: passed
       ? 'v2.0 Tier-1 precheck passed.'
-      : 'v2.0 Tier-1 helper evidence is present, but v2.0 is not release-ready.',
+      : 'v2.0 Tier-1 production and helper evidence is present, but v2.0 is not release-ready.',
     completedChecks: checks.filter((check) => check.status === 'pass').length,
     blockingChecks: checks.filter((check) => check.status !== 'pass').length,
     checks,
     blockers,
     nextActions: [
-      'D129: prove production Browser automation and visual-grounding behavior without expanding default exposure.',
+      'D130: close the next v2.0 Tier-2 blocker without expanding default exposure.',
       'Keep Tier-2 v2.0 blockers separate from helper-layer evidence.',
       'Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure.',
     ],

@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + v2.0 Tier-1 implementation sprint
-- Current sprint: D128 v2.0 Tier-1 release-gate hardening
+- Current sprint: D129 production Browser proof
 - Default registry: 21 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -36,6 +36,7 @@
 - Gate-1.5 live result recorder: 20 candidates queued, 20/20 completed; runnerStatus=opt-in-runner-available; resultRecorderStatus=all-recorded; binding=true; Browser enhancement unlocked=true.
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 - v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json
+- v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json
 
 ### Completed Stabilization Slices
 
@@ -105,6 +106,7 @@
 - D126 Browser Tier-1 foundation: pure TypeScript helpers now provide richer semantic DOM extraction, structured page summaries, deterministic element ranking with reasons/scores, bounded action history, repeated-action detection, and planner repeat avoidance while keeping Browser defaults narrow.
 - D127 Memory Ranking and Code Intelligence enhancement: memory ranking now exposes score factors and reasons, MemoryStore.rank returns active ranked memories, semantic-index results include token evidence and stable tie-breaking, and smart_search local/all adds heuristic semantic_fallback results for free-text queries while keeping exact symbol matches higher priority.
 - D128 v2.0 Tier-1 release-gate hardening: a deterministic precheck now verifies D126 Browser helper evidence, D127 Memory Ranking evidence, D127 Code Intel semantic fallback evidence, and default-exposure invariants while keeping v2.0 blocked on production Browser automation, visual grounding, and Tier-2 proof.
+- D129 production Browser proof: a pure injected adapter contract now records an ordered Browser automation transcript plus visual snapshot metadata proof, moving production Browser automation and visual grounding to Tier-1 pass while keeping Tier-2 blockers explicit and defaults narrow.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -113,7 +115,7 @@
 | --- | --- | --- |
 | v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | v1.0 ship ritual remains gated on user approval; other v1-v4 blockers remain separate |
 | v1.5 | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 evidence exists via React target | rename_symbol remains heuristic, not IDE-grade |
-| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence; D128 precheck makes Tier-1 status machine-readable | Production Browser automation/visual grounding proof and Tier-2 blockers remain |
+| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence; D128 precheck makes Tier-1 status machine-readable; D129 adds production Browser transcript and visual metadata proof | Tier-2 blockers remain |
 | v2.5 | Planner/DAG/cache modules exist | Integration into the main agent loop is still limited |
 | v3.0 | Reviewer and Gate-2 harness exist; current Gate-2 live evidence passes | Long-horizon evidence must stay honest and reproducible |
 | v4.0 | Researcher, TaskGraph, memory, channel foundations exist | Agent OS, Desktop, channels, and production orchestration are not complete |
@@ -130,8 +132,8 @@
 
 ### Next Work
 
-1. D128 v2.0 Tier-1 release-gate hardening is complete at the precheck layer: helper evidence and default exposure are machine-readable, while release blockers remain explicit.
-2. Next implementation slice: D129 production Browser automation and visual-grounding proof without expanding default exposure.
+1. D129 production Browser proof is complete at the adapter-contract layer: automation transcript and visual metadata evidence are machine-readable, while Tier-2 blockers remain explicit.
+2. Next implementation slice: D130 close the next v2.0 Tier-2 blocker without expanding default exposure.
 3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
@@ -144,6 +146,7 @@
 - Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 - v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json
+- v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json
 - Release/version hygiene: docs/superpowers/release-version-hygiene.json
 - v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json
 - V1 to V4 master plan: docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md
@@ -228,8 +231,9 @@
 - D124 plan: docs/superpowers/plans/2026-06-11-d124-hybrid-live-evidence-batch.md
 - D127 plan: docs/superpowers/plans/2026-06-12-d127-memory-ranking-code-intel-enhancement.md
 - D128 plan: docs/superpowers/plans/2026-06-12-d128-v2-tier1-release-gate-hardening.md
+- D129 plan: docs/superpowers/plans/2026-06-12-d129-production-browser-proof.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D128.
+- Last status hygiene sprint: D129.
 
 <!-- status:current:end -->
 

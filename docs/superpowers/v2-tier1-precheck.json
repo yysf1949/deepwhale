@@ -1,12 +1,12 @@
 {
-  "slice": "D128",
+  "slice": "D129",
   "generatedAt": "2026-06-12T00:00:00.000Z",
   "milestone": "v2.0",
   "tier": "Tier-1",
   "passed": false,
-  "summary": "v2.0 Tier-1 helper evidence is present, but v2.0 is not release-ready.",
-  "completedChecks": 4,
-  "blockingChecks": 3,
+  "summary": "v2.0 Tier-1 production and helper evidence is present, but v2.0 is not release-ready.",
+  "completedChecks": 6,
+  "blockingChecks": 1,
   "checks": [
     {
       "id": "browser-tier1-foundation",
@@ -61,18 +61,26 @@
     {
       "id": "production-browser-automation",
       "label": "Production Browser automation proof",
-      "status": "blocked",
+      "status": "pass",
       "requiredForRelease": true,
-      "blocker": "production Browser automation proof is still missing",
-      "caveat": "Release-blocking production Browser automation proof is absent."
+      "evidence": [
+        "packages/coding-agent/src/browser/production-proof.ts",
+        "packages/coding-agent/test/unit/production-browser-proof.test.ts",
+        "docs/superpowers/v2-production-browser-proof.json"
+      ],
+      "caveat": "Adapter-contract proof with transcript evidence; not default Browser exposure."
     },
     {
       "id": "visual-grounding",
       "label": "Visual grounding proof",
-      "status": "blocked",
+      "status": "pass",
       "requiredForRelease": true,
-      "blocker": "visual grounding proof is still missing",
-      "caveat": "Release-blocking visual grounding proof is absent."
+      "evidence": [
+        "packages/coding-agent/src/browser/production-proof.ts",
+        "packages/coding-agent/test/unit/production-browser-proof.test.ts",
+        "docs/superpowers/v2-production-browser-proof.json"
+      ],
+      "caveat": "Visual snapshot metadata proof; raw screenshot bytes are not stored in repository evidence."
     },
     {
       "id": "tier2-blockers",
@@ -84,8 +92,6 @@
     }
   ],
   "blockers": [
-    "production Browser automation proof is still missing",
-    "visual grounding proof is still missing",
     "Tier-2 v2.0 blockers remain tracked separately"
   ],
   "defaultExposure": {
@@ -118,7 +124,7 @@
     "caveat": "browser_action and browser_js are coding-surface helpers in the default registry, not production Browser completion proof."
   },
   "nextActions": [
-    "D129: prove production Browser automation and visual-grounding behavior without expanding default exposure.",
+    "D130: close the next v2.0 Tier-2 blocker without expanding default exposure.",
     "Keep Tier-2 v2.0 blockers separate from helper-layer evidence.",
     "Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure."
   ]

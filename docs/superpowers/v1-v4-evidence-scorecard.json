@@ -6,9 +6,10 @@
     "gate1PreferredReport": "docs/superpowers/gate-1-preferred-targets.json",
     "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
     "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md",
-    "v2Tier1Precheck": "docs/superpowers/v2-tier1-precheck.json"
+    "v2Tier1Precheck": "docs/superpowers/v2-tier1-precheck.json",
+    "v2ProductionBrowserProof": "docs/superpowers/v2-production-browser-proof.json"
   },
-  "aggregatePercent": 67,
+  "aggregatePercent": 68,
   "milestones": [
     {
       "id": "v1.0",
@@ -48,8 +49,8 @@
     },
     {
       "id": "v2.0",
-      "percent": 64,
-      "status": "memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence; D128 adds a machine-readable v2.0 Tier-1 precheck",
+      "percent": 66,
+      "status": "memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence; D128 adds a machine-readable v2.0 Tier-1 precheck; D129 adds production Browser transcript and visual metadata proof",
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
@@ -70,11 +71,12 @@
         "D125 completes the final 7 live Browser tasks (settings-toggle, profile-edit, modal-open-close, tabs-switch, breadcrumb-navigation, download-link-detection, error-page-recovery) via real HTTP fetch evidence, advancing the repository ledger from 13/20 to 20/20; binding becomes true and browserEnhancementUnlocked becomes true",
         "D126 implements the first Browser Tier-1 foundation slice as pure TypeScript helpers: richer semantic DOM extraction, pageSummary, deterministic rankElementsForIntent candidates with reasons/scores, bounded action history, repeated-action detection, and planner selection that avoids repeating the same target when alternatives exist (verified by Browser unit tests)",
         "D127 adds explainable Memory Ranking and deterministic Code Intel semantic fallback evidence: rankMemoriesWithScores and MemoryStore.rank expose score factors/reasons, semantic-index results expose matched tokens/coverage/reason/stable tie-breaking, and smart_search local/all reports heuristic semantic_fallback results for free-text queries while exact symbol matches remain higher priority",
-        "D128 adds a machine-readable v2.0 Tier-1 precheck: Browser helper evidence, Memory Ranking evidence, Code Intel semantic fallback evidence, and default-exposure invariants pass; production Browser automation, visual grounding, and Tier-2 blockers remain blocked"
+        "D128 adds a machine-readable v2.0 Tier-1 precheck: Browser helper evidence, Memory Ranking evidence, Code Intel semantic fallback evidence, and default-exposure invariants pass; production Browser automation, visual grounding, and Tier-2 blockers remain blocked",
+        "D129 adds a production Browser proof recorder with an injected adapter contract: the evidence records an ordered navigate/type/click/observe/visual-snapshot transcript, validates visual snapshot metadata, keeps raw screenshot bytes out of repository evidence, and leaves default exposure unchanged"
       ],
       "blockers": [
         "default registry must remain coding plus Code Intel essentials",
-        "D128 covers deterministic release-gate precheck evidence, but full v2.0 still requires production Browser automation and visual-grounding proof",
+        "D129 proves the production Browser adapter contract and visual-grounding metadata path, but it is not a live external Browser run",
         "Tier-2 v2.0 blockers remain tracked separately"
       ]
     },
@@ -135,7 +137,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D129: prove production Browser automation and visual-grounding behavior without expanding default exposure.",
+    "D130: close the next v2.0 Tier-2 blocker without expanding default exposure.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]

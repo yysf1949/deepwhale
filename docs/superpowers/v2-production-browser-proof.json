@@ -1,0 +1,98 @@
+{
+  "slice": "D129",
+  "generatedAt": "2026-06-12T00:00:00.000Z",
+  "proofKind": "production-browser-proof",
+  "scenarioId": "d129-checkout-proof",
+  "goal": "Complete a checkout form with visual grounding",
+  "passed": true,
+  "automationStatus": "pass",
+  "visualGroundingStatus": "pass",
+  "defaultExposureChanged": false,
+  "adapterContract": {
+    "kind": "injected-browser-adapter",
+    "runtimeDependencyAdded": false,
+    "rawScreenshotBytesStored": false,
+    "requiredSteps": [
+      "navigate",
+      "type",
+      "click",
+      "observe",
+      "visual-snapshot"
+    ]
+  },
+  "transcript": [
+    {
+      "index": 0,
+      "kind": "navigate",
+      "target": "https://example.test/checkout",
+      "status": "success",
+      "urlAfter": "https://example.test/checkout",
+      "titleAfter": "Checkout",
+      "ms": 12,
+      "summary": "navigate ok"
+    },
+    {
+      "index": 1,
+      "kind": "type",
+      "target": "input[name=\"email\"]",
+      "status": "success",
+      "urlAfter": "https://example.test/checkout",
+      "titleAfter": "Checkout",
+      "ms": 12,
+      "summary": "type ok"
+    },
+    {
+      "index": 2,
+      "kind": "click",
+      "target": "button[type=\"submit\"]",
+      "status": "success",
+      "urlAfter": "https://example.test/checkout",
+      "titleAfter": "Checkout",
+      "ms": 12,
+      "summary": "click ok"
+    },
+    {
+      "index": 3,
+      "kind": "observe",
+      "target": "main",
+      "status": "success",
+      "urlAfter": "https://example.test/checkout",
+      "titleAfter": "Checkout",
+      "ms": 12,
+      "summary": "observe ok"
+    },
+    {
+      "index": 4,
+      "kind": "visual-snapshot",
+      "target": "button[type=\"submit\"]",
+      "status": "success",
+      "urlAfter": "https://example.test/checkout",
+      "titleAfter": "Checkout",
+      "ms": 12,
+      "summary": "visual-snapshot ok"
+    }
+  ],
+  "visualSnapshots": [
+    {
+      "width": 1280,
+      "height": 720,
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "nonBlankRatio": 0.42,
+      "targetRects": [
+        {
+          "selector": "button[type=\"submit\"]",
+          "x": 40,
+          "y": 80,
+          "width": 120,
+          "height": 32
+        }
+      ]
+    }
+  ],
+  "blockers": [],
+  "caveats": [
+    "D129 proves the production Browser adapter contract and visual-grounding metadata path; it is not a live external Browser run.",
+    "D129 does not add Browser, Desktop, Channel, media, or productivity tools to the default registry.",
+    "D129 does not complete v2.0; Tier-2 blockers remain tracked separately."
+  ]
+}
