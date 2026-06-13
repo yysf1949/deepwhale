@@ -1,12 +1,12 @@
 {
-  "slice": "D129",
-  "generatedAt": "2026-06-12T00:00:00.000Z",
+  "slice": "D130",
+  "generatedAt": "2026-06-13T00:00:00.000Z",
   "milestone": "v2.0",
   "tier": "Tier-1",
   "passed": false,
-  "summary": "v2.0 Tier-1 production and helper evidence is present, but v2.0 is not release-ready.",
-  "completedChecks": 6,
-  "blockingChecks": 1,
+  "summary": "v2.0 Tier-1 evidence and Tier-2 Compaction evidence are present, but v2.0 is not release-ready.",
+  "completedChecks": 7,
+  "blockingChecks": 3,
   "checks": [
     {
       "id": "browser-tier1-foundation",
@@ -83,16 +83,51 @@
       "caveat": "Visual snapshot metadata proof; raw screenshot bytes are not stored in repository evidence."
     },
     {
-      "id": "tier2-blockers",
-      "label": "v2.0 Tier-2 blockers",
+      "id": "tier2-automation",
+      "label": "Tier-2 Automation",
       "status": "blocked",
       "requiredForRelease": true,
-      "blocker": "Tier-2 v2.0 blockers remain tracked separately",
-      "caveat": "Tier-2 blockers remain separate and unresolved."
+      "blocker": "Tier-2 Automation remains blocked",
+      "caveat": "Automation remains a separate Tier-2 blocker."
+    },
+    {
+      "id": "tier2-remote-tui",
+      "label": "Tier-2 Remote TUI",
+      "status": "blocked",
+      "requiredForRelease": true,
+      "blocker": "Tier-2 Remote TUI remains blocked",
+      "caveat": "Remote TUI remains a separate Tier-2 blocker."
+    },
+    {
+      "id": "tier2-compaction",
+      "label": "Tier-2 Compaction",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/core/src/session/compaction.ts",
+        "packages/coding-agent/src/agent/agent-compaction.ts",
+        "packages/coding-agent/src/modes/print.ts",
+        "packages/coding-agent/src/modes/rpc.ts",
+        "packages/core/test/session-compaction.test.ts",
+        "packages/coding-agent/test/agent-compaction-2d6.test.ts",
+        "packages/core/test/session-compaction-hook.test.ts",
+        "packages/coding-agent/test/integration/compaction-cross-protocol-2d5.test.ts"
+      ],
+      "caveat": "Compaction has implementation and integration evidence, but this does not complete v2.0."
+    },
+    {
+      "id": "tier2-mcp-runtime",
+      "label": "Tier-2 MCP Runtime",
+      "status": "blocked",
+      "requiredForRelease": true,
+      "blocker": "Tier-2 MCP Runtime remains blocked",
+      "caveat": "MCP Runtime remains a separate Tier-2 blocker."
     }
   ],
   "blockers": [
-    "Tier-2 v2.0 blockers remain tracked separately"
+    "Tier-2 Automation remains blocked",
+    "Tier-2 Remote TUI remains blocked",
+    "Tier-2 MCP Runtime remains blocked"
   ],
   "defaultExposure": {
     "toolCount": 21,
@@ -124,8 +159,8 @@
     "caveat": "browser_action and browser_js are coding-surface helpers in the default registry, not production Browser completion proof."
   },
   "nextActions": [
-    "D130: close the next v2.0 Tier-2 blocker without expanding default exposure.",
-    "Keep Tier-2 v2.0 blockers separate from helper-layer evidence.",
+    "D131: close another v2.0 Tier-2 blocker without expanding default exposure.",
+    "Keep remaining Tier-2 v2.0 blockers separate from Compaction evidence.",
     "Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure."
   ]
 }

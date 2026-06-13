@@ -5,7 +5,10 @@ export type V2Tier1PrecheckCheckId =
   | 'default-exposure'
   | 'production-browser-automation'
   | 'visual-grounding'
-  | 'tier2-blockers';
+  | 'tier2-automation'
+  | 'tier2-remote-tui'
+  | 'tier2-compaction'
+  | 'tier2-mcp-runtime';
 
 export type V2Tier1PrecheckStatus = 'pass' | 'fail' | 'blocked';
 export type V2Tier1EvidenceKind = 'source' | 'test' | 'doc' | 'gate';
@@ -51,7 +54,7 @@ export interface V2Tier1PrecheckInput {
 }
 
 export interface V2Tier1PrecheckResult {
-  slice: 'D129';
+  slice: 'D130';
   milestone: 'v2.0';
   tier: 'Tier-1';
   passed: boolean;
@@ -249,6 +252,70 @@ export const DEFAULT_V2_TIER1_PRECHECK_EVIDENCE: readonly V2Tier1EvidenceRef[] =
     layer: 'release-gate',
     note: 'D129 machine-readable visual-grounding proof snapshot.',
   },
+  {
+    id: 'd130-compaction-core-source',
+    checkId: 'tier2-compaction',
+    path: 'packages/core/src/session/compaction.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D130 core compaction implementation with token-budget tail, summary replacement, latch, and lifecycle hook evidence.',
+  },
+  {
+    id: 'd130-agent-compaction-source',
+    checkId: 'tier2-compaction',
+    path: 'packages/coding-agent/src/agent/agent-compaction.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D130 tool-loop compaction integration writes compaction and compaction_paused session events.',
+  },
+  {
+    id: 'd130-print-compaction-source',
+    checkId: 'tier2-compaction',
+    path: 'packages/coding-agent/src/modes/print.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D130 print mode can inject AgentCompactionConfig into the tool-loop path when session persistence exists.',
+  },
+  {
+    id: 'd130-rpc-compaction-source',
+    checkId: 'tier2-compaction',
+    path: 'packages/coding-agent/src/modes/rpc.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D130 RPC mode can reuse AgentCompactionConfig across chat requests with session persistence.',
+  },
+  {
+    id: 'd130-core-compaction-test',
+    checkId: 'tier2-compaction',
+    path: 'packages/core/test/session-compaction.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D130 deterministic core compaction coverage for trigger, replacement, tail budget, and latch behavior.',
+  },
+  {
+    id: 'd130-agent-compaction-test',
+    checkId: 'tier2-compaction',
+    path: 'packages/coding-agent/test/agent-compaction-2d6.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D130 agent compaction coverage for tool-loop integration and system-prefix replaced_range alignment.',
+  },
+  {
+    id: 'd130-compaction-hook-test',
+    checkId: 'tier2-compaction',
+    path: 'packages/core/test/session-compaction-hook.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D130 lifecycle hook coverage proving compaction is the prefix-cache reset point.',
+  },
+  {
+    id: 'd130-cross-protocol-compaction-test',
+    checkId: 'tier2-compaction',
+    path: 'packages/coding-agent/test/integration/compaction-cross-protocol-2d5.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D130 integration smoke coverage for compaction across supported protocol paths.',
+  },
 ];
 
 const CHECK_ORDER: readonly V2Tier1PrecheckCheckId[] = [
@@ -258,7 +325,10 @@ const CHECK_ORDER: readonly V2Tier1PrecheckCheckId[] = [
   'default-exposure',
   'production-browser-automation',
   'visual-grounding',
-  'tier2-blockers',
+  'tier2-automation',
+  'tier2-remote-tui',
+  'tier2-compaction',
+  'tier2-mcp-runtime',
 ];
 
 const CHECK_LABELS: Record<V2Tier1PrecheckCheckId, string> = {
@@ -268,7 +338,10 @@ const CHECK_LABELS: Record<V2Tier1PrecheckCheckId, string> = {
   'default-exposure': 'Default registry exposure invariant',
   'production-browser-automation': 'Production Browser automation proof',
   'visual-grounding': 'Visual grounding proof',
-  'tier2-blockers': 'v2.0 Tier-2 blockers',
+  'tier2-automation': 'Tier-2 Automation',
+  'tier2-remote-tui': 'Tier-2 Remote TUI',
+  'tier2-compaction': 'Tier-2 Compaction',
+  'tier2-mcp-runtime': 'Tier-2 MCP Runtime',
 };
 
 const CHECK_CAVEATS: Record<V2Tier1PrecheckCheckId, string> = {
@@ -280,11 +353,17 @@ const CHECK_CAVEATS: Record<V2Tier1PrecheckCheckId, string> = {
     'Adapter-contract proof with transcript evidence; not default Browser exposure.',
   'visual-grounding':
     'Visual snapshot metadata proof; raw screenshot bytes are not stored in repository evidence.',
-  'tier2-blockers': 'Tier-2 blockers remain separate and unresolved.',
+  'tier2-automation': 'Automation remains a separate Tier-2 blocker.',
+  'tier2-remote-tui': 'Remote TUI remains a separate Tier-2 blocker.',
+  'tier2-compaction':
+    'Compaction has implementation and integration evidence, but this does not complete v2.0.',
+  'tier2-mcp-runtime': 'MCP Runtime remains a separate Tier-2 blocker.',
 };
 
 const BLOCKED_CHECKS: ReadonlyMap<V2Tier1PrecheckCheckId, string> = new Map([
-  ['tier2-blockers', 'Tier-2 v2.0 blockers remain tracked separately'],
+  ['tier2-automation', 'Tier-2 Automation remains blocked'],
+  ['tier2-remote-tui', 'Tier-2 Remote TUI remains blocked'],
+  ['tier2-mcp-runtime', 'Tier-2 MCP Runtime remains blocked'],
 ]);
 
 const NON_CODING_DEFAULT_PATTERNS: readonly RegExp[] = [
@@ -321,20 +400,20 @@ export function evaluateV2Tier1Precheck(input: V2Tier1PrecheckInput = {}): V2Tie
     ]),
   );
   return {
-    slice: 'D129',
+    slice: 'D130',
     milestone: 'v2.0',
     tier: 'Tier-1',
     passed,
     summary: passed
       ? 'v2.0 Tier-1 precheck passed.'
-      : 'v2.0 Tier-1 production and helper evidence is present, but v2.0 is not release-ready.',
+      : 'v2.0 Tier-1 evidence and Tier-2 Compaction evidence are present, but v2.0 is not release-ready.',
     completedChecks: checks.filter((check) => check.status === 'pass').length,
     blockingChecks: checks.filter((check) => check.status !== 'pass').length,
     checks,
     blockers,
     nextActions: [
-      'D130: close the next v2.0 Tier-2 blocker without expanding default exposure.',
-      'Keep Tier-2 v2.0 blockers separate from helper-layer evidence.',
+      'D131: close another v2.0 Tier-2 blocker without expanding default exposure.',
+      'Keep remaining Tier-2 v2.0 blockers separate from Compaction evidence.',
       'Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure.',
     ],
     defaultExposure,

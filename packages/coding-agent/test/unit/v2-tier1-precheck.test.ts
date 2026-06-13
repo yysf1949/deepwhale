@@ -12,13 +12,13 @@ function statusOf(result: V2Tier1PrecheckResult, id: V2Tier1PrecheckCheckId): st
   return result.checks.find((check) => check.id === id)?.status;
 }
 
-describe('v2.0 Tier-1 release precheck (D129)', () => {
-  it('passes Tier-1 proof checks but keeps the current v2.0 gate blocked on Tier-2', () => {
+describe('v2.0 Tier-1 release precheck (D130)', () => {
+  it('passes Tier-1 proof checks and closes Compaction while keeping remaining Tier-2 blocked', () => {
     const result = evaluateV2Tier1Precheck({
       defaultToolNames: createDefaultRegistry().list().map((tool) => tool.name),
     });
 
-    expect(result.slice).toBe('D129');
+    expect(result.slice).toBe('D130');
     expect(result.milestone).toBe('v2.0');
     expect(result.tier).toBe('Tier-1');
     expect(result.passed).toBe(false);
@@ -29,12 +29,19 @@ describe('v2.0 Tier-1 release precheck (D129)', () => {
     expect(statusOf(result, 'default-exposure')).toBe('pass');
     expect(statusOf(result, 'production-browser-automation')).toBe('pass');
     expect(statusOf(result, 'visual-grounding')).toBe('pass');
-    expect(statusOf(result, 'tier2-blockers')).toBe('blocked');
+    expect(statusOf(result, 'tier2-automation')).toBe('blocked');
+    expect(statusOf(result, 'tier2-remote-tui')).toBe('blocked');
+    expect(statusOf(result, 'tier2-compaction')).toBe('pass');
+    expect(statusOf(result, 'tier2-mcp-runtime')).toBe('blocked');
     expect(result.defaultExposure.toolCount).toBe(21);
     expect(result.defaultExposure.nonCodingDefaultEnabled).toBe(false);
     expect(result.defaultExposure.caveat).toContain('coding-surface helpers');
-    expect(result.blockers).toEqual(['Tier-2 v2.0 blockers remain tracked separately']);
-    expect(result.nextActions[0]).toContain('D130');
+    expect(result.blockers).toEqual([
+      'Tier-2 Automation remains blocked',
+      'Tier-2 Remote TUI remains blocked',
+      'Tier-2 MCP Runtime remains blocked',
+    ]);
+    expect(result.nextActions[0]).toContain('D131');
   });
 
   it('fails default exposure when an opt-in non-coding tool leaks into defaults', () => {
@@ -59,7 +66,7 @@ describe('v2.0 Tier-1 release precheck (D129)', () => {
     expect(result.passed).toBe(false);
   });
 
-  it('ships machine-readable D129 evidence snapshots', () => {
+  it('ships machine-readable D130 evidence snapshots', () => {
     const evidence = JSON.parse(
       readFileSync(resolve(process.cwd(), 'docs/superpowers/v2-tier1-precheck.json'), 'utf8'),
     ) as {
@@ -80,11 +87,15 @@ describe('v2.0 Tier-1 release precheck (D129)', () => {
       visualGroundingStatus: string;
     };
 
-    expect(evidence.slice).toBe('D129');
+    expect(evidence.slice).toBe('D130');
     expect(evidence.milestone).toBe('v2.0');
     expect(evidence.tier).toBe('Tier-1');
     expect(evidence.passed).toBe(false);
-    expect(evidence.blockers).toEqual(['Tier-2 v2.0 blockers remain tracked separately']);
+    expect(evidence.blockers).toEqual([
+      'Tier-2 Automation remains blocked',
+      'Tier-2 Remote TUI remains blocked',
+      'Tier-2 MCP Runtime remains blocked',
+    ]);
     expect(evidence.checks.map((check) => `${check.id}:${check.status}`)).toEqual([
       'browser-tier1-foundation:pass',
       'memory-ranking:pass',
@@ -92,7 +103,10 @@ describe('v2.0 Tier-1 release precheck (D129)', () => {
       'default-exposure:pass',
       'production-browser-automation:pass',
       'visual-grounding:pass',
-      'tier2-blockers:blocked',
+      'tier2-automation:blocked',
+      'tier2-remote-tui:blocked',
+      'tier2-compaction:pass',
+      'tier2-mcp-runtime:blocked',
     ]);
     expect(browserProof.slice).toBe('D129');
     expect(browserProof.proofKind).toBe('production-browser-proof');
