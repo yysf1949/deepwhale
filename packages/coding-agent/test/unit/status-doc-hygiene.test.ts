@@ -65,7 +65,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(readme).toContain(`registryProfile=${gate2.registryProfile ?? 'unknown'}`);
     expect(readme).toContain(`toolCalls=${gate2.toolCalls}`);
     expect(readme).toContain(`Gate-1 preferred status: ${gate1Targets.status}`);
-    expect(readme).toContain('preferred-available');
+    expect(readme).toContain('preferred-passed');
     expect(gate1Targets.preferredTargets.length).toBeGreaterThan(0);
     expect(readme).toContain('Gate-1.5 evidence kind: live-browser');
     expect(gate15.evidenceKind).toBe('live-browser');
@@ -196,7 +196,6 @@ describe('status documentation hygiene (D-56)', () => {
     const combined = DOCS.map((path) => readRepoFile(path)).join('\n');
 
     expect(combined).not.toMatch(/v1-v4 production complete/i);
-    expect(combined).not.toMatch(/preferred-100k[^.\n]*passed/i);
     expect(combined).not.toMatch(/Browser[^.\n]*(is|are) default-enabled/i);
     expect(combined).not.toMatch(/Desktop[^.\n]*(is|are) default-enabled/i);
     expect(combined).not.toMatch(/Channel[^.\n]*(is|are) default-enabled/i);
@@ -219,13 +218,14 @@ describe('status documentation hygiene (D-56)', () => {
     };
     const scorecardMd = readRepoFile('docs/superpowers/v1-v4-evidence-scorecard.md');
 
-    expect(scorecard.aggregatePercent).toBe(77);
+    expect(scorecard.aggregatePercent).toBe(73);
     expect(scorecard.milestones.map((m) => m.id)).toEqual(['v1.0', 'v1.5', 'v2.0', 'v2.5', 'v3.0', 'v4.0']);
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
-    expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
+    expect(scorecard.caveats).toContain('Gate-1 preferred-100k now PASSES; Gate-1 minimum-50k evidence is a separate pass.');
     expect(scorecard.nextActions).toEqual([
-      'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
-      'Keep Gate-2 production long-horizon proof as a separate future blocker rather than inferring it from unit fixtures.',
+      'Gate-1 preferred-100k now PASSES (D141); continue broadening Gate-1 evidence with additional 100K+ targets when available.',
+      'Gate-2 multi-scenario evidence expanded to 5 scenarios (D142); keep Gate-2 production long-horizon proof as a separate future blocker rather than inferring it from replay fixtures.',
+      'Agent OS orchestration now has integration tests (D143); expand orchestration evidence with broader task lifecycle scenarios.',
       'v5/v6 seed work continues on production hardening bootstrap (D-139), trace span observability (D-137), and distributed coordination (D-138) while v1-v4 completion remains gate-driven.',
     ]);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D135:/m);
@@ -262,7 +262,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D70:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D68:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D69:/m);
-    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 77%');
+    expect(scorecardMd).toContain('Aggregate evidence-backed progress: 73%');
     expect(scorecardMd).toContain('D67 rename_symbol exposes hashline edit hunks');
     expect(scorecardMd).toContain('D71 covers TypeScript combined default-plus-named import references');
     expect(scorecardMd).toContain('D126 implements the first Browser Tier-1 foundation slice');
@@ -279,6 +279,9 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecardMd).toContain('D137 adds v5.0 observability 3rd cycle trace span seed');
     expect(scorecardMd).toContain('D138 adds v6.0 Theme 3 (distributed coordination) seed');
     expect(scorecardMd).toContain('D139 adds v5.0 production hardening bootstrap');
+    expect(scorecardMd).toContain('D141 advances Gate-1 preferred-100k');
+    expect(scorecardMd).toContain('D142 expands Gate-2 multi-scenario evidence');
+    expect(scorecardMd).toContain('D143 adds Agent OS orchestration integration tests');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
@@ -374,11 +377,11 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D136-D140', () => {
+  it('keeps the current sprint and next-work pointers aligned after D136-D143', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D136-D140 complete');
+      expect(block).toContain('Current sprint: D136-D143 complete');
       expect(block).not.toMatch(/v2\.0 Tier-1 implementation/i);
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
@@ -454,6 +457,9 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D137 v5.0 observability 3rd cycle trace span seed:');
       expect(block).toContain('D138 v6.0 Theme 3 distributed coordination seed:');
       expect(block).toContain('D139 v5.0 production hardening bootstrap:');
+      expect(block).toContain('D141 Gate-1 preferred-100k pass:');
+      expect(block).toContain('D142 Gate-2 multi-scenario evidence:');
+      expect(block).toContain('D143 Agent OS orchestration integration tests:');
       expect(block).toContain('Gate-1.5 evidence kind: live-browser');
       expect(block).toContain('Gate-1.5 binding: true');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');

@@ -1,29 +1,24 @@
 # Gate-1 Result
 
-Status: failed
-Repo: D:\App\openClaw\projects\deepwhale
+Status: passed
+Repo: D:\App\openClaw\projects\deepwhale\.gate-targets\react
 
 ## Metrics
 
-- LOC: 47203 (minimum 50000, preferred 100000)
-- LOC qualification: below-minimum
-- Supported files: 412
-- Files indexed: 412
-- Symbols indexed: 3091
-- References indexed: 16564
-- Call edges: 3183
-- Graph build: 990ms
-- Call graph: 108ms
-- Elapsed: 1190ms / 1200000ms
+- LOC: 753902 (minimum 50000, preferred 100000)
+- LOC qualification: preferred-100k
+- Supported files: 4462
+- Files indexed: 4462
+- Symbols indexed: 36171
+- References indexed: 143068
+- Call edges: 9021550
+- Graph build: 9663ms
+- Call graph: 2677ms
+- Elapsed: 71937ms / 1200000ms
 
 ## Evidence
 
-- Entry: createDefaultRegistry at packages/coding-agent/src/tools/registry.ts:123:7 (declaration)
-- Modification point: createDefaultRegistry at packages/coding-agent/src/tools/registry.ts:123:7 (declaration)
-- Call chain edges: 2
-  - packages/coding-agent/src/repl/repl-agent-turn.ts:runAgentTurn -> packages/coding-agent/src/tools/registry.ts:createDefaultRegistry @ packages/coding-agent/src/repl/repl-agent-turn.ts:122
-  - packages/coding-agent/src/repl/repl-agent-turn.ts:runAgentTurn -> packages/coding-agent/src/tools/registry.ts:createDefaultRegistry @ packages/coding-agent/src/repl/repl-agent-turn.ts:139
-
-## Failure Reasons
-
-- loc-below-minimum: 47203 < 50000
+- Entry: createElement at packages/react/src/jsx/ReactJSXElement.js:610:7 (declaration)
+- Modification point: createElement at packages/react/src/jsx/ReactJSXElement.js:610:7 (declaration)
+- Call chain edges: 1
+  - packages/react/src/jsx/ReactJSXElement.js:createElement -> packages/react/src/jsx/ReactJSXElement.js:ReactElement @ packages/react/src/jsx/ReactJSXElement.js:735

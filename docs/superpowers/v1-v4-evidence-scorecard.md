@@ -2,23 +2,23 @@
 
 Generated: 2026-06-13
 
-Aggregate evidence-backed progress: 77%
+Aggregate evidence-backed progress: 73%
 
 This scorecard measures current evidence, not ambition. A module existing in `src/` is foundation work unless the main runtime and gates prove integration.
 
 | Milestone | Percent | Evidence-backed status | Main blockers |
 | --- | ---: | --- | --- |
 | v1.0 | 80% | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79); default registry invariant asserted (D-83) | No new public code claims; v1.0 ship ritual (tag, npm publish) is gated on user approval |
-| v1.5 | 80% | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 evidence achieved via React target (753,902 LOC); re-export chain call graph correctness fixture present (D-84) | rename_symbol is reference-guided lexical rewrite with hashline edit hunks, not IDE-grade AST rename |
+| v1.5 | 85% | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 PASSES via React target (753,902 LOC, createElement -> ReactElement call chain verified, D-141); re-export chain call graph correctness fixture present (D-84) | rename_symbol is reference-guided lexical rewrite with hashline edit hunks, not IDE-grade AST rename |
 | v2.0 | 70% | Memory, Browser, MCP, Automation, and Remote TUI foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence; D128 adds a machine-readable Tier-1 precheck; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row; D131 closes the MCP Runtime Tier-2 row; D132 closes the Automation Tier-2 row; D133 closes the Remote TUI Tier-2 row | D129 is adapter-contract proof, not a live external Browser run; D131 is a one-server stdio proof, not full multiplexed MCP orchestration; D132 is an injected runner/run-record proof, not a full hosted/no-agent automation service; D133 is an authenticated injected-transport protocol/session proof, not a full WebSocket/app-server implementation |
 | v2.5 | 65% | Planner/DAG/cache modules exist; main-loop integration has multi-scenario planner.plan evidence fixtures (D-77 + 3 D-81 + D-82); v5 implementation gate reached (v2.5 >= 65%) | Integration is 5 fixtures; a real long-horizon multi-step execution run is still not proven in this scorecard; release gate scenarios are not freshly proven |
-| v3.0 | 65% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes; inclusive 30-50 boundary fixture present (D-85); D134 adds a v3/v4 production precheck; D135 closes the v3.0 production breadth gap with a 3-scenario default-profile replay suite (replay evidence, not a new live external Gate-2 run) | Gate-2 is fixture-scoped, not broad production proof; D135 v3 production breadth is replay evidence of existing on-disk artifacts through evaluateGate2Transcript, not a new live external Gate-2 run; v1-v4 production completion is not claimed |
-| v4.0 | 60% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present (D-78 + D-80 + D-86); D134 records these in the v3/v4 production precheck; D136 closes the v4-cross-platform-sigkill blocker with 3 SIGKILL/restore scenarios (process-kill, docker-stop, session-crash-recovery) all preserving data integrity; v3/v4 production precheck now passes all 7 checks | Agent OS orchestration, Desktop, and channels remain incomplete; cross-session evidence is deterministic unit-style fixtures, not real production orchestration |
+| v3.0 | 70% | Reviewer and Gate-2 runner exist; default-profile Gate-2 fixture passes; inclusive 30-50 boundary fixture present (D-85); D134 adds a v3/v4 production precheck; D135 closes the v3.0 production breadth gap with a 3-scenario default-profile replay suite (replay evidence, not a new live external Gate-2 run); D142 expands Gate-2 multi-scenario evidence to 5 scenarios (2 new fixtures: code-refactor, bug-investigation) | Gate-2 is now multi-scenario but still fixture-scoped, not broad production proof; D135/D142 v3 production breadth is replay evidence of existing on-disk artifacts through evaluateGate2Transcript, not a new live external Gate-2 run; v1-v4 production completion is not claimed |
+| v4.0 | 65% | Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present (D-78 + D-80 + D-86); D134 records these in the v3/v4 production precheck; D136 closes the v4-cross-platform-sigkill blocker with 3 SIGKILL/restore scenarios (process-kill, docker-stop, session-crash-recovery) all preserving data integrity; v3/v4 production precheck now passes all 7 checks; D143 adds Agent OS orchestration integration tests (4 TaskOrchestrator test cases) | Agent OS orchestration now has integration tests but is not production-complete; Desktop and channels remain incomplete; cross-session evidence is deterministic unit-style fixtures, not real production orchestration |
 
 ## Caveats
 
 - Gate-2 default-profile fixture pass is not v1-v4 production completion.
-- Gate-1 minimum-50k evidence is not preferred-100k evidence.
+- Gate-1 preferred-100k now PASSES; Gate-1 minimum-50k evidence is a separate pass.
 - Module existence is not production integration.
 - Code Intel rename, reference, call graph, and smart search behavior remains heuristic unless a specific test proves stronger semantics.
 - Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in.
@@ -60,6 +60,9 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 - D137 adds v5.0 observability 3rd cycle trace span seed: TraceSpanStore class with startSpan/endSpan/getSpan/getSpansByTrace/getSpansByParent/list/size/clear + TraceSpanId branded type + asTraceSpanId/isTraceSpanId helpers + TraceSpan interface with spanId/traceId/parentSpanId/name/kind/status/attributes fields + 4 new unit tests. OpenTelemetry-compatible span model for distributed tracing. Observability+auditability theme now covers write (D-87/88/89) + read (D-90) + render (D-102) + trace spans (D-137).
 - D138 adds v6.0 Theme 3 (distributed coordination) seed: DistributedLockManager class (lease-based, in-memory: acquire/release/renew/isLocked/getLock/list/size/clear with TTL expiry and owner verification) + LockId branded type + DistributedEventAggregator class (merges audit logs from multiple instances: addEvent/merge/list/size/clear with eventId-based deduplication and cross-instance conflict detection) + InstanceId branded type + 2 new test files. v6.0 Theme 3 (distributed cross-instance coordination) SEED-COMPLETE: lock-manager + event-aggregator foundational pieces.
 - D139 adds v5.0 production hardening bootstrap: bootstrapHardening function wires D-96/D-97/D-98/D-99 signal handlers, uncaught handlers, and graceful shutdown into a single idempotent call; HardeningBootstrapOptions + HardeningBootstrapResult interfaces; _resetHardeningStateForTesting for test isolation; wired into REPL bootstrap path. Production hardening now covers the full process lifecycle from handler installation through shutdown.
+- D141 advances Gate-1 preferred-100k from available to PASSES: React target (753,902 LOC) now has verified createElement -> ReactElement call chain evidence. Gate-1 preferred status is no longer blocked; preferred-100k PASSES.
+- D142 expands Gate-2 multi-scenario evidence from 1 to 5 scenarios: 2 new fixtures added (code-refactor, bug-investigation); v3 production replay suite expanded from 3 to 5 default-profile replay scenarios. v3.0 production breadth evidence strengthened but remains replay evidence, not a new live external Gate-2 run.
+- D143 adds Agent OS orchestration integration tests: 4 new TaskOrchestrator test cases covering task lifecycle management, task dependency resolution, error recovery, and concurrent task execution. v4.0 Agent OS now has integration test evidence beyond module existence.
 - D74 resolves TypeScript default re-export barrel call edges to the original named default declaration.
 - D75 records latest user goals into TaskGraphRecorder through runToolLoopWithReview without expanding the default registry.
 - D77 records planner.plan invocation in the main loop with the latest user goal when a Planner is provided, with the resulting tasks recorded into the task graph.
@@ -102,6 +105,7 @@ This scorecard measures current evidence, not ambition. A module existing in `sr
 
 ## Next Actions
 
-1. Continue preferred-100k Gate-1 search only when a local 100K+ target is available.
-2. Keep Gate-2 production long-horizon proof as a separate future blocker rather than inferring it from unit fixtures.
-3. v5/v6 seed work continues on production hardening bootstrap (D-139), trace span observability (D-137), and distributed coordination (D-138) while v1-v4 completion remains gate-driven.
+1. Gate-1 preferred-100k now PASSES (D141); continue broadening Gate-1 evidence with additional 100K+ targets when available.
+2. Gate-2 multi-scenario evidence expanded to 5 scenarios (D142); keep Gate-2 production long-horizon proof as a separate future blocker rather than inferring it from replay fixtures.
+3. Agent OS orchestration now has integration tests (D143); expand orchestration evidence with broader task lifecycle scenarios.
+4. v5/v6 seed work continues on production hardening bootstrap (D-139), trace span observability (D-137), and distributed coordination (D-138) while v1-v4 completion remains gate-driven.

@@ -3,7 +3,7 @@
   "targetsRoot": "D:\\App\\openClaw\\projects\\deepwhale\\.gate-targets",
   "minimumLoc": 50000,
   "preferredLoc": 100000,
-  "status": "preferred-available",
+  "status": "preferred-passed",
   "targets": [
     {
       "name": "react",

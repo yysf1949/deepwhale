@@ -15,5 +15,21 @@
   "finalResult": "pass",
   "startedAt": "2026-06-09T15:55:14.291Z",
   "finishedAt": "2026-06-09T15:56:09.569Z",
-  "durationMs": 55278
+  "durationMs": 55278,
+  "multiScenarioSummary": {
+    "totalScenarios": 5,
+    "passedScenarios": 5,
+    "scenarioIds": [
+      "invoice-domain-repair-live-replay",
+      "release-precheck-hardening-replay",
+      "cross-package-status-hygiene-replay",
+      "code-refactor-transcript-replay",
+      "bug-investigation-transcript-replay"
+    ],
+    "toolCallRanges": {
+      "min": 31,
+      "max": 40,
+      "avg": 35.8
+    }
+  }
 }

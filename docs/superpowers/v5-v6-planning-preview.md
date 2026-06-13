@@ -2,9 +2,9 @@
 
 Generated: 2026-06-13
 
-Status: In progress (v5.0 evidence D-87 through D-105 + D-137 + D-139 and v6.0 seed evidence D-106 through D-113 + D-138 recorded)
+Status: In progress (v5.0 evidence D-87 through D-105 + D-137 + D-139 and v6.0 seed evidence D-106 through D-113 + D-138 recorded; D-141-D143 advance v1-v4 completion)
 
-Implementation is now ACTIVE: v5.0 BOTH gates reached (v1-v4 aggregate 65% AND v2.5 65%); v5.0 has completed its 4-theme seed/bridge set through D-105 with additional observability (D-137 trace spans) and production hardening (D-139 bootstrap) evidence, and v6.0 seed implementation has started through D-113 with distributed coordination seed (D-138). This does not complete v1-v4 or unlock non-coding defaults.
+Implementation is now ACTIVE: v5.0 BOTH gates reached (v1-v4 aggregate 65% AND v2.5 65%); v5.0 has completed its 4-theme seed/bridge set through D-105 with additional observability (D-137 trace spans) and production hardening (D-139 bootstrap) evidence, and v6.0 seed implementation has started through D-113 with distributed coordination seed (D-138). D141 advances Gate-1 preferred-100k to PASSES, D142 expands Gate-2 multi-scenario evidence to 5 scenarios, and D143 adds Agent OS orchestration integration tests. This does not complete v1-v4 or unlock non-coding defaults.
 
 The v5.0 themes remain the same: production hardening, plugin governance, distribution and upgrade flow, observability and auditability. Future v5.0 sub-sprints will expand each theme with additional evidence fixtures.
 
@@ -15,9 +15,9 @@ The v5.0 themes remain the same: production hardening, plugin governance, distri
 - Gate-1 preferred-100k, Gate-1.5, and production long-horizon evidence must not be inferred from fixture or module existence.
 - v5.0 implementation allowed only when v1-v4 scorecard aggregate >= 65% AND v2.5 percent >= 65%.
 
-## Gate Status (2026-06-13, D-139)
+## Gate Status (2026-06-13, D-143)
 
-- v1-v4 aggregate percent: 77% (gate threshold: 65%, **REACHED 2026-06-10 D-86**)
+- v1-v4 aggregate percent: 73% (gate threshold: 65%, **REACHED 2026-06-10 D-86**)
 - v2.5 percent: 65% (gate threshold: 65%, REACHED 2026-06-10 D-82)
 - v2.5 implementation gate: reached
 - **Aggregate implementation gate: REACHED 2026-06-10 D-86**

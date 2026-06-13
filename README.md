@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + v3/v4 evidence-gate sprint + v5/v6 seed deepening
-- Current sprint: D136-D140 complete (SIGKILL/restore, trace spans, distributed seed, hardening bootstrap, scorecard update)
+- Current sprint: D136-D143 complete (SIGKILL/restore, trace spans, distributed seed, hardening bootstrap, scorecard update, Gate-1 preferred pass, Gate-2 multi-scenario, Agent OS orchestration tests)
 - Default registry: 21 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -24,8 +24,8 @@
 - Gate-2 limit: this does not prove v1-v4 production readiness.
 - Gate-2 limit: this does not unlock Browser, Desktop, Channel, media, or productivity defaults.
 - Gate-1 minimum evidence: Vite target has 86,216 supported LOC and remains a minimum-50k pass target.
-- Gate-1 preferred status: preferred-available
-- Gate-1 preferred evidence: React target has 753,902 supported LOC (preferred-100k qualified)
+- Gate-1 preferred status: preferred-passed
+- Gate-1 preferred evidence: React target has 753,902 supported LOC (preferred-100k qualified, createElement -> ReactElement call chain verified, D-141)
 - Gate-1 preferred report: docs/superpowers/gate-1-preferred-targets.json
 - Gate-1.5 evidence kind: live-browser
 - Gate-1.5 algorithmic decision: continue
@@ -119,6 +119,9 @@
 - D137 v5.0 observability 3rd cycle trace span seed: TraceSpanStore class with startSpan/endSpan/getSpan/getSpansByTrace/getSpansByParent/list/size/clear + TraceSpanId branded type + TraceSpan interface with OpenTelemetry-compatible fields + 4 unit tests. Observability+auditability theme now covers write + read + render + trace spans.
 - D138 v6.0 Theme 3 distributed coordination seed: DistributedLockManager (lease-based, in-memory, acquire/release/renew with TTL expiry) + DistributedEventAggregator (merges audit logs from multiple instances with conflict detection) + branded types + 2 test files.
 - D139 v5.0 production hardening bootstrap: bootstrapHardening function wires D-96/D-97/D-98/D-99 into a single idempotent call with HardeningBootstrapOptions/Result interfaces; wired into REPL bootstrap path.
+- D141 Gate-1 preferred-100k pass: React target (753,902 LOC) now has verified createElement -> ReactElement call chain evidence; Gate-1 preferred status advances from available to passed.
+- D142 Gate-2 multi-scenario evidence: 2 new fixtures added (code-refactor, bug-investigation); v3 production replay suite expanded from 3 to 5 default-profile replay scenarios; Gate-2 multi-scenario evidence now covers 5 scenarios.
+- D143 Agent OS orchestration integration tests: 4 new TaskOrchestrator test cases covering task lifecycle management, task dependency resolution, error recovery, and concurrent task execution.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -126,11 +129,11 @@
 | Milestone | Current evidence-backed status | Main gap |
 | --- | --- | --- |
 | v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | v1.0 ship ritual remains gated on user approval; other v1-v4 blockers remain separate |
-| v1.5 | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 evidence exists via React target | rename_symbol remains heuristic, not IDE-grade |
+| v1.5 | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 PASSES via React target | rename_symbol remains heuristic, not IDE-grade |
 | v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence; D128 precheck makes Tier-1 status machine-readable; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row; D131 closes the MCP Runtime Tier-2 row; D132 closes the Automation Tier-2 row; D133 closes the Remote TUI Tier-2 row | D133 Remote TUI is an injected-transport protocol/session proof, not a full WebSocket/app-server implementation |
 | v2.5 | Planner/DAG/cache modules exist | Integration into the main agent loop is still limited |
-| v3.0 | Reviewer and Gate-2 harness exist; current Gate-2 live evidence passes; D134 adds a v3/v4 production precheck; D135 adds multi-scenario default-profile replay evidence | D135 replay evidence is not a new live external Gate-2 run; v1-v4 production completion is not claimed |
-| v4.0 | Researcher, TaskGraph, memory, channel foundations exist; D136 closes the v4-cross-platform-sigkill blocker; v3/v4 production precheck passes all 7 checks | Agent OS orchestration, Desktop, and channels are not production-complete |
+| v3.0 | Reviewer and Gate-2 harness exist; current Gate-2 live evidence passes; D134 adds a v3/v4 production precheck; D135 adds multi-scenario default-profile replay evidence; D142 expands Gate-2 multi-scenario evidence to 5 scenarios | D135/D142 replay evidence is not a new live external Gate-2 run; v1-v4 production completion is not claimed |
+| v4.0 | Researcher, TaskGraph, memory, channel foundations exist; D136 closes the v4-cross-platform-sigkill blocker; v3/v4 production precheck passes all 7 checks; D143 adds Agent OS orchestration integration tests (4 TaskOrchestrator cases) | Agent OS orchestration now has integration tests but is not production-complete; Desktop and channels are not production-complete |
 
 ### Current Policy
 
@@ -144,7 +147,7 @@
 
 ### Next Work
 
-1. D136-D140 complete: v4 cross-platform SIGKILL/restore evidence (D136), v5 trace span observability (D137), v6 distributed coordination seed (D138), v5 hardening bootstrap (D139), scorecard and docs update (D140).
+1. D136-D143 complete: v4 cross-platform SIGKILL/restore evidence (D136), v5 trace span observability (D137), v6 distributed coordination seed (D138), v5 hardening bootstrap (D139), scorecard and docs update (D140), Gate-1 preferred pass (D141), Gate-2 multi-scenario evidence (D142), Agent OS orchestration tests (D143).
 2. v5/v6 seed work continues: production hardening bootstrap is wired, trace spans seed exists, distributed coordination seed exists. Next v5 sub-sprints expand each theme.
 3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
 4. Continue v1-v4 completion only through verified gates.
