@@ -50,7 +50,7 @@
     {
       "id": "v2.0",
       "percent": 70,
-      "status": "memory, Browser, and MCP foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence; D128 adds a machine-readable v2.0 Tier-1 precheck; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row from existing implementation and integration evidence; D131 closes the MCP Runtime Tier-2 row with a one-server stdio JSON-RPC transport proof",
+      "status": "memory, Browser, MCP, and Automation foundations exist; Gate-1.5 binding achieved at 20/20 completed live Browser tasks (D-117 through D-125); Browser enhancement unlocked; D126 adds Browser Tier-1 pure-function foundation; D127 adds explainable Memory Ranking and heuristic Code Intel semantic fallback evidence; D128 adds a machine-readable v2.0 Tier-1 precheck; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row from existing implementation and integration evidence; D131 closes the MCP Runtime Tier-2 row with a one-server stdio JSON-RPC transport proof; D132 closes the Automation Tier-2 row with an injected runner and persisted run-record proof",
       "evidence": [
         "memory modules exist",
         "Browser foundation modules exist behind opt-in surfaces",
@@ -74,12 +74,12 @@
         "D128 adds a machine-readable v2.0 Tier-1 precheck: Browser helper evidence, Memory Ranking evidence, Code Intel semantic fallback evidence, and default-exposure invariants pass; production Browser automation, visual grounding, and Tier-2 blockers remain blocked",
         "D129 adds a production Browser proof recorder with an injected adapter contract: the evidence records an ordered navigate/type/click/observe/visual-snapshot transcript, validates visual snapshot metadata, keeps raw screenshot bytes out of repository evidence, and leaves default exposure unchanged",
         "D130 closes the v2.0 Tier-2 Compaction row using existing implementation and integration evidence: core session compaction, agent tool-loop compaction, print/RPC compaction configuration paths, lifecycle hook tests, and cross-protocol compaction smoke coverage",
-        "D131 closes the v2.0 Tier-2 MCP Runtime row with a one-server stdio JSON-RPC transport proof: coding-agent starts the gh-search MCP server, completes initialize/tools-list/tools-call, registers discovered tools behind the opt-in mcp profile, and keeps the default registry unchanged"
+        "D131 closes the v2.0 Tier-2 MCP Runtime row with a one-server stdio JSON-RPC transport proof: coding-agent starts the gh-search MCP server, completes initialize/tools-list/tools-call, registers discovered tools behind the opt-in mcp profile, and keeps the default registry unchanged",
+        "D132 closes the v2.0 Tier-2 Automation row with an injected runner execution proof: enabled CronStore jobs execute through AutomationRuntime, disabled jobs are skipped, success and failed outcomes are persisted to cron/runs.json, and one failed job does not stop later enabled jobs"
       ],
       "blockers": [
         "default registry must remain coding plus Code Intel essentials",
         "D129 proves the production Browser adapter contract and visual-grounding metadata path, but it is not a live external Browser run",
-        "Tier-2 Automation remains blocked",
         "Tier-2 Remote TUI remains blocked"
       ]
     },
@@ -140,7 +140,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D132: close another remaining v2.0 Tier-2 blocker without expanding default exposure.",
+    "D133: close or explicitly defer the remaining v2.0 Tier-2 Remote TUI blocker without expanding default exposure.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]

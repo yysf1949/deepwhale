@@ -224,7 +224,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D132: close another remaining v2.0 Tier-2 blocker without expanding default exposure.',
+      'D133: close or explicitly defer the remaining v2.0 Tier-2 Remote TUI blocker without expanding default exposure.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
       'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
     ]);
@@ -269,6 +269,7 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecardMd).toContain('D129 adds a production Browser proof recorder with an injected adapter contract');
     expect(scorecardMd).toContain('D130 closes the v2.0 Tier-2 Compaction row');
     expect(scorecardMd).toContain('D131 closes the v2.0 Tier-2 MCP Runtime row');
+    expect(scorecardMd).toContain('D132 closes the v2.0 Tier-2 Automation row');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
@@ -362,11 +363,11 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D131', () => {
+  it('keeps the current sprint and next-work pointers aligned after D132', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D131 v2.0 Tier-2 MCP Runtime closure');
+      expect(block).toContain('Current sprint: D132 v2.0 Tier-2 Automation closure');
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -431,13 +432,16 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D129 production Browser proof:');
       expect(block).toContain('D130 v2.0 Tier-2 Compaction closure:');
       expect(block).toContain('D131 v2.0 Tier-2 MCP Runtime closure:');
-      expect(block).toContain('Next implementation slice: D132');
+      expect(block).toContain('D132 v2.0 Tier-2 Automation closure:');
+      expect(block).toContain('Next implementation slice: D133');
       expect(block).toContain('Gate-1.5 evidence kind: live-browser');
       expect(block).toContain('Gate-1.5 binding: true');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
       expect(block).toContain('v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json');
       expect(block).toContain('v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D131/i);
+      expect(block).not.toMatch(/Next implementation slice: D132 close another/i);
       expect(block).not.toMatch(/Current sprint: D130/i);
       expect(block).not.toMatch(/Next implementation slice: D131/i);
       expect(block).not.toMatch(/Current sprint: D129/i);

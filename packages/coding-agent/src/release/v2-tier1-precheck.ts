@@ -54,7 +54,7 @@ export interface V2Tier1PrecheckInput {
 }
 
 export interface V2Tier1PrecheckResult {
-  slice: 'D131';
+  slice: 'D132';
   milestone: 'v2.0';
   tier: 'Tier-1';
   passed: boolean;
@@ -253,6 +253,54 @@ export const DEFAULT_V2_TIER1_PRECHECK_EVIDENCE: readonly V2Tier1EvidenceRef[] =
     note: 'D129 machine-readable visual-grounding proof snapshot.',
   },
   {
+    id: 'd132-automation-runtime-source',
+    checkId: 'tier2-automation',
+    path: 'packages/coding-agent/src/util/automation-runtime.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D132 injected automation runtime executes enabled CronStore jobs through a caller-provided runner and records outcomes.',
+  },
+  {
+    id: 'd132-cron-store-source',
+    checkId: 'tier2-automation',
+    path: 'packages/coding-agent/src/util/cron-store.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D132 CronStore persists success and failed automation run records in cron/runs.json.',
+  },
+  {
+    id: 'd132-cron-daemon-source',
+    checkId: 'tier2-automation',
+    path: 'packages/coding-agent/src/util/cron-daemon.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D132 reuses the existing CronDaemon timer/listing boundary for enabled-job ticks.',
+  },
+  {
+    id: 'd132-automation-runtime-test',
+    checkId: 'tier2-automation',
+    path: 'packages/coding-agent/test/unit/automation-runtime.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D132 runtime coverage for injected runner execution, disabled-job skipping, success records, failure records, and continue-after-failure behavior.',
+  },
+  {
+    id: 'd132-cron-store-test',
+    checkId: 'tier2-automation',
+    path: 'packages/coding-agent/test/unit/cron-store.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D132 CronStore run-record persistence coverage.',
+  },
+  {
+    id: 'd132-cron-daemon-test',
+    checkId: 'tier2-automation',
+    path: 'packages/coding-agent/test/unit/cron-daemon.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D132 continues to rely on existing CronDaemon timer and enabled-job filtering coverage.',
+  },
+  {
     id: 'd130-compaction-core-source',
     checkId: 'tier2-compaction',
     path: 'packages/core/src/session/compaction.ts',
@@ -401,7 +449,8 @@ const CHECK_CAVEATS: Record<V2Tier1PrecheckCheckId, string> = {
     'Adapter-contract proof with transcript evidence; not default Browser exposure.',
   'visual-grounding':
     'Visual snapshot metadata proof; raw screenshot bytes are not stored in repository evidence.',
-  'tier2-automation': 'Automation remains a separate Tier-2 blocker.',
+  'tier2-automation':
+    'Injected runner plus persisted run-record proof; not a full hosted/no-agent automation service.',
   'tier2-remote-tui': 'Remote TUI remains a separate Tier-2 blocker.',
   'tier2-compaction':
     'Compaction has implementation and integration evidence, but this does not complete v2.0.',
@@ -410,7 +459,6 @@ const CHECK_CAVEATS: Record<V2Tier1PrecheckCheckId, string> = {
 };
 
 const BLOCKED_CHECKS: ReadonlyMap<V2Tier1PrecheckCheckId, string> = new Map([
-  ['tier2-automation', 'Tier-2 Automation remains blocked'],
   ['tier2-remote-tui', 'Tier-2 Remote TUI remains blocked'],
 ]);
 
@@ -448,20 +496,20 @@ export function evaluateV2Tier1Precheck(input: V2Tier1PrecheckInput = {}): V2Tie
     ]),
   );
   return {
-    slice: 'D131',
+    slice: 'D132',
     milestone: 'v2.0',
     tier: 'Tier-1',
     passed,
     summary: passed
       ? 'v2.0 Tier-1 precheck passed.'
-      : 'v2.0 Tier-1 evidence plus Tier-2 Compaction and MCP Runtime evidence are present, but v2.0 is not release-ready.',
+      : 'v2.0 Tier-1 evidence plus Tier-2 Automation, Compaction, and MCP Runtime evidence are present, but v2.0 is not release-ready.',
     completedChecks: checks.filter((check) => check.status === 'pass').length,
     blockingChecks: checks.filter((check) => check.status !== 'pass').length,
     checks,
     blockers,
     nextActions: [
-      'D132: close another remaining v2.0 Tier-2 blocker without expanding default exposure.',
-      'Keep remaining Tier-2 v2.0 blockers separate from Compaction and MCP Runtime evidence.',
+      'D133: close or explicitly defer the remaining v2.0 Tier-2 Remote TUI blocker without expanding default exposure.',
+      'Keep the remaining Tier-2 v2.0 Remote TUI blocker separate from Automation, Compaction, and MCP Runtime evidence.',
       'Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure.',
     ],
     defaultExposure,

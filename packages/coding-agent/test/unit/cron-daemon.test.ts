@@ -1,9 +1,8 @@
 /**
- * D-30.3.4: Cron daemon stub (后台 setInterval 跑, 拍板 stub).
+ * D-30.3.4/D132: Cron daemon timer boundary.
  *
- * 拍板 (D-30.3): CronDaemon.start(60_000) tick 调 store.list(), 对每个 enabled
- *   job 调 onTick(job). 拍板 stub, 实调 (跑 prompt, 调 LLM) 留 D-30.4.
- * - 0 改业务, 5 红线 0 触碰
+ * The daemon lists jobs on each tick and invokes an injected handler for enabled
+ * jobs. AutomationRuntime supplies the D132 execution and run-record layer.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';

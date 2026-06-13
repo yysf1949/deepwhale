@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Work mode: stabilization + v2.0 Tier-1 implementation sprint
-- Current sprint: D131 v2.0 Tier-2 MCP Runtime closure
+- Current sprint: D132 v2.0 Tier-2 Automation closure
 - Default registry: 21 tools, limited to coding plus Code Intel essentials
 - Non-coding expansion: frozen by default
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -109,6 +109,7 @@
 - D129 production Browser proof: a pure injected adapter contract now records an ordered Browser automation transcript plus visual snapshot metadata proof, moving production Browser automation and visual grounding to Tier-1 pass while keeping Tier-2 blockers explicit and defaults narrow.
 - D130 v2.0 Tier-2 Compaction closure: Compaction is now a pass row in the v2.0 precheck using core/session compaction, agent tool-loop compaction, print/RPC configuration paths, lifecycle hook tests, and cross-protocol smoke evidence while Automation, Remote TUI, and MCP Runtime remain blocked.
 - D131 v2.0 Tier-2 MCP Runtime closure: MCP Runtime is now a pass row in the v2.0 precheck using a one-server stdio JSON-RPC transport proof against the gh-search MCP server, opt-in capability registration, and client/server roundtrip tests while Automation and Remote TUI remain blocked.
+- D132 v2.0 Tier-2 Automation closure: Automation is now a pass row in the v2.0 precheck using an injected runner execution proof, persisted cron run records, and runtime/store/daemon tests while Remote TUI remains blocked.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 
 ### Capability Progress
@@ -117,7 +118,7 @@
 | --- | --- | --- |
 | v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | v1.0 ship ritual remains gated on user approval; other v1-v4 blockers remain separate |
 | v1.5 | Code Intel foundation exists and is labeled heuristic; preferred 100K Gate-1 evidence exists via React target | rename_symbol remains heuristic, not IDE-grade |
-| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence; D128 precheck makes Tier-1 status machine-readable; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row; D131 closes the MCP Runtime Tier-2 row | Automation and Remote TUI remain blocked |
+| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence; D128 precheck makes Tier-1 status machine-readable; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row; D131 closes the MCP Runtime Tier-2 row; D132 closes the Automation Tier-2 row | Remote TUI remains blocked |
 | v2.5 | Planner/DAG/cache modules exist | Integration into the main agent loop is still limited |
 | v3.0 | Reviewer and Gate-2 harness exist; current Gate-2 live evidence passes | Long-horizon evidence must stay honest and reproducible |
 | v4.0 | Researcher, TaskGraph, memory, channel foundations exist | Agent OS, Desktop, channels, and production orchestration are not complete |
@@ -134,8 +135,8 @@
 
 ### Next Work
 
-1. D131 v2.0 Tier-2 MCP Runtime closure is complete at the precheck layer: one-server stdio MCP transport evidence is machine-readable, while Automation and Remote TUI remain blocked.
-2. Next implementation slice: D132 close another remaining v2.0 Tier-2 blocker without expanding default exposure.
+1. D132 v2.0 Tier-2 Automation closure is complete at the precheck layer: injected runner execution and persisted run-record evidence are machine-readable, while Remote TUI remains blocked.
+2. Next implementation slice: D133 close or explicitly defer the remaining v2.0 Tier-2 Remote TUI blocker without expanding default exposure.
 3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
@@ -237,7 +238,7 @@
 - D130 plan: docs/superpowers/plans/2026-06-13-d130-v2-tier2-compaction-closure.md
 - D131 plan: docs/superpowers/plans/2026-06-13-d131-v2-tier2-mcp-runtime-closure.md
 - v1.0 fresh release gate: docs/superpowers/v1.0-fresh-release-gate.json
-- Last status hygiene sprint: D131.
+- Last status hygiene sprint: D132.
 
 <!-- status:current:end -->
 

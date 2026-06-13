@@ -49,4 +49,31 @@ describe('cron store (D-30.1δ.9)', () => {
     expect(jobs).toHaveLength(1);
     expect(jobs[0]?.prompt).toBe('tick');
   });
+
+  it('records and lists cron run records', async () => {
+    const store = new CronStore(dir);
+    await store.recordRun({
+      runId: 'run-1',
+      jobId: 'j1',
+      schedule: '* * * * *',
+      prompt: 'summarize repo',
+      status: 'success',
+      startedAt: '2026-06-13T00:00:00.000Z',
+      finishedAt: '2026-06-13T00:00:01.000Z',
+      output: 'done',
+    });
+
+    expect(await store.listRuns()).toEqual([
+      {
+        runId: 'run-1',
+        jobId: 'j1',
+        schedule: '* * * * *',
+        prompt: 'summarize repo',
+        status: 'success',
+        startedAt: '2026-06-13T00:00:00.000Z',
+        finishedAt: '2026-06-13T00:00:01.000Z',
+        output: 'done',
+      },
+    ]);
+  });
 });
