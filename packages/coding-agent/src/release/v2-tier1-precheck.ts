@@ -54,7 +54,7 @@ export interface V2Tier1PrecheckInput {
 }
 
 export interface V2Tier1PrecheckResult {
-  slice: 'D132';
+  slice: 'D133';
   milestone: 'v2.0';
   tier: 'Tier-1';
   passed: boolean;
@@ -301,6 +301,30 @@ export const DEFAULT_V2_TIER1_PRECHECK_EVIDENCE: readonly V2Tier1EvidenceRef[] =
     note: 'D132 continues to rely on existing CronDaemon timer and enabled-job filtering coverage.',
   },
   {
+    id: 'd133-remote-tui-session-source',
+    checkId: 'tier2-remote-tui',
+    path: 'packages/coding-agent/src/remote-tui/session.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D133 authenticated injected-transport Remote TUI session bridge with hello, input, resize, output, and close semantics.',
+  },
+  {
+    id: 'd133-remote-tui-index-source',
+    checkId: 'tier2-remote-tui',
+    path: 'packages/coding-agent/src/remote-tui/index.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D133 package-local Remote TUI export boundary.',
+  },
+  {
+    id: 'd133-remote-tui-session-test',
+    checkId: 'tier2-remote-tui',
+    path: 'packages/coding-agent/test/unit/remote-tui-session.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D133 coverage for authenticated handshake, unauthorized rejection, input/resize forwarding, output sequencing, and close behavior.',
+  },
+  {
     id: 'd130-compaction-core-source',
     checkId: 'tier2-compaction',
     path: 'packages/core/src/session/compaction.ts',
@@ -451,16 +475,15 @@ const CHECK_CAVEATS: Record<V2Tier1PrecheckCheckId, string> = {
     'Visual snapshot metadata proof; raw screenshot bytes are not stored in repository evidence.',
   'tier2-automation':
     'Injected runner plus persisted run-record proof; not a full hosted/no-agent automation service.',
-  'tier2-remote-tui': 'Remote TUI remains a separate Tier-2 blocker.',
+  'tier2-remote-tui':
+    'Authenticated injected-transport protocol/session proof only; not a full WebSocket server, browser UI, TLS/auth stack, reconnect layer, or hosted app-server.',
   'tier2-compaction':
     'Compaction has implementation and integration evidence, but this does not complete v2.0.',
   'tier2-mcp-runtime':
     'One-server stdio JSON-RPC transport proof; not a full multiplexed MCP runtime with auth, reconnect, HTTP/SSE, resources, prompts, or subscriptions.',
 };
 
-const BLOCKED_CHECKS: ReadonlyMap<V2Tier1PrecheckCheckId, string> = new Map([
-  ['tier2-remote-tui', 'Tier-2 Remote TUI remains blocked'],
-]);
+const BLOCKED_CHECKS: ReadonlyMap<V2Tier1PrecheckCheckId, string> = new Map();
 
 const NON_CODING_DEFAULT_PATTERNS: readonly RegExp[] = [
   /^browser_(?!action$|js$)/i,
@@ -496,20 +519,20 @@ export function evaluateV2Tier1Precheck(input: V2Tier1PrecheckInput = {}): V2Tie
     ]),
   );
   return {
-    slice: 'D132',
+    slice: 'D133',
     milestone: 'v2.0',
     tier: 'Tier-1',
     passed,
     summary: passed
-      ? 'v2.0 Tier-1 precheck passed.'
-      : 'v2.0 Tier-1 evidence plus Tier-2 Automation, Compaction, and MCP Runtime evidence are present, but v2.0 is not release-ready.',
+      ? 'v2.0 Tier-1 precheck passed with Tier-2 Automation, Remote TUI, Compaction, and MCP Runtime evidence rows closed at their stated caveat boundaries.'
+      : 'v2.0 Tier-1 evidence plus Tier-2 evidence rows are incomplete or drifted; v2.0 remains not release-ready until the listed blockers are resolved.',
     completedChecks: checks.filter((check) => check.status === 'pass').length,
     blockingChecks: checks.filter((check) => check.status !== 'pass').length,
     checks,
     blockers,
     nextActions: [
-      'D133: close or explicitly defer the remaining v2.0 Tier-2 Remote TUI blocker without expanding default exposure.',
-      'Keep the remaining Tier-2 v2.0 Remote TUI blocker separate from Automation, Compaction, and MCP Runtime evidence.',
+      'D134: advance v3.0/v4.0 production gate evidence without expanding default exposure.',
+      'Keep Remote TUI caveated as an authenticated injected-transport protocol/session proof until a full WebSocket/app-server implementation exists.',
       'Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure.',
     ],
     defaultExposure,

@@ -1,12 +1,12 @@
 {
-  "slice": "D132",
+  "slice": "D133",
   "generatedAt": "2026-06-13T00:00:00.000Z",
   "milestone": "v2.0",
   "tier": "Tier-1",
-  "passed": false,
-  "summary": "v2.0 Tier-1 evidence plus Tier-2 Automation, Compaction, and MCP Runtime evidence are present, but v2.0 is not release-ready.",
-  "completedChecks": 9,
-  "blockingChecks": 1,
+  "passed": true,
+  "summary": "v2.0 Tier-1 precheck passed with Tier-2 Automation, Remote TUI, Compaction, and MCP Runtime evidence rows closed at their stated caveat boundaries.",
+  "completedChecks": 10,
+  "blockingChecks": 0,
   "checks": [
     {
       "id": "browser-tier1-foundation",
@@ -100,10 +100,14 @@
     {
       "id": "tier2-remote-tui",
       "label": "Tier-2 Remote TUI",
-      "status": "blocked",
+      "status": "pass",
       "requiredForRelease": true,
-      "blocker": "Tier-2 Remote TUI remains blocked",
-      "caveat": "Remote TUI remains a separate Tier-2 blocker."
+      "evidence": [
+        "packages/coding-agent/src/remote-tui/session.ts",
+        "packages/coding-agent/src/remote-tui/index.ts",
+        "packages/coding-agent/test/unit/remote-tui-session.test.ts"
+      ],
+      "caveat": "Authenticated injected-transport protocol/session proof only; not a full WebSocket server, browser UI, TLS/auth stack, reconnect layer, or hosted app-server."
     },
     {
       "id": "tier2-compaction",
@@ -138,9 +142,7 @@
       "caveat": "One-server stdio JSON-RPC transport proof; not a full multiplexed MCP runtime with auth, reconnect, HTTP/SSE, resources, prompts, or subscriptions."
     }
   ],
-  "blockers": [
-    "Tier-2 Remote TUI remains blocked"
-  ],
+  "blockers": [],
   "defaultExposure": {
     "toolCount": 21,
     "expectedToolCount": 21,
@@ -171,8 +173,8 @@
     "caveat": "browser_action and browser_js are coding-surface helpers in the default registry, not production Browser completion proof."
   },
   "nextActions": [
-    "D133: close or explicitly defer the remaining v2.0 Tier-2 Remote TUI blocker without expanding default exposure.",
-    "Keep the remaining Tier-2 v2.0 Remote TUI blocker separate from Automation, Compaction, and MCP Runtime evidence.",
+    "D134: advance v3.0/v4.0 production gate evidence without expanding default exposure.",
+    "Keep Remote TUI caveated as an authenticated injected-transport protocol/session proof until a full WebSocket/app-server implementation exists.",
     "Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure."
   ]
 }
