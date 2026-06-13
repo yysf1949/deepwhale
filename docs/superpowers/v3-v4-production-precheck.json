@@ -1,0 +1,99 @@
+{
+  "slice": "D134",
+  "generatedAt": "2026-06-13T00:00:00.000Z",
+  "scope": "v3.0/v4.0 production evidence",
+  "passed": false,
+  "summary": "v3.0/v4.0 production precheck is expected to fail overall; v3 production breadth and v4 cross-platform SIGKILL/restore evidence remain blockers.",
+  "completedChecks": 5,
+  "blockingChecks": 2,
+  "checks": [
+    {
+      "id": "v3-gate2-live-fixture",
+      "label": "v3.0 Gate-2 live fixture",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/long-horizon/gate2.ts",
+        "packages/coding-agent/test/unit/gate2-long-horizon.test.ts",
+        "docs/superpowers/gate-2-long-horizon-live.json",
+        "docs/superpowers/gate2-live-trace.json"
+      ],
+      "caveat": "Default-profile live fixture evidence only; not broad production long-horizon breadth."
+    },
+    {
+      "id": "v3-reviewer-gate-boundary",
+      "label": "v3.0 Reviewer gate boundary",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/reviewer/gates.ts",
+        "packages/coding-agent/test/integration/tool-loop-policy.test.ts"
+      ],
+      "caveat": "Reviewer gate boundary integration evidence; not full reviewer-driven production proof."
+    },
+    {
+      "id": "v3-production-breadth",
+      "label": "v3.0 production breadth",
+      "status": "blocked",
+      "requiredForRelease": true,
+      "blocker": "v3.0 production breadth needs multi-scenario long-horizon replay evidence",
+      "caveat": "Blocked: multi-scenario production long-horizon replay evidence is not yet present."
+    },
+    {
+      "id": "v4-cross-session-agent-os",
+      "label": "v4.0 cross-session Agent OS",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/agent/persisting-task-graph-recorder.ts",
+        "packages/coding-agent/test/unit/persisting-task-graph-recorder.test.ts"
+      ],
+      "caveat": "Deterministic cross-session JSONL fixture evidence; not real Agent OS orchestration proof."
+    },
+    {
+      "id": "v4-persistent-memory-recovery",
+      "label": "v4.0 persistent memory recovery",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/memory/persistent-store.ts",
+        "packages/coding-agent/test/unit/persistent-memory.test.ts"
+      ],
+      "caveat": "Atomic write + partial-last-line recovery evidence; not real cross-platform SIGKILL tests."
+    },
+    {
+      "id": "v4-cross-platform-sigkill",
+      "label": "v4.0 cross-platform SIGKILL/restore",
+      "status": "blocked",
+      "requiredForRelease": true,
+      "blocker": "v4.0 cross-platform SIGKILL/restore evidence is missing",
+      "caveat": "Blocked: real cross-platform SIGKILL/restore evidence is not yet present."
+    },
+    {
+      "id": "default-exposure",
+      "label": "Default registry exposure invariant",
+      "status": "pass",
+      "requiredForRelease": true,
+      "evidence": [
+        "packages/coding-agent/src/tools/registry.ts",
+        "packages/coding-agent/test/unit/default-registry-invariant.test.ts"
+      ],
+      "caveat": "Narrow default must remain coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
+    }
+  ],
+  "blockers": [
+    "v3.0 production breadth needs multi-scenario long-horizon replay evidence",
+    "v4.0 cross-platform SIGKILL/restore evidence is missing"
+  ],
+  "defaultExposure": {
+    "toolCount": 21,
+    "expectedToolCount": 21,
+    "nonCodingDefaultEnabled": false,
+    "caveat": "Narrow default registry (21 tools: coding + Code Intel essentials); non-coding surfaces require explicit opt-in."
+  },
+  "nextActions": [
+    "D135: record multi-scenario v3.0 production long-horizon replay evidence without expanding default exposure.",
+    "D136: record real cross-platform v4.0 SIGKILL/restore evidence without expanding default exposure.",
+    "Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure."
+  ]
+}

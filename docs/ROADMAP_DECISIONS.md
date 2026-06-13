@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D133 v2.0 Tier-2 Remote TUI closure
+- Current sprint: D134 v3/v4 production precheck
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -46,6 +46,7 @@
 - Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json
 - v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json
 - v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json
+- v3/v4 production precheck: docs/superpowers/v3-v4-production-precheck.json
 
 ### Completed Stabilization Slices
 
@@ -121,6 +122,7 @@
 - D131 v2.0 Tier-2 MCP Runtime closure: MCP Runtime is now a pass row in the v2.0 precheck using a one-server stdio JSON-RPC transport proof against the gh-search MCP server, opt-in capability registration, and client/server roundtrip tests while Automation and Remote TUI remain blocked.
 - D132 v2.0 Tier-2 Automation closure: Automation is now a pass row in the v2.0 precheck using an injected runner execution proof, persisted cron run records, and runtime/store/daemon tests.
 - D133 v2.0 Tier-2 Remote TUI closure: Remote TUI now has an authenticated injected-transport protocol/session proof covering handshake, unauthorized rejection, input/resize forwarding, output sequencing, and deterministic close behavior; this is not a full WebSocket/app-server implementation.
+- D134 v3/v4 production precheck: machine-readable v3/v4 evidence matrix added; production breadth and cross-platform SIGKILL remain blockers.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -138,8 +140,8 @@
 
 ### Next Decisions Needed
 
-1. D133 v2.0 Tier-2 Remote TUI closure is complete at the precheck layer: authenticated injected-transport protocol/session evidence is machine-readable, while full WebSocket/app-server delivery remains outside this proof.
-2. Next implementation slice: D134 advance v3.0/v4.0 production gate evidence without expanding default exposure.
+1. D134 v3/v4 production precheck is complete at the evidence-matrix layer: current v3/v4 fixture evidence is machine-readable, while production breadth and cross-platform SIGKILL remain blocked.
+2. Next implementation slice: D135 record multi-scenario v3.0 production long-horizon replay evidence without expanding default exposure.
 3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.

@@ -7,7 +7,8 @@
     "gate2LiveReport": "docs/superpowers/gate-2-long-horizon-live.json",
     "masterPlan": "docs/superpowers/plans/2026-06-09-v1-to-v4-master-execution-plan.md",
     "v2Tier1Precheck": "docs/superpowers/v2-tier1-precheck.json",
-    "v2ProductionBrowserProof": "docs/superpowers/v2-production-browser-proof.json"
+    "v2ProductionBrowserProof": "docs/superpowers/v2-production-browser-proof.json",
+    "v3v4ProductionPrecheck": "docs/superpowers/v3-v4-production-precheck.json"
   },
   "aggregatePercent": 70,
   "milestones": [
@@ -104,11 +105,12 @@
     {
       "id": "v3.0",
       "percent": 55,
-      "status": "Reviewer and Gate-2 runner exist; current Gate-2 live fixture passes under default profile; inclusive 30-50 boundary fixture present (D-85)",
+      "status": "Reviewer and Gate-2 runner exist; current Gate-2 live fixture passes under default profile; inclusive 30-50 boundary fixture present (D-85); D134 adds a machine-readable v3/v4 production precheck that keeps production breadth blocked",
       "evidence": [
         "Reviewer modules exist",
         "Gate-2 live evidence is passed_live=true with toolCalls=31 and registryProfile=default",
-        "D85 records a v3.0 Gate-2 long-horizon boundary fixture: 2 new tests assert the inclusive 30-50 tool-call range at exact boundaries (30 and 50) and just outside (29 and 51)"
+        "D85 records a v3.0 Gate-2 long-horizon boundary fixture: 2 new tests assert the inclusive 30-50 tool-call range at exact boundaries (30 and 50) and just outside (29 and 51)",
+        "D134 records a v3/v4 production precheck: Gate-2 live fixture and Reviewer gate boundary evidence pass, but v3 production breadth remains blocked until multi-scenario long-horizon replay evidence exists"
       ],
       "blockers": [
         "Gate-2 evidence is a default-profile invoice fixture pass, not broad long-horizon production proof",
@@ -118,13 +120,14 @@
     {
       "id": "v4.0",
       "percent": 50,
-      "status": "Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present",
+      "status": "Researcher, TaskGraph, memory, and channel foundations exist; cross-session memory crash/reload evidence plus multi-hop cross-session TaskGraph persistence evidence fixtures present; D134 records these in the v3/v4 production precheck while keeping cross-platform SIGKILL blocked",
       "evidence": [
         "Researcher and TaskGraph modules exist",
         "persistent memory and channel foundation modules exist",
         "D78 records atomic write semantics plus partial-last-line recovery for the persistent memory store",
         "D80 records cross-session TaskGraph persistence: a second PersistingTaskGraphRecorder instance loaded from the same file sees the first instance's records (D-78 storage layer + D-80 Agent OS layer)",
-        "D86 records multi-hop cross-session handoff: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances"
+        "D86 records multi-hop cross-session handoff: 3 instances (A writes 3, B writes 2, C reads all 5 in order) verify the JSONL format supports Agent OS session handoffs with multiple intermediate instances",
+        "D134 records a v3/v4 production precheck: v4 cross-session Agent OS and persistent memory recovery evidence pass, but cross-platform SIGKILL/restore remains blocked"
       ],
       "blockers": [
         "Agent OS orchestration is not production-complete",
@@ -141,7 +144,7 @@
     "Default registry exposure remains coding plus Code Intel essentials; non-coding surfaces require explicit opt-in."
   ],
   "nextActions": [
-    "D134: advance v3.0/v4.0 production gate evidence without expanding default exposure.",
+    "D135: record multi-scenario v3.0 production long-horizon replay evidence without expanding default exposure.",
     "Continue preferred-100k Gate-1 search only when a local 100K+ target is available.",
     "Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures."
   ]

@@ -224,10 +224,11 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecard.caveats).toContain('Gate-2 default-profile fixture pass is not v1-v4 production completion.');
     expect(scorecard.caveats).toContain('Gate-1 minimum-50k evidence is not preferred-100k evidence.');
     expect(scorecard.nextActions).toEqual([
-      'D134: advance v3.0/v4.0 production gate evidence without expanding default exposure.',
+      'D135: record multi-scenario v3.0 production long-horizon replay evidence without expanding default exposure.',
       'Continue preferred-100k Gate-1 search only when a local 100K+ target is available.',
       'Keep Gate-2 production, cross-platform Desktop, and cross-platform SIGKILL evidence as separate future blockers rather than inferring them from unit fixtures.',
     ]);
+    expect(scorecard.nextActions.join('\n')).not.toMatch(/^D134:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D131:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D130:/m);
     expect(scorecard.nextActions.join('\n')).not.toMatch(/^D129:/m);
@@ -271,11 +272,13 @@ describe('status documentation hygiene (D-56)', () => {
     expect(scorecardMd).toContain('D131 closes the v2.0 Tier-2 MCP Runtime row');
     expect(scorecardMd).toContain('D132 closes the v2.0 Tier-2 Automation row');
     expect(scorecardMd).toContain('D133 closes the v2.0 Tier-2 Remote TUI row');
+    expect(scorecardMd).toContain('D134 adds a machine-readable v3/v4 production precheck');
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
       expect(block).toContain('Current v1-v4 scorecard: docs/superpowers/v1-v4-evidence-scorecard.json');
       expect(block).toContain('v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json');
       expect(block).toContain('v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json');
+      expect(block).toContain('v3/v4 production precheck: docs/superpowers/v3-v4-production-precheck.json');
     }
   });
 
@@ -364,11 +367,12 @@ describe('status documentation hygiene (D-56)', () => {
     }
   });
 
-  it('keeps the current sprint and next-work pointers aligned after D133', () => {
+  it('keeps the current sprint and next-work pointers aligned after D134', () => {
     for (const path of DOCS) {
       const block = currentStatusBlock(readRepoFile(path));
 
-      expect(block).toContain('Current sprint: D133 v2.0 Tier-2 Remote TUI closure');
+      expect(block).toContain('Current sprint: D134 v3/v4 production precheck');
+      expect(block).not.toMatch(/v2\.0 Tier-1 implementation/i);
       expect(block).toContain('D60 rename scanner truthfulness');
       expect(block).toContain('D61 Gate-2 drift prompt hardening');
       expect(block).toContain('D63 Code Intel heuristic metadata');
@@ -435,13 +439,17 @@ describe('status documentation hygiene (D-56)', () => {
       expect(block).toContain('D131 v2.0 Tier-2 MCP Runtime closure:');
       expect(block).toContain('D132 v2.0 Tier-2 Automation closure:');
       expect(block).toContain('D133 v2.0 Tier-2 Remote TUI closure:');
-      expect(block).toContain('Next implementation slice: D134');
+      expect(block).toContain('D134 v3/v4 production precheck:');
+      expect(block).toContain('Next implementation slice: D135');
       expect(block).toContain('Gate-1.5 evidence kind: live-browser');
       expect(block).toContain('Gate-1.5 binding: true');
       expect(block).toContain('Gate-1.5 live task ledger: docs/superpowers/gate-1.5-live-browser-tasks.json');
       expect(block).toContain('v2.0 Tier-1 precheck: docs/superpowers/v2-tier1-precheck.json');
       expect(block).toContain('v2.0 production Browser proof: docs/superpowers/v2-production-browser-proof.json');
+      expect(block).toContain('v3/v4 production precheck: docs/superpowers/v3-v4-production-precheck.json');
       expect(block).toContain('v5/v6 planning preview: docs/superpowers/v5-v6-planning-preview.json');
+      expect(block).not.toMatch(/Current sprint: D133/i);
+      expect(block).not.toMatch(/Next implementation slice: D134 advance/i);
       expect(block).not.toMatch(/Current sprint: D132/i);
       expect(block).not.toMatch(/Next implementation slice: D133 close/i);
       expect(block).not.toMatch(/Current sprint: D131/i);
