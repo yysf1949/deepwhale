@@ -1,12 +1,12 @@
 {
-  "slice": "D130",
+  "slice": "D131",
   "generatedAt": "2026-06-13T00:00:00.000Z",
   "milestone": "v2.0",
   "tier": "Tier-1",
   "passed": false,
-  "summary": "v2.0 Tier-1 evidence and Tier-2 Compaction evidence are present, but v2.0 is not release-ready.",
-  "completedChecks": 7,
-  "blockingChecks": 3,
+  "summary": "v2.0 Tier-1 evidence plus Tier-2 Compaction and MCP Runtime evidence are present, but v2.0 is not release-ready.",
+  "completedChecks": 8,
+  "blockingChecks": 2,
   "checks": [
     {
       "id": "browser-tier1-foundation",
@@ -118,16 +118,22 @@
     {
       "id": "tier2-mcp-runtime",
       "label": "Tier-2 MCP Runtime",
-      "status": "blocked",
+      "status": "pass",
       "requiredForRelease": true,
-      "blocker": "Tier-2 MCP Runtime remains blocked",
-      "caveat": "MCP Runtime remains a separate Tier-2 blocker."
+      "evidence": [
+        "packages/coding-agent/src/mcp/client.ts",
+        "packages/coding-agent/src/mcp/runtime.ts",
+        "packages/coding-agent/test/unit/mcp-client.test.ts",
+        "packages/coding-agent/test/unit/mcp-runtime.test.ts",
+        "packages/mcp-servers/gh-search/bin/gh-search-mcp.mjs",
+        "packages/mcp-servers/gh-search/test/server.test.mjs"
+      ],
+      "caveat": "One-server stdio JSON-RPC transport proof; not a full multiplexed MCP runtime with auth, reconnect, HTTP/SSE, resources, prompts, or subscriptions."
     }
   ],
   "blockers": [
     "Tier-2 Automation remains blocked",
-    "Tier-2 Remote TUI remains blocked",
-    "Tier-2 MCP Runtime remains blocked"
+    "Tier-2 Remote TUI remains blocked"
   ],
   "defaultExposure": {
     "toolCount": 21,
@@ -159,8 +165,8 @@
     "caveat": "browser_action and browser_js are coding-surface helpers in the default registry, not production Browser completion proof."
   },
   "nextActions": [
-    "D131: close another v2.0 Tier-2 blocker without expanding default exposure.",
-    "Keep remaining Tier-2 v2.0 blockers separate from Compaction evidence.",
+    "D132: close another remaining v2.0 Tier-2 blocker without expanding default exposure.",
+    "Keep remaining Tier-2 v2.0 blockers separate from Compaction and MCP Runtime evidence.",
     "Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure."
   ]
 }

@@ -2,7 +2,7 @@
 
 Generated: 2026-06-13
 
-Slice: D130
+Slice: D131
 
 Milestone: v2.0
 
@@ -10,7 +10,7 @@ Tier: Tier-1
 
 Passed: false
 
-Summary: v2.0 Tier-1 evidence and Tier-2 Compaction evidence are present, but v2.0 is not release-ready.
+Summary: v2.0 Tier-1 evidence plus Tier-2 Compaction and MCP Runtime evidence are present, but v2.0 is not release-ready.
 
 ## Checks
 
@@ -25,7 +25,7 @@ Summary: v2.0 Tier-1 evidence and Tier-2 Compaction evidence are present, but v2
 | Tier-2 Automation | blocked | tracked separately | Automation remains a separate Tier-2 blocker. |
 | Tier-2 Remote TUI | blocked | tracked separately | Remote TUI remains a separate Tier-2 blocker. |
 | Tier-2 Compaction | pass | core/session compaction, agent compaction, print/RPC integration, and compaction tests | Compaction has implementation and integration evidence, but this does not complete v2.0. |
-| Tier-2 MCP Runtime | blocked | tracked separately | MCP Runtime remains a separate Tier-2 blocker. |
+| Tier-2 MCP Runtime | pass | stdio JSON-RPC client, opt-in manifest registration, gh-search MCP server, and client/server tests | One-server stdio JSON-RPC transport proof; not a full multiplexed MCP runtime with auth, reconnect, HTTP/SSE, resources, prompts, or subscriptions. |
 
 ## Default Exposure
 
@@ -37,6 +37,6 @@ Summary: v2.0 Tier-1 evidence and Tier-2 Compaction evidence are present, but v2
 
 ## Next Actions
 
-1. D131: close another v2.0 Tier-2 blocker without expanding default exposure.
-2. Keep remaining Tier-2 v2.0 blockers separate from Compaction evidence.
+1. D132: close another remaining v2.0 Tier-2 blocker without expanding default exposure.
+2. Keep remaining Tier-2 v2.0 blockers separate from Compaction and MCP Runtime evidence.
 3. Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure.

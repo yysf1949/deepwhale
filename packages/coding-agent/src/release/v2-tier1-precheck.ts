@@ -54,7 +54,7 @@ export interface V2Tier1PrecheckInput {
 }
 
 export interface V2Tier1PrecheckResult {
-  slice: 'D130';
+  slice: 'D131';
   milestone: 'v2.0';
   tier: 'Tier-1';
   passed: boolean;
@@ -316,6 +316,54 @@ export const DEFAULT_V2_TIER1_PRECHECK_EVIDENCE: readonly V2Tier1EvidenceRef[] =
     layer: 'release-gate',
     note: 'D130 integration smoke coverage for compaction across supported protocol paths.',
   },
+  {
+    id: 'd131-mcp-client-source',
+    checkId: 'tier2-mcp-runtime',
+    path: 'packages/coding-agent/src/mcp/client.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D131 minimal coding-agent stdio JSON-RPC MCP client with initialize, tools/list, and tools/call roundtrip support.',
+  },
+  {
+    id: 'd131-mcp-runtime-source',
+    checkId: 'tier2-mcp-runtime',
+    path: 'packages/coding-agent/src/mcp/runtime.ts',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D131 existing opt-in capability registration path for MCP tool manifests.',
+  },
+  {
+    id: 'd131-mcp-client-test',
+    checkId: 'tier2-mcp-runtime',
+    path: 'packages/coding-agent/test/unit/mcp-client.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D131 client roundtrip test against the gh-search MCP server plus default-profile capability isolation.',
+  },
+  {
+    id: 'd131-mcp-runtime-test',
+    checkId: 'tier2-mcp-runtime',
+    path: 'packages/coding-agent/test/unit/mcp-runtime.test.ts',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D131 existing manifest registration remains opt-in only.',
+  },
+  {
+    id: 'd131-gh-search-server-source',
+    checkId: 'tier2-mcp-runtime',
+    path: 'packages/mcp-servers/gh-search/bin/gh-search-mcp.mjs',
+    kind: 'source',
+    layer: 'release-gate',
+    note: 'D131 existing gh-search MCP server (stdio JSON-RPC) used as the roundtrip target.',
+  },
+  {
+    id: 'd131-gh-search-server-test',
+    checkId: 'tier2-mcp-runtime',
+    path: 'packages/mcp-servers/gh-search/test/server.test.mjs',
+    kind: 'test',
+    layer: 'release-gate',
+    note: 'D131 existing server-side stdio JSON-RPC roundtrip tests.',
+  },
 ];
 
 const CHECK_ORDER: readonly V2Tier1PrecheckCheckId[] = [
@@ -357,13 +405,13 @@ const CHECK_CAVEATS: Record<V2Tier1PrecheckCheckId, string> = {
   'tier2-remote-tui': 'Remote TUI remains a separate Tier-2 blocker.',
   'tier2-compaction':
     'Compaction has implementation and integration evidence, but this does not complete v2.0.',
-  'tier2-mcp-runtime': 'MCP Runtime remains a separate Tier-2 blocker.',
+  'tier2-mcp-runtime':
+    'One-server stdio JSON-RPC transport proof; not a full multiplexed MCP runtime with auth, reconnect, HTTP/SSE, resources, prompts, or subscriptions.',
 };
 
 const BLOCKED_CHECKS: ReadonlyMap<V2Tier1PrecheckCheckId, string> = new Map([
   ['tier2-automation', 'Tier-2 Automation remains blocked'],
   ['tier2-remote-tui', 'Tier-2 Remote TUI remains blocked'],
-  ['tier2-mcp-runtime', 'Tier-2 MCP Runtime remains blocked'],
 ]);
 
 const NON_CODING_DEFAULT_PATTERNS: readonly RegExp[] = [
@@ -400,20 +448,20 @@ export function evaluateV2Tier1Precheck(input: V2Tier1PrecheckInput = {}): V2Tie
     ]),
   );
   return {
-    slice: 'D130',
+    slice: 'D131',
     milestone: 'v2.0',
     tier: 'Tier-1',
     passed,
     summary: passed
       ? 'v2.0 Tier-1 precheck passed.'
-      : 'v2.0 Tier-1 evidence and Tier-2 Compaction evidence are present, but v2.0 is not release-ready.',
+      : 'v2.0 Tier-1 evidence plus Tier-2 Compaction and MCP Runtime evidence are present, but v2.0 is not release-ready.',
     completedChecks: checks.filter((check) => check.status === 'pass').length,
     blockingChecks: checks.filter((check) => check.status !== 'pass').length,
     checks,
     blockers,
     nextActions: [
-      'D131: close another v2.0 Tier-2 blocker without expanding default exposure.',
-      'Keep remaining Tier-2 v2.0 blockers separate from Compaction evidence.',
+      'D132: close another remaining v2.0 Tier-2 blocker without expanding default exposure.',
+      'Keep remaining Tier-2 v2.0 blockers separate from Compaction and MCP Runtime evidence.',
       'Keep Browser, Desktop, Channel, media, and productivity tools out of non-coding default exposure.',
     ],
     defaultExposure,

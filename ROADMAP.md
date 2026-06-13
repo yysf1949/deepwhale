@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Roadmap mode: gate-driven stabilization + v2.0 Tier-1 implementation
-- Current sprint: D130 v2.0 Tier-2 Compaction closure
+- Current sprint: D131 v2.0 Tier-2 MCP Runtime closure
 - Current policy: freeze default non-coding expansion
 - Default registry: coding plus Code Intel essentials only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -108,9 +108,10 @@
 - D128 v2.0 Tier-1 release-gate hardening: a deterministic precheck now verifies D126 Browser helper evidence, D127 Memory Ranking evidence, D127 Code Intel semantic fallback evidence, and default-exposure invariants while keeping v2.0 blocked on production Browser automation, visual grounding, and Tier-2 proof.
 - D129 production Browser proof: a pure injected adapter contract now records an ordered Browser automation transcript plus visual snapshot metadata proof, moving production Browser automation and visual grounding to Tier-1 pass while keeping Tier-2 blockers explicit and defaults narrow.
 - D130 v2.0 Tier-2 Compaction closure: Compaction is now a pass row in the v2.0 precheck using core/session compaction, agent tool-loop compaction, print/RPC configuration paths, lifecycle hook tests, and cross-protocol smoke evidence while Automation, Remote TUI, and MCP Runtime remain blocked.
-- D131 v2.0 Tier-2 blocker closure: next planned slice, scoped to one remaining blocker and no default exposure expansion.
-- D132 v5.0 3rd-cycle depth: audit correlationId + policy-snapshot CLI command.
-- D133 v6.0 enterprise cross-bridge + distributed coordination seed: EnterprisePolicySnapshot + LeaderElector.
+- D131 v2.0 Tier-2 MCP Runtime closure: MCP Runtime is now a pass row in the v2.0 precheck using a one-server stdio JSON-RPC transport proof against the gh-search MCP server, opt-in capability registration, and client/server roundtrip tests while Automation and Remote TUI remain blocked.
+- D132 v2.0 Tier-2 blocker closure: next planned slice, scoped to one remaining blocker and no default exposure expansion.
+- D133 v5.0 3rd-cycle depth: audit correlationId + policy-snapshot CLI command.
+- D134 v6.0 enterprise cross-bridge + distributed coordination seed: EnterprisePolicySnapshot + LeaderElector.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Milestone Status
 
@@ -118,7 +119,7 @@
 | --- | --- | --- |
 | v1.0 | Mostly implemented coding baseline; fresh release gate proven 2026-06-10 (D-79) | Other v1-v4 milestones remain below 100% due to gate blockers (Gate-2 production proof, cross-platform Desktop, cross-platform SIGKILL) |
 | v1.5 | Code Intel foundation exists; preferred 100K Gate-1 evidence via React target (753K LOC) | rename_symbol is heuristic, not IDE-grade |
-| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence; D128 precheck makes Tier-1 status machine-readable; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row | Automation, Remote TUI, and MCP Runtime remain blocked |
+| v2.0 | Gate-1.5 binding achieved at 20/20; D126 Browser Tier-1 pure-function foundation covers DOM understanding, ranking, page summary, and action history; D127 adds explainable Memory Ranking and heuristic semantic fallback evidence; D128 precheck makes Tier-1 status machine-readable; D129 adds production Browser transcript and visual metadata proof; D130 closes the Compaction Tier-2 row; D131 closes the MCP Runtime Tier-2 row | Automation and Remote TUI remain blocked |
 | v2.5 | Planner, task DAG, and plan cache exist | Main-loop integration is limited |
 | v3.0 | Reviewer and Gate-2 live runner exist | Long-horizon proof must remain reproducible and scoped |
 | v4.0 | Researcher, TaskGraph, memory, and channel foundations exist | Agent OS orchestration, Desktop, and channels are not production-complete |
@@ -136,8 +137,8 @@
 
 ### Next Roadmap Work
 
-1. D130 v2.0 Tier-2 Compaction closure is complete at the precheck layer: Compaction evidence is machine-readable, while Automation, Remote TUI, and MCP Runtime remain blocked.
-2. Next implementation slice: D131 close another v2.0 Tier-2 blocker without expanding default exposure.
+1. D131 v2.0 Tier-2 MCP Runtime closure is complete at the precheck layer: one-server stdio MCP transport evidence is machine-readable, while Automation and Remote TUI remain blocked.
+2. Next implementation slice: D132 close another remaining v2.0 Tier-2 blocker without expanding default exposure.
 3. Gate-1 preferred-100K evidence remains blocked by missing local 100K+ target.
 4. Gate-2 production long-horizon proof remains a separate future blocker.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.

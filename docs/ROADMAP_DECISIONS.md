@@ -8,7 +8,7 @@
 - Package version line: 2.3.0
 - Release/version hygiene report: docs/superpowers/release-version-hygiene.json
 - Decision mode: stabilization first, expansion later
-- Current sprint: D130 v2.0 Tier-2 Compaction closure
+- Current sprint: D131 v2.0 Tier-2 MCP Runtime closure
 - Default registry: coding plus Code Intel essentials only
 - Non-coding tools: explicit opt-in only
 - Browser, Desktop, Channel, media, and productivity remain opt-in or stopped, not default-enabled.
@@ -118,6 +118,7 @@
 - D128 v2.0 Tier-1 release-gate hardening: a deterministic precheck now verifies D126 Browser helper evidence, D127 Memory Ranking evidence, D127 Code Intel semantic fallback evidence, and default-exposure invariants while keeping v2.0 blocked on production Browser automation, visual grounding, and Tier-2 proof.
 - D129 production Browser proof: a pure injected adapter contract now records an ordered Browser automation transcript plus visual snapshot metadata proof, moving production Browser automation and visual grounding to Tier-1 pass while keeping Tier-2 blockers explicit and defaults narrow.
 - D130 v2.0 Tier-2 Compaction closure: Compaction is now a pass row in the v2.0 precheck using core/session compaction, agent tool-loop compaction, print/RPC configuration paths, lifecycle hook tests, and cross-protocol smoke evidence while Automation, Remote TUI, and MCP Runtime remain blocked.
+- D131 v2.0 Tier-2 MCP Runtime closure: MCP Runtime is now a pass row in the v2.0 precheck using a one-server stdio JSON-RPC transport proof against the gh-search MCP server, opt-in capability registration, and client/server roundtrip tests while Automation and Remote TUI remain blocked.
 - Current tracked worktree policy: preserve unrelated untracked plan files and do not stage them unless explicitly adopted.
 ### Decision Hygiene
 
@@ -135,8 +136,8 @@
 
 ### Next Decisions Needed
 
-1. D130 v2.0 Tier-2 Compaction closure is complete at the precheck layer: Compaction evidence is machine-readable, while Automation, Remote TUI, and MCP Runtime remain blocked.
-2. Next implementation slice: D131 close another v2.0 Tier-2 blocker without expanding default exposure.
+1. D131 v2.0 Tier-2 MCP Runtime closure is complete at the precheck layer: one-server stdio MCP transport evidence is machine-readable, while Automation and Remote TUI remain blocked.
+2. Next implementation slice: D132 close another remaining v2.0 Tier-2 blocker without expanding default exposure.
 3. Keep Browser default exposure narrow; Gate-1.5 binding unlocks enhancement work, not broad default Browser automation.
 4. Continue v1-v4 completion only through verified gates.
 5. v5/v6 seed work exists, but v1-v4 completion remains gate-driven and incomplete.
